@@ -1,8 +1,68 @@
-.th01-touch-player{position:relative}.th01-touch-player .screen{isolation:isolate}.th01-touch-surface{position:absolute;inset:0;z-index:3;touch-action:none;user-select:none;-webkit-user-select:none}.th01-touch-hint{position:absolute;left:50%;top:10px;transform:translateX(-50%);pointer-events:none;z-index:4;color:#eee8;background:#1118;border-radius:8px;padding:4px 8px;font-size:11px}
-.th01-touch-player [data-touch-control]{position:absolute;z-index:6;width:68px;height:60px;padding:6px 9px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;border:1px solid #ffffff25;border-radius:16px;background:#20161db3;color:#fff;transform:translate(-50%,-50%) scale(var(--touch-scale,1));transform-origin:center;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;box-shadow:0 3px 10px #0004}
-.th01-touch-player [data-touch-control] strong{font:700 15px/1.2 "Microsoft YaHei",sans-serif}.th01-touch-player [data-touch-control] small{font:10px/1.2 sans-serif;color:#ddd}.th01-touch-player [data-touch-control=bomb]{border-radius:50%;width:66px;height:66px;border-color:#ffb9c855;background:#4a1824b3}.th01-touch-player [data-touch-control=pause]{width:62px;height:42px;border-radius:9px}.th01-touch-player [data-touch-control].pressed{background:#a53254c9}.th01-touch-player [data-touch-control]:disabled{opacity:.35}.th01-touch-player [data-touch-control]:focus-visible{outline:2px solid #ffe6ee;outline-offset:3px}.touch-toggle[aria-pressed=true]{color:#ffd4e3;border-color:#d991ac}
-.touch-resize{display:none}.touch-editing .touch-resize{position:absolute;display:grid;place-items:center;right:-8px;bottom:-8px;width:25px;height:25px;border-radius:50%;background:#b13861;color:#fff;font:14px sans-serif}.touch-editing [data-touch-control]{outline:1px dashed #fff;cursor:move;z-index:12}.touch-editing [data-touch-control].touch-selected{outline:2px solid #ffc8de;box-shadow:0 0 0 3px #902c52}
-.th01-touch-editor{position:relative;z-index:15;display:flex;flex-direction:column;padding:14px;background:#282024;border-top:1px solid #624453;color:#eee;max-height:60dvh;font-size:13px}.th01-touch-editor header{display:flex;justify-content:space-between;align-items:center}.th01-touch-editor header span{color:#deb2c3;font-size:11px}.th01-touch-editor .touch-editor-body{overflow:auto;overscroll-behavior:contain;min-height:0}.th01-touch-editor p{font-size:11px;line-height:1.5;color:#bfadb4}.th01-touch-editor label{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}.th01-touch-editor select{padding:6px;min-width:95px}.th01-touch-editor input[type=range]{flex:1;min-width:90px;accent-color:#efb3c8;touch-action:pan-x}.th01-touch-editor output{width:42px}.th01-touch-editor footer{display:flex;gap:8px;margin:6px 0 0}.th01-touch-editor footer button{min-height:42px;flex:1;padding:6px}.th01-touch-editor [data-save]{background:#efb3c8;color:#351621}
-.th01-immersive-page{overflow:hidden}.th01-touch-player.th01-immersive,.th01-touch-player:fullscreen{position:fixed;inset:0;width:100%;height:100dvh;margin:0;max-width:none;display:flex;flex-direction:column;border:0;border-radius:0;background:#000;z-index:100}.th01-immersive .screen{flex:1;min-height:0;aspect-ratio:auto}.th01-immersive .screen canvas{width:100%;height:100%;object-fit:contain}.th01-immersive .toolbar{flex:none;padding:5px max(8px,env(safe-area-inset-right)) 5px max(8px,env(safe-area-inset-left))}.th01-immersive .toolbar>div{flex-wrap:wrap;justify-content:flex-end}.th01-immersive .toolbar button{min-height:36px}.th01-immersive #seat-note,.th01-immersive #session-settings,.th01-immersive #menu-note:empty{display:none}.th01-immersive .coop-hud{font-size:10px;padding:2px 6px;gap:4px}.th01-immersive .th01-touch-editor{position:absolute;top:48px;left:50%;transform:translateX(-50%);width:min(290px,94%);max-height:calc(100dvh - 58px);border:1px solid #624453;border-radius:12px;box-shadow:0 8px 26px #0009}.th01-immersive .th01-touch-hint{display:none}
-@media(max-width:650px){.th01-touch-player [data-touch-control]{width:60px;height:54px}.th01-touch-player [data-touch-control] strong{font-size:14px}.th01-touch-player [data-touch-control=bomb]{width:60px;height:60px}.th01-touch-player .toolbar>div{flex-wrap:wrap}.th01-touch-player .toolbar button{min-height:38px}.th01-touch-editor{padding:12px}}
-@media(max-height:500px){.th01-immersive .toolbar #status{max-width:30%;font-size:10px}.th01-immersive .toolbar button{padding:4px 7px;min-height:32px;font-size:11px}.th01-immersive .coop-hud{max-height:40px;overflow:auto}.th01-immersive .th01-touch-editor{top:38px;max-height:calc(100dvh - 46px)}}
+/* TH03/TH04 floating controls, adapted to horizontal TH01 movement. */
+.th01-touch-player{position:relative}
+.th01-touch-player [hidden]{display:none!important}
+.th01-touch-player .screen{isolation:isolate}
+#player.touch-enabled .screen{touch-action:none}
+.th01-touch-safe-zone{position:absolute;inset:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));pointer-events:none;z-index:4}
+.touch-editing .th01-touch-safe-zone{border:1px dashed #ffffff2e;border-radius:12px}
+#player [data-touch-control]{position:absolute;width:86px;height:42px;min-height:0;padding:6px 10px;display:flex;align-items:flex-start;justify-content:center;flex-direction:column;gap:4px;border:0;border-radius:11px;background:#1417138f;color:#f4eee5;transform:translate(-50%,-50%) scale(var(--touch-scale,1));transform-origin:center;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 12px #0004,inset 0 0 0 1px #ffffff09;transition:none}
+#player [data-touch-control] strong{font:700 13px/1.1 system-ui}
+#player [data-touch-control] small{font:9px/1 system-ui;color:#b7b8ac}
+#player [data-touch-control=bomb]{border-radius:50%;width:66px;height:66px;align-items:center;background:#33191d94}
+#player [data-touch-control=bomb] strong{color:#ff858e;font:700 16px/1 Georgia}
+#player [data-touch-control=pause]{width:42px;height:42px;padding:0;align-items:center;opacity:.75}
+#player [data-touch-control=pause] strong{font-size:11px}
+#player [data-touch-control=pause] small{display:none}
+#player :is([data-touch-control=left],[data-touch-control=right],[data-touch-control=up],[data-touch-control=down]){width:44px;height:40px;align-items:center}
+#player.touch-gameplay :is([data-touch-control=left],[data-touch-control=right]){width:72px;height:56px;align-items:center}
+#player.touch-gameplay :is([data-touch-control=left],[data-touch-control=right]) strong{font-size:24px}
+#player [data-touch-control=confirm]{width:64px;height:42px;align-items:center}
+#player [data-touch-control].pressed{background:#5b1b259e}
+#player [data-touch-control]:disabled{opacity:.3}
+#player [data-touch-control]:focus-visible{outline:2px solid #e6b3bf;outline-offset:3px}
+.touch-toggle[aria-pressed=true]{color:#ffd4e3;border-color:#d991ac}
+.touch-resize{display:none}
+.touch-editing .touch-resize{position:absolute;display:grid;place-items:center;right:-8px;bottom:-8px;width:24px;height:24px;border-radius:50%;background:#a93243;color:#fff;font:14px sans-serif}
+#player.touch-editing [data-touch-control]{outline:1px dashed #eee;cursor:move}
+#player.touch-editing [data-touch-control].touch-selected{outline:2px solid #fff;box-shadow:0 0 0 3px #d94d55}
+#player .touch-help-open,#player .touch-full-open{display:none;position:absolute;z-index:40;top:max(10px,env(safe-area-inset-top));height:42px;min-height:0;padding:0 10px;background:#121511d1;border:0;border-radius:10px;color:#eee;font:12px system-ui}
+#player .touch-help-open{right:max(62px,calc(env(safe-area-inset-right) + 62px))}
+#player .touch-full-open{right:max(10px,env(safe-area-inset-right));width:42px;font-size:22px;padding:0}
+#player:is(.touch-enabled,.th01-immersive) .screen>.touch-help-open,#player:is(.touch-enabled,.th01-immersive) .screen>.touch-full-open{display:inline-flex}
+#player.touch-editing .touch-help-open{opacity:.5}
+#player.touch-enabled:not(.th01-immersive) .screen{height:clamp(280px,65dvh,680px);aspect-ratio:auto}
+#player .th01-touch-editor{position:absolute;z-index:50;width:min(288px,calc(100% - 20px));max-height:calc(100% - 16px);display:flex;flex-direction:column;padding:0;margin:0;border:1px solid #ffffff16;border-radius:18px;background:#191a17;color:#eee9e1;box-shadow:0 14px 42px #0005;font:400 12px/1.5 system-ui;overflow:hidden}
+#player .th01-touch-editor header{display:flex;flex:none;gap:8px;padding:5px 12px;align-items:center;touch-action:none;cursor:move;user-select:none}
+#player .th01-touch-editor header strong{font-size:14px}
+#player .th01-touch-editor header span{margin-left:auto;color:#b7b8ac;font-size:11px}
+#player .th01-touch-editor [data-collapse]{height:40px;width:34px;min-height:0;padding:0;background:none;font-size:20px}
+.touch-editor-content{display:flex;flex-direction:column;min-height:0}
+#player .th01-touch-editor .touch-editor-body{overflow:auto;overscroll-behavior:contain;min-height:0;padding:0 14px;scrollbar-width:thin}
+#player .th01-touch-editor p{font-size:11px;line-height:1.6;color:#999b8d}
+#player .th01-touch-editor label{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;font-size:11px}
+#player .th01-touch-editor select{padding:6px;min-width:0;min-height:32px;flex:1;background:#292b25;border:0;border-radius:8px}
+#player .th01-touch-editor input[type=range]{flex:1;min-width:90px;height:34px;min-height:0;padding:0;accent-color:#e6b3bf;touch-action:pan-x}
+#player .th01-touch-editor input[type=checkbox]{width:16px;height:16px;min-height:0;padding:0;accent-color:#e6b3bf}
+#player .th01-touch-editor output{width:36px;color:#e6b3bf}
+#player .th01-touch-editor button{min-height:34px;padding:6px 8px;border:0;border-radius:8px;background:#292b25;color:#c9cbbb;font-size:11px;touch-action:manipulation}
+.touch-editor-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#player .th01-touch-editor footer{display:flex;flex:none;gap:8px;padding:10px 14px;margin:0;border:0}
+#player .th01-touch-editor footer button{min-height:40px;flex:1}
+#player .th01-touch-editor [data-save]{background:#f1e4e6;color:#a93243}
+#player .touch-system-settings .toolbar{padding:0;margin:12px 0;background:none}
+#player .touch-system-settings .toolbar>div{display:flex;width:100%;gap:6px;flex-wrap:wrap}
+#player .touch-system-settings .toolbar button{flex:1 1 auto}
+#player .touch-system-settings :is(#status,.toolbar>span,.touch-layout-open,#fullscreen){display:none}
+#player .touch-system-settings .music-controls{margin:10px 0;padding:0;background:none;font-size:11px}
+#player .touch-system-settings .music-controls span{flex-basis:100%}
+/* Fullscreen is the game surface, with no space reserved for page chrome. */
+.th01-immersive-page{overflow:hidden}
+#player.th01-immersive,#player:fullscreen{position:fixed;inset:0;width:100%;height:100dvh;max-width:none;margin:0;padding:0;border:0;border-radius:0;background:#000;z-index:100;display:block}
+#player.th01-immersive>.screen{position:absolute;inset:0;width:100%;height:100%;min-height:0;aspect-ratio:auto}
+#player.th01-immersive .screen canvas{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain}
+#player.th01-immersive>:is(.toolbar,.music-controls,.coop-hud,#seat-note,#session-settings,#debug-runtime,#menu-note,#coop-menu-note){display:none}
+#player.th01-immersive #continue-game{position:absolute;z-index:41;left:50%;bottom:max(12px,env(safe-area-inset-bottom));transform:translateX(-50%);margin:0}
+#player.th01-immersive #fallback{position:absolute;z-index:45;left:50%;top:50%;transform:translate(-50%,-50%);width:min(440px,90%);border-radius:14px}
+#player.th01-immersive #cover{z-index:2}
+@media(max-width:760px){#player [data-touch-control]{width:80px;height:40px}#player [data-touch-control=bomb]{width:60px;height:60px}#player .touch-help-open{right:max(56px,calc(env(safe-area-inset-right) + 56px));height:40px}#player .touch-full-open{width:40px;height:40px}}
+@media(max-height:500px){#player .th01-touch-editor{width:min(288px,calc(100% - 20px))}#player .th01-touch-editor label{margin:8px 0}}

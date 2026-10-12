@@ -1,31 +1,25 @@
-// Browser gestures become ordinary horizontal buttons, sampled by the caller.
+// Touch buttons become ordinary input bits, sampled by the caller.
 // No vertical movement, position writes or native updates run on pointer events.
 export const TOUCH_BOMB=4096;
-const clamp=(n,lo,hi)=>Math.max(lo,Math.min(hi,n));
+// phase 0 also covers a nonfatal miss animation. Native flags distinguish it
+// from title/route/score menus without guessing from the animation duration.
+export function readHitRecovery(view,bridge,offsets){
+  if(!offsets||!['PLAYER_IS_HIT','STAGE_CLEARED','GAME_CLEARED','REM_LIVES'].every(name=>Number.isInteger(offsets[name])))return false;
+  return view.getUint16(bridge+18,true)===0&&view.getUint16(bridge+210,true)===0&&
+    !!view.getUint8(bridge+offsets.PLAYER_IS_HIT)&&!view.getUint16(bridge+offsets.STAGE_CLEARED,true)&&
+    !view.getUint8(bridge+offsets.GAME_CLEARED)&&view.getInt16(bridge+offsets.REM_LIVES,true)>0;
+}
 export class HorizontalTouchInput{
   constructor(){this.reset();}
-  reset(){this.drag=null;this.held=new Map();this.pulses=0;}
-  start(id,x,left,scale,gain=1.5){
-    if(this.drag||!Number.isFinite(left)||!(scale>0))return false;
-    this.drag={id,x,target:left,scale,gain};return true;
-  }
-  move(id,x){
-    if(this.drag?.id!==id)return;
-    const d=this.drag;d.target=clamp(d.target+(x-d.x)*d.gain/d.scale,0,608);d.x=x;
-  }
-  end(id){if(this.drag?.id===id)this.drag=null;this.held.delete(id);}
-  press(id,bits,{pulseOnly=false}={}){
-    this.pulses|=bits;
+  reset(){this.held=new Map();this.pulses=0;}
+  end(id){this.held.delete(id);}
+  press(id,bits,{pulseOnly=false,menu=false}={}){
+    this.pulses|=menu?bits:bits&~3;
     this.held.set(id,pulseOnly?0:bits);
   }
   sample(left,{play=true,ghost=false}={}){
     let bits=this.pulses;this.pulses=0;
     for(const value of this.held.values())bits|=value;
-    if(play&&this.drag&&Number.isFinite(left)){
-      const distance=this.drag.target-left;
-      // Native regular movement is four pixels/frame. Avoid alternating keys at rest.
-      bits&=~3;if(Math.abs(distance)>4)bits|=distance<0?1:2;
-    }
     if(play&&ghost)bits&=~(4|8|TOUCH_BOMB);
     return bits;
   }

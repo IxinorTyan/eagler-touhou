@@ -48,7 +48,7 @@ const touchControls=mountTouchControls({player:$('player'),screen:$('screen'),ca
   toolbar:$('fullscreen').parentElement,fullscreenButton:$('fullscreen'),
   getContext:()=>{
     const state=session?.game.state(),slot=session?.slot??0,p=state?.players?.[slot];
-    return {active:!!session?.running,play:[1,2].includes(state?.phase),phase:state?.phase,
+    return {active:!!session?.running,play:[1,2].includes(state?.phase),phase:state?.phase,stage:state?.stage,recovering:state?.recovering,menu:state?.coopMenu>0,
       key:`${slot}:${state?.stage??0}:${state?.phase??'boot'}`,slot,left:p?.left,ghost:p?.ghost,bombs:p?.bombs,canMenu:identity?.role==='host'};
   },onGesture:()=>session?.game.unlockAudio()});
 addEventListener('keydown',e=>{

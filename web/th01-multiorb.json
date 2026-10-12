@@ -49,5 +49,11 @@
     "commit": "28d59d31331e27fcbe61d1b65bd8c0cd618757d8"
   },
   "compiler": "Borland C++ 4.52 / TASM32 5.2",
-  "baseline": false
+  "baseline": false,
+  "touch_state": {
+    "PLAYER_IS_HIT": -84,
+    "STAGE_CLEARED": 3814,
+    "GAME_CLEARED": 3816,
+    "REM_LIVES": -74
+  }
 }

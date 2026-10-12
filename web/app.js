@@ -3,7 +3,7 @@ import {sha256} from './netplay/sha256.js';
 import {installQA} from './qa.js';
 import {createCoopControls,createCoopFeedback,readCoopState,coopInputOffset} from './coop.js';
 import {mountTouchControls} from './touch-controls.js';
-import {TOUCH_BOMB} from './touch-input.js';
+import {TOUCH_BOMB,readHitRecovery} from './touch-input.js';
 import {createPresentationLimiter,nextPerformanceMode,performanceModeLabel} from './performance-mode.js';
 import {createFrameGate} from './frame-limit.js';
 import {mountBossBalance,bossBalanceText} from './boss-balance.js';
@@ -89,7 +89,7 @@ function syncTouchInputs(){
 touchControls=mountTouchControls({player:$('player'),screen:$('screen'),canvas:$('canvas'),
   toolbar:$('fullscreen').parentElement,fullscreenButton:$('fullscreen'),getContext:()=>{
     const state=nativeState(),p=state?.players?.[touchSlot];
-    return {active:emulator?.state==='running',play:[1,2].includes(state?.phase),phase:state?.phase,
+    return {active:emulator?.state==='running',play:[1,2].includes(state?.phase),phase:state?.phase,stage:state?.stage,recovering:state?.recovering,menu:state?.coopMenu>0,
       key:`${touchSlot}:${state?.stage??0}:${state?.phase??'boot'}`,slot:touchSlot,
       left:p?.left??state?.playerLeft,ghost:p?.ghost,bombs:baseline?0:p?.bombs??state?.playerBombs,
       canMenu:true,players:sessionSettings?.players,localCoop:sessionSettings?.players>1};
@@ -179,7 +179,7 @@ function nativeState(){
     const pos=at+44+i*12;
     balls.push({x:v.getInt16(pos,true),y:v.getInt16(pos+2,true),vx:v.getInt16(pos+4,true)/256,vy:v.getInt16(pos+6,true)/256,portal:!!v.getUint16(pos+8,true)});
   }
-  return {phase,stage,count,ticks:v.getUint32(at+20,true),ack:v.getUint16(at+32,true),launchAge:v.getUint16(at+34,true),collisions:v.getUint32(at+36,true),armedPairs:v.getUint32(at+40,true),invincible:!!v.getUint16(at+142,true),balls,players:baseline?null:readCoopState(v,at),playerLeft:baseline?undefined:v.getInt16(at+186,true),playerBombs:baseline?undefined:v.getInt16(at+190,true),coopMenu:baseline?0:v.getUint16(at+210,true),continueRequested:baseline?false:!!v.getUint16(at+212,true),
+  return {phase,stage,count,recovering:!baseline&&readHitRecovery(v,at,manifest?.touch_state),ticks:v.getUint32(at+20,true),ack:v.getUint16(at+32,true),launchAge:v.getUint16(at+34,true),collisions:v.getUint32(at+36,true),armedPairs:v.getUint32(at+40,true),invincible:!!v.getUint16(at+142,true),balls,players:baseline?null:readCoopState(v,at),playerLeft:baseline?undefined:v.getInt16(at+186,true),playerBombs:baseline?undefined:v.getInt16(at+190,true),coopMenu:baseline?0:v.getUint16(at+210,true),continueRequested:baseline?false:!!v.getUint16(at+212,true),
     samples:baseline?0:v.getUint32(at+214,true),profile:Array.from({length:7},(_,i)=>v.getUint32(at+146+i*4,true)),cardHits:v.getUint32(at+174,true),activeItems:v.getUint16(at+178,true)};
 }
 

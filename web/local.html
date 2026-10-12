@@ -15,7 +15,7 @@
     <label>启用玉数 · 影响 Boss 减伤<select id="count" aria-describedby="orbs-boss-note boss-balance-summary"><option value="1">1 玉 · 原作</option><option value="2">2 玉 · 上 / 下</option><option value="3">3 玉 · 左 / 右 / 下</option><option value="4">4 玉 [灵异阴阳玉]</option><option value="6">6 玉 [阴阳神玉]</option><option value="8">8 玉 [阴阳窒息]</option></select><small id="orbs-boss-note" class="boss-choice-note">每多 1 玉，耐久系数增加 15%</small></label>
     </div>
     <div class="casual-settings"><label class="check-option"><input id="life-compensation" type="checkbox" checked aria-describedby="life-compensation-note">多玉生命补偿</label><p id="life-compensation-note" aria-live="polite"></p><small>全员阵亡可不限次数续关，恢复各自初始残机和 Bomb。</small></div>
-    <div class="row launch-toolbar"><button id="start" class="primary">开始本地合作 →</button><span class="muted">触屏布局、灵敏度可在“按键与触控”中调整。</span></div>
+    <div class="row launch-toolbar"><button id="start" class="primary">开始本地合作 →</button><span class="muted">触屏布局、按键大小可在“按键与触控”中调整。</span></div>
     <div class="boss-balance-note"><p id="boss-balance-summary" aria-live="polite"></p><p>Boss 血量格保持原样，玉与 Bomb 都按倍率减伤，伤害累计满一格才扣血；每次命中仍有闪白与音效。倍率在 Boss 入场时固定，成为幽灵或获救不会改变它。</p></div>
     <details class="debug-disclosure"><summary>调试设置</summary><fieldset class="debug-settings">
       <legend>调试设置</legend>
@@ -40,7 +40,7 @@
     <div id="coop-hud" class="coop-hud" hidden aria-live="polite"><span id="p1-hud"></span><span id="p2-hud"></span><span id="p3-hud" hidden></span></div>
     <div class="screen" id="screen"><canvas id="canvas" width="640" height="400" tabindex="0" aria-label="东方灵异传游戏画面"></canvas><div id="coop-markers" hidden aria-hidden="true"><span id="p1-marker">P1</span><span id="p2-marker">P2</span><span id="p3-marker" hidden>P3</span></div><div id="cover">东方靈異伝<small>选择模式、难度与玉数，开始新的游戏</small></div></div>
   </section>
-  <details class="controls-help"><summary>按键、触控与合作救援</summary><p class="controls">P1：← → 移动 · Z 发射 / 确认 · X 御币 / 滑铲 · Esc 原作暂停<br>P2：A / D 移动 · J 发射 · K 御币 / 滑铲<br>P3：F / H 移动 · T 发射 · Y 御币 / 滑铲<br>触屏：单指横向拖动，射击 / 御币和 Bomb 各有独立按钮；本地合作可在“按键与触控”中选择 P1 / P2 / P3。<br>键盘 Bomb：各自射击 / 御币键连续组合，或同时按住左右与射击键。<br>合作救援：残机耗尽后成为幽灵，碰到活着的队友立即复活，阴阳玉不会救援；过关自动救起，全员都成为幽灵才结束。</p></details>
+  <details class="controls-help"><summary>按键、触控与合作救援</summary><p class="controls">P1：← → 移动 · Z 发射 / 确认 · X 御币 / 滑铲 · Esc 原作暂停<br>P2：A / D 移动 · J 发射 · K 御币 / 滑铲<br>P3：F / H 移动 · T 发射 · Y 御币 / 滑铲<br>触屏：按住左／右按钮移动，射击 / 御币和 Bomb 各有独立按钮；本地合作可在“按键与触控”中选择 P1 / P2 / P3。<br>键盘 Bomb：各自射击 / 御币键连续组合，或同时按住左右与射击键。<br>合作救援：残机耗尽后成为幽灵，碰到活着的队友立即复活，阴阳玉不会救援；过关自动救起，全员都成为幽灵才结束。</p></details>
   <details><summary>运行状态</summary><pre id="diagnostics">游戏尚未启动。</pre><pre id="runtime">尚未进入关卡。</pre></details>
   <footer class="footer"><a href="index.html">← 返回启动器</a><span>TH01 · HIGHLY RESPONSIVE TO PRAYERS</span></footer>
 </main>

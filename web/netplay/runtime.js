@@ -1,7 +1,7 @@
 import {NP21} from '../vendor/np2/np2-wasm.js';
 import {sha256} from './sha256.js';
 import {readCoopState,coopInputOffset} from '../coop.js';
-import {TOUCH_BOMB} from '../touch-input.js';
+import {TOUCH_BOMB,readHitRecovery} from '../touch-input.js';
 import {createPresentationLimiter} from '../performance-mode.js';
 import {NativeMusic,NetplayMusic} from './local-music.js';
 
@@ -22,6 +22,7 @@ export class GameRuntime{
     progress('加载并校验游戏和联机运行时…');
     const get=async path=>{const r=await fetch(path,{cache:'no-store'});if(!r.ok)throw Error(`资源读取失败：${path}`);return r;};
     const meta=await (await get('th01-multiorb.json')).json();
+    this.touchStateOffsets=meta.touch_state;
     const version=await (await get('netplay/runtime.json')).json();
     for(const [name,hash] of Object.entries(version.files)){
       const bytes=new Uint8Array(await (await get(name)).arrayBuffer());
@@ -96,6 +97,7 @@ export class GameRuntime{
     if(!this.emulator||!this.valid(this.bridge))return null;
     const v=this.view(),b=this.bridge,count=v.getUint16(b+26,true);
     const state={phase:v.getUint16(b+18,true),stage:v.getUint16(b+24,true),count,
+      recovering:readHitRecovery(v,b,this.touchStateOffsets),
       ticks:v.getUint32(b+20,true),samples:v.getUint32(b+214,true),
       coopMenu:v.getUint16(b+210,true)};
     if(detail){state.players=readCoopState(v,b);state.balls=Array.from({length:count},(_,i)=>({x:v.getInt16(b+44+i*12,true),y:v.getInt16(b+46+i*12,true)}));}
