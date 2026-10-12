@@ -15,7 +15,6 @@ const updateLifeCompensation=mountLifeCompensation();
 let identity,room,session,polling=false,leaving=false,busy=false,editing=false,capabilities;
 const initialMode=readNetworkMode();
 for(const id of ['network','transport','ice'])$(id).value=initialMode[id];
-if(initialMode.network==='public')$('delay').value='6';
 $('code').value=new URLSearchParams(location.search).get('room')?.match(/^\d{4}$/)?.[0]||'';
 function networkPresentation(value){
   const pub=value.network==='public',rtc=value.transport==='rtc';
@@ -25,7 +24,7 @@ function networkPresentation(value){
   $(pub?'public-link':'lan-link').setAttribute('aria-current','page');
   $('ice-field').hidden=!pub||!rtc;
   $('mode-note').textContent=pub?'优先 UDP 打洞，可选 TURN 中继或 TCP 转发。':'同一局域网内默认 UDP 直连。';
-  $('network-help').textContent=pub?'全员打开同一个公网 HTTPS 地址。自动模式使用 STUN 打洞，配置 TURN 后可兜底；公网默认缓冲 6 帧，等待较多时可增加。公网隧道只提供网页与信令入口，打洞失败可重建房间改用 TURN 或 TCP 转发。':'全员打开服务窗口里的同一个局域网地址，默认缓冲 3 帧。';
+  $('network-help').textContent=pub?'全员打开同一个公网 HTTPS 地址。自动模式使用 STUN 打洞，配置 TURN 后可兜底；输入缓冲默认在开局时测量并选择，三人模式计入经房主转发的延迟。公网隧道只提供网页与信令入口，打洞失败可重建房间改用 TURN 或 TCP 转发。':'全员打开服务窗口里的同一个局域网地址，输入缓冲默认在开局时测量并选择。';
   $('network-capabilities').textContent=!pub?'':!capabilities?'正在检查公网打洞配置…':`STUN：${capabilities.publicStunCount?'已启用':'未配置'} · TURN：${capabilities.turnConfigured?'已配置（开始连接时验证）':'未配置；自动模式仍会尝试直接打洞，强制 TURN 需先运行 configure-turn.bat'}`;
   $('retry-turn').hidden=!pub||!capabilities?.turnConfigured;
 }
@@ -43,24 +42,26 @@ $('fullscreen').parentElement.append(performanceButton);
 performanceButton.onclick=()=>{const mode=nextPerformanceMode();performanceButton.textContent=performanceModeLabel(mode);session?.game.setPresentationMode(mode);};
 function held(){let bits=0;for(const key of keys)bits|=keyBits[key]||0;return bits;}
 function buttons(){const bits=held()|taps|commands|touchControls.sample();taps=commands=0;return bits;}
-function clear(){keys.clear();taps=commands=0;touchControls.reset();}
+function inputChanged(){session?.pump();}
+function clear(){keys.clear();taps=commands=0;touchControls.reset();inputChanged();}
+// Register first: the touch controller's blur reset also wakes input sampling.
+addEventListener('blur',clear);
 const touchControls=mountTouchControls({player:$('player'),screen:$('screen'),canvas:$('canvas'),
   toolbar:$('fullscreen').parentElement,fullscreenButton:$('fullscreen'),
   getContext:()=>{
     const state=session?.game.state(),slot=session?.slot??0,p=state?.players?.[slot];
     return {active:!!session?.running,play:[1,2].includes(state?.phase),phase:state?.phase,stage:state?.stage,recovering:state?.recovering,menu:state?.coopMenu>0,
       key:`${slot}:${state?.stage??0}:${state?.phase??'boot'}`,slot,left:p?.left,ghost:p?.ghost,bombs:p?.bombs,canMenu:identity?.role==='host'};
-  },onGesture:()=>session?.game.unlockAudio()});
+  },onChange:inputChanged,onGesture:()=>session?.game.unlockAudio()});
 addEventListener('keydown',e=>{
   if(!session||e.target.closest('input,select,textarea')||!keyBits[e.code])return;
   e.preventDefault();e.stopImmediatePropagation();
-  if(!keys.has(e.code))taps|=keyBits[e.code];keys.add(e.code);
+  if(!keys.has(e.code)){taps|=keyBits[e.code];keys.add(e.code);inputChanged();}
 },true);
 addEventListener('keyup',e=>{
   if(!keyBits[e.code])return;
-  keys.delete(e.code);if(session){e.preventDefault();e.stopImmediatePropagation();}
+  const changed=keys.delete(e.code);if(session){e.preventDefault();e.stopImmediatePropagation();if(changed)inputChanged();}
 },true);
-addEventListener('blur',clear);
 document.addEventListener('visibilitychange',()=>{if(document.hidden){clear();session?.game.emulator?.module.netFlushAudio();}});
 document.addEventListener('focusin',e=>{if(e.target.closest('input,select,textarea'))clear();});
 async function post(action,data={}){
@@ -74,7 +75,7 @@ function showRoom(value){
   const host=identity.role==='host',lobby=room.phase==='lobby';
   $('room-title').textContent=`合作房间 · 你是 P${room.seats[identity.role]+1}${host?'（房主）':''}`;
   $('room-code').textContent=room.room;
-  $('room-settings').textContent=`${['Easy','Normal','Hard','Lunatic'][room.settings.rank]} · ${room.settings.players} 人 · ${room.settings.count} 玉 · ${bossBalanceText(room.settings.players,room.settings.count)} · ${lifeCompensationText(room.settings.count,room.settings.lifeCompensation??true)} · 允许续关 · ${describeNetwork({...room.settings,transport:room.transport})} · 缓冲 ${room.settings.delay} 帧`;
+  $('room-settings').textContent=`${['Easy','Normal','Hard','Lunatic'][room.settings.rank]} · ${room.settings.players} 人 · ${room.settings.count} 玉 · ${bossBalanceText(room.settings.players,room.settings.count)} · ${lifeCompensationText(room.settings.count,room.settings.lifeCompensation??true)} · 允许续关 · ${describeNetwork({...room.settings,transport:room.transport})} · ${room.settings.delay===0?'自动输入缓冲':`缓冲 ${room.settings.delay} 帧`}`;
   $('members').dataset.players=room.settings.players;
   $('members').replaceChildren(...roles.slice(0,room.settings.players).map(role=>{
     const card=document.createElement('article');card.className='seat-card';
@@ -99,7 +100,7 @@ async function accept(value){
     session.game.setMusicVolume?.(Number($('music-volume').value)/100);
     session.game.onMusicStatus=text=>{$('music-status').textContent=text;};
     window.th01Net={get session(){return session;},get room(){return room;},
-      ...(room.settings.qa&&identity.role==='host'?{qa(bit){commands|=bit;}}:{})};
+      ...(room.settings.qa&&identity.role==='host'?{qa(bit){commands|=bit;inputChanged();}}:{})};
     try{await session.prepare();}catch(error){session.fail(error);return;}
   }
   for(const message of value.signals||[])await session?.receiveSignal(message);
@@ -158,7 +159,7 @@ $('settings').onclick=()=>{
     button.onclick=()=>action(async()=>{const value=await post('settings',{settings:config()});editing=false;await accept(value);});configPanel.append(button);
   }
 };
-$('continue-game').onclick=()=>{commands|=256;$('canvas').focus();};
+$('continue-game').onclick=()=>{commands|=256;$('canvas').focus();inputChanged();};
 async function returnToEntry(mode=room.settings){
   leaving=true;session?.close();
   try{await post('leave');}finally{identity=null;location.href='lan.html?'+networkParams(mode);}

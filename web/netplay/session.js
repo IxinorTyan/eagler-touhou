@@ -7,6 +7,7 @@ import {describeNetwork} from './network-mode.js';
 
 const ROLES=['host','guest','guest2'],TICK=1000/60;
 const HASH_INTERVAL=120,HASH_WINDOW=2*HASH_INTERVAL,DISCONNECT_GRACE=10000;
+const BUFFER_PROBES=5,BUFFER_PROBE_TICK=120,BUFFER_PROBE_TIMEOUT=2500;
 export class NetSession{
   constructor(identity,room,{canvas,api,status,buttons,render,failure}){
     Object.assign(this,{identity,room,api,status,buttons,render,failure});
@@ -16,7 +17,8 @@ export class NetSession{
     this.hellos=new Map();this.acks=new Set();this.sentHello=new Set();this.sentAck=new Set();
     this.game=new GameRuntime(canvas,room.seats.host);
     this.game.onFailure=e=>this.fail(e);
-    this.queue=new FrameQueue(this.slot,room.settings.delay,this.roles.length);
+    this.autoBuffer=room.settings.delay===0;
+    this.queue=new FrameQueue(this.slot,this.autoBuffer?(room.settings.network==='public'?6:3):room.settings.delay,this.roles.length);
     this.hashes=new Map();this.remoteHashes=new Map(this.remotes.map(r=>[r,new Map()]));this.iceCounts={};this.iceErrors=[];
     this.closed=false;this.running=false;this.connected=false;this.lastAdvance=performance.now();
     this.rtt=0;this.lastHash=0;this.waitHash=false;this.signalChain=Promise.resolve();
@@ -97,7 +99,7 @@ export class NetSession{
     for(const role of this.links){
       const peer=this.peers.get(role),time=performance.now();
       peer.pings??=new Set();peer.pings.add(time);
-      while(peer.pings.size>4)peer.pings.delete(peer.pings.values().next().value);
+      while(peer.pings.size>(this.running?4:24))peer.pings.delete(peer.pings.values().next().value);
       this.sendTo(role,{type:'ping',time});
     }
   }
@@ -109,7 +111,9 @@ export class NetSession{
     peer.jitter=previous==null?0:(peer.jitter||0)*0.75+Math.abs(sample-previous)*0.25;
     peer.rtt=previous==null?sample:previous*0.75+sample*0.25;
     peer.samples=(peer.samples||0)+1;
+    if(!this.running)peer.probePeak=Math.max(peer.probePeak||0,sample);
     this.rtt=Math.max(...[...this.peers.values()].map(p=>p.rtt||0));
+    if(this.bufferTimer!=null)this.maybeHello();
   }
   async receiveSignal(message){
     if(this.closed)return;
@@ -147,7 +151,43 @@ export class NetSession{
         if(!this.sentAck.has(role)){this.sentAck.add(role);this.sendTo(role,{type:'loaded'});}
       }
     }
-    if(this.identity.role==='host'&&!this.running&&this.links.every(r=>this.sentAck.has(r)&&this.acks.has(r))){this.send({type:'go'});this.start();}
+    if(this.identity.role==='host'&&!this.running&&this.links.every(r=>this.sentAck.has(r)&&this.acks.has(r))){
+      if(this.autoBuffer&&!this.bufferReady){
+        if(!this.bufferProbing){
+          this.bufferProbing=true;this.rtt=0;
+          // Resource loading can block the main thread. Discard those old
+          // heartbeat samples and outstanding pongs before startup probing.
+          for(const peer of this.peers.values()){
+            peer.pings?.clear();peer.rtt=null;peer.jitter=0;peer.samples=0;peer.probePeak=0;
+          }
+        }
+        if(this.links.every(r=>(this.peers.get(r)?.samples||0)>=BUFFER_PROBES)){
+          this.queue=new FrameQueue(this.slot,this.recommendedDelay(true),this.roles.length);this.bufferReady=true;
+        }else{
+          if(this.bufferTimer==null){
+            this.status('测量连接延迟，选择输入缓冲…');
+            this.bufferTimer=setInterval(()=>{try{this.pingPeers();}catch(e){this.fail(e);}},BUFFER_PROBE_TICK);
+            this.bufferTimeout=setTimeout(()=>{
+              try{
+                if(this.closed||this.running)return;
+                // Keep a conservative floor if a slow link did not finish probing.
+                this.queue=new FrameQueue(this.slot,Math.max(this.queue.delay,this.recommendedDelay(true)),this.roles.length);
+                this.bufferReady=true;this.bufferFallback=true;this.maybeHello();
+              }catch(e){this.fail(e);}
+            },BUFFER_PROBE_TIMEOUT);
+            this.pingPeers();
+          }
+          return;
+        }
+      }
+      // Pace frame zero together. Starting the host immediately would consume
+      // part of the buffer while "go" is still travelling to the guests.
+      const travel=role=>this.autoBuffer?(this.peers.get(role)?.probePeak||0)/2:0;
+      const lead=this.autoBuffer?Math.max(...this.links.map(travel))+TICK:0;
+      for(const role of this.links)this.sendTo(role,{type:'go',delay:this.queue.delay,
+        fallback:!!this.bufferFallback,startAfter:lead-travel(role)});
+      this.start(lead);
+    }
   }
   receive(message,link){
     if(this.closed)return;
@@ -165,18 +205,22 @@ export class NetSession{
         this.acks.add(source);this.maybeHello();break;
       case 'go':
         if(this.identity.role==='host'||source!=='host'||!this.sentAck.has('host')||!this.acks.has('host')||this.running)throw Error('未完成校验就尝试开局');
-        this.start();break;
+        if(!Number.isInteger(message.delay)||message.delay<2||message.delay>12||
+          (!this.autoBuffer&&message.delay!==this.room.settings.delay)||typeof message.fallback!=='boolean'||
+          !Number.isFinite(message.startAfter)||message.startAfter<0||message.startAfter>10000)throw Error('开局输入缓冲无效');
+        this.queue=new FrameQueue(this.slot,message.delay,this.roles.length);this.bufferFallback=message.fallback;
+        this.start(message.startAfter);break;
       case 'input':{
         if(!this.running||message.slot!==this.room.seats[source])throw Error('输入座位或开局状态无效');
         const commands=message.buttons&~(255|4096);
         if(commands&&(source!=='host'||(!this.room.settings.qa&&commands!==256)))throw Error('队友发送了未授权控制命令');
-        this.queue.receive(message.frame,message.buttons,message.slot);this.forward(message,source);break;
+        this.queue.receive(message.frame,message.buttons,message.slot);this.forward(message,source);this.pump();break;
       }
       case 'hash':{
         const hashes=this.remoteHashes.get(source);
         if(!this.running||!Number.isSafeInteger(message.frame)||message.frame<=0||message.frame%HASH_INTERVAL||message.frame>this.queue.frame+HASH_INTERVAL||
           message.frame<=this.lastHash||hashes.has(message.frame)||!/^[0-9a-f]{8}$/.test(message.hash)||typeof message.memory!=='boolean')throw Error('状态摘要帧无效');
-        hashes.set(message.frame,message);this.forward(message,source);this.checkHashes();break;
+        hashes.set(message.frame,message);this.forward(message,source);this.checkHashes();this.pump();break;
       }
       case 'ping':if(!Number.isFinite(message.time))throw Error('探测无效');this.sendTo(link,{type:'pong',time:message.time});break;
       case 'pong':this.recordPong(link,message.time);break;
@@ -201,14 +245,16 @@ export class NetSession{
     }
     this.waitHash=this.queue.frame-this.lastHash>=HASH_WINDOW;
   }
-  start(){
+  start(startAfter=0){
+    clearInterval(this.bufferTimer);clearTimeout(this.bufferTimeout);this.bufferTimer=null;
     this.running=true;clearTimeout(this.loadTimer);this.game.start();
-    this.status('联机运行中');this.lastAdvance=performance.now();this.nextTick=this.lastAdvance;
+    this.status('联机运行中');this.lastAdvance=performance.now();this.nextTick=this.lastAdvance+startAfter;
     this.waitStats={since:this.lastAdvance,at:this.lastAdvance,elapsed:0,input:0,hash:0};
     this.timer=setInterval(()=>this.pump(),4);
   }
   pump(){
-    if(this.closed||!this.running)return;
+    if(this.closed||!this.running||this.pumping)return;
+    this.pumping=true;
     try{
       const now=performance.now();
       if(now-this.lastAdvance>30000)throw Error('等待队友输入超过 30 秒，请重开房间');
@@ -235,7 +281,7 @@ export class NetSession{
         }
       }
       if(now-(this.renderAt||0)>150){this.renderAt=now;this.render(this);}
-    }catch(error){this.fail(error);}
+    }catch(error){this.fail(error);}finally{this.pumping=false;}
   }
   recordWait(now){
     const stats=this.waitStats,elapsed=now-(stats.at??now);stats.at=now;
@@ -266,17 +312,25 @@ export class NetSession{
     }
     return '联机运行中';
   }
+  recommendedDelay(startup=false){
+    // The two longest host links cover the guest -> host -> guest path in 3P.
+    // Use the probing peak at startup, then EWMA RTT for subsequent advice.
+    const paths=[...this.peers.values()].filter(p=>p.samples).map(p=>
+      (startup?p.probePeak??p.rtt:p.rtt)/2+(p.jitter||0)).sort((a,b)=>b-a);
+    // A guest sees only its host link: double it for conservative 3P advice.
+    const travel=this.roles.length===3?(paths.length===1?2*paths[0]:paths.slice(0,2).reduce((a,b)=>a+b,0)):(paths[0]||0);
+    return Math.max(2,Math.min(12,Math.ceil(travel/TICK)+1));
+  }
   networkQualityText(){
     const peers=[...this.peers.values()].filter(p=>p.samples),jitter=Math.max(0,...peers.map(p=>p.jitter));
     const measured=peers.length===this.links.length;
-    // In 3P, guest-to-guest input traverses the host. This is a conservative
-    // suggestion for the next room, never a local change to synchronized delay.
-    const travel=this.rtt/(this.roles.length===2?2:1);
-    const recommendation=Math.max(2,Math.ceil((travel+2*jitter)/TICK)+2);
-    return `缓冲 ${this.queue.delay} 帧（约 ${(this.queue.delay*TICK).toFixed(0)} ms）`+
+    const canRecommend=measured&&(this.roles.length===2||this.identity.role==='host');
+    const recommendation=this.recommendedDelay();
+    return `${this.autoBuffer?'自动选定 · ':''}缓冲 ${this.queue.delay} 帧（约 ${(this.queue.delay*TICK).toFixed(0)} ms）${this.bufferFallback?' · 测量超时，采用保守缓冲':''}`+
       (measured?` · 最大往返 ${this.rtt.toFixed(0)} ms · 抖动约 ${jitter.toFixed(0)} ms`:' · 正在测量延迟')+
       (this.waitPercent!=null?` · 近 5 秒网络等待 ${this.waitPercent.toFixed(1)}%`:'')+
-      (measured&&recommendation>this.queue.delay?`\n下次开房建议缓冲 ${Math.min(12,recommendation)} 帧${recommendation>12?'；当前延迟仍可能需要等待':''}`:'');
+      (canRecommend&&recommendation>this.queue.delay?`\n下次开房建议缓冲 ${recommendation} 帧${recommendation===12?'；较高延迟仍可能需要等待':''}`:
+        canRecommend&&recommendation<this.queue.delay&&this.waitPercent!=null&&this.waitPercent<1?`\n下次开房可选自动或 ${recommendation} 帧，减少操作等待`:'');
   }
   connectionText(){
     const mode=describeNetwork({...this.room.settings,transport:this.room.transport});
@@ -292,8 +346,8 @@ export class NetSession{
   }
   close(){
     if(this.closed)return;this.closed=true;this.running=false;
-    for(const timer of [this.timer,this.heartbeat])clearInterval(timer);
-    for(const timer of [this.connectTimer,this.loadTimer])clearTimeout(timer);
+    for(const timer of [this.timer,this.heartbeat,this.bufferTimer])clearInterval(timer);
+    for(const timer of [this.connectTimer,this.loadTimer,this.bufferTimeout])clearTimeout(timer);
     this.game.stop();this.relay?.close();for(const peer of this.peers.values()){clearTimeout(peer.disconnectTimer);peer.disconnectTimer=null;peer.channel?.close();peer.pc?.close();}
   }
 }

@@ -24,7 +24,7 @@ PROTOCOL = 'th01-lockstep/2'
 def settings(value):
     if not isinstance(value, dict): raise ValueError('设置格式无效')
     rank, count = value.get('rank', 1), value.get('count', 2)
-    transport, delay = value.get('transport', 'rtc'), value.get('delay', 3)
+    transport, delay = value.get('transport', 'rtc'), value.get('delay', 0)
     players = value.get('players', 2)
     life_compensation = value.get('lifeCompensation', True)
     if type(life_compensation) is not bool: raise ValueError('生命补偿设置无效')
@@ -37,7 +37,7 @@ def settings(value):
     if ice not in ('all', 'relay'): raise ValueError('ICE 策略无效')
     if ice == 'relay' and (network != 'public' or transport != 'rtc'):
         raise ValueError('强制 TURN 仅适用于公网 UDP 房间')
-    if type(delay) is not int or delay not in range(2, 13): raise ValueError('输入缓冲无效')
+    if type(delay) is not int or (delay != 0 and delay not in range(2, 13)): raise ValueError('输入缓冲无效')
     return dict(rank=rank, count=count, players=players, transport=transport,
                 network=network, ice=ice, delay=delay, qa=ALLOW_QA,
                 lifeCompensation=life_compensation)
