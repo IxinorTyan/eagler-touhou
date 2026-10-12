@@ -1,0 +1,33 @@
+{
+  "protocol": "th01-lockstep/2",
+  "epoch": 946684800000,
+  "files": {
+    "vendor/np2/np21-lockstep.js": "f9c408113b5d16ae1a0829d59177fabd6e6b288e7a907383aad46740648034fa",
+    "vendor/np2/np21-rollback.wasm": "3a2da4f9ffe9fca0b51ed1e4fd8814114a3bd83bee77e5965428d83b7bf66ea4",
+    "vendor/np2/np21-rollback-mobile.wasm": "2ab2a21eef987cdbc6f0e3cf4f0bcfd4a4b13f43bd3bbd1e92e7cb474e2c606b",
+    "netplay/np2-clock.js": "4c66ee76a3e5c6e96c31279842cc7a25e490bcf2856bd854ec6dafbeeb916705",
+    "netplay/native-snapshots.js": "3395a06775ea4b3553492ad32a7a42bf723b9fd73c94f5c25a479f8c5147ac32",
+    "netplay/audio-output.js": "18760a612db5dfff8a8dd63bef48f12df51c62474a7cd465084ffbe0fc90a214",
+    "netplay/sha256.js": "9cb7be2bc039bcea2a4d727ef98bcd9047a78dfd4c11950355723147423e1f43",
+    "netplay/connection.js": "9b79b9bcc647a6fee5858b8f080df0b088c6537d953ca3ab911d2d862e8525ce",
+    "netplay/relay.js": "967e09da2690df2a733ce2e7f8393a16620cb263a447fa4df192657927a12d50",
+    "vendor/np2/np2-wasm.js": "653d913a704683e7fc0e71dffbddbd7cad4461126137761d27c2c41be257265f",
+    "vendor/np2/font.bmp": "1d3d133c92d9e54893ed16f9bdef1f4ef3fcb1d1fb434db3338b73b147f6e2e7",
+    "netplay/runtime.js": "6c928743bdc3d7692d0d76ae88112c02ee2e729d50211471b80cf1637224cc06",
+    "netplay/queue.js": "dd05eda77d252f380bcc2c6dca48a8460a3325a62d2d753ac119456be9916fcb",
+    "netplay/session.js": "0c548d147775eebceb8b165621127da2a4814b3f69f71bbf3fc4107b2c408a41",
+    "netplay/app.js": "aff784ba0c6ed0b72686832df8452434dc420a1ae7d103733ee9aca1ec68e6f8",
+    "netplay/local-music.js": "55bd3b99aa72c6f013b70bad5d7c295308507119de930da2d765cb31a059d796",
+    "bgm/manifest.json": "9201f38046eaa14f1d9b8f32916383cbb83f5d8c88038f9ec29832770ad84ef7",
+    "netplay/udp-config.js": "b667ca14324b5bd81ffbadee1ec228dcb51b007e8bcc77e78da7c049c4af0d0c",
+    "netplay/network-mode.js": "b20d401de873b0930dff3c971fdb7b7f13f3969879976e4bfd6cc2c50fd5c533",
+    "site-ui.js": "f47a0e41e323e45a94f1b7904cf5ebbe7374858e50883059b63c5c35e887ae92",
+    "coop.js": "2d66b58d1eba5ae2a777e286f01ab17bbd7051c5a6ac90a0985fb5ea9283ea95",
+    "touch-input.js": "dae17cc370687c4a33028c49ae4cdb3f983cb5917786613f593b1a07e38ec323",
+    "touch-controls.js": "53db5e58e4f96b624bf071fbc3b0f148fd059da193f3d61f38283a0e0a4cf533",
+    "touch-controls.css": "63391569d5d87ae4ec442bba8da6c484d2584e4fa6528b4d1c5ebda66bf92593",
+    "performance-mode.js": "216c80abfe755abfc1e4bc61326d0a4358cdb1e0b51a3b4ebf61ed5139f270e5",
+    "boss-balance.js": "322ac30da1dd5c517e057f224fc84f1b2ded99d02b1e48e39719b4a63e27e83f",
+    "life-compensation.js": "c2db9ba5dbb1fe34ac4f506db774c185c4ed58d30e0f9f686e3dc27bf4680a3d"
+  }
+}

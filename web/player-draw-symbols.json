@@ -1,0 +1,19 @@
+{
+  "exe_sha256": "183485d8bbfd362b62da7d40a51a82e4c6d757dca06499333b0e38b77e5661be",
+  "ram_base": 2492848,
+  "relative": {
+    "PLAYER_DRAW_KIND": 3800,
+    "PLAYER_DRAW_LEFT": 32302,
+    "PLAYER_DRAW_TOP": 32304,
+    "PLAYER_DRAW_CEL": 32306,
+    "PLAYER_48X48": 19458,
+    "PLAYER_48X32": 20102,
+    "PTN_IMAGES": 17862,
+    "Z_PALETTES": -3114,
+    "PLAYER_IS_HIT": -84,
+    "ORBS": 12688,
+    "ORB_COUNT": -10,
+    "COOP_EFFECT_KIND": 17840,
+    "COOP_EFFECT_FRAME": 17843
+  }
+}

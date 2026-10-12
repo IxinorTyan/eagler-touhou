@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "url": "disks/th01-multiorb.hdi.gz",
+  "size": 21415936,
+  "sha256": "7775e65251943329844eede7e0e3fad027777b7513a8eefee822d622713a70ec",
+  "exe_sha256": "183485d8bbfd362b62da7d40a51a82e4c6d757dca06499333b0e38b77e5661be",
+  "source_disk_sha256": "24e835fe53c9fb77ee2f05a1ae9056833188b29f1d999bed26b8cf574ed210dc",
+  "configuration": {
+    "REIIDEN/ORBS.CFG": {
+      "offset": 326656,
+      "size": 1
+    },
+    "REIIDEN/REIIDEN.CFG": {
+      "offset": 12180480,
+      "size": 11
+    },
+    "REIIDEN/COOP.CFG": {
+      "offset": 334848,
+      "size": 1
+    },
+    "REIIDEN/MUSIC.CFG": {
+      "offset": 343040,
+      "size": 1
+    },
+    "REIIDEN/START.CFG": {
+      "offset": 351232,
+      "size": 1
+    },
+    "REIIDEN/LIVES.CFG": {
+      "offset": 359424,
+      "size": 1
+    }
+  },
+  "modified_files": [
+    "REIIDEN/GAME.BAT",
+    "REIIDEN/REIIDEN.EXE",
+    "REIIDEN/ZUNSOFT.COM"
+  ],
+  "added_files": [
+    "REIIDEN/COOP.CFG",
+    "REIIDEN/LIVES.CFG",
+    "REIIDEN/MUSIC.CFG",
+    "REIIDEN/ORBS.CFG",
+    "REIIDEN/START.CFG"
+  ],
+  "upstream": {
+    "repository": "https://github.com/nmlgc/ReC98",
+    "branch": "debloated",
+    "commit": "28d59d31331e27fcbe61d1b65bd8c0cd618757d8"
+  },
+  "compiler": "Borland C++ 4.52 / TASM32 5.2",
+  "baseline": false
+}
