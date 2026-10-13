@@ -139,11 +139,6 @@ $('leave').onclick = async () => {
   try { await api('leave'); } catch {}
   location.href = `lan.html?${networkParams(connection)}`;
 };
-$('share').onclick = async () => {
-  const url = new URL('lan.html', location.href); const params=networkParams(connection);params.set('room',session.room);url.search=params;
-  try { await navigator.clipboard.writeText(url.href); status('邀请链接已复制'); }
-  catch { status(`邀请链接：${url.href}`); }
-};
 window.addEventListener('message', async event => {
   if (event.origin !== location.origin || event.source !== runtime?.contentWindow || event.data?.protocol !== protocol) return;
   const value = event.data;

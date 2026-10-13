@@ -13,11 +13,16 @@ export class Netplay {
       this.localSeat=(state.settings.hostSeat===1?1:0)^(this.role==='guest'?1:0);
       this.network=state.network||'lan';this.ice=state.ice||'all';
       this.heartbeat=setInterval(()=>this.state().catch(error=>this.fail(error)),5000);
+      // This instance is created after native boot. A faster device must not
+      // spend its transport timeout waiting for its peer to finish booting.
+      this.onState('本机资源已就绪，等待另一端完成游戏启动');
+      await this.waitForPlayers();
+      if(this.closed)throw Error('连接已关闭');
       return await (this.mode==='relay'?this.startRelay():this.startRtc());
     }catch(error){this.close();throw error;}
   }
   async state(){const query=new URLSearchParams({protocol,room:this.room,token:this.token});const response=await fetch(`/api/state?${query}`,{cache:'no-store'});const state=await response.json();if(!response.ok)throw Error(state.error||'房间已结束');if(!state.present.host||!state.present.guest)throw Error('另一位玩家已离开');return state;}
-  async waitForPlayers(){const response=await fetch('/api/progress',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({protocol,room:this.room,token:this.token,message:'本机资源已就绪',loaded:true})});if(!response.ok)throw Error('房间准备确认失败');const deadline=performance.now()+60000;while(!this.closed){const state=await this.state();if(state.startup.host?.error||state.startup.guest?.error)throw Error('另一端加载失败，请结束后重新建房');if(state.startup.host?.loaded&&state.startup.guest?.loaded)return;if(performance.now()>deadline)throw Error('等待另一端加载超时');await new Promise(resolve=>setTimeout(resolve,200));}throw Error('连接已关闭');}
+  async waitForPlayers(){const response=await fetch('/api/progress',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({protocol,room:this.room,token:this.token,message:'本机资源已就绪',loaded:true})});if(!response.ok)throw Error('房间准备确认失败');const deadline=performance.now()+600000;while(!this.closed){const state=await this.state();if(state.startup.host?.error||state.startup.guest?.error)throw Error('另一端加载失败，请结束后重新建房');if(state.startup.host?.loaded&&state.startup.guest?.loaded)return;if(performance.now()>deadline)throw Error('等待另一端加载超时');await new Promise(resolve=>setTimeout(resolve,200));}throw Error('连接已关闭');}
   fail(error){if(this.closed)return;this.rtcReject?.(error);this.relayReject?.(error);this.rtcResolve=this.rtcReject=this.relayReject=null;this.close();this.onState(error.message);this.onError(error);}
   get isLockstep(){return true;}
   clearLocal(){this.localActions=[];this.localTaps=new Set();this.localTouch=null;}
@@ -52,7 +57,7 @@ export class Netplay {
     this.localTaps?.clear();if(touch)touch.x=touch.y=0;return input;}
   sendPacket(packet){if(this.channel?.readyState!=='open')throw Error('同步通道未连接');
     if((this.channel.bufferedAmount||this.socket?.bufferedAmount||0)>524288)throw Error('联机发送队列拥塞，请结束后重新建房');
-    this.channel.send(JSON.stringify({...packet,sync:'th03-rollback/1'}));}
+    this.channel.send(JSON.stringify({...packet,sync:'th03-rollback/5'}));}
   async synchronize(identity){
     this.sendPacket({type:'sync-ready',identity});
     const deadline=performance.now()+30000;
@@ -66,7 +71,7 @@ export class Netplay {
   }
   send(value,touch=0){const message=JSON.stringify({type:'input',seq:this.seq++,actions:[...value],touch});if(this.channel?.readyState==='open')this.channel.send(message);}
   receive(message){
-    if(message.sync==='th03-rollback/1'){
+    if(message.sync==='th03-rollback/5'){
       if(message.type==='sync-ready'){this.peerIdentity=message.identity;return;}
       if(message.type==='frame'||message.type==='check'||message.type==='rollback'){this.onPacket?.(message);return;}
       throw Error('未知同步消息');
@@ -121,10 +126,16 @@ export class Netplay {
     this.onState(this.network!=='public'?'正在连接局域网设备':this.ice==='relay'?'正在连接 TURN 中继':
       this.rtcHasTurn?'正在尝试 UDP 打洞 / TURN 中继':'正在尝试 UDP 打洞（尚未配置 TURN，失败可改用 TCP）');
     this.pc=new RTCPeerConnection(config);
+    this.localIceCount=0;this.remoteIceCount=0;
     this.pc.onicecandidate=e=>{
-      if(e.candidate&&!this.closed)this.signal(this.role==='host'?'guest':'host',{type:'ice',candidate:e.candidate.toJSON()}).catch(error=>this.fail(error));
+      if(e.candidate&&!this.closed){
+        this.localIceCount++;
+        this.signal(this.role==='host'?'guest':'host',{type:'ice',candidate:e.candidate.toJSON()}).catch(error=>this.fail(error));
+        this.rtcProgress();
+      }
     };
     this.pc.onicecandidateerror=e=>{this.lastIceError=Number.isInteger(e.errorCode)?`（ICE 错误 ${e.errorCode}）`:'';};
+    this.pc.oniceconnectionstatechange=()=>this.rtcProgress();
     this.pc.onconnectionstatechange=()=>{
       if(this.closed)return;
       const state=this.pc.connectionState;
@@ -152,7 +163,18 @@ export class Netplay {
     return connected;
   }
   rtcFailure(){
-    return `WebRTC 连接失败或超时${this.lastIceError||''}。${this.network==='public'&&!this.rtcHasTurn?'当前未配置 TURN；请配置 TURN 或改用 TCP。':'请检查 STUN / TURN 网络，或改用 TCP 服务器转发。'}结束后重新建房再试。`;
+    const detail=this.rtcDetail();
+    const help=this.network!=='public'?'请检查设备间 UDP 通信、防火墙或 Wi-Fi 设备隔离，或改用 TCP 服务器转发。':
+      !this.rtcHasTurn?'当前未配置 TURN；请配置 TURN 或改用 TCP。':'请检查 STUN / TURN 网络，或改用 TCP 服务器转发。';
+    return `WebRTC 连接失败或超时${this.lastIceError||''}（${detail}）。${help}结束后重新建房再试。`;
+  }
+  rtcDetail(){
+    const phase=this.remoteDescriptionReady?'已收到对方协商':this.role==='host'?'等待客机应答':'等待房主连接请求';
+    return `${phase}；ICE ${this.pc?.iceConnectionState||'new'}；候选发送 ${this.localIceCount||0} / 收到 ${this.remoteIceCount||0}`;
+  }
+  rtcProgress(){
+    if(this.closed||this.channel?.readyState==='open')return;
+    this.onState(`正在建立${this.network==='public'?'公网':'局域网'}连接：${this.rtcDetail()}`);
   }
   attach(channel){
     if(this.closed){channel.close();return;}
@@ -186,7 +208,21 @@ export class Netplay {
     // Chained timeouts prevent overlapping polls from reordering offer/ICE.
     if(!this.closed)this.rtcPoll=setTimeout(()=>this.readSignals(),this.channel?.readyState==='open'?1000:300);
   }
-  async handleSignal(from,message){if(message.type==='offer'&&this.role==='guest'){await this.pc.setRemoteDescription(message.description);this.remoteDescriptionReady=true;for(const candidate of this.pendingIce.splice(0))await this.pc.addIceCandidate(candidate);await this.pc.setLocalDescription(await this.pc.createAnswer());await this.signal('host',{type:'answer',description:this.pc.localDescription});}else if(message.type==='answer'&&this.role==='host'){await this.pc.setRemoteDescription(message.description);this.remoteDescriptionReady=true;for(const candidate of this.pendingIce.splice(0))await this.pc.addIceCandidate(candidate);}else if(message.type==='ice'){if(this.remoteDescriptionReady)await this.pc.addIceCandidate(message.candidate);else this.pendingIce.push(message.candidate);}}
+  async handleSignal(from,message){
+    if(message.type==='offer'&&this.role==='guest'){
+      await this.pc.setRemoteDescription(message.description);this.remoteDescriptionReady=true;
+      for(const candidate of this.pendingIce.splice(0))await this.pc.addIceCandidate(candidate);
+      await this.pc.setLocalDescription(await this.pc.createAnswer());
+      await this.signal('host',{type:'answer',description:this.pc.localDescription});
+    }else if(message.type==='answer'&&this.role==='host'){
+      await this.pc.setRemoteDescription(message.description);this.remoteDescriptionReady=true;
+      for(const candidate of this.pendingIce.splice(0))await this.pc.addIceCandidate(candidate);
+    }else if(message.type==='ice'){
+      this.remoteIceCount++;
+      if(this.remoteDescriptionReady)await this.pc.addIceCandidate(message.candidate);else this.pendingIce.push(message.candidate);
+    }
+    this.rtcProgress();
+  }
   closeRtc(){clearTimeout(this.rtcPoll);clearTimeout(this.rtcTimer);clearTimeout(this.disconnectTimer);clearInterval(this.pathTimer);this.rtcAbort?.abort();this.rtcPoll=null;this.rtcTimer=null;}
   close(){if(this.closed)return;this.closed=true;this.rtcReject?.(Error('WebRTC 连接已结束'));this.relayReject?.(Error('TCP 连接已结束'));this.rtcResolve=this.rtcReject=this.relayReject=null;this.remote.clear();clearInterval(this.heartbeat);clearTimeout(this.relayTimer);this.closeRtc();this.socket?.close();this.channel?.close?.();this.pc?.close();}
 }

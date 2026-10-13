@@ -9,8 +9,8 @@ export class WorkerNP21 {
   constructor(config,setup){
     this.config=config;this.setup=setup;this.state='loading';this.isWorker=true;
     this.pending=new Map();this.serial=0;this.closed=false;this.sources=new Set();this.audioEnd=0;this.audioEpoch=0;
-    this.snapshot={state:null,markers:[]};
-    this.context=new AudioContext();this.context.resume().catch(()=>{});
+    this.snapshot={state:null,markers:[]};this.nativeResults=[];
+    this.context=new AudioContext({sampleRate:44100,latencyHint:'interactive'});this.context.resume().catch(()=>{});
     this.module={heapBytes:0,SDL2:{audioContext:this.context},executionThread:'worker'};
     this.worker=new Worker(new URL('./solo-worker.js',import.meta.url),{type:'module',name:'TH'+setup.game+' simulation'});
     this.worker.onmessage=({data})=>this.receive(data);
@@ -30,7 +30,7 @@ export class WorkerNP21 {
   }
   async initialize(){
     if(!supportsSoloWorker())throw Error('浏览器不支持独立线程模式，请选择兼容模式');
-    const {canvas,onDiskChange,onExit,...config}=this.config;
+    const {canvas,onDiskChange,onExit,onError:configOnError,...config}=this.config;
     const offscreen=canvas.transferControlToOffscreen();
     const {onError,...setup}=this.setup;
     const result=await this.call('init',[{...setup,config,canvas:offscreen,sampleRate:this.context.sampleRate}],[offscreen]);
@@ -40,7 +40,7 @@ export class WorkerNP21 {
     if(this.closed)return Promise.reject(Error('模拟线程已关闭'));
     const id=++this.serial;
     return new Promise((resolve,reject)=>{
-      const timeout=setTimeout(()=>{this.pending.delete(id);reject(Error('模拟线程响应超时：'+method));},60000);
+      const timeout=setTimeout(()=>{this.pending.delete(id);reject(Error('模拟线程响应超时：'+method));},['init','setHdd','reset'].includes(method)?600000:60000);
       this.pending.set(id,{resolve,reject,timeout});
       try{this.worker.postMessage({id,method,args},transfer);}catch(error){clearTimeout(timeout);this.pending.delete(id);reject(error);}
     });
@@ -57,12 +57,13 @@ export class WorkerNP21 {
       clearTimeout(pending.timeout);this.pending.delete(data.id);pending.resolve(data.result);
     }else if(data.type==='snapshot'){
       this.send('snapshotAck');this.snapshot=data;this.module.localFrameCount=data.frames;this.module.frameUploads=data.uploads;
+      this.module.heapBytes=data.heapBytes;this.nativeResults.push(...(data.pauseResults||[]));
       // Timing samples are needed only while the user records a report.
       const collecting=typeof this.module.observeLocalFrame==='function';
       if(collecting!==!!this.collectingFrames){this.collectingFrames=collecting;this.send('performance',[collecting]);}
       for(const cost of data.costs)this.module.observeLocalFrame?.(cost);
       for(const [ax,hash]of data.events)this.onMusic?.(ax,hash);
-    }else if(data.type==='diskChange')this.config.onDiskChange?.();
+    }else if(data.type==='diskChange')this.config.onDiskChange?.(data.name);
     else if(data.type==='exit'){this.state='exited';this.flushAudio();this.config.onExit?.();}
   }
   async pumpAudio(){
@@ -86,7 +87,7 @@ export class WorkerNP21 {
   }
   run(){this.state='running';this.send('run');this.context.resume().catch(()=>{});}
   pause(){if(this.state==='running'){this.state='paused';this.clearInput();this.send('pause');this.flushAudio();}}
-  reset(){this.clearInput();this.snapshot={state:null,markers:[]};this.flushAudio();this.send('reset');}
+  async reset(){this.clearInput();this.snapshot={state:null,markers:[]};this.nativeResults=[];this.flushAudio();await this.call('reset');}
   addDiskImage(name,data){return this.call('addDiskImage',[name,data],[data.buffer]);}
   setHdd(drive,name){return this.call('setHdd',[drive,name]);}
   getDiskImage(name){return this.call('getDiskImage',[name]);}

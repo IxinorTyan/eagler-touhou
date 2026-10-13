@@ -1,7 +1,7 @@
 export const ROOM_DEFAULTS={language:'jp',difficulty:3,clock:32,rollback:false,focusEnabled:true,touchUnlimitedAllowed:true,hostSeat:0};
-export const ROOM_COOKIE='th03_room_preferences_v1';
+export const ROOM_COOKIE='th03_fast_room_preferences_v1';
 const valid={language:v=>['jp','cn'].includes(v),difficulty:v=>Number.isInteger(v)&&v>=0&&v<=3,
-  clock:v=>[8,16,24,32].includes(v),hostSeat:v=>v===0||v===1,
+  clock:v=>v===32,hostSeat:v=>v===0||v===1,
   rollback:v=>typeof v==='boolean',focusEnabled:v=>typeof v==='boolean',touchUnlimitedAllowed:v=>typeof v==='boolean'};
 
 export function readRoomPreferences(cookie){

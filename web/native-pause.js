@@ -15,7 +15,7 @@ export class NativePause {
     return at >= 0 && at + this.meta.mailboxSize <= heap.length
       && this.signature.every((byte, i) => heap[at + i] === byte);
   }
-  update(now = performance.now()) {
+  update(now = performance.now(), scanRange = null) {
     const emulator = this.getEmulator(), heap = emulator?.module.HEAPU8;
     if (!heap) return null;
     const view = new DataView(heap.buffer, heap.byteOffset, heap.byteLength), f = this.meta.fields;
@@ -23,7 +23,9 @@ export class NativePause {
       // Raw disk buffers also contain the signature. Only a changing heartbeat
       // with plausible relocated CS/DS can identify the running DOS allocation.
       if (this.live < 0 || !this.valid(heap, this.live)) {
-        const end = Math.min(this.cursor + 2 * 1024 * 1024, heap.length);
+        const scanStart=scanRange?.start??0,scanEnd=scanRange?.end??heap.length;
+        if(this.cursor<scanStart||this.cursor>=scanEnd)this.cursor=scanStart;
+        const end = Math.min(this.cursor + 2 * 1024 * 1024, scanEnd);
         const slice = heap.subarray(this.cursor, Math.min(end + this.signature.length - 1, heap.length));
         for (let i = slice.indexOf(this.signature[0]); i >= 0 && this.cursor + i < end; i = slice.indexOf(this.signature[0], i + 1)) {
           const at = this.cursor + i;
@@ -35,7 +37,7 @@ export class NativePause {
             this.residents.set(at, {rand: view.getUint32(at + 0x10, true), changes: 0, changed: -Infinity});
           }
         }
-        this.cursor = end === heap.length ? 0 : end;
+        this.cursor = end === scanEnd ? scanStart : end;
       }
       const active = [];
       for (const [at, candidate] of this.candidates) {

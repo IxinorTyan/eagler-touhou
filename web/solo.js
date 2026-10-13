@@ -5,8 +5,8 @@ import {FireControl} from './fire-control.js';
 import {prepareSoloDisk} from './solo-save.js';
 import {Fat12} from './disk.js';
 import {unlockDiskScores} from './scores.js';
-import {NP21} from './vendor/np2/np2-original.js';
-import {sha256} from './sha256.js';
+import {NP21} from './dosbox-adapter.js';
+import {loadVerifiedBytes} from './startup-assets.js';
 import {mountPlayer} from './player-ui.js';
 import {unpackTouch} from './touch-input.js';
 import {createSoloAssist} from './solo-assist.js';
@@ -26,9 +26,25 @@ const status=text=>{$('status').textContent=text;player.note(text);if(!cover.hid
 const report=error=>{console.error(error);status(`错误：${error.message}`);};
 const canvas=$('canvas'),cover=$('cover');
 const player=mountPlayer($('screen'),{solo:true,pure:true,onGesture:()=>{canvas.focus();soloMusic?.resume();emulator?.module.SDL2?.audioContext?.resume();}});
+$('screen').classList.remove('screen');
 mountSoloView($('screen'));
 const viewport=document.createElement('div');viewport.className='screen';viewport.append(canvas);player.stage.prepend(viewport);player.stage.append(cover);
 player.setLabel('原版单人');player.setContext({key:'original:menu',play:false});
+// Launch-page and in-game switches share the player's existing saved settings.
+const launchFocus=$('solo-focus-enabled'),launchPoints=$('solo-focus-points');
+const focusControl=$('screen').querySelector('[data-focus-enabled]');
+const pointsControl=$('screen').querySelector('[data-focus-points]');
+function syncLaunchAssists(){
+  launchFocus.checked=focusControl.checked;launchFocus.disabled=false;
+  launchPoints.checked=pointsControl.checked;launchPoints.disabled=!focusControl.checked;
+}
+for(const [launch,control]of [[launchFocus,focusControl],[launchPoints,pointsControl]]){
+  launch.addEventListener('change',()=>{
+    control.checked=launch.checked;control.dispatchEvent(new Event('change'));
+  });
+  control.addEventListener('change',syncLaunchAssists);
+}
+syncLaunchAssists();
 const markerLayer=document.createElement('div');markerLayer.className='hit-points';
 const marker=document.createElement('i');marker.hidden=true;markerLayer.append(marker);viewport.append(markerLayer);
 mountSoloPerformance({host:$('screen'),game:'03',getEmulator:()=>emulator,readState:()=>{
@@ -45,7 +61,7 @@ async function metadata(language){
 }
 async function storage(language,mode,value){
   database ||= await new Promise((resolve,reject)=>{
-    const request=indexedDB.open('th03-original-solo',1);
+    const request=indexedDB.open('th03-fast-original-solo',1);
     request.onupgradeneeded=()=>request.result.createObjectStore('disks');
     request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);
     request.onblocked=()=>reject(Error('原版存档数据库被占用'));
@@ -67,10 +83,7 @@ async function loadDisk(){
   meta=await metadata(lang);
   try{const disk=await storage(lang,'readonly');if(disk){const data=new Uint8Array(disk);validate(data,meta);return data;}}
   catch(error){$('save-status').textContent=`存档读取失败：${error.message}`;}
-  const response=await fetch(meta.url);if(!response.ok)throw Error('原版镜像加载失败');
-  const data=new Uint8Array(await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
-  if(await sha256(data)!==meta.sha256)throw Error('原版镜像校验失败');
-  return data;
+  return loadVerifiedBytes(meta.url,meta.sha256,{gzip:true});
 }
 async function exportDisk(){let disk=assist.exportDisk(await emulator.getDiskImage(`3-${lang}.hdi`));if(soloMusic)disk=soloMusic.exportDisk(disk);unlockDiskScores(new Fat12(disk));return disk;}
 async function save(){
@@ -83,7 +96,7 @@ async function save(){
   return saveTask;
 }
 $('start').onclick=async()=>{
-  if(starting||emulator)return;starting=true;$('start').disabled=true;audioMode.disabled=true;runtimeMode.disabled=true;player.enter();
+  if(starting||emulator)return;starting=true;$('start').disabled=true;audioMode.disabled=true;runtimeMode.disabled=true;
   for(const id of ['language','clock','import'])$(id).disabled=true;
   try{
     if(audioMode.value==='independent')soloMusic=new SoloMusic(status);
@@ -92,7 +105,7 @@ $('start').onclick=async()=>{
     catch(error){$('save-status').textContent=`全解锁已生效，存档写入失败：${error.message}`;}
     assist=await createSoloAssist(()=>emulator);await assist.install(disk);
     if(soloMusic)await soloMusic.install(disk,'YUMEZIKU');
-    const config={canvas,clk_base:2457600,clk_mult:Number($('clock').value),
+    const config={canvas,
       // Independent BGM uses its own audio clock; native PCM retains sound effects.
       DIPswtch:[0x3e,0xf3,0x7b],ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,nativeSoloAudio:audioMode.value!=='original',
       no_mouse:true,use_menu:false,fontfile:lang==='cn'?'font_cn.bmp':'font.bmp',
@@ -102,11 +115,12 @@ $('start').onclick=async()=>{
     if(emulator.isWorker){assist.bridge=workerAssistBridge(emulator);emulator.onMusic=(ax,hash)=>soloMusic?.player.command(ax,hash);}
     await emulator.addDiskImage(`3-${lang}.hdi`,disk);await emulator.setHdd(0,`3-${lang}.hdi`);
     emulator.run();cover.hidden=true;$('reset').disabled=$('export').disabled=false;
+    await player.enter({native:false});
     canvas.focus();emulator.module.SDL2?.audioContext?.resume();status('原版运行中');
   }catch(error){emulator?.dispose?.();soloMusic?.dispose();player.exit();report(error);$('start').textContent='刷新重试';$('start').disabled=false;$('start').onclick=()=>location.reload();}
   finally{starting=false;}
 };
-$('reset').onclick=async()=>{if(!confirm('重启原版游戏？当前对局会结束。'))return;release();emulator.pause();await save();assist.bridge.reset();soloMusic?.reset();emulator.reset();emulator.run();canvas.focus();status('原版运行中');};
+$('reset').onclick=async()=>{if(!confirm('重启原版游戏？当前对局会结束。'))return;release();emulator.pause();await save();assist.bridge.reset();soloMusic?.reset();await emulator.reset();emulator.run();canvas.focus();status('原版运行中');};
 $('export').onclick=async()=>{try{const url=URL.createObjectURL(new Blob([await exportDisk()]));
   const a=document.createElement('a');a.href=url;a.download=`th03-original-${lang}.hdi`;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}catch(error){report(error);}};
 $('import').onchange=async event=>{try{const file=event.target.files[0];if(!file||emulator||starting)return;

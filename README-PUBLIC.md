@@ -15,7 +15,7 @@
 
 1. 在 **th03-netplay-lab** 运行一次 `install-relay.bat`，安装 TCP Relay 依赖。
 2. 如需 TURN，运行 `configure-turn.bat`，填写自己的 Cloudflare TURN Key ID 和配套 API Token。和 TH04 使用同一种配置格式，本项目使用独立配置文件。
-3. 运行 `start-lan.bat`，保留服务窗口，默认端口 **9869**。
+3. 运行 `start-lan.bat`，保留服务窗口，默认端口 **9877**。
 4. 安装过 cloudflared 后，运行 `start-public-tunnel.bat`。未安装时可在终端执行 `winget install --id Cloudflare.cloudflared --exact`。
 5. 窗口与 `public-test-url.txt` 会列出 UDP、强制 TURN、TCP 三个完整链接。**包括房主在内，双方打开同一个公网链接**，再建房、分享邀请、加入、准备、开始。
 
@@ -30,21 +30,21 @@
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-relay.txt
-.venv/bin/python lan_server.py --bind 127.0.0.1 --port 9869
+.venv/bin/python lan_server.py --bind 127.0.0.1 --port 9877
 ```
 
 在具有有效证书的 Nginx HTTPS server 中，代理整个站点：
 
 ```nginx
 location / {
-    proxy_pass http://127.0.0.1:9869;
+    proxy_pass http://127.0.0.1:9877;
     proxy_http_version 1.1;
     proxy_set_header Host $http_host;
     proxy_buffering off;
     proxy_read_timeout 120s;
 }
 location = /relay {
-    proxy_pass http://127.0.0.1:9869;
+    proxy_pass http://127.0.0.1:9877;
     proxy_http_version 1.1;
     proxy_set_header Host $http_host;
     proxy_set_header Upgrade $http_upgrade;
@@ -65,7 +65,7 @@ https://你的域名/lan.html?network=public&transport=ws
 
 兼容 TH04 的旧链接参数 `network=public-udp`、`public-ws`、`direct-ws`，以及 TH03 原有 `transport=relay`。客机加入后自动采用房间连接设置；分享链接也保留这些设置。切换传输前先“结束并返回”，重新建房。
 
-没有域名时，TCP 临时对照可直接监听 `--bind 0.0.0.0`，放行选定 TCP 端口，然后使用 `http://服务器IP:9869/lan.html?network=public&transport=ws`。完整浏览器权限及正式使用推荐 HTTPS。
+没有域名时，TCP 临时对照可直接监听 `--bind 0.0.0.0`，放行选定 TCP 端口，然后使用 `http://服务器IP:9877/lan.html?network=public&transport=ws`。完整浏览器权限及正式使用推荐 HTTPS。
 
 必须代理 `/api/*`（含 `/api/ice`）和 `/relay` 到同一个进程，保留外部 Host（含端口）及原始 Origin。使用独立域名根路径，不要直接挂在 `/th03/` 子路径下。房间存在进程内存中，只运行一个实例；重启后需重新建房。
 

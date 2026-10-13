@@ -1,7 +1,9 @@
 import {FrameQueue,TICK_MS} from './frame-queue.js';
 export class Lockstep {
-  constructor({network,step,hash,onError,onState,capture,restore,confirm,rollbackEnabled=false,directionPrediction=3}){
-    Object.assign(this,{network,step,hash,onError,onState,capture,restore,confirm,rollbackEnabled});
+  constructor({network,step,present,hash,onError,onState,capture,restore,confirm,rollbackEnabled=false,directionPrediction=3,snapshotStride=1}){
+    if(!Number.isInteger(snapshotStride)||snapshotStride<1||snapshotStride>2)throw Error('无效回滚检查点间隔');
+    Object.assign(this,{network,step,present,hash,onError,onState,capture,restore,confirm,rollbackEnabled,snapshotStride});
+    this.checkpoints=new Set();
     this.queue=new FrameQueue(network.localSeat,{rollbackEnabled,directionPrediction});this.hashes=new Map();this.remoteHashes=new Map();this.pendingHashes=new Map();
     this.costs={simulate:0,steps:0,capture:0,captures:0,restore:0,restores:0,hash:0,confirm:0,replays:0};
     this.running=false;this.applying=false;this.last=0;this.budget=0;this.lastProgress=performance.now();this.replayUntil=null;
@@ -28,7 +30,13 @@ export class Lockstep {
     this.hashes.delete(frame);this.remoteHashes.delete(frame);
   }
   confirmFrames(){
-    const prefix=Math.min(this.queue.frame,this.queue.confirmed);this.confirm?.(prefix);
+    const prefix=Math.min(this.queue.frame,this.queue.confirmed);
+    // Retain the preceding checkpoint when the confirmed frontier falls
+    // between checkpoints. Audio still confirms at the exact input frontier.
+    const preceding=[...this.checkpoints].filter(frame=>frame<=prefix).at(-1);
+    const retainFrom=this.snapshotStride===1?prefix:(preceding??prefix);
+    this.confirm?.(prefix,retainFrom);
+    for(const frame of this.checkpoints)if(frame<retainFrom)this.checkpoints.delete(frame);
     for(const [frame,hash] of this.pendingHashes)if(frame<=prefix){
       this.hashes.set(frame,hash);this.network.sendPacket({type:'check',frame,hash});this.compare(frame);this.pendingHashes.delete(frame);
     }
@@ -63,17 +71,23 @@ export class Lockstep {
     if(!this.running||this.pumping)return;
     this.pumping=true;
     try{
-      // Preserve fractional time under normal callback jitter. Once two new
-      // frames are overdue, discard the stall debt and resume with just one.
+      // Keep ordinary native-update/callback jitter in the 60 Hz budget. A
+      // 20-30 ms checkpoint must not discard almost a whole extra frame.
+      // Discard severe stalls, and bound ordinary catch-up to two ticks.
       // Historical rollback repair still uses the separate replay loop below.
       this.budget+=Math.max(0,now-this.last);this.last=now;
-      if(this.budget>=TICK_MS*2)this.budget=TICK_MS;
+      if(this.budget>=TICK_MS*4)this.budget=TICK_MS;
+      else this.budget=Math.min(this.budget,TICK_MS*2);
+      if(this.queue.waitReason)this.budget=Math.min(this.budget,TICK_MS);
       const started=performance.now();let steps=0;
       const timed=(kind,fn)=>{const at=performance.now();const result=fn();this.costs[kind]+=performance.now()-at;return result;};
       const simulate=replay=>{
         const pair=this.queue.peek();if(!pair)return false;
         const frame=this.queue.frame;
-        if(this.queue.active&&frame>=this.queue.confirmed){timed('capture',()=>this.capture?.(frame));this.costs.captures++;}
+        const previous=[...this.checkpoints].at(-1);
+        if(this.queue.active&&frame>=this.queue.confirmed&&(previous===undefined||frame-previous>=this.snapshotStride)){
+          timed('capture',()=>this.capture?.(frame));this.checkpoints.add(frame);this.costs.captures++;
+        }
         this.applying=true;try{timed('simulate',()=>this.step(pair,frame,replay));}finally{this.applying=false;}
         this.queue.commit(pair);this.costs.steps++;
         if(this.queue.frame%120===0)this.pendingHashes.set(this.queue.frame,timed('hash',()=>this.hash()));
@@ -85,9 +99,12 @@ export class Lockstep {
         if(this.budget>=TICK_MS&&(this.replayUntil===null||this.queue.frame>=this.replayUntil)&&this.queue.needsCapture()){
           const packet=this.queue.capture(this.network.capture());if(packet)this.network.sendPacket(packet);
         }
-        const from=this.queue.dirty;
+        const dirty=this.queue.dirty;
+        const from=this.snapshotStride===1?dirty:[...this.checkpoints].filter(frame=>frame<=dirty).at(-1);
+        if(from===undefined)throw Error('回滚检查点已过期');
         this.replayUntil=Math.max(this.replayUntil??0,this.queue.frame);
         const restored=timed('restore',()=>this.restore?.(from)??from);this.queue.rewind(restored);this.costs.restores++;
+        for(const frame of this.checkpoints)if(frame>=restored)this.checkpoints.delete(frame);
         for(const at of this.pendingHashes.keys())if(at>restored)this.pendingHashes.delete(at);
       }
       timed('confirm',()=>this.confirmFrames());
@@ -109,6 +126,7 @@ export class Lockstep {
       if(wait>15000&&this.queue.waitReason==='window')throw Error('联机延迟超过回滚窗口，请双方检查网络连接');
       if(wait>600)this.onState?.(`等待另一端第 ${this.queue.frame} 帧输入`);
       else if(steps&&this.queue.frame%120===0)this.onState?.(`帧同步运行中 · ${this.queue.frame}`);
+      if(this.replayUntil===null)this.present?.();
       this.schedule();
       if(this.replayUntil!==null)this.wake(steps?0:16);
       else this.wake(Math.max(1,TICK_MS-this.budget-(after-this.last)));

@@ -11,7 +11,7 @@
 玩家 B 浏览器 ── HTTP(S) / WebSocket ── TH03 服务器
 ```
 
-各玩家在浏览器内运行游戏和 NP21 模拟器；服务器提供资源、管理房间并转发输入，不运行模拟器，不传输游戏画面或音频流。服务器需保存完整的网页和游戏资源，玩家首次访问还会下载 WASM、磁盘及音乐。
+各玩家在浏览器内运行游戏和 DOSBox-X 模拟器；服务器提供资源、管理房间并转发输入，不运行模拟器，不传输游戏画面或音频流。服务器需保存完整的网页和游戏资源，玩家首次访问还会下载 WASM、磁盘及音乐。
 
 | 方式 | 游戏输入路径 | 服务要求 |
 | --- | --- | --- |
@@ -57,7 +57,7 @@ th03-netplay-lab/
 局域网：
 
 1. 在 TH03 目录运行一次 `install-relay.bat`。
-2. 启动 `start-lan.bat`，保持窗口打开，默认监听 TCP 9869。
+2. 启动 `start-lan.bat`，保持窗口打开，默认监听 TCP 9877。
 3. 双方打开启动窗口提供的局域网地址，在“连接设置与帮助”选择“服务器转发（WebSocket）”，再建房、加入、准备、开始。
 
 临时公网：
@@ -77,7 +77,7 @@ th03-netplay-lab/
 cd /实际路径/th03-netplay-lab
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-relay.txt
-.venv/bin/python lan_server.py --bind 0.0.0.0 --port 9869
+.venv/bin/python lan_server.py --bind 0.0.0.0 --port 9877
 ```
 
 若缺少 venv，先按发行版安装 `python3-venv`。在云安全组和系统防火墙放行选定的 **TCP** 端口。前台运行需保持会话存活；长期部署可用现有 systemd 等服务管理方式托管。
@@ -85,10 +85,10 @@ python3 -m venv .venv
 双方使用这个完整入口：
 
 ```text
-http://服务器IP:9869/lan.html?network=public&transport=ws
+http://服务器IP:9877/lan.html?network=public&transport=ws
 ```
 
-不带 `transport=ws` 的公网入口默认走 WebRTC，不能用于确认 TCP Relay 已连通。网页自动从当前来源生成 `ws://服务器IP:9869/relay`，无需硬编码 IP，也无需另开 9870 端口。
+不带 `transport=ws` 的公网入口默认走 WebRTC，不能用于确认 TCP Relay 已连通。网页自动从当前来源生成 `ws://服务器IP:9877/relay`，无需硬编码 IP，也无需另开 9876 端口。
 
 房主创建房间并分享邀请链接；双方准备后由房主开始。房主可在开局前选择左侧 P1 或右侧 P2，客机自动分配到另一侧；更换席位需双方重新准备，角色在游戏内选择。两人必须使用同一个服务，不能一人访问 localhost、另一人访问独立部署的服务器。
 
@@ -99,14 +99,14 @@ HTTP 可用于临时键盘联机对照；手柄等浏览器功能可能要求安
 使用已有有效证书的独立域名，将 Python 服务限制在回环地址：
 
 ```bash
-.venv/bin/python lan_server.py --bind 127.0.0.1 --port 9869
+.venv/bin/python lan_server.py --bind 127.0.0.1 --port 9877
 ```
 
 在 Nginx 的 HTTPS `server` 块配置：
 
 ```nginx
 location / {
-    proxy_pass http://127.0.0.1:9869;
+    proxy_pass http://127.0.0.1:9877;
     proxy_http_version 1.1;
     proxy_set_header Host $http_host;
     proxy_buffering off;
@@ -114,7 +114,7 @@ location / {
 }
 
 location = /relay {
-    proxy_pass http://127.0.0.1:9869;
+    proxy_pass http://127.0.0.1:9877;
     proxy_http_version 1.1;
     proxy_set_header Host $http_host;
     proxy_set_header Upgrade $http_upgrade;
@@ -131,7 +131,7 @@ location = /relay {
 https://你的域名/lan.html?network=public&transport=ws
 ```
 
-浏览器自动连接 `wss://你的域名/relay`。公网只需开放 HTTPS 入口，Python 的 9869 无需对公网开放。
+浏览器自动连接 `wss://你的域名/relay`。公网只需开放 HTTPS 入口，Python 的 9877 无需对公网开放。
 
 部署时保持以下条件：
 

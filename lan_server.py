@@ -1,5 +1,6 @@
 """TH03 LAN room/signaling server. Game input is exchanged by the selected transport."""
 import argparse, json, secrets, socket, threading, time
+from urllib.request import urlopen
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -20,7 +21,7 @@ def validated_settings(value, host_seat=0):
       or value['language'] not in ('jp', 'cn') \
       or type(value['hostSeat']) is not int or value['hostSeat'] not in (0, 1) \
       or type(value['difficulty']) is not int or value['difficulty'] not in range(4) \
-      or type(value['clock']) is not int or value['clock'] not in (8, 16, 24, 32) \
+      or type(value['clock']) is not int or value['clock'] != 32 \
       or any(type(value[key]) is not bool for key in ('rollback', 'focusEnabled', 'touchUnlimitedAllowed')):
         return None
     return value
@@ -35,7 +36,7 @@ def snapshot(room):
 
 class Handler(SimpleHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
-    extensions_map = {**SimpleHTTPRequestHandler.extensions_map, '.js': 'text/javascript', '.wasm': 'application/wasm', '.gz': 'application/octet-stream'}
+    extensions_map = {**SimpleHTTPRequestHandler.extensions_map, '.js': 'text/javascript', '.mjs': 'text/javascript', '.wasm': 'application/wasm', '.gz': 'application/octet-stream'}
     def log_message(self, *args): pass
     def end_headers(self):
         self.send_header('Cache-Control', 'no-store')
@@ -187,7 +188,7 @@ class Handler(SimpleHTTPRequestHandler):
         return self.reply(config)
 
 def main():
-    parser = argparse.ArgumentParser(); parser.add_argument('--port', type=int, default=9869)
+    parser = argparse.ArgumentParser(); parser.add_argument('--port', type=int, default=9877)
     parser.add_argument('--bind', default='0.0.0.0'); args = parser.parse_args()
     try:
         class Server(ThreadingHTTPServer):
@@ -198,8 +199,18 @@ def main():
                 super().server_bind()
         server = Server((args.bind, args.port), partial(Handler, directory=str(ROOT)))
     except OSError as error:
-        raise SystemExit(f'Cannot listen on port {args.port}. Close the previous LAN server and try again. ({error})')
+        print(f'当前启动目录：{ROOT.parent}', flush=True)
+        try:
+            with urlopen(f'http://127.0.0.1:{args.port}/lockstep-runtime.json', timeout=2) as response:
+                active_version = json.load(response).get('protocol', 'unknown')
+            print(f'端口 {args.port} 已由另一服务占用，正在提供：{active_version}', flush=True)
+        except (OSError, ValueError):
+            print(f'端口 {args.port} 已被占用。', flush=True)
+        raise SystemExit(f'新版服务没有启动。请关闭旧服务，再运行此目录的 start-lan.bat；刷新网页仍会访问旧服务。({error})')
     print('TH03 netplay - lobby, STUN/TURN credentials and TCP WebSocket relay', flush=True)
+    with (ROOT / 'lockstep-runtime.json').open(encoding='utf-8') as runtime_file:
+        runtime_version = json.load(runtime_file)['protocol']
+    print(f'服务目录：{ROOT.parent}\n联机版本：{runtime_version}', flush=True)
     print(f'A computer: http://localhost:{args.port}/lan.html', flush=True)
     addresses = sorted({item[4][0] for item in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)
                         if not item[4][0].startswith('127.')})

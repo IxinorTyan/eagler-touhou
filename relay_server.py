@@ -13,7 +13,7 @@ ACTIONS = {'up', 'down', 'left', 'right', 'shot', 'rapid', 'attack', 'focus'}
 def valid_message(message):
     if not isinstance(message, dict):
         return False
-    if message.get('sync') == 'th03-rollback/1':
+    if message.get('sync') == 'th03-rollback/5':
         kind = message.get('type')
         if kind == 'sync-ready':
             return isinstance(message.get('identity'), dict)

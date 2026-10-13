@@ -20,10 +20,16 @@ export class NativeMusic {
       &&view.getUint16(base+0x60*4,true)>=0x100
       &&view.getUint16(base+0x60*4,true)<this.patch.mailbox_com_offset;
   }
-  read(heap){
+  dosRange(heap) {
+    if (!this.valid(heap,this.at)) return null;
+    const segment=new DataView(heap.buffer,heap.byteOffset,heap.byteLength).getUint16(this.at+16,true);
+    const start=this.at-this.patch.mailbox_com_offset-segment*16;
+    return {start,end:start+0xa0000};
+  }
+  read(heap,scanBytes=2*1024*1024){
     if(!this.valid(heap,this.at)){
       this.at=-1;
-      const end=Math.min(heap.length,this.cursor+2*1024*1024);
+      const end=Math.min(heap.length,this.cursor+scanBytes);
       const slice=heap.subarray(this.cursor,Math.min(heap.length,end+this.signature.length));
       for(let i=slice.indexOf(this.signature[0]);i>=0&&this.cursor+i<end;i=slice.indexOf(this.signature[0],i+1)){
         const at=this.cursor+i;
@@ -47,13 +53,14 @@ export class NativeMusic {
 }
 
 export class ConfirmedMusic {
-  constructor(player){this.player=player;this.frames=new Map();}
-  stage(frame,events){if(events.length)this.frames.set(frame,events);}
+  constructor(player){this.player=player;this.frames=new Map();this.confirmed=0;}
+  stage(frame,events){if(frame>=this.confirmed&&events.length)this.frames.set(frame,events);}
   rewind(frame){for(const key of this.frames.keys())if(key>=frame)this.frames.delete(key);}
   confirm(prefix){
     for(const [frame,events] of this.frames)if(frame<prefix){
       for(const [ax,hash] of events)this.player.command(ax,hash);
       this.frames.delete(frame);
     }
+    this.confirmed=Math.max(this.confirmed,prefix);
   }
 }

@@ -26,12 +26,12 @@ export function mountSoloPerformance({host,game,getEmulator,readState}){
     const now=performance.now(),elapsed=now-run.start,final=readState(),config=run.emulator.config;
     const native=summarize(run.costs),raf=summarize(run.intervals);
     const stable=run.stable&&final?.playing&&final.generation===run.state?.generation&&final.ticks>=run.state?.ticks;
-    report={schema:'touhou-solo-performance/1',build:'20261009-worker-input-v2',game,recordedAt:new Date().toISOString(),
+    report={schema:'touhou-solo-performance/1',build:'20261013-th03-dosbox-x-v1',game,recordedAt:new Date().toISOString(),
       completion:reason,durationMs:elapsed,environment:{userAgent:navigator.userAgent,
         hardwareConcurrency:navigator.hardwareConcurrency||null,deviceMemoryGiB:navigator.deviceMemory||null,
         devicePixelRatio,viewport:{width:innerWidth,height:innerHeight},screen:{width:screen.width,height:screen.height},
         crossOriginIsolated:globalThis.crossOriginIsolated===true},
-      emulator:{executionThread:run.module.executionThread||'main',clockMultiplier:config.clk_mult,clockBase:config.clk_base,sampleHz:config.SampleHz,
+      emulator:{executionThread:run.module.executionThread||'main',core:run.module.mobileRuntime?.core,cpuCore:'simple',cycles:'max 100%',sampleHz:config.SampleHz,
         soundBoard:config.SNDboard,heapMiB:(run.module.heapBytes??run.module.HEAPU8?.length)/1048576,
         audioState:run.module.SDL2?.audioContext?.state||null,audioSampleHz:run.module.SDL2?.audioContext?.sampleRate||null},
       nativeCallbacks:{...native,hz:run.costs.length*1000/elapsed,

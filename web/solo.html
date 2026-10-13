@@ -6,16 +6,20 @@
 <style>
 .solo-assists{display:grid;gap:10px;padding:0 0 14px;margin-bottom:14px;border-bottom:1px solid #ffffff16}
 .solo-assists strong{font-size:13px}
+.solo-launch-assists{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px}
+.solo-launch-assists label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.solo-launch-assists input[type=checkbox]{width:18px;height:18px;min-height:0;margin:0;accent-color:var(--pink)}
+.solo-launch-assists label:has(input:disabled){opacity:.55;cursor:default}
 </style></head>
-<body class="shell game-page"><header class="masthead"><a class="brand" href="index.html">TOUHOU / 03 · 测试 beta0.3</a><small>東方夢時空 · PHANTASMAGORIA OF DIM.DREAM</small></header><nav class="mode-nav" aria-label="游戏模式"><a data-mode="solo" aria-current="page" href="solo.html">单机游戏</a><a data-mode="local" href="local.html">本地双人</a><a data-mode="lan" data-network="lan" href="lan.html?network=lan">局域网联机</a><a data-mode="public" data-network="public" href="lan.html?network=public">公网联机</a></nav><main>
+<body class="shell game-page"><header class="masthead"><a class="brand" href="index.html">TOUHOU / 03 · 测试 beta0.3 · 性能版</a><small>東方夢時空 · PHANTASMAGORIA OF DIM.DREAM</small></header><nav class="mode-nav" aria-label="游戏模式"><a data-mode="solo" aria-current="page" href="solo.html">单机游戏</a><a data-mode="local" href="local.html">本地双人</a><a data-mode="lan" data-network="lan" href="lan.html?network=lan">局域网联机</a><a data-mode="public" data-network="public" href="lan.html?network=public">公网联机</a></nav><main>
 <header class="intro"><span class="eyebrow">ORIGINAL / SINGLE PLAYER</span><h1>单机游戏</h1><p>选择中文汉化或日文版，从开头进入梦时空。默认 Lunatic，全部九名角色已解锁；可在原版菜单内选择难度和角色，保留剧情与排行榜记录。</p></header>
 <fieldset class="launch-settings"><legend>启动设置</legend><div class="settings-grid">
 <label>游戏语言 <select id="language"><option value="jp">日文原版</option><option value="cn">中文汉化</option></select></label>
-<label>声音 <select id="audio-mode" aria-describedby="audio-help"><option value="independent">独立音乐（手机建议）</option><option value="buffered">原声·抗卡顿缓冲</option><option value="original">原声·低延迟</option></select></label><small id="audio-help">独立音乐保持正常速度，不随游戏掉帧变调；音效仍由游戏播放。原声缓冲适合短暂卡顿，约增加 0.2 秒声音延迟。</small>
-<label>CPU <select id="clock" aria-describedby="clock-help"><option value="16">39 MHz</option><option value="8">20 MHz</option><option value="24">59 MHz</option><option value="32" selected>79 MHz</option></select><small id="clock-help">默认 79 MHz，卡顿时可尝试其他频率；较低频率可能让游戏减速。</small></label></div></fieldset>
-<div class="row launch-toolbar"><button id="start" class="primary">启动原版游戏 →</button><span class="muted">“按键与触控”可设置低速、判定点和不限速移动。</span></div>
-<section id="screen" aria-label="游戏"><canvas id="canvas" width="640" height="400" tabindex="0" aria-label="梦时空游戏画面"></canvas><div id="cover"><span>选择语言，点击“启动原版游戏”。</span></div></section>
+<label>声音 <select id="audio-mode" aria-describedby="audio-help"><option value="independent">独立音乐（手机建议）</option><option value="buffered">原声·缓冲</option><option value="original">原声·低延迟</option></select></label><small id="audio-help">独立音乐保持正常速度，不随游戏掉帧变调；音效仍由游戏播放。原声由模拟器播放，独立音乐由浏览器播放。</small>
+<select id="clock" hidden aria-hidden="true"><option value="32" selected>自动</option></select></div></fieldset>
+<div class="row launch-toolbar"><button id="start" class="primary" disabled>启动原版游戏 →</button><div class="solo-launch-assists" role="group" aria-label="单人低速设置"><label><input id="solo-focus-enabled" type="checkbox" disabled> 启用低速（按住空格）</label><label><input id="solo-focus-points" type="checkbox" disabled> 低速时显示判定点</label></div></div>
+<section id="screen" class="screen" aria-label="游戏"><canvas id="canvas" width="640" height="400" tabindex="0" aria-label="梦时空游戏画面"></canvas><div id="cover"><span>选择语言，点击“启动原版游戏”。</span></div></section>
 <nav class="toolbar"><div class="commands"><button id="reset" disabled>重启</button><button id="export" disabled>导出存档</button><label class="file-button">导入原版存档<input id="import" type="file" accept=".hdi"></label></div></nav>
-<div class="status"><span id="status" role="status">等待启动</span><span id="save-status"></span></div>
+<div class="status"><span id="status" role="status">正在初始化单机页面…</span><span id="save-status"></span></div>
 <p>键盘：方向键移动，Z/J 连发（点按单次、按住最高速，60帧下每秒15次），Shift/K 蓄力，X/L Bomb，Esc 原版暂停。启用低速后可按住空格。触屏：拖动移动，按住独立蓄力键蓄力，松手释放；菜单方向键和确认可直接点击。“按键与触控”中可设置辅助、使用独立连发键、调整布局和全屏。</p>
-</main><footer class="footer"><a href="index.html">← 返回启动器</a><span>TH03 · PHANTASMAGORIA OF DIM.DREAM</span></footer><script type="module" src="solo.js"></script></body></html>
+</main><footer class="footer"><a href="index.html">← 返回启动器</a><span>TH03 · PHANTASMAGORIA OF DIM.DREAM</span></footer><script type="module" src="solo-bootstrap.js"></script></body></html>

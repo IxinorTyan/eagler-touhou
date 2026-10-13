@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 where cloudflared >nul 2>nul
 if errorlevel 1 goto missing
-echo Keep start-lan.bat running on port 9869 first.
+echo Keep start-lan.bat running on port 9877 first.
 echo This exposes the TH03 web directory and room API through a temporary URL.
 echo UDP, TURN-only and TCP game URLs will be printed and saved to public-test-url.txt.
 echo Both players must open the same public URL, including the host.

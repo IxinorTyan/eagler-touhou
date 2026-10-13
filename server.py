@@ -21,7 +21,7 @@ class Server(ThreadingHTTPServer):
 
 
 class Handler(SimpleHTTPRequestHandler):
-    extensions_map = {**SimpleHTTPRequestHandler.extensions_map, '.js': 'text/javascript',
+    extensions_map = {**SimpleHTTPRequestHandler.extensions_map, '.js': 'text/javascript', '.mjs': 'text/javascript',
                       '.wasm': 'application/wasm', '.gz': 'application/octet-stream'}
 
     def send_head(self):
@@ -43,10 +43,11 @@ class Handler(SimpleHTTPRequestHandler):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--port', type=int, default=9868)
+    parser.add_argument('--port', type=int, default=9876)
     parser.add_argument('--no-browser', action='store_true')
+    parser.add_argument('--page', choices=('index.html', 'solo.html', 'local.html'), default='index.html')
     args = parser.parse_args()
-    for name in ('index.html', 'vendor/np2/np21.wasm', 'disks/3-jp.hdi.gz', 'disks/3-cn.hdi.gz',
+    for name in ('index.html', 'vendor/dosbox-x/wdosbox-x-fast.wasm', 'vendor/dosbox-x/wdosbox-x-rollback.wasm', 'disks/3-jp.hdi.gz', 'disks/3-cn.hdi.gz',
                  'native-patch.json', 'native/main.exe', 'native/start.com',
                  'native/game-jp.bat', 'native/game-cn.bat'):
         if not (ROOT / name).is_file():
@@ -60,7 +61,8 @@ def main():
                 raise
     else:
         raise SystemExit('No free local port')
-    url = f'http://127.0.0.1:{port}/'
+    url = f'http://127.0.0.1:{port}/{args.page}'
+    print(f'服务目录：{ROOT.parent}', flush=True)
     print(f'TH03 local multiplayer\n{url}\nKeep this window open. Ctrl+C to stop.', flush=True)
     if not args.no_browser:
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()

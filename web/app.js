@@ -1,5 +1,8 @@
-import {NP21} from './vendor/np2/np2-wasm.js';
-import {NP21 as SyncNP21} from './vendor/np2/np2-netplay.js';
+import {DOSBoxPC98} from './dosbox-adapter.js';
+import {WorkerNP21, supportsSoloWorker} from './solo-worker-client.js';
+import {workerLocalPause} from './local-worker-client.js';
+import {bootToSelection} from './dosbox-boot.js';
+import {loadVerifiedBytes, loadNetworkAssets} from './startup-assets.js';
 import {mountControls} from './controls.js';
 import {Fat12, installNativePause, nativeAssets, sha256} from './disk.js';
 import {unlockDiskScores} from './scores.js';
@@ -10,6 +13,7 @@ import {Lockstep} from './lockstep.js';
 import {createFrameGate} from './frame-limit.js';
 import {LocalBgm} from './local-bgm.js';
 import {NativeMusic, ConfirmedMusic} from './native-music.js';
+import {createNetworkHistory} from './network-performance.js';
 
 const $ = id => document.getElementById(id);
 const netQuery = new URLSearchParams(location.search);
@@ -41,14 +45,23 @@ const visibleCanvas = $('canvas');
 const visibleContext = online ? visibleCanvas.getContext('2d', {alpha: false}) : null;
 const presentationDue = createFrameGate();
 let presentationCount = 0, lastUpload = -1;
+let presentationMs=0;
+const networkHistory=createNetworkHistory();
+const networkEvents=createNetworkHistory(100);
+const logError=(kind,error)=>{if(online)networkEvents.push({at:performance.now(),kind,message:String(error?.message??error).replace(/https?:\/\/[^\s)]+/g,'[URL]').slice(0,2000)});};
+window.addEventListener('error',event=>logError('error',event.error??event.message));
+window.addEventListener('unhandledrejection',event=>logError('unhandledrejection',event.reason));
 function presentFrame() {
   if (!online || !emulator || closed || closing || emulator.state === 'exited') return;
   const uploaded=emulator.module.frameUploads||0;
   if(uploaded===lastUpload)return;
+  const began=performance.now();
+  if(!emulator.module.netPresent())return;
   lastUpload=uploaded;
   visibleContext.imageSmoothingEnabled = false;
   visibleContext.drawImage(nativeCanvas, 0, 0, 640, 400);
   presentationCount++;
+  presentationMs+=performance.now()-began;
 }
 const syncSnapshots=new Map();
 const hiddenSeats=new Set();
@@ -59,7 +72,8 @@ function performanceTotals(){
     executed:costs?.steps??module?.localFrameCount??0,simulate:costs?.simulate??module?.localStepMs??0,
     uploads:module?.frameUploads||0,presentations:online?presentationCount:module?.frameUploads||0,
     capture:costs?.capture||0,captures:costs?.captures||0,hash:costs?.hash||0,
-    restore:costs?.restore||0,replays:costs?.replays||0};
+    restore:costs?.restore||0,replays:costs?.replays||0,presentationMs,
+    native:module?.stepMetrics?.totalMs||0,nativeSteps:module?.stepMetrics?.count||0};
 }
 setInterval(()=>{
   if(!emulator||closed)return;
@@ -70,12 +84,19 @@ setInterval(()=>{
   const stats={stepsHz:rate('steps'),uploadsHz:rate('uploads'),presentationsHz:rate('presentations'),
     simulateMs:delta('simulate')/Math.max(1,delta('executed')),
     snapshotMs:delta('capture')/Math.max(1,delta('captures')),hashMs:delta('hash'),
-    replaySteps:delta('replays'),restoreMs:delta('restore'),snapshotBytes:emulator.module.netSnapshotInfo?.().snapshotBytes||0};
+    replaySteps:delta('replays'),restoreMs:delta('restore'),snapshotBytes:emulator.module.netSnapshotInfo?.().snapshotBytes||0,
+    nativeMs:delta('native')/Math.max(1,delta('nativeSteps')),presentationMs:delta('presentationMs')/Math.max(1,delta('presentations'))};
   window.th03Performance=stats;
+  if(online)networkHistory.push({at:next.at,intervalMs:dt,...stats,frame:sync?.queue.frame??null,confirmed:sync?.queue.confirmed??null,
+    tick:emulator.tick,virtualNow:emulator.module.virtualNow,waitReason:sync?.queue.waitReason??'',replayUntil:sync?.replayUntil??null,
+    phase:nativeState?.phase??0,selecting:nativePause?.selecting??false,pauseSeat,hiddenSeats:[...hiddenSeats],documentHidden:document.hidden,
+    nativeMaxMs:emulator.module.stepMetrics?.maxMs??0,program:emulator.module.programReads?.at(-1)?.name??null,
+    snapshotStorage:emulator.module.netSnapshotInfo?.().storage??'disabled',heapBytes:emulator.module.HEAPU8.length,
+    audioState:emulator.audio.context.state,status:$('status').textContent,connection:$('connection-path').textContent});
   $('performance-stats').textContent=`模拟 ${stats.stepsHz.toFixed(1)}/60 步/秒 · 画面上传 ${stats.uploadsHz.toFixed(1)} 次/秒 · 显示提交 ${stats.presentationsHz.toFixed(1)} 次/秒\n模拟 ${stats.simulateMs.toFixed(2)} ms/步 · 快照 ${stats.snapshotMs.toFixed(2)} ms/次 · 校验 ${stats.hashMs.toFixed(2)} ms\n补算 ${stats.replaySteps} 步 · 恢复 ${stats.restoreMs.toFixed(2)} ms · 快照 ${(stats.snapshotBytes/1048576).toFixed(1)} MiB\n${localBgm?.status||'音乐准备中'}`;
 },1000);
 const enqueue=value=>{if(netplay?.isLockstep&&!sync?.applying){netplay.command(value);return true;}return false;};
-const nativeNow=()=>sync?.applying?syncFrame*1000/60:performance.now();
+const nativeNow=()=>online?(emulator?.module.virtualNow??0):performance.now();
 const inGameplay = () => !!nativeState?.phase;
 const screenChildren = [...$('screen').children];
 const player = mountPlayer($('screen'), {solo: true,network:online, onGesture: () => { clearEscape(); resumeAudio(); },
@@ -143,7 +164,7 @@ try {
   sessionStorage.removeItem('th03-local-restart');
   if (launch && ['jp', 'cn'].includes(launch.lang) && /^[0-3]$/.test(launch.rank)
     && ['8', '16', '24', '32'].includes(launch.clock)) {
-    $('language').value = launch.lang; $('difficulty').value = launch.rank; $('clock').value = launch.clock;
+    $('language').value = launch.lang; $('difficulty').value = launch.rank; $('clock').value = '32';
     restartOnLoad = true;
   }
 } catch {}
@@ -156,6 +177,7 @@ function status(text, error = false) {
   if (starting) notifyRoom(text, false, error);
 }
 function report(error) {
+  logError('reported',error);
   sync?.stop();
   console.error(error); status(`错误：${error.message || error}`, true);
   if (online) { emulator?.pause(); controls.release(); notifyRoom(`错误：${error.message || error}`, false, true); }
@@ -201,7 +223,7 @@ async function prepareDisk(data, meta, lang = activeLang || $('language').value)
 }
 function openDatabase() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('th03-local-lab', 1);
+    const request = indexedDB.open('th03-fast-local-lab', 1);
     request.onupgradeneeded = () => request.result.createObjectStore('disks');
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -230,11 +252,7 @@ async function loadDisk(lang) {
     }
   }
   status('正在加载梦时空镜像');
-  const response = await fetch(meta.url);
-  if (!response.ok) throw Error(`镜像加载失败 (${response.status})`);
-  const data = new Uint8Array(await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
-  const hash = await sha256(data);
-  if (hash !== meta.sha256) throw Error('原版镜像校验失败');
+  const data = await loadVerifiedBytes(meta.url, meta.sha256, {gzip: true});
   return prepareDisk(data, meta);
 }
 function diskChanged(name) {
@@ -250,7 +268,7 @@ async function save() {
   saveTask = (async () => {
     try {
       while (saved !== dirty) {
-        const version = dirty, disk = emulator.getDiskImage(`3-${activeLang}.hdi`);
+        const version = dirty, disk = await emulator.getDiskImage(`3-${activeLang}.hdi`);
         await stored(activeLang, 'readwrite', disk); saved = version;
       }
       storageWarning = ''; $('save-status').textContent = '已保存';
@@ -359,7 +377,7 @@ async function closeGame() {
 function trackNativePause() {
   if (!online && !closed && !closing && nativePause && emulator?.state !== 'exited') {
     nativeState = nativePause.update();
-    if (nativeMusic && localBgm) {
+    if (!emulator.isWorker && nativeMusic && localBgm) {
       for (const [ax,hash] of nativeMusic.read(emulator.module.HEAPU8)) localBgm.command(ax,hash);
     }
     if (!nativePause.selecting && escapeAt !== -Infinity) { clearEscape(); reflectState(); }
@@ -381,14 +399,10 @@ function trackNativePause() {
 trackNativePause();
 function stepSynchronized(inputs,frame,replay=false){
   emulator.module.netBeginFrame(frame,replay);
-  const present = !replay && presentationDue(performance.now());
-  // The native renderer can run ahead during catch-up. Avoid converting and
-  // uploading discarded/intermediate frames; state simulation remains exact.
-  emulator.module.skipFrameUpload = !present;
   try{
     syncReplaying=replay;
     syncFrame=frame;
-    nativeState=nativePause.update(frame*1000/60);
+    nativeState=nativePause.update(nativeNow(),nativeMusic.dosRange(emulator.module.HEAPU8));
     for(let seat=0;seat<2;seat++)for(const command of inputs[seat].commands){
       if(command==='hidden'){hiddenSeats.add(seat);continue;}
       if(command==='visible'){hiddenSeats.delete(seat);continue;}
@@ -405,15 +419,13 @@ function stepSynchronized(inputs,frame,replay=false){
     if(!paused){
       emulator.run();emulator.step();
       confirmedMusic?.stage(frame,nativeMusic.read(emulator.module.HEAPU8));
-      nativeState=nativePause.update((frame+1)*1000/60);
-      nativePause.result((frame+1)*1000/60);
+      nativeState=nativePause.update(nativeNow(),nativeMusic.dosRange(emulator.module.HEAPU8));
+      nativePause.result(nativeNow());
     }else emulator.pause();
-    if(present)presentFrame();
     if(pauseSeat!==null&&!replay)refreshPauseMenu();
     window.th03SyncState={frame:frame+1,tick:emulator.module.netInfo().tick,phase:nativeState?.phase??0,
       selecting:nativePause.selecting,pauseSeat,hidden:[...hiddenSeats]};
   }finally{
-    emulator.module.skipFrameUpload = false;
     emulator.module.netEndFrame();
     syncReplaying=false;
   }
@@ -425,7 +437,7 @@ function captureSynchronized(frame){
 }
 function restoreSynchronized(frame){
   const saved=syncSnapshots.get(frame);if(!saved)throw Error(`同步快照已过期：${frame}`);
-  emulator.module.netRestore(frame);const state=saved.app;
+  emulator.module.netRestore(frame);lastUpload=-1;const state=saved.app;
   pauseSeat=state.pauseSeat;pauseSelection=state.pauseSelection;hiddenSeats.clear();for(const seat of state.hidden)hiddenSeats.add(seat);
   visibilityPaused=state.visibilityPaused;nativePause.restore(state.nativePause);nativeMusic.restore(state.music);confirmedMusic.rewind(frame);controls.restore(state.controls);
   localizePause();
@@ -434,15 +446,15 @@ function restoreSynchronized(frame){
   for(const key of [...syncSnapshots.keys()])if(key>=frame)syncSnapshots.delete(key);
   return frame;
 }
-function confirmSynchronized(prefix){
+function confirmSynchronized(prefix,retainFrom=prefix){
   confirmedMusic?.confirm(prefix);
-  emulator.module.netConfirm?.(prefix);
-  for(const key of [...syncSnapshots.keys()])if(key<prefix)syncSnapshots.delete(key);
+  emulator.module.netConfirm?.(prefix,retainFrom);
+  for(const key of [...syncSnapshots.keys()])if(key<retainFrom)syncSnapshots.delete(key);
 }
 function syncHash(){
   const heap=emulator.module.HEAPU8;let h=2166136261;
   // Match TH04: verify all 640 KiB of DOS conventional memory instead of
-  // synchronously hashing the 20.5 MiB emulator heap every two seconds.
+  // synchronously hashing the complete DOSBox-X heap every two seconds.
   // Keep full-heap checking available for emulator regression tests.
   let base=-1;
   if(nativeMusic?.valid(heap,nativeMusic.at)){
@@ -484,22 +496,23 @@ $('start').addEventListener('click', async () => {
     }
     activeLang = $('language').value;
     localizePause();
-    const disk = await loadDisk(activeLang);
-    if(online){
+    const networkTask = online?(async()=>{
       const response=await fetch('lockstep-runtime.json',{cache:'no-store'});
       if(!response.ok)throw Error('同步引擎清单缺失');
       const runtime=await response.json();
-      for(const [path,expected] of Object.entries(runtime.files)){
-        const asset=await fetch(path,{cache:'no-store'});if(!asset.ok||await sha256(new Uint8Array(await asset.arrayBuffer()))!==expected)
-          throw Error('同步资源校验失败：'+path);
-      }
+      return {runtime,wasmBinary:await loadNetworkAssets(runtime,message=>status(message))};
+    })():null;
+    const [disk,networkAssets]=await Promise.all([loadDisk(activeLang),networkTask]);
+    const wasmBinary=networkAssets?.wasmBinary;
+    if(online){
+      const {runtime}=networkAssets;
       syncIdentity={protocol:runtime.protocol,files:runtime.files,disk:await sha256(disk),hostSeat:roomHostSeat,
         language:activeLang,difficulty:$('difficulty').value,clock:$('clock').value,rollback:rollbackEnabled,focusEnabled:roomFocusEnabled,touchUnlimitedAllowed:roomTouchUnlimitedAllowed};
     }
     nativePause = new NativePause(() => emulator, (await nativeAssets()).meta);
     nativeState = null; clearEscape();
-    status('正在启动 NP21');
-    emulator = await (online?SyncNP21:NP21).create({canvas:online?nativeCanvas:visibleCanvas,lockstep:online,lockstepEpoch:946684800000,clk_base:2457600,clk_mult:Number($('clock').value),
+    status('正在启动 DOSBox-X');
+    const config={canvas:online?nativeCanvas:visibleCanvas,lockstep:online,rollbackEnabled,wasmBinary,lockstepEpoch:946684800000,onError:report,
       DIPswtch: [0x3e, 0xf3, 0x7b], ExMemory: 7, Latencys: online?40:100, SampleHz: 44100, SNDboard: 4,
       no_mouse: true, use_menu: false, fontfile: activeLang === 'cn' ? 'font_cn.bmp' : 'font.bmp',
       onDiskChange: diskChanged, onExit: () => {
@@ -507,10 +520,14 @@ $('start').addEventListener('click', async () => {
         controls.release(); pauseSeat = null; nativeState = null;
         $('pause-menu').hidden = $('pause-shade').hidden = true;
         nativePause.reset(); reflectState(); save();
-      }});
+      }};
+    const useWorker=!online&&netQuery.get('runtime')!=='main'&&supportsSoloWorker();
+    emulator=useWorker?await WorkerNP21.create(config,{game:'03local',patch:nativePause.meta,music:(await nativeAssets()).meta.startup.music,onError:report}):await DOSBoxPC98.create(config);
+    if(emulator.isWorker)nativePause=workerLocalPause(emulator);
     localBgm = new LocalBgm(emulator.module.SDL2.audioContext, () => {});
     nativeMusic = new NativeMusic((await nativeAssets()).meta.startup.music);
     confirmedMusic = new ConfirmedMusic(localBgm);
+    if(emulator.isWorker)emulator.onMusic=(ax,hash)=>localBgm?.command(ax,hash);
     // The device decodes music asynchronously; downloads cannot stall game start.
     const loadingBgm=localBgm;
     loadingBgm.load({warmOpening:true}).catch(error => {
@@ -518,8 +535,13 @@ $('start').addEventListener('click', async () => {
       loadingBgm.status = `本地音乐错误：${error.message}`;
       console.error(error);
     });
-    emulator.addDiskImage(`3-${activeLang}.hdi`, disk);
-    emulator.setHdd(0, `3-${activeLang}.hdi`);
+    await emulator.addDiskImage(`3-${activeLang}.hdi`, disk);
+    await emulator.setHdd(0, `3-${activeLang}.hdi`);
+    let bootMusic=[];
+    if(online){
+      bootMusic=await bootToSelection({emulator,pause:nativePause,music:nativeMusic,clearInput:()=>controls.release(),progress:message=>{status(message);notifyRoom(message);}});
+      syncIdentity.boot=syncHash();
+    }
     if (online) {
       netplay = new Netplay({room: netQuery.get('room'), token: netQuery.get('token'), role: netQuery.get('role'), mode: netQuery.get('net'),sampleLocal:controls.sampleLocal,
         onState: message => {
@@ -527,14 +549,14 @@ $('start').addEventListener('click', async () => {
           if(embedded)window.parent.postMessage({protocol:'th03-lan/1',event:'connection',message},location.origin);
         }, onError: error => report(error)});
       emulator.pause();
-      status('正在连接另一台设备');
+      status('本机资源已就绪，等待另一位玩家完成加载');
       await netplay.start();
-      status('本机资源已就绪，等待另一位玩家');
-      await netplay.waitForPlayers();
-      sync=new Lockstep({network:netplay,rollbackEnabled,directionPrediction:netQuery.get('net')==='relay'?6:3,step:stepSynchronized,hash:syncHash,capture:captureSynchronized,restore:restoreSynchronized,confirm:confirmSynchronized,onError:report,
+      status('双方已连接，正在校验开局状态');
+      sync=new Lockstep({network:netplay,rollbackEnabled,snapshotStride:2,directionPrediction:netQuery.get('net')==='relay'?6:3,step:stepSynchronized,present:()=>{if(presentationDue(performance.now()))presentFrame();},hash:syncHash,capture:captureSynchronized,restore:restoreSynchronized,confirm:confirmSynchronized,onError:report,
         onState:message=>status(message)});
       await netplay.synchronize(syncIdentity);
     }
+    for(const [ax,hash]of bootMusic)localBgm.command(ax,hash);
     closed = false; dirty = saved = 0;
     $('cover').hidden = true; emulator.run(); $('canvas').focus(); resumeAudio();
     if(online)sync.start();
@@ -557,7 +579,7 @@ $('reset').addEventListener('click', async () => {
   clearEscape(); pauseSeat = null; nativeState = null; nativePause.reset();
   $('pause-menu').hidden = $('pause-shade').hidden = true;
   localBgm?.stop(); nativeMusic?.reset(); confirmedMusic?.frames.clear();
-  visibilityPaused = false; emulator.reset(); emulator.run(); reflectState(); $('canvas').focus(); resumeAudio();
+  visibilityPaused = false; await emulator.reset(); emulator.run(); reflectState(); $('canvas').focus(); resumeAudio();
 });
 $('controls').addEventListener('click', () => { controls.release(); if(online)$('screen').append($('settings')); $('settings').showModal(); });
 if(controlsOnly){
@@ -573,9 +595,9 @@ $('fullscreen').addEventListener('click', async () => {
 });
 $('canvas').addEventListener('pointerdown', () => { clearEscape(); $('canvas').focus(); resumeAudio(); });
 $('canvas').addEventListener('contextmenu', event => event.preventDefault());
-$('export').addEventListener('click', () => {
+$('export').addEventListener('click', async () => {
   try {
-    const url = URL.createObjectURL(new Blob([emulator.getDiskImage(`3-${activeLang}.hdi`)], {type: 'application/octet-stream'}));
+    const url = URL.createObjectURL(new Blob([await emulator.getDiskImage(`3-${activeLang}.hdi`)], {type: 'application/octet-stream'}));
     const link = document.createElement('a'); link.href = url;
     link.download = `th03-${activeLang}-${new Date().toISOString().slice(0, 10)}.hdi`; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 10000);

@@ -7,7 +7,7 @@ from pathlib import Path
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--port', type=int, default=9869)
+    parser.add_argument('--port', type=int, default=9877)
     args = parser.parse_args()
     if not 1 <= args.port <= 65535:
         parser.error('port must be in 1..65535')
