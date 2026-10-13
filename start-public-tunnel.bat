@@ -2,7 +2,7 @@
 cd /d "%~dp0"
 where cloudflared >nul 2>nul
 if errorlevel 1 goto missing
-echo Keep start-lan.bat running on port 9866 first.
+echo Keep start-lan.bat running on port 9868 first.
 echo This exposes the lab web directory and room API through a temporary URL.
 echo The complete WebSocket game URL will be printed as GAME URL.
 echo It will also be saved to public-test-url.txt in this folder.

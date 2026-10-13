@@ -17,7 +17,7 @@ class Handler(SimpleHTTPRequestHandler):
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('--no-browser',action='store_true')
-    parser.add_argument('--port',type=int,default=9864)
+    parser.add_argument('--port',type=int,default=9867)
     parser.add_argument('--page',choices=['local.html','solo.html','index.html'],default='local.html')
     args=parser.parse_args()
     root=Path(__file__).resolve().parent/'web'

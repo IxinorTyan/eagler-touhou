@@ -7,7 +7,7 @@ import {mountSoloFault} from './solo-fault.js';
 import {mountSoloTestTools,readSoloDiagnostics,writeSoloTestCommand} from './solo-test-tools.js';
 import {gameVersion,rememberLanguage} from './game-version.js';
 // Standalone original game. No cooperative runtime, launcher or netplay session.
-import {NP21} from './vendor/np2/np2-wasm.js';
+import {NP21} from './dosbox-adapter.js';
 import {mountPlayer} from './player-ui.js';
 import {mountFocusSettings} from './focus-settings.js';
 import {mountControlSettings,keyboardBits,padBits,isBound,isFormTarget,controlsSummary,syntheticInputEvents} from './control-settings.js';
@@ -150,7 +150,7 @@ $('start').onclick=async()=>{
     const data=new Uint8Array(await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
     if(data.length!==patch.disk.size||await sha256(data)!==patch.disk.sha256)throw Error('单机磁盘校验失败');
     if(soloMusic)await soloMusic.install(data,'GENSO');
-    const config={canvas,clk_base:2457600,clk_mult:16,ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,nativeSoloAudio:audioMode.value!=='original',no_mouse:true,use_menu:false,fontfile:'font.bmp'};
+    const config={canvas,ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,nativeSoloAudio:audioMode.value!=='original',no_mouse:true,use_menu:false,fontfile:'font.bmp'};
     emulator=runtimeMode.value==='worker'?await WorkerNP21.create(config,{game:'04',patch,music:soloMusic?.reader.patch,onError:e=>{soloMusic?.suspend();player.exit();status('模拟线程停止：'+e.message);}}):await NP21.create(config);
     if(emulator.isWorker)emulator.onMusic=(ax,hash)=>soloMusic?.player.command(ax,hash);
     await emulator.addDiskImage('th04-solo.hdi',data);await emulator.setHdd(0,'th04-solo.hdi');emulator.run();player.setActive(true);canvas.focus();

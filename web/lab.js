@@ -2,7 +2,10 @@ import {startFrameLoop} from './frame-limit.js';
 import {mountPlayer} from './player-ui.js';
 import {writeNativeTouch,touchPlayer} from './native-touch.js';
 import {sha256} from './netplay/sha256.js';
-import {NP21} from './vendor/np2/np2-wasm.js';
+import {NP21} from './dosbox-adapter.js';
+import {WorkerNP21,supportsSoloWorker} from './solo-worker-client.js';
+import {SoloMusic} from './solo-music.js';
+import {mountSoloFault} from './solo-fault.js';
 import {mountFocusSettings} from './focus-settings.js';
 import {gameVersion,rememberLanguage} from './game-version.js';
 import {encodeConfig,installConfig} from './launch-config.js';
@@ -13,10 +16,11 @@ const signature=new TextEncoder().encode('TH04COOPLABv001!');
 let emulator, mailbox=-1, candidates=[], scanCursor=0, lastDiagnostics=-Infinity, lastPadLabel=null, lastPadList=-Infinity, lastTick=-1, lastTickAt=0;
 let keyboard=new Set(), testInput=null, testing=false, padMenu=0, pageFocused=true,oldP1=0;
 let launchSettings=null, launchStarted=0, stageAnnounced=false;
-let nativePatch;
+let nativePatch,localMusic;
 const screen=$('screen'),playerHost=document.createElement('div');screen.before(playerHost);
-const player=mountPlayer(playerHost,{onGesture:async()=>{const context=emulator?.module.SDL2?.audioContext;if(context)await context.resume();}});
+const player=mountPlayer(playerHost,{onGesture:async()=>{localMusic?.resume();const context=emulator?.module.SDL2?.audioContext;if(context)await context.resume();}});
 player.stage.append(screen);player.setLabel('本地触屏控制 P1');
+mountSoloFault({host:playerHost,getEmulator:()=>emulator,readState:snapshot,readContext:()=>({mode:'local-coop',settings:launchSettings,status:$('status').textContent})});
 const focusSettings=mountFocusSettings($('control-settings'),{local:true,alwaysPointControl:player.alwaysPointControl});
 const syntheticKeys=syntheticInputEvents;
 const nativeActions=[['ArrowUp',1],['ArrowDown',2],['ArrowLeft',4],['ArrowRight',8],['KeyX',16],['KeyZ',32],['ShiftLeft',64],['Escape',128],['Enter',256]];
@@ -37,7 +41,7 @@ function syncP1(){
   for(const [code,bit]of nativeActions)if((bits&bit)!==(oldP1&bit))nativeKey(code,!!(bits&bit));
   oldP1=bits;
 }
-function release(){player.reset();keyboard.clear();syncP1();padMenu=0;if(mailbox>=0)emulator.module.HEAPU8.fill(0,mailbox+22,mailbox+25);}
+function release(){player.reset();keyboard.clear();syncP1();padMenu=0;if(emulator?.isWorker)emulator.clearInput();else if(mailbox>=0)emulator.module.HEAPU8.fill(0,mailbox+22,mailbox+25);}
 function showControls(){
   $('controls-summary').textContent=`P1：${controlsSummary('local1')}。 P2：${controlsSummary('local2')}。`;
 }
@@ -66,11 +70,14 @@ window.addEventListener('keypress',e=>{if(!syntheticKeys.has(e)){e.stopImmediate
 document.addEventListener('focusin',e=>{if(isFormTarget(e.target))release();});
 window.addEventListener('blur',()=>{pageFocused=false;release();});
 window.addEventListener('focus',()=>{pageFocused=true;});
-document.addEventListener('visibilitychange',()=>{if(document.hidden)release();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){release();localMusic?.suspend();}else if(emulator?.state==='running')localMusic?.resume();});
+window.addEventListener('pagehide',event=>{if(event.persisted)localMusic?.suspend();else localMusic?.dispose();});
+window.addEventListener('pageshow',event=>{if(event.persisted&&emulator?.state==='running')localMusic?.resume();});
 $('canvas').addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();});
 $('canvas').addEventListener('pointerdown',()=>{$('canvas').focus();});
 
 function scan(){
+  if(emulator.isWorker){mailbox=emulator.snapshot.state?.at??-1;return;}
   const heap=emulator.module.HEAPU8,v=new DataView(heap.buffer);
   // Known addresses are cheap to validate. Only search when they stop being
   // active, and never traverse the whole heap in a single animation frame.
@@ -90,6 +97,7 @@ function scan(){
   else if(!active.includes(mailbox))mailbox=-1;
 }
 function snapshot(){
+  if(emulator?.isWorker)return emulator.snapshot.state;
   if(!emulator||mailbox<0)return null;
   const heap=emulator.module.HEAPU8,v=new DataView(heap.buffer),m=mailbox;
   const players=[];
@@ -133,13 +141,15 @@ function tick(now){
   try{
     const pad=gamepadInput(now);
     if(emulator){
+      if(!emulator.isWorker)localMusic?.poll(emulator.module.HEAPU8,now);
       scan();
-      const nativePaused=mailbox>=0&&!!emulator.module.HEAPU8[mailbox-nativePatch.mailbox_cs_offset+nativePatch.native_pause_cs_offset+3];
+      const nativePaused=emulator.isWorker?!!emulator.snapshot.state?.nativePaused:mailbox>=0&&!!emulator.module.HEAPU8[mailbox-nativePatch.mailbox_cs_offset+nativePatch.native_pause_cs_offset+3];
       const play=emulator.state==='running'&&!controlEditor.isEditing()&&!nativePaused;
       const s=snapshot();
-      if(mailbox>=0){const p=touchPlayer(emulator.module.HEAPU8,mailbox,nativePatch,0);player.setContext({key:`${s?.stage}:${play?'game':'menu'}`,play:play&&!p.miss&&!p.entry&&!p.out});}
+      if(mailbox>=0){const p=emulator.isWorker?s.touch:touchPlayer(emulator.module.HEAPU8,mailbox,nativePatch,0);player.setContext({key:`${s?.stage}:${play?'game':'menu'}`,play:play&&!p.miss&&!p.entry&&!p.out});}
       syncP1();
-      if(nativePatch)writeNativeTouch(emulator.module.HEAPU8,mailbox,nativePatch,[player.pack(oldP1)],!play);
+      const touch=[player.pack(oldP1)];
+      if(nativePatch&&!emulator.isWorker)writeNativeTouch(emulator.module.HEAPU8,mailbox,nativePatch,touch,!play);
       player.consume();
       if(s){
         if(!stageAnnounced){stageAnnounced=true;status(`已进入关卡 · P1 ${$('loadout-p1').selectedOptions[0].textContent} / P2 ${$('loadout-p2').selectedOptions[0].textContent}`);}
@@ -150,9 +160,11 @@ function tick(now){
         if(testInput){bits=testInput.bits;focus=testInput.focus||0;}
         if(!pageFocused||document.hidden||!live){bits=0;focus=0;}
         if((bits&3)===3)bits&=~3;if((bits&12)===12)bits&=~12;
-        const heap=emulator.module.HEAPU8,v=new DataView(heap.buffer);
-        v.setUint16(mailbox+22,bits,true);heap[mailbox+24]=focus;
-        heap[mailbox-nativePatch.mailbox_cs_offset+nativePatch.focus_visible_mask_cs_offset]=focusSettings()|(player.alwaysPoint()?8:0);
+        const points=focusSettings()|(player.alwaysPoint()?8:0);
+        if(emulator.isWorker)emulator.setInput({generation:s.stage,bits,focus,points,touch,blocked:!play});
+        else {const heap=emulator.module.HEAPU8,v=new DataView(heap.buffer);
+          v.setUint16(mailbox+22,bits,true);heap[mailbox+24]=focus;
+          heap[mailbox-nativePatch.mailbox_cs_offset+nativePatch.focus_visible_mask_cs_offset]=points;}
         if($('diagnostics').closest('details').open&&now-lastDiagnostics>=250){
           lastDiagnostics=now;
           $('diagnostics').textContent=`游戏帧 ${s.ticks} · 关卡帧 ${s.stageFrame} · ${live?'运行中':'暂停 / 非关卡状态'}\nP1 (${s.p1.map(n=>n.toFixed(1)).join(', ')}) 受击动画 ${s.p1Miss}\nP2 (${s.p2.map(n=>n.toFixed(1)).join(', ')}) 无敌 ${s.p2Inv} 受击动画 ${s.p2Miss}\nP2 射击调用 ${s.shots} · 子弹命中 ${s.shotHits} · 碰撞受击 ${s.hits}\nP2 拾取 ${s.items} · 瞄准 / 吸引选择 P2 ${s.targets}\nP2 输入 0x${bits.toString(16)} · ${focus?'低速':'通常速度'}\n手柄输入与 P1 的 SDL 输入已隔离。`;
@@ -182,21 +194,29 @@ $('start').onclick=async()=>{
     status('正在校验并加载实验磁盘…');
     const response=await fetch(version.coopDisk,{cache:'no-store'});
     if(!response.ok)throw Error(`磁盘 HTTP ${response.status}`);
-    const data=new Uint8Array(await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+    let data=new Uint8Array(await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
     const meta=await (await fetch(version.coopMeta,{cache:'no-store'})).json();
     const hash=await sha256(data);
     if(hash!==meta.sha256||data.length!==meta.size)throw Error('实验磁盘校验失败');
     const patch=await (await fetch(gameVersion($('language').value).coopPatch,{cache:'no-store'})).json();
     nativePatch=patch;
     installConfig(data,patch,config);
-    emulator=await NP21.create({canvas:$('canvas'),clk_base:2457600,clk_mult:16,ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,no_mouse:true,use_menu:false,fontfile:'font.bmp'});
-    emulator.addDiskImage('th04-lab.hdi',data);emulator.setHdd(0,'th04-lab.hdi');emulator.run();player.setActive(true);
+    if($('audio-mode').value==='independent'){
+      localMusic=new SoloMusic(status);const musicDisk=data.slice();
+      try{await localMusic.install(musicDisk,'GENSO');data=musicDisk;}
+      catch(error){localMusic.dispose();localMusic=null;status('独立音乐加载失败，将使用原声：'+error.message);}
+    }
+    const runtimeConfig={canvas:$('canvas'),ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,no_mouse:true,use_menu:false,fontfile:'font.bmp'};
+    const background=supportsSoloWorker()&&new URLSearchParams(location.search).get('runtime')!=='main';
+    emulator=background?await WorkerNP21.create(runtimeConfig,{game:'04coop',patch,music:localMusic?.reader.patch,onError:error=>{localMusic?.suspend();status('模拟线程错误：'+error.message);}}):await NP21.create(runtimeConfig);
+    if(emulator.isWorker)emulator.onMusic=(ax,hash)=>localMusic?.player.command(ax,hash);
+    await emulator.addDiskImage('th04-lab.hdi',data);await emulator.setHdd(0,'th04-lab.hdi');emulator.run();player.setActive(true);
     $('canvas').focus();$('pause').disabled=false;$('restart').disabled=false;$('capture').disabled=false;
     launchStarted=performance.now();
     status('正在启动游戏并载入双方机体，请稍候…');
-  }catch(e){player.setActive(false);player.exit();status(`启动失败：${e.message}`);console.error(e);$('restart').disabled=false;if(!emulator){$('start').disabled=false;$('setup').disabled=false;}}
+  }catch(e){localMusic?.dispose();localMusic=null;player.setActive(false);player.exit();status(`启动失败：${e.message}`);console.error(e);$('restart').disabled=false;if(!emulator){$('start').disabled=false;$('setup').disabled=false;}}
 };
-$('pause').onclick=()=>{if(!emulator)return;if(emulator.state==='running'){release();emulator.pause();$('pause').textContent='继续模拟器';}else{emulator.run();$('pause').textContent='暂停模拟器';$('canvas').focus();}};
+$('pause').onclick=()=>{if(!emulator)return;if(emulator.state==='running'){release();emulator.pause();localMusic?.suspend();$('pause').textContent='继续模拟器';}else{emulator.run();localMusic?.resume();$('pause').textContent='暂停模拟器';$('canvas').focus();}};
 $('restart').onclick=()=>location.reload();
 $('fullscreen').onclick=()=>player.enter();
 $('capture').onclick=()=>{
@@ -229,6 +249,8 @@ $('hit-test').onclick=async()=>{
     if(s.p2Inv||s.p2Miss)throw Error('请等 P2 无敌 / 复活动画结束后再测试');
     // Recover the guest RAM base from the live code signature and relocated DS.
     // CS is the original main_01 segment; mailbox offset supplied by build.
+    if(emulator.isWorker)await emulator.call('coopHit');
+    else {
     const patch=await (await fetch(gameVersion($('language').value).coopPatch)).json();
     const csLinear=mailbox-patch.mailbox_cs_offset;
     // Actual load CS cannot be inferred from DS alone; locate P1 data via
@@ -242,6 +264,7 @@ $('hit-test').onclick=async()=>{
     v.setInt16(slot+2,s.p2[0]*16,true);v.setInt16(slot+4,s.p2[1]*16,true);
     v.setInt16(slot+6,s.p2[0]*16,true);v.setInt16(slot+8,s.p2[1]*16,true);
     heap[slot+0x12]=2;heap[slot+0x13]=2;
+    }
     $('tests').textContent='已生成测试敌弹，正在观察 P2 碰撞与复活…';
     const after=await inputForFrames(0,100);
     $('tests').textContent=`${after.hits>s.hits&&after.p2Miss===0?'通过':'未通过 / 被关卡清弹干扰'}：真实敌弹触发 P2 受击 +${after.hits-s.hits}，复活状态 ${after.p2Miss}，剩余无敌 ${after.p2Inv}。`;

@@ -8,7 +8,7 @@ def main():
     destination = Path(__file__).resolve().parent / 'public-test-url.txt'
     destination.write_text('Waiting for a new tunnel URL. Keep this launcher open.\n', encoding='utf-8')
     process = subprocess.Popen(
-        ['cloudflared', 'tunnel', '--url', 'http://127.0.0.1:9866'],
+        ['cloudflared', 'tunnel', '--url', 'http://127.0.0.1:9868'],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, encoding='utf-8', errors='replace',
     )

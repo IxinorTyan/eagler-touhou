@@ -2,10 +2,15 @@ import {workerEnvironment} from './solo-worker-environment.js';
 import {readSoloDiagnostics,writeSoloTestCommand} from './solo-test-tools.js';
 import {readSoloFault} from './solo-fault.js';
 
-let emulator,environment,bridge,music,game,patch,mailbox=-1,cursor=0;
+let emulator,environment,bridge,music,game,patch,coop,mailbox=-1,cursor=0;
 const seen=new Map(),signature=new TextEncoder().encode('TH04SOLOINPUTv1!');
 let awaitingSnapshot=false,pendingMusic=[],lastPublish=0,costs=[],lastInput=performance.now(),held=new Map();
 let input={focus:0,points:0,touch:[0,0]},timer;
+let drawTimes=[],lastRenderPublish=-Infinity;
+function observeFrames(){
+  emulator.module.observeLocalFrame=cost=>{if(costs.length<120)costs.push(cost);};
+  emulator.module.observeFrameDraw=now=>{if(drawTimes.length<120)drawTimes.push(now);};
+}
 function scan04(now){
   const h=emulator.module.HEAPU8,v=new DataView(h.buffer);mailbox=-1;
   for(const [at,candidate] of seen){
@@ -30,10 +35,10 @@ function scan04(now){
     ...readSoloDiagnostics(h,at,patch)};
 }
 function clear(){
-  for(const event of held.values())environment.key({...event,type:'keyup'});
+  for(const event of held.values())if(emulator?.key)emulator.key(event.code,false);else environment.key({...event,type:'keyup'});
   held.clear();input={focus:0,points:0,touch:[0,0]};
   if(bridge){bridge.setFocus(0,0);bridge.setTouch([0,0]);}
-  if(mailbox>=0)emulator.module.HEAPU8.fill(0,mailbox+28,mailbox+36);
+  if(coop)coop.clear();else if(mailbox>=0)emulator.module.HEAPU8.fill(0,mailbox+28,mailbox+36);
 }
 function update(){
   if(!emulator)return;
@@ -41,40 +46,45 @@ function update(){
   if(now-lastInput>750)clear();
   const h=emulator.module.HEAPU8;
   let state,markers=[];
-  if(bridge){state=bridge.update(now);markers=bridge.markers();if(state)state.ticks=new DataView(h.buffer).getUint32(state.at+patch.fields.ticks,true);}
+  if(coop)state=coop.read();
+  else if(bridge){state=bridge.update(now);markers=bridge.markers();if(state)state.ticks=new DataView(h.buffer).getUint32(state.at+patch.fields.ticks,true);}
   else state=scan04(now);
   pendingMusic.push(...(music?.read(h)||[]));
   if(!awaitingSnapshot&&(now-lastPublish>=15||pendingMusic.length)){
     lastPublish=now;awaitingSnapshot=true;const events=pendingMusic;pendingMusic=[];
-    postMessage({type:'snapshot',state,markers,events,costs,frames:emulator.module.localFrameCount||0,uploads:emulator.module.frameUploads||0});costs=[];
+    const render=now-lastRenderPublish>=250?emulator.module.framePresenter?.info():undefined;
+    if(render)lastRenderPublish=now;
+    postMessage({type:'snapshot',state,markers,events,costs,drawTimes,render,heapBytes:h.length,frames:emulator.module.localFrameCount||0,uploads:emulator.module.frameUploads||0});costs=[];drawTimes=[];
   }
 }
 async function dispatch(message){
   const {method,args=[]}=message;
-  if(method==='soloFault')return readSoloFault(emulator?.module.HEAPU8);
+  if(method==='soloFault')return readSoloFault(emulator?.module.HEAPU8,emulator?.module);
   if(method==='init'){
     const setup=args[0];game=setup.game;patch=setup.patch;
     environment=workerEnvironment(setup.canvas,setup.sampleRate);
-    const {NP21}=await import(game==='03'?'./vendor/np2/np2-original.js':'./vendor/np2/np2-wasm.js');
+    const {NP21}=await import(game==='03'?'./vendor/np2/np2-original.js':'./dosbox-adapter.js');
     emulator=await NP21.create({...setup.config,canvas:setup.canvas,workerRuntime:true,nativeSoloAudio:false,
       onDiskChange:()=>postMessage({type:'diskChange'}),onExit:()=>{clear();postMessage({type:'exit'});}});
     if(game==='03'){
       const {NativePause}=await import('./native-pause.js');bridge=new NativePause(()=>emulator,patch);
     }
+    if(game==='04coop'){const {createLocalWorkerState}=await import('./local-worker-state.js');coop=createLocalWorkerState(emulator,patch);}
     if(setup.music){const {NativeMusic}=await import(game==='03'?'./native-music.js':'./solo-native-music.js');music=new NativeMusic(setup.music);}
-    emulator.module.observeLocalFrame=cost=>{if(costs.length<120)costs.push(cost);};
+    observeFrames();
     timer=setInterval(update,16);
     return {heapBytes:emulator.module.HEAPU8.length,runtime:emulator.module.mobileRuntime};
   }
   if(method==='snapshotAck'){awaitingSnapshot=false;return;}
-  if(method==='audio')return emulator.state==='running'?environment.audio():null;
+  if(method==='audio')return emulator.state==='running'?(emulator.readAudio?.()||environment.audio()):null;
   if(method==='key'){
     lastInput=performance.now();const event=args[0];
     if(event.type==='keydown')held.set(event.code,event);else if(event.type==='keyup')held.delete(event.code);
-    environment.key(event);return;
+    if(emulator.key)emulator.key(event.code,event.type==='keydown');else environment.key(event);return;
   }
   if(method==='input'){
     lastInput=performance.now();input=args[0];
+    if(coop){coop.input(input);return;}
     if(bridge){
       const h=emulator.module.HEAPU8;
       if(!bridge.valid(h,bridge.live)||input.generation!==new DataView(h.buffer).getUint16(bridge.live+patch.fields.generation,true))return;
@@ -92,25 +102,28 @@ async function dispatch(message){
     return;
   }
   if(method==='clear'){clear();return;}
+  if(method==='coopHit'){if(!coop)throw Error('本地合作尚未启动');coop.hit();return;}
   if(method==='soloTest'){
     if(game!=='04')throw Error('测试工具仅用于 TH04 独立单机。');
     writeSoloTestCommand(emulator.module.HEAPU8,mailbox,patch,args[0]);return;
   }
   if(method==='pause'){clear();emulator.pause();return;}
-  if(method==='reset'){pendingMusic=[];clear();bridge?.reset();music?.reset();seen.clear();mailbox=-1;cursor=0;emulator.reset();return;}
+  if(method==='reset'){pendingMusic=[];clear();bridge?.reset();music?.reset();seen.clear();mailbox=-1;cursor=0;await emulator.reset();costs=[];drawTimes=[];lastRenderPublish=-Infinity;observeFrames();return;}
   if(method==='run'){lastInput=performance.now();emulator.run();return;}
   if(method==='getDiskImage')return emulator.getDiskImage(...args);
   if(method==='addDiskImage'){emulator.addDiskImage(...args);return;}
-  if(method==='setHdd'){emulator.setHdd(...args);return;}
+  if(method==='setHdd'){await emulator.setHdd(...args);return;}
   throw Error('Unknown worker command: '+method);
 }
 // Requests arrive in order; serialize startup/disk operations as well as input.
 let queue=Promise.resolve();
 onmessage=({data})=>{queue=queue.then(async()=>{
+  if(data?.name){if(data.name==='wc-sync-sleep')emulator?.module.receive?.({data});return;}
   try{
     const result=await dispatch(data);
     if(data.id){const transfer=Array.isArray(result)?result.map(channel=>channel.buffer):result instanceof Uint8Array?[result.buffer]:[];postMessage({type:'reply',id:data.id,result},transfer);}
-  }catch(error){postMessage({type:'error',id:data.id,message:error?.stack||String(error),diagnostics:readSoloFault(emulator?.module.HEAPU8)});}
+  }catch(error){postMessage({type:'error',id:data.id,message:error?.stack||String(error),diagnostics:readSoloFault(emulator?.module.HEAPU8,emulator?.module)});}
 });};
-addEventListener('error',event=>postMessage({type:'error',message:event.message,diagnostics:readSoloFault(emulator?.module.HEAPU8)}));
-addEventListener('unhandledrejection',event=>postMessage({type:'error',message:String(event.reason?.stack||event.reason),diagnostics:readSoloFault(emulator?.module.HEAPU8)}));
+addEventListener('message',({data})=>{if(data?.name==='ws-sync-sleep')postMessage({name:'wc-sync-sleep',props:data.props});});
+addEventListener('error',event=>postMessage({type:'error',message:event.message,diagnostics:readSoloFault(emulator?.module.HEAPU8,emulator?.module)}));
+addEventListener('unhandledrejection',event=>postMessage({type:'error',message:String(event.reason?.stack||event.reason),diagnostics:readSoloFault(emulator?.module.HEAPU8,emulator?.module)}));

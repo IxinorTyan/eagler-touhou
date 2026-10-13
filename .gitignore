@@ -1,4 +1,5 @@
-# Upload only the ready-to-run distribution. Development files remain local.
+# th04-coop-lab now ships DOSBox-X. Keep the ready-to-run distribution;
+# development files and the sibling th04-np21 backup remain local.
 /*
 !/.gitignore
 !/.gitattributes
@@ -24,6 +25,9 @@
 # build/, baseline/, extracted/, reference/, vendor-source/, local credentials,
 # tunnel URL files and any future development-only root files by default.
 # Keep runtime JS/WASM, fonts, music, assets and JSON manifests.
+# web/vendor/dosbox-x/ is shipped, including .mjs glue, all runtime WASM,
+# runtime.json, audio-worklet.js, NOTICE.md and LICENSE. Do not ignore *.wasm
+# or *.mjs globally: a fresh checkout must start without rebuilding.
 # Only the four patched game disks (solo/co-op, Chinese/Japanese) ship.
 # The supplied 4-cn source and Japanese baseline stay outside web/.
 /web/*.hdi
@@ -40,6 +44,8 @@
 /web/extracted/
 /web/reports/
 /web/screenshots/
+/web/backups/
+/web/th04-np21/
 /web/tools/
 /web/vendor-source/
 
@@ -52,6 +58,16 @@
 /web/**/extra-raw.wasm
 /web/**/*.wat
 /web/**/*.lst
+/web/**/*.cpuprofile
+/web/**/*.heapsnapshot
+
+# DOSBox source maps, disassembly and experimental cores are build artifacts.
+/web/vendor/dosbox-x/*.map
+/web/vendor/dosbox-x/*.symbols
+/web/vendor/dosbox-x/*.tgz
+/web/vendor/dosbox-x/*-candidate.wasm
+/web/vendor/dosbox-x/*-probe.wasm
+/web/vendor/dosbox-x/*-dbg.*
 
 # Retired assets are not used by the current game.
 /web/local-music-disk.json
@@ -74,6 +90,9 @@ Desktop.ini
 *.bak
 *.orig
 *~
+# Downloaded per-device diagnostics are not release assets.
+th04-solo-fault.json
+th04-network-fault.json
 .idea/
 .vscode/
 .env

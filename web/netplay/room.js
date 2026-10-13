@@ -6,6 +6,7 @@ import {isBound,keyboardBits,gamepadBits,gamepadStatus,normalize} from './contro
 import {mountFocusSettings} from '../focus-settings.js';
 import {mountControlSettings,controlSnapshot,isFormTarget} from '../control-settings.js';
 import {mergeDeparture} from './membership.js';
+import {downloadFaultReport} from '../solo-fault.js';
 import {createRelay} from './relay.js';
 import {loadRtcConfiguration,refreshRtcPath,describeRtcConfiguration,countIceCandidate,describeIceCandidates,recordIceServerError} from './connection.js';
 const $=id=>document.getElementById(id),roles=['host','guest','guest2'];
@@ -34,12 +35,12 @@ let keys=new Set(),childBits=0,pendingAction=0,bits=0,inputChangedAt=0;
 let peers=new Map(),hashes=new Map(),captureTimes=new Map();
 let pumping=false,lastNow=0,accumulator=0,lastUi=0,lastMeasure=0,measureFrame=0;
 let stepCost=0,stepCount=0,maxCost=0,hz=0,averageCost=0,peakCost=0,inputAge=0,lastApplied=0,receivedInputs=0;
-const newCosts=()=>({capture:0,captures:0,simulate:0,steps:0,hash:0,restore:0,restores:0,confirm:0,replay:0,replays:0,lead:0});
+const newCosts=()=>({capture:0,captures:0,simulate:0,steps:0,present:0,presentations:0,hash:0,restore:0,restores:0,confirm:0,replay:0,replays:0,lead:0});
 let costs=newCosts(),measuredCosts=newCosts(),waitDetail='',earlyInputs=0;
 const activeRoles=()=>roles.slice(0,state.settings.players);
 const onlinePeers=()=>[...peers.values()].filter(peer=>!peer.offline);
 const GRACE_MS=5000;
-let membership=null,membershipId=0,pollFailedAt=0;
+let membership=null,membershipId=0,pollFailedAt=0,roomServiceError='';
 let bootStage='等待加载游戏页面';
 let bootStep=0,bootStartedAt=0;
 let connectionConfigPending=false,pendingConnectionSignals=[];
@@ -58,6 +59,17 @@ const rawView=document.createElement('button');rawView.type='button';let rawEnab
 rawView.textContent='显示：个人 HUD';rawView.setAttribute('aria-pressed','false');
 rawView.onclick=()=>{rawEnabled=!rawEnabled;runtime?.setRawPresentation(rawEnabled);rawView.textContent=rawEnabled?'显示：原始画面':'显示：个人 HUD';rawView.setAttribute('aria-pressed',String(rawEnabled));};
 $('game').querySelector('.player-toolbar').append(rawView);
+const faultDownload=document.createElement('button');faultDownload.type='button';faultDownload.dataset.faultDownload='';faultDownload.textContent='下载故障信息';
+faultDownload.onclick=()=>{
+  if(!runtime){player.note('请先启动游戏。');return;}
+  try{downloadFaultReport({schema:'touhou-network-fault/1',recordedAt:new Date().toISOString(),
+    environment:{userAgent:navigator.userAgent,visibility:document.visibilityState},
+    settings:state?.settings,slot:queue?.slot,frame:queue?.frame,confirmed:queue?.confirmed,
+    running,stopped,stopReason,diagnostics:$('diagnostics').textContent,runtime:runtime.faultReport()},'th04-network-fault.json');
+    player.note('故障信息已下载，只保存在本机。');
+  }catch(error){player.note('读取故障信息失败：'+error.message);}
+};
+$('game').querySelector('.player-toolbar').append(faultDownload);
 
 if(!useRelay){
   const relayLink=document.createElement('a');
@@ -108,6 +120,7 @@ function showStartup(){
     +`本机实际连接配置：${connectionConfigSummary}\n`
     +'资源就绪但通道仍 connecting：正在建立网络连接，不是继续下载资源。\n'
     +(useRelay?'本局通过房间服务转发可靠有序消息；不进行 NAT 穿透。':'候选类型：host 本地地址，srflx 服务器反射地址，relay 中继地址，prflx 对端反射地址。计数不代表连接成功；701 表示某次 ICE 服务访问失败，不代表所有候选都失败。');
+  if(roomServiceError)$('diagnostics').textContent+='\n房间服务正在重试：'+roomServiceError;
   player.diagnostics(`${rows.map(row=>`${row.name}：${row.step}/7 · ${row.stage}${row.connection?'\n'+row.connection:''}`).join('\n\n')}\n\n${$('diagnostics').textContent}`);
   player.note(`启动 ${Math.floor((performance.now()-bootStartedAt)/1000)} 秒 · 本机 ${bootStep}/7：${bootStage}。点击“启动／运行详情”查看各端状态。`);
   if(localReady&&onlinePeers().some(peer=>peer.channel?.readyState!=='open')){
@@ -257,7 +270,7 @@ function render(){
 }
 function update(value){
   if(stopped)return;
-  if(!value||value.protocol!==PROTOCOL||typeof value.settings?.rollback!=='boolean'||!['cn','jp'].includes(value.settings?.language))throw Error('请重启新版 start-lan.bat 并刷新所有玩家的页面');
+  if(!value||value.protocol!==PROTOCOL||typeof value.settings?.rollback!=='boolean'||'cpuMultiplier' in value.settings||!['cn','jp'].includes(value.settings?.language))throw Error('请重启新版 start-lan.bat 并刷新所有玩家的页面');
   if(state&&value.revision<=state.revision)return;
   state=value;render();
   if(state.phase==='ended'){closeDisconnected('房主已离开');return;}
@@ -288,12 +301,24 @@ async function enter(role){
 }
 async function poll(){
   if(stopped)return;
+  let result;
   try{
     const q=new URLSearchParams({room:session.room,token:session.token});
     if(preparing&&!running){q.set('boot_stage',bootStage);q.set('boot_step',String(bootStep));}
     const response=await fetch(`/api/events?${q}`,{signal:AbortSignal.timeout(10000)});
-    const result=await response.json();if(!response.ok)throw Error(result.error);
-    pollFailedAt=0;
+    result=await response.json();if(!response.ok)throw Error(result.error||`HTTP ${response.status}`);
+    pollFailedAt=0;roomServiceError='';
+  }catch(error){
+    if(stopped)return;
+    pollFailedAt||=performance.now();roomServiceError=String(error.message||error).slice(0,300);
+    // Once started, gameplay membership is governed by authenticated player
+    // channels and their watchdog. HTTP signaling loss does not close the game.
+    // Loading uses its resource deadline; a slow CPU must not pay a 5 s grace.
+    if(!running&&!preparing&&performance.now()-pollFailedAt>=30000){closeDisconnected('房间服务连接失败：'+roomServiceError);return;}
+    if(!running)status('房间服务暂时无响应，正在重试：'+roomServiceError);
+    pollTimer=setTimeout(poll,1000);return;
+  }
+  try{
     update(result.state);
     for(const [role,progress]of Object.entries(result.startup||{})){
       const peer=peers.get(role);if(!peer)continue;
@@ -307,9 +332,7 @@ async function poll(){
     if(!stopped)pollTimer=setTimeout(poll,400);
   }catch(error){
     if(stopped)return;
-    pollFailedAt||=performance.now();
-    if(performance.now()-pollFailedAt>=GRACE_MS){closeDisconnected('房间服务连接已断开');return;}
-    status('房间服务暂时无响应，正在重试…');pollTimer=setTimeout(poll,500);
+    fail(error);
   }
 }
 function trim(map){while(map.size>60)map.delete(map.keys().next().value);}
@@ -512,7 +535,7 @@ async function beginGame(){
       showStartup();
       for(const peer of onlinePeers()){
         if(!useRelay)void refreshRtcPath(peer);
-        // Connecting/loading have their own 30 s / 180 s deadlines. A mobile
+        // Connecting/loading have their own 30 s / 10 min deadlines. A mobile
         // browser compiling WASM must not be evicted by the in-game watchdog.
         if(running&&now-peer.lastPacket>3000)suspect(peer);
         if(running&&peer.suspectAt!=null&&now-peer.suspectAt>=GRACE_MS){
@@ -531,7 +554,7 @@ async function beginGame(){
     }catch(error){fail(error);}
   },1000);
   status('所有玩家正在各自加载游戏并建立网络连接…');
-  loadTimer=setTimeout(()=>fail(Error(`等待全员资源就绪超过 180 秒；本机：${bootStage}。请查看下方各端加载状态`)),180000);
+  loadTimer=setTimeout(()=>fail(Error(`等待全员资源就绪超过 10 分钟；本机：${bootStage}。请查看下方各端加载状态`)),600000);
   bootStage='加载游戏页面与 JavaScript 模块';showStartup();
   iframe=document.createElement('iframe');iframe.title='本机游戏模拟器';iframe.allow='autoplay; gamepad; fullscreen';iframe.allowFullscreen=true;
   const loaded=new Promise((resolve,reject)=>{iframe.onload=resolve;iframe.onerror=()=>reject(Error('游戏页面加载失败'));});
@@ -644,14 +667,15 @@ function updateMetrics(now,waiting){
   const c=measuredCosts,game=runtime.snapshot();
   $('diagnostics').textContent=`${label(session.role)} · P${queue.slot+1} · ${state.settings.players} 人 · 同步步 ${queue.frame}\n`
     +`本机 ${hz.toFixed(1)}/60 步每秒 · 执行平均 ${averageCost.toFixed(1)} / 最慢 ${peakCost.toFixed(1)} ms\n`
-    +`性能诊断 v1 · 最近统计周期：模拟含呈现 ${(c.simulate/Math.max(1,c.steps)).toFixed(1)} ms/步 · 快照 ${(c.capture/Math.max(1,c.captures)).toFixed(1)} ms/次（${c.captures} 次）\n`
+    +`性能诊断 v2 · 最近统计周期：模拟 ${(c.simulate/Math.max(1,c.steps)).toFixed(1)} ms/步 · 呈现 ${(c.present/Math.max(1,c.presentations)).toFixed(1)} ms/批 · 快照 ${(c.capture/Math.max(1,c.captures)).toFixed(1)} ms/次（${c.captures} 次）\n`
     +`恢复 ${c.restore.toFixed(1)} ms（${c.restores} 次） · 重算 ${c.replay.toFixed(1)} ms（${c.replays} 步，含模拟和快照） · 确认 ${c.confirm.toFixed(1)} ms · 校验 ${c.hash.toFixed(1)} ms\n`
     +`${queue.active?`预测回滚 · 本地缓冲 ${queue.inputDelay} 步 · 方向预测 ${queue.directionPrediction} 步`:inputPolicy.rollbackEnabled?'确认锁步 · 等待回滚启用':'确认锁步 · 回滚已关闭'} · 最近输入至应用 ${inputAge.toFixed(1)} ms · 已收输入 ${receivedInputs}\n${links}\n`
     +`已确认 ${Math.min(queue.frame,queue.confirmed)} · 预测领先 ${Math.max(0,queue.frame-queue.confirmed)}/${MAX_ROLLBACK} 步\n`
     +`最近周期最大领先 ${c.lead} 步 · 游戏帧 ${game?.gameFrame??'启动中'} · 预测条件：${runtime.predictionBlockReason()||'允许'} · 补算前提前发输入 ${earlyInputs} 次\n`
     +`回滚 ${rollbackCount} 次 · 重算 ${resimulated} 步 · 最长 ${maxRewind} 步 · 快照 ${((runtime.rollbackInfo()?.snapshotBytes||0)/1048576).toFixed(0)} MiB\n`
     +`当前等待 ${waitingSince?(now-waitingSince).toFixed(0):0} ms\n`
-    +(waiting?waitDetail:queue.frame<replayUntil?`正在补算，还剩 ${replayUntil-queue.frame} 步`:'正常推进／等待下一步时刻')+`\n${gamepadStatus}`;
+    +(waiting?waitDetail:queue.frame<replayUntil?`正在补算，还剩 ${replayUntil-queue.frame} 步`:'正常推进／等待下一步时刻')+`\n${gamepadStatus}`
+    +(roomServiceError?'\n房间服务正在重试（游戏按玩家数据通道继续）：'+roomServiceError:'');
   player.diagnostics(`${runtime.diagnosticText()}\n\n${$('diagnostics').textContent}`);
   if(!game)player.note(`正在启动 DOS／游戏 · 同步步 ${queue.frame} · ${waiting?waitDetail:'正在推进'}。详情可查看当前状态。`);
 }
@@ -698,6 +722,8 @@ function pump(now){
       lastApplied=pair[queue.slot];captureTimes.delete(queue.frame-1);accumulator-=TICK_MS;count++;
       confirmFrames();if(stopped)return;
     }
+    const presentAt=performance.now();
+    if(runtime.present()){costs.present+=performance.now()-presentAt;costs.presentations++;}
     const after=performance.now();
     if(waiting&&!waitingSince)waitingSince=after;
     updateMetrics(after,waiting);

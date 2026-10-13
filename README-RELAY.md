@@ -1,6 +1,6 @@
 # TH04 Relay 临时部署说明
 
-本文面向接收仓库的部署人员及 AI 助手。依据 2026-10-06 当前源码编写；本次只核对源码、编写文档，没有启动服务器或执行联机测试。
+本文面向接收仓库的部署人员及 AI 助手。当前 `th04-coop-lab` 已采用 DOSBox-X，部署入口沿用房间、WebRTC 和 WebSocket 服务。当前启动、性能及验证范围见 [README](README.md)；下文公网网络路径的讨论来自早期部署记录，不代表已完成异地公网验收。
 
 ## 目的与部署方式
 
@@ -13,11 +13,11 @@
 玩家 B 浏览器 ── HTTP(S) / WebSocket ── 国内服务器
 ```
 
-游戏和 NP21 模拟器在各玩家浏览器内运行。服务器负责提供静态资源、管理房间、转发操作消息，不运行游戏模拟器，不传输游戏画面或音频流。
+游戏和 DOSBox-X 模拟器在各玩家浏览器内运行。服务器负责提供静态资源、管理房间、转发操作消息，不运行游戏模拟器，不传输游戏画面或音频流。
 
 ## UDP 打洞接口（负责人后续填写）
 
-公网直连入口使用浏览器 WebRTC ICE。浏览器不能直接打开原生 UDP 端口；所谓 UDP 打洞由 ICE、STUN 和必要时的 TURN 完成。当前客户端已经预留 `th04NetplayUdp` 接口，负责人只需填写部署配置，不需要修改 NP21 或回滚代码。
+公网直连入口使用浏览器 WebRTC ICE。浏览器不能直接打开原生 UDP 端口；所谓 UDP 打洞由 ICE、STUN 和必要时的 TURN 完成。当前客户端已经预留 `th04NetplayUdp` 接口，负责人只需填写部署配置，不需要修改 DOSBox-X 或回滚代码。
 
 启用入口：
 
@@ -80,13 +80,13 @@ export const udpConfig={
 - 推荐 Linux，Python 3.10 或更新版本（例如 Ubuntu 22.04 / 24.04）。
 - Python 依赖：`requirements-relay.txt`，当前固定 `websockets==16.0`。
 - 两三人临时测试可先从共享的 1 vCPU / 1 GiB 资源预算开始；这是建议起点，不是经压测确认的最低配置。不需要 GPU、数据库、Node.js 或模拟器安装。
-- 一个玩家可访问的公网 TCP 入口；端口可以自选，9866 只是示例。若只有 IPv6，需要所有玩家都有可用 IPv6。
+- 一个玩家可访问的公网 TCP 入口；端口可以自选，9868 只是示例。若只有 IPv6，需要所有玩家都有可用 IPv6。
 - 中继操作消息较小，但首次访问还要下载 WASM、磁盘及按需音乐，不能把整个站点当成只有几 KB 的流量。
 
 保持以下目录关系：
 
 ```text
-th04-coop-lab/
+th04-pc98-fast/
   lan_server.py
   relay_server.py
   turn_service.py
@@ -109,10 +109,10 @@ th04-coop-lab/
 在收到的仓库根目录执行：
 
 ```bash
-cd /实际路径/th04-coop-lab
+cd /实际路径/th04-pc98-fast
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-relay.txt
-.venv/bin/python lan_server.py --bind 0.0.0.0 --port 9866
+.venv/bin/python lan_server.py --bind 0.0.0.0 --port 9868
 ```
 
 若系统没有 venv 模块，先按发行版安装 `python3-venv`。服务前台运行，保持会话存活；长期驻留可以由部署者使用现有 systemd 等方式托管。
@@ -120,7 +120,7 @@ python3 -m venv .venv
 在云安全组和系统防火墙中放行所选 TCP 端口。浏览器打开：
 
 ```text
-http://服务器IP:9866/lan.html?network=direct-ws&rollback=off
+http://服务器IP:9868/lan.html?network=direct-ws&rollback=off
 ```
 
 两名玩家都访问这个服务器，建房、加入、选择不同座位、准备并开始。不能一方打开开发者电脑的 localhost，另一方打开服务器；两者是不同房间服务。
@@ -136,14 +136,14 @@ HTTP 可以用于临时键盘联机对照；部分浏览器的手柄功能要求
 Python 只监听回环地址：
 
 ```bash
-.venv/bin/python lan_server.py --bind 127.0.0.1 --port 9866
+.venv/bin/python lan_server.py --bind 127.0.0.1 --port 9868
 ```
 
 在已有且证书正常的 HTTPS `server` 块中配置以下路由。示例假设独立域名根路径，没有其他应用占用这些路径：
 
 ```nginx
 location / {
-    proxy_pass http://127.0.0.1:9866;
+    proxy_pass http://127.0.0.1:9868;
     proxy_http_version 1.1;
     proxy_set_header Host $http_host;
     proxy_buffering off;
@@ -151,7 +151,7 @@ location / {
 }
 
 location = /relay {
-    proxy_pass http://127.0.0.1:9866;
+    proxy_pass http://127.0.0.1:9868;
     proxy_http_version 1.1;
     proxy_set_header Host $http_host;
     proxy_set_header Upgrade $http_upgrade;
@@ -168,11 +168,11 @@ location = /relay {
 https://你的域名/lan.html?network=direct-ws&rollback=off
 ```
 
-浏览器会自动使用 `wss://你的域名/relay`。只需要公网开放 HTTPS 入口，Python 的 9866 不必对公网开放。
+浏览器会自动使用 `wss://你的域名/relay`。只需要公网开放 HTTPS 入口，Python 的 9868 不必对公网开放。
 
 注意：
 
-- 保留浏览器原始 `Origin`，并使用 `$http_host` 保留外部 Host 和非默认端口。后端检查 Origin 与 Host 是否匹配，不要把 Host 改成 `127.0.0.1:9866`，也不要删除来源校验来绕过 403。
+- 保留浏览器原始 `Origin`，并使用 `$http_host` 保留外部 Host 和非默认端口。后端检查 Origin 与 Host 是否匹配，不要把 Host 改成 `127.0.0.1:9868`，也不要删除来源校验来绕过 403。
 - 网页、`/api/*` 和 `/relay` 都必须可达同一服务；不能只代理 `/relay`。
 - 当前前端使用绝对路径 `/api/*` 和 `/relay`，不要直接挂到 `/th04/` 子路径，除非同时适配路径。
 - 本次对照应让域名直接到该节点，避免再次套 Cloudflare Tunnel 或其他改变路径的代理。

@@ -1,4 +1,4 @@
-"""LAN lobby/signaling only. Each browser runs its own deterministic NP21."""
+"""LAN lobby/signaling only. Each browser runs its own deterministic DOSBox-X."""
 import argparse
 import json
 import secrets
@@ -16,6 +16,12 @@ ROLES=('host','guest','guest2')
 ROOMS={}
 LOCK=threading.Lock()
 TTL=120
+LOADING_TTL=600
+
+
+def room_expired(room,now):
+    lease=LOADING_TTL if room['phase']=='loading' else TTL
+    return now-room['seen']['host']>lease
 
 
 def snapshot(room):
@@ -25,7 +31,7 @@ def snapshot(room):
 
 
 class Handler(SimpleHTTPRequestHandler):
-    extensions_map={**SimpleHTTPRequestHandler.extensions_map,'.js':'text/javascript','.wasm':'application/wasm','.opus':'audio/ogg'}
+    extensions_map={**SimpleHTTPRequestHandler.extensions_map,'.js':'text/javascript','.mjs':'text/javascript','.wasm':'application/wasm','.opus':'audio/ogg'}
 
     def log_message(self,*args):
         pass
@@ -50,7 +56,7 @@ class Handler(SimpleHTTPRequestHandler):
         url=urlparse(self.path)
         if url.path=='/relay':
             from relay_server import handle
-            handle(self,ROOMS,LOCK,ROLES,TTL)
+            handle(self,ROOMS,LOCK,ROLES,TTL,room_expired)
         elif url.path=='/api/events':
             self.api('events',{k:v[0] for k,v in parse_qs(url.query).items()})
         elif url.path.startswith('/api/'):
@@ -82,7 +88,7 @@ class Handler(SimpleHTTPRequestHandler):
             with LOCK:
                 room=ROOMS.get(code)
                 now=time.monotonic()
-                if not room or now-room['seen']['host']>TTL:
+                if not room or room_expired(room,now):
                     return self.reply({'error':'房间不存在或已结束，请重新建房'},404)
                 role=next((r for r in ROLES if room[r] and room[r]==data.get('token')),None)
                 if not role:
@@ -106,7 +112,7 @@ class Handler(SimpleHTTPRequestHandler):
         with LOCK:
             now=time.monotonic()
             for code,room in list(ROOMS.items()):
-                if now-room['seen']['host']>TTL:
+                if room_expired(room,now):
                     del ROOMS[code]
             if action=='create':
                 transport=data.get('transport','rtc')
@@ -251,7 +257,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
-    parser.add_argument('--port',type=int,default=9866)
+    parser.add_argument('--port',type=int,default=9868)
     parser.add_argument('--bind',default='0.0.0.0',help='监听地址；IPv6 公网测试使用 ::')
     args=parser.parse_args()
     root=Path(__file__).resolve().parent/'web'

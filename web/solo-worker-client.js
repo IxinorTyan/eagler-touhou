@@ -48,6 +48,7 @@ export class WorkerNP21 {
   send(method,args=[]){if(!this.closed)this.worker.postMessage({method,args});}
   receive(data){
     if(this.closed)return;
+    if(data.name==='ws-sync-sleep'){this.worker.postMessage({name:'wc-sync-sleep',props:data.props});return;}
     if(data.type==='error'){
       if(data.diagnostics)this.lastDiagnostics=data.diagnostics;
       const pending=this.pending.get(data.id);
@@ -58,7 +59,10 @@ export class WorkerNP21 {
       clearTimeout(pending.timeout);this.pending.delete(data.id);pending.resolve(data.result);
     }else if(data.type==='snapshot'){
       this.send('snapshotAck');this.snapshot=data;this.module.localFrameCount=data.frames;this.module.frameUploads=data.uploads;
+      if(data.heapBytes)this.module.heapBytes=data.heapBytes;
+      if(data.render)this.module.renderMetrics=data.render;
       for(const cost of data.costs)this.module.observeLocalFrame?.(cost);
+      for(const now of data.drawTimes||[])this.module.observeFrameDraw?.(now);
       for(const [ax,hash]of data.events)this.onMusic?.(ax,hash);
     }else if(data.type==='diskChange')this.config.onDiskChange?.();
     else if(data.type==='exit'){this.state='exited';this.flushAudio();this.config.onExit?.();}

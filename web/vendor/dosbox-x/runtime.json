@@ -1,0 +1,51 @@
+{
+  "schema": 3,
+  "package": "emulators",
+  "version": "8.5.2",
+  "machine": "pc98",
+  "local": {
+    "core": "simple",
+    "cycles": "max 100%",
+    "continuation": "JSPI",
+    "initialHeapMiB": 64,
+    "maximumHeapMiB": 256
+  },
+  "network": {
+    "core": "simple",
+    "cycles": 30000,
+    "continuation": "full Asyncify",
+    "binaryen": "132",
+    "initialHeapMiB": 64,
+    "maximumHeapMiB": 256
+  },
+  "presentation": {
+    "local": "direct",
+    "network": "completed batch",
+    "sha256": "83893ca252caa26c9ecdb6a8fcca7fe496d793bb5f95d29e921c360a4c957631"
+  },
+  "sourceWasm": "c154235667747e613be00d0955f068b54cbf8e1fb8e5c34d34e5552292f4c72a",
+  "keyboardFix": {
+    "excludedKeys": [
+      340,
+      341,
+      342,
+      343,
+      344,
+      345,
+      346,
+      347
+    ]
+  },
+  "files": {
+    "audio-worklet.js": "e1e8912f986479b1926cca0d8342f6b504defca873d3a51aac1172e5fbbf4c5d",
+    "dosbox-jspi.mjs": "c8839f654946fdb3c3527fa4b9790360f73f16ac19c8b29557829be7668aea0f",
+    "dosbox-rollback.mjs": "6fb03bd9c26c7361e681c7d2d0cd31a2e89db6f25cb82751263d811ca6fca068",
+    "emulators.js": "066176a9e9e6babfb5388552a5154f3c1f81ed778af3bf4a1f9f904161e3c4bb",
+    "LICENSE": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+    "NOTICE.md": "914c8d6e3f1834c1745f958b4060e99b22d686344a31069821996397eeace002",
+    "snapshot-diff.wasm": "c8c211fdcbb435bc2c501aef4398d917ff37a7cbb1135bdec48da04ce2ea4f06",
+    "wdosbox-x-fast.wasm": "bcf82c465a012bd19c0999a31c5fb15efcee6d32b28bd4f7d23ca1a030e92cee",
+    "wdosbox-x-jspi.wasm": "c154235667747e613be00d0955f068b54cbf8e1fb8e5c34d34e5552292f4c72a",
+    "wdosbox-x-rollback.wasm": "23f41f943f4a7832d850e66aba0fe64d25e5538caf6121e6978dd755968d0c71"
+  }
+}

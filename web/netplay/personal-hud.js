@@ -5,6 +5,7 @@ import {drawCollisionPoints} from './collision-points.js';
 // into NP21 RAM, VRAM, devices, snapshots or the state checksum.
 export function createPersonalHud(canvas,nativeCanvas){
   const context=canvas.getContext('2d',{alpha:false});
+  let tramAddress=-1,tramBuffer=null,lastTramSearch=-Infinity;
   const atlas=document.createElement('canvas');atlas.width=160;atlas.height=16;
   const ink=atlas.getContext('2d'),pixels=ink.createImageData(160,16);
   for(let digit=0;digit<10;digit++)for(let y=0;y<16;y++)for(let x=0;x<16;x++){
@@ -19,13 +20,19 @@ export function createPersonalHud(canvas,nativeCanvas){
       context.drawImage(atlas,Number(text[i])*16,0,16,16,x+i*16,y,16,16);
   }
   return ({heap,mailbox,patch,slot,guestBase,raw=false,points={}})=>{
-    if(canvas.width!==nativeCanvas.width||canvas.height!==nativeCanvas.height){
-      canvas.width=nativeCanvas.width;canvas.height=nativeCanvas.height;
+    if(canvas.width!==640||canvas.height!==400){
+      canvas.width=640;canvas.height=400;
     }
     context.imageSmoothingEnabled=false;
-    context.drawImage(nativeCanvas,0,0);
+    context.drawImage(nativeCanvas,0,0,640,400);
     if(raw||mailbox<0||!patch?.personal_stats||slot==null)return;
-    const view=new DataView(heap.buffer),tram=guestBase+0xa0000;
+    const view=new DataView(heap.buffer);
+    if(tramBuffer!==heap.buffer){tramBuffer=heap.buffer;tramAddress=-1;lastTramSearch=-Infinity;}
+    // DOSBox-X backs PC-98 text VRAM separately from ordinary guest RAM.
+    // Locate its two eight-digit HUD rows once, then use the same native guard
+    // for menus/endings. Presentation address discovery never enters the state.
+    if(tramAddress<0&&performance.now()-lastTramSearch>1000){lastTramSearch=performance.now();tramAddress=findDosboxTram(heap);}
+    const tram=tramAddress>=0?tramAddress:guestBase+0xa0000;
     // Native score digits are gaiji 0xA0..0xA9 -> TRAM 0x2057..0x2957.
     // Don't paint over the boot screen, cleared menus or ending artwork.
     const cell=view.getUint16(tram+6*160+56*2,true);
@@ -55,4 +62,12 @@ export function createPersonalHud(canvas,nativeCanvas){
       number(view.getUint32(bonus+1+slot*4,true),272,336,8);
     }
   };
+}
+
+export function findDosboxTram(heap){
+  const view=new DataView(heap.buffer,heap.byteOffset,heap.byteLength),score=6*160+56*2,high=4*160+56*2;
+  function row(at){if(at<2||at+34>heap.length||view.getUint16(at-2,true)!==0x20||view.getUint16(at+32,true)!==0x20)return false;
+    for(let i=0;i<8;i++){const word=view.getUint16(at+i*4,true);if((word&255)!==0x57||(word>>>8)<0x20||(word>>>8)>0x29||view.getUint16(at+i*4+2,true)!==(word|0x8000))return false;}return true;}
+  for(let at=heap.indexOf(0x57,score);at>=0;at=heap.indexOf(0x57,at+1))if(!(at&1)&&row(at)&&row(at-score+high))return at-score;
+  return -1;
 }

@@ -1,6 +1,5 @@
-import {createFrameGate} from '../frame-limit.js';
 import {gameVersion} from '../game-version.js';
-import {NP21} from '../vendor/np2/np2-wasm.js';
+import {NP21} from '../dosbox-adapter.js';
 import {writeNativeTouch,touchPlayer} from '../native-touch.js';
 import {encodeConfig,installConfig} from '../launch-config.js';
 import {sha256} from './sha256.js';
@@ -8,15 +7,15 @@ import {isBound,keyboardBits} from './controls.js';
 import {useControlSnapshot,isFormTarget,controlsSummary} from '../control-settings.js';
 import {PauseMenu} from './pause.js';
 import {createPersonalHud} from './personal-hud.js';
+import {readSoloFault} from '../solo-fault.js';
 const canvas=document.getElementById('canvas'),details=document.getElementById('details');
 const nativeCanvas=document.createElement('canvas');
 nativeCanvas.width=640;nativeCanvas.height=400;nativeCanvas.hidden=true;
 nativeCanvas.style.display='none';
 document.body.append(nativeCanvas);
 const presentPersonalHud=createPersonalHud(canvas,nativeCanvas);
-let rawPresentation=false,presentationCount=0;
+let rawPresentation=false,presentationCount=0,presentationPending=false;
 let pointPreferences={focus:true,always:false};
-const presentationDue=createFrameGate();
 const signature=new TextEncoder().encode('TH04COOPLABv001!');
 const keyTable=[['ArrowUp','ArrowUp',38,1],['ArrowDown','ArrowDown',40,2],['ArrowLeft','ArrowLeft',37,4],['ArrowRight','ArrowRight',39,8],['KeyX','x',88,16],['KeyZ','z',90,32],['ShiftLeft','Shift',16,64],['Escape','Escape',27,128],['Enter','Enter',13,256]];
 let emulator,patch,soundPolicy,bgm,musicTask,closed=false,bootPromise,oldP1=0,ticks=0,inputListener=()=>{},keys=new Set(),enabled=false,mailbox=-1;
@@ -112,19 +111,38 @@ async function boot(config){
     }
   }
   for(const edit of sound.edits)edit.targets.forEach((at,i)=>{disk[at]=edit.values[i];});
-  await bootProgress('下载、编译并初始化 NP2 WASM 与音频设备',5);
-  emulator=await NP21.create({canvas:nativeCanvas,lockstep:true,lockstepEpoch:version.epoch,
-    clk_base:2457600,clk_mult:16,ExMemory:7,Latencys:40,SampleHz:44100,SNDboard:4,
+  await bootProgress('下载、编译并初始化 DOSBox-X WASM 与音频设备',5);
+  emulator=await NP21.create({canvas:nativeCanvas,lockstep:true,rollbackEnabled:config.rollback!==false,lockstepEpoch:version.epoch,
+    ExMemory:7,Latencys:40,SampleHz:44100,SNDboard:4,
     no_mouse:true,use_menu:false,fontfile:'font.bmp',
     onExit:()=>{enabled=false;closed=true;bgm?.dispose();window.parent.postMessage({protocol:'th04-rollback/3',event:'runtime-exit'},location.origin);}});
   if(closed){emulator.pause();return;}
   await bootProgress('挂载游戏磁盘',6);
-  emulator.addDiskImage('th04-sync.hdi',disk);emulator.setHdd(0,'th04-sync.hdi');
+  emulator.addDiskImage('th04-sync.hdi',disk);await emulator.setHdd(0,'th04-sync.hdi');
+  // The private DOS launcher restores 30000 cycles before MAIN. The initial
+  // 1000-cycle budget avoids wasting interpreted work on firmware/driver waits.
+  // All peers run the same fixed sequence until the first gameplay mailbox.
+  emulator.module.warmingBoot=true;emulator.run();
+  try{
+    const {runBoot}=await import('./boot-runner.js');
+    const ready=await runBoot({step:()=>{
+      emulator.step();
+      // Before MAIN is running the mailbox cannot be live. Avoid repeatedly
+      // scanning the entire WASM heap during BIOS and DOS driver waits.
+      if(emulator.tick%15===0&&emulator.module.UTF8ToString(emulator.module._emGetRunningProgram()).toUpperCase()==='MAIN')findMailbox();
+    },
+      ready:()=>mailbox>=0,tick:()=>emulator.tick,cancelled:()=>closed,
+      progress:message=>bootProgress(message,6)});
+    if(!ready)return;
+  }finally{emulator.module.warmingBoot=false;emulator.pause();}
+  emulator.module.bootCPUMetrics=emulator.module.UTF8ToString(emulator.module._getCPUMetrics());
+  if(emulator.module.bootCPUMetrics.split('|')[0]!=='30000')
+    throw Error('启动后联机算力未恢复，请刷新页面并检查引擎版本');
   if(emulator.module.SDL2?.audioContext?.sampleRate!==44100)throw Error('此浏览器未提供统一的 44100 Hz 音频，请改用新版 Chrome 或 Edge');
   // No music imports/downloads/decoding until an actual game frame is observed.
   musicSettings=config;
   await bootProgress('原游戏磁盘和引擎已就绪，等待全员同步开局',7);
-  return {presentation:version.presentation_sha256,disk:meta.sha256,runtime:version.generated_js_sha256,wasm:version.wasm_sha256,mobileWasm:version.mobile_wasm_sha256,clock:version.clock_sha256,audio:version.audio_output_sha256,nativeSound:sound,queue:version.rollback_queue_sha256,snapshots:version.native_snapshots_sha256,controls:version.controls_sha256,pause:version.pause_sha256,game:version.game_adapter_sha256,room:version.room_sha256,membership:version.membership_sha256,startup:version.startup_sha256,hostSlot:pauseMenu.hostSlot,adapter:version.adapter};
+  return {presentation:version.presentation_sha256,disk:meta.sha256,runtime:version.generated_js_sha256,wasm:version.wasm_sha256,mobileWasm:version.mobile_wasm_sha256,clock:version.clock_sha256,cpuCycles:version.cpu_cycles,audio:version.audio_output_sha256,nativeSound:sound,queue:version.rollback_queue_sha256,snapshots:version.native_snapshots_sha256,controls:version.controls_sha256,pause:version.pause_sha256,game:version.game_adapter_sha256,room:version.room_sha256,membership:version.membership_sha256,startup:version.startup_sha256,hostSlot:pauseMenu.hostSlot,adapter:version.adapter,dosboxDisk:version.dosbox_disk_sha256,memoryDiff:version.dosbox_memory_diff_sha256,snapshotDiff:version.snapshot_diff_wasm_sha256,fault:version.fault_sha256};
 }
 function findMailbox(){
   const heap=emulator.module.HEAPU8,view=new DataView(heap.buffer);
@@ -202,10 +220,18 @@ function step(inputs,{frame=ticks,replay=false,offlineMask=0}={}){
   try{
     if(mailbox>=0)emulator.module.HEAPU8[mailbox-patch.mailbox_cs_offset+patch.offline_mask_cs_offset]=offlineMask;
     currentEffect.result=stepInner(inputs);effects.set(frame,currentEffect);
-    if(!replay&&presentationDue(performance.now())){presentationCount++;presentPersonalHud({raw:rawPresentation,heap:emulator.module.HEAPU8,mailbox,patch,slot:localSlot,
-      guestBase:mailbox>=0?guestBase():0,points:{...pointPreferences,players:playerCount}});}
+    if(!replay)presentationPending=true;
     return currentEffect.result;
   }finally{emulator.module.netEndFrame();replaying=false;currentEffect=null;}
+}
+function present(){
+  if(!enabled||!presentationPending)return false;
+  // Called once per completed room batch, synchronously after all simulation.
+  // Flush the current native RGB before drawing HUD from the same state.
+  if(!emulator.module.netPresent())return false;
+  presentPersonalHud({raw:rawPresentation,heap:emulator.module.HEAPU8,mailbox,patch,slot:localSlot,
+    guestBase:mailbox>=0?guestBase():0,points:{...pointPreferences,players:playerCount}});
+  presentationPending=false;presentationCount++;return true;
 }
 function capture(frame){
   emulator.module.netCapture(frame);
@@ -213,6 +239,7 @@ function capture(frame){
     pause:{previous:pauseMenu.previous.slice(),paused:pauseMenu.paused,selection:pauseMenu.selection,exited:pauseMenu.exited}});
 }
 function restore(frame){
+  presentationPending=false;
   const saved=rollbackStates.get(frame);
   if(!saved||frame<confirmedPrefix)throw Error('游戏回滚状态已过期');
   emulator.module.netRestore(frame);
@@ -296,9 +323,15 @@ function checksum(){
   return {tick:ticks,hash:(h>>>0).toString(16).padStart(8,'0'),gameFrame:v.getUint32(mailbox+16,true)};
 }
 window.th04Sync={
+  faultReport(){return {settings:musicSettings,game:snapshot(),cpu:emulator?readSoloFault(emulator.module.HEAPU8,emulator.module):null,diagnostics:details.textContent};},
   setPointPreferences({focus,always}){pointPreferences={focus:!!focus,always:!!always};},
-  diagnosticText:()=>`${details.textContent}\n画面提交 ${presentationCount} · ${rawPresentation?"原始画面":"个人 HUD"}`,
-  setRawPresentation(value){rawPresentation=!!value;},
+  diagnosticText:()=>{
+    const r=emulator?.module.framePresenter?.info(),ms=value=>value==null?'—':value.toFixed(1);
+    return `${details.textContent}\n画面提交 ${presentationCount} · ${rawPresentation?"原始画面":"个人 HUD"}`
+      +(r?`\n核心画面更新 ${r.submitted} · WebGL 绘制 ${r.drawn} · 重算画面更新 ${r.replaySubmitted}\n最近绘制间隔 P95 ${ms(r.intervals.p95Ms)} / P99 ${ms(r.intervals.p99Ms)} ms`:'');
+  },
+  renderInfo:()=>({canvasSubmitted:presentationCount,...emulator?.module.framePresenter?.info()}),
+  setRawPresentation(value){rawPresentation=!!value;presentationPending=true;},
   setMusicVolume(value){document.getElementById('bgm-volume').value=value;bgm?.setVolume(Number(value)/100);},
   touchContext(){
     if(!enabled||mailbox<0)return {key:'boot',play:false};
@@ -321,7 +354,7 @@ window.th04Sync={
   onInput(callback){inputListener=callback;},
   start(){emulator.run();enabled=true;details.textContent='启动进度：全员已同步开局，正在启动 DOS 和游戏。';canvas.focus();},
   stop(){enabled=false;closed=true;clearKeys();bgm?.dispose();if(emulator){emulator.module.netFlushAudio();emulator.pause();}},
-  step,checksum,snapshot,capture,restore,confirm,
+  step,present,checksum,snapshot,capture,restore,confirm,
   readyForRollback:()=>mailbox>=0&&!!emulator?.module.netCapture,
   canPredict:()=>!predictionBlockReason(),predictionBlockReason,
   rollbackInfo:()=>emulator?.module.netSnapshotInfo()

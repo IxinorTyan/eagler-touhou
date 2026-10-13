@@ -69,7 +69,8 @@ class OutboundWriter:
         self.abort()
 
 
-def handle(handler,rooms,room_lock,roles,ttl):
+def handle(handler,rooms,room_lock,roles,ttl,expired=None):
+    expired=expired or (lambda room,now:now-room['seen']['host']>ttl)
     try:
         from websockets.server import ServerProtocol
         from websockets.protocol import OPEN
@@ -85,7 +86,7 @@ def handle(handler,rooms,room_lock,roles,ttl):
     token=data.get('token')
     with room_lock:
         room=rooms.get(code)
-        if not room or time.monotonic()-room['seen']['host']>ttl:
+        if not room or expired(room,time.monotonic()):
             handler.reply({'error':'房间已结束'},404);return
         role=next((r for r in roles if room[r] and room[r]==token),None)
         if role is None or room['phase']!='loading' or room.get('transport','rtc')!='ws':
@@ -135,7 +136,7 @@ def handle(handler,rooms,room_lock,roles,ttl):
         while True:
             with room_lock:
                 current=rooms.get(code)
-                valid=current and current['generation']==generation and current[role]==token and time.monotonic()-current['seen']['host']<=ttl
+                valid=current and current['generation']==generation and current[role]==token and not expired(current,time.monotonic())
             if not valid:break
             if (entry['ready'] and time.monotonic()-last_data>40) or (not entry['ready'] and time.monotonic()-started>30):break
             if not select.select([sock],[],[],1)[0]:continue
@@ -154,6 +155,9 @@ def handle(handler,rooms,room_lock,roles,ttl):
                 if not event.fin:continue
                 packet=bytes(fragments);fragments.clear();last_data=time.monotonic()
                 if len(packet)<3 or packet[0]!=0xe7 or packet[1]>=count or packet[1]==source:raise ValueError('bad envelope')
+                with room_lock:
+                    current=rooms.get(code)
+                    if current and current['generation']==generation and current[role]==token:current['seen'][role]=time.monotonic()
                 with HUB_LOCK:
                     if not entry['ready']:raise ValueError('route not released')
                     target=HUBS.get(key,{}).get(packet[1])
