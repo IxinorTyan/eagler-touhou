@@ -10,6 +10,7 @@ export class DOSBoxPC98 {
   constructor(config){this.config=config;this.state='loading';this.disks=new Map();this.keys=new Set();this.outputs=new Map();this.frame=null;this.replaying=false;this.tick=0;this.audioChunks=[];}
   async initialize(){
     const net=!!this.config.lockstep;
+    const tracked=net&&this.config.rollbackEnabled!==false&&WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,5,2,0,1,0,1]));
     if(!net&&(typeof WebAssembly.Suspending!=='function'||typeof WebAssembly.promising!=='function'))throw Error('DOSBox-X 性能版需要支持 JSPI 的新版 Chrome / Edge。');
     const context=(this.config.audioContext?.state!=='closed'&&this.config.audioContext)||new AudioContext({sampleRate:44100,latencyHint:'interactive'});
     context.resume().catch(()=>{});this.audio=new LocalAudioOutput(context,1);
@@ -19,8 +20,8 @@ export class DOSBoxPC98 {
     class VirtualDate extends NativeDate {constructor(...args){super(...(args.length?args:[epoch+(emulator.module?.virtualNow||0)]));}static now(){return epoch+(emulator.module?.virtualNow||0);}getTimezoneOffset(){return 0;}getFullYear(){return this.getUTCFullYear();}getMonth(){return this.getUTCMonth();}getDate(){return this.getUTCDate();}getDay(){return this.getUTCDay();}getHours(){return this.getUTCHours();}getMinutes(){return this.getUTCMinutes();}getSeconds(){return this.getUTCSeconds();}}
     const queue=[];let receiver;
     this.module={canvas:this.config.canvas,worker:!!this.config.workerRuntime,SDL2:{audioContext:context},virtualDate:VirtualDate,virtualNow:0,targetNow:0,deterministic:net,
-      mobileRuntime:{core:'dosbox-x',cpuCore:'simple',continuation:net?'Asyncify':'JSPI'},
-      locateFile:f=>new URL(f==='wdosbox-x-jspi.wasm'?(net?'wdosbox-x-rollback.wasm':'wdosbox-x-fast.wasm'):f==='wdosbox-x.wasm'?'wdosbox-x-rollback.wasm':f,vendor).href,
+      mobileRuntime:{core:'dosbox-x',cpuCore:'simple',continuation:net?'Asyncify':'JSPI',writeJournal:tracked},
+      locateFile:f=>new URL(f==='wdosbox-x-jspi.wasm'?(net?(tracked?'wdosbox-x-rollback-tracked.wasm':'wdosbox-x-rollback.wasm'):'wdosbox-x-fast.wasm'):f==='wdosbox-x.wasm'?(tracked?'wdosbox-x-rollback-tracked.wasm':'wdosbox-x-rollback.wasm'):f,vendor).href,
       postMessage:(name,props)=>{if(receiver)receiver(name,props);else queue.push([name,props]);},
       onAbort:error=>{this.state='failed';this.config.onError?.(Error(String(error)));}};
     this.module.installFramePresenter=()=>{
@@ -30,7 +31,7 @@ export class DOSBoxPC98 {
     this.transport={sessionId:'th04-dosbox',module:this.module,net:null,
       sendMessageToServer:(name,props)=>this.module.messageHandler({data:{name,props}}),
       initMessageHandler:handler=>{receiver=handler;for(const [name,props]of queue)handler(name,props);queue.length=0;},exit:()=>{}};
-    const factory=(await import(net?'./vendor/dosbox-x/dosbox-rollback.mjs':'./vendor/dosbox-x/dosbox-jspi.mjs')).default;
+    const factory=(await import(net?(tracked?'./vendor/dosbox-x/dosbox-rollback-tracked.mjs':'./vendor/dosbox-x/dosbox-rollback.mjs'):'./vendor/dosbox-x/dosbox-jspi.mjs')).default;
     await factory(this.module);this.module.callMain([this.transport.sessionId]);
     if(net&&this.config.rollbackEnabled!==false)this.module.memoryDiff=await makeMemoryDiff(this.module);
     this.onSleep=({data})=>{if(!net&&data?.name==='ws-sync-sleep'&&data.props.sessionId===this.transport.sessionId)globalThis.postMessage({name:'wc-sync-sleep',props:data.props},'*');};

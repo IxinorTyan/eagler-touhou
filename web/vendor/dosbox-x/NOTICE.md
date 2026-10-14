@@ -34,5 +34,18 @@ and multi-client verification; merely shipping this build is not validation.
 `tools/build_dosbox_runtime.cjs` builds both glue modules and version manifests
 from this project's pinned sources. It does not read a sibling project.
 
+Rollback-enabled network sessions on multi-memory browsers select
+`wdosbox-x-rollback-tracked.wasm`, `dosbox-rollback-tracked.mjs` and
+`snapshot-diff-tracked.wasm`. `tools/build_dirty_core.mjs` instruments native
+stores and bulk writes with a separate 64 KiB page bitmap. Constant-address
+store pages are conservatively scanned. `tools/prepare_dirty_runtime.cjs`
+covers host glue mutations and builds the byte-exact dirty-page scan helper.
+The game adapter also covers browser-written guest input. This changes snapshot
+work only; emulated CPU cycles, virtual time, Asyncify continuation and complete
+memory/filesystem undo are retained. The untracked network and local binaries
+remain unchanged. Browsers without multi-memory keep the original rollback
+core and storage fallback. Build dependencies are pinned Binaryen 132 and
+Acorn 8.15.0 in the local development workspace.
+
 The x86 CPU is interpreted. This build does not include a dynamic x86 compiler.
 Unsupported local browsers receive a startup error. There is no NP21 fallback.

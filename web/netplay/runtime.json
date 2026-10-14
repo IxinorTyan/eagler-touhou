@@ -18,11 +18,11 @@
   "generated_js_sha256": "6fb03bd9c26c7361e681c7d2d0cd31a2e89db6f25cb82751263d811ca6fca068",
   "mobile_wasm_sha256": "23f41f943f4a7832d850e66aba0fe64d25e5538caf6121e6978dd755968d0c71",
   "presentation_sha256": "17e12ac03bb27ecb38b35c3e2698b9fbeb840f6ed56fb81d11f55cdc56695774",
-  "clock_sha256": "9432cce913fb3dae0729253eee222f8597ddb6b9059db098fb88f612aee1b6dd",
+  "clock_sha256": "59ce84e8288d2b51fb2ad727aae8d9ad83f23ccbf54261f0ca78bc9106951cb5",
   "audio_output_sha256": "18760a612db5dfff8a8dd63bef48f12df51c62474a7cd465084ffbe0fc90a214",
   "rollback_queue_sha256": "3e9690c1eecbfd9dd71c1d171608144ca58afbfb473bd53406dc72ee3ec4db04",
   "native_snapshots_sha256": "d6413ec1ef0c6ba4c10421e68cefce031f2fc009320a7993346b93de061a3daa",
-  "game_adapter_sha256": "f84e3b85a35d279bba68c9abe90e5674900435e6479e242966ba894edaf9f1a4",
+  "game_adapter_sha256": "33023c9d40b1b91cd38f90c3675a9e7d4c84b1f9bf970dccf36c4b016a49e253",
   "room_sha256": "84df20baba2c38eb6136583d51912b649c0fbc0b8c47ded6096c193a2a5f8a47",
   "membership_sha256": "a84a5b38066e29a876db2c900e2411f3d4168f329bcb83fb44a81226a88e6fca",
   "startup_sha256": "c6bebede4b4c64245c1e97bfba7d1867018329734ac7c5e1e7f628f1f3610036",
@@ -357,12 +357,19 @@
       }
     }
   },
-  "dosbox_adapter_sha256": "9432cce913fb3dae0729253eee222f8597ddb6b9059db098fb88f612aee1b6dd",
+  "dosbox_adapter_sha256": "59ce84e8288d2b51fb2ad727aae8d9ad83f23ccbf54261f0ca78bc9106951cb5",
   "dosbox_disk_sha256": "2c456baa5ceff1b5ccbe4a73a442a6f5652002274c263b35825ed7d570dc55a8",
-  "dosbox_memory_diff_sha256": "e6242e53d401f0fb16f1453213d8aa49aa103749ad8e78b0e03ba5d97ae1bc57",
+  "dosbox_memory_diff_sha256": "74d030e2728d792d71c84110b16f649dbc928a12138b1d80564972caf3549c6b",
   "snapshot_diff_wasm_sha256": "20235d6360a49d633f2db03832ef5ad3fbe6daffd4f44e4d7f8e790875a4662f",
   "frame_presenter_sha256": "83893ca252caa26c9ecdb6a8fcca7fe496d793bb5f95d29e921c360a4c957631",
   "cpu_cycles": 30000,
   "local_worker_sha256": "90f45167a8644280232564c7ad315a736823665a5bff7326aa4e0daefdca2d83",
-  "fault_sha256": "9c1469b44d1dd156b4811f514bbf761ffccb010510d57a96548257e7de67d2e0"
+  "fault_sha256": "9c1469b44d1dd156b4811f514bbf761ffccb010510d57a96548257e7de67d2e0",
+  "write_journal": {
+    "schema": 1,
+    "page_bytes": 4096,
+    "wasm_sha256": "bc7fd56d753667dd11026328c70c86367e905266c157119feca1aea740d76ca1",
+    "glue_sha256": "7a137790f5d51bd2f37843d870706145f14c8bb52457fb5ba7a481d214bc21f8",
+    "diff_sha256": "fb69ccf0818caa9199ac3f357435528622413b690af90a353b99c88d81adb5c2"
+  }
 }

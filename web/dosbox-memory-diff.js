@@ -2,16 +2,17 @@ export async function makeMemoryDiff(module){
   // A portable full-copy fallback retains rollback on engines without multiple
   // memories. The fast helper changes storage only, never emulated execution.
   try{
-    const response=await fetch(new URL('./vendor/dosbox-x/snapshot-diff.wasm',import.meta.url));
+    const tracked=!!module.thDirty;
+    const response=await fetch(new URL(tracked?'./vendor/dosbox-x/snapshot-diff-tracked.wasm':'./vendor/dosbox-x/snapshot-diff.wasm',import.meta.url));
     if(!response.ok)throw Error('snapshot diff missing');
-    const {instance}=await WebAssembly.instantiate(await response.arrayBuffer(),{env:{memory:module.nativeExports().memory}});
+    const {instance}=await WebAssembly.instantiate(await response.arrayBuffer(),{env:{memory:module.nativeExports().memory,...(tracked?{thDirty:module.thDirty}:{})}});
     const api=instance.exports,pageBytes=4096,directoryBytes=262144,pool=[];let size=0;
     if(!api.packPages||!api.restorePages)throw Error('snapshot helper version mismatch');
     function reserve(scratchBytes=0){const needed=module.HEAPU8.length+directoryBytes+scratchBytes;
       if(api.shadow.buffer.byteLength<needed)api.shadow.grow(Math.ceil((needed-api.shadow.buffer.byteLength)/65536));
     }
     return {begin(){reserve();if(!size)api.init(module.HEAPU8.length);else if(size!==module.HEAPU8.length)api.extend(size,module.HEAPU8.length);size=module.HEAPU8.length;},
-      changes(){const count=api.scan(module.HEAPU8.length>>>12);return new Uint32Array(api.shadow.buffer,0,count).slice();},
+      changes(){if(tracked){const dirty=new Uint8Array(module.thDirty.buffer);for(const page of module.thDirtyStatic)dirty[page]=1;}const count=api.scan(module.HEAPU8.length>>>12);return new Uint32Array(api.shadow.buffer,0,count).slice();},
       pack(pages){
         if(!pages.length)return null;
         const length=pages.length*pageBytes,scratch=directoryBytes+module.HEAPU8.length;
