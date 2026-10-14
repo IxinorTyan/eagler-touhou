@@ -24,6 +24,7 @@ let pendingMusic=[],lastMusicName='',musicSettings,musicReady=false;
 let pauseMenu,localSlot,menuAction=()=>{},blocked=[0,0],emulatedTicks=0,playerCount=2;
 const rollbackStates=new Map(),effects=new Map();
 let confirmedPrefix=0,replaying=false,currentEffect;
+let checkpointReplays=0;
 let controlsBlocked=false;
 function localButtons(){
   return keyboardBits(keys);
@@ -215,6 +216,8 @@ function stepInner(inputs){
   }
 }
 function step(inputs,{frame=ticks,replay=false,offlineMask=0}={}){
+  const saved=rollbackStates.get(frame);
+  if(saved)saved.execution={inputs:inputs.slice(),offlineMask};
   replaying=replay;currentEffect={};
   emulator.module.netBeginFrame(frame,replay);
   try{
@@ -233,33 +236,61 @@ function present(){
     guestBase:mailbox>=0?guestBase():0,points:{...pointPreferences,players:playerCount}});
   presentationPending=false;presentationCount++;return true;
 }
-function capture(frame){
-  emulator.module.netCapture(frame);
-  rollbackStates.set(frame,{ticks,emulatedTicks,oldP1,mailbox,blocked:blocked.slice(),
+function capture(frame,restored=false){
+  if(rollbackStates.has(frame))throw Error('游戏回滚快照重复');
+  // Two adjacent speculative ticks share a first-write set. The JS state and
+  // original input of each tick remain available for exact odd-tick restore.
+  const previous=rollbackStates.get(frame-1);
+  const nativeFrame=previous?.nativeFrame===frame-1?frame-1:frame;
+  if(nativeFrame===frame)emulator.module.netCapture(frame,restored);
+  rollbackStates.set(frame,{nativeFrame,ticks,emulatedTicks,oldP1,mailbox,blocked:blocked.slice(),
     pause:{previous:pauseMenu.previous.slice(),paused:pauseMenu.paused,selection:pauseMenu.selection,exited:pauseMenu.exited}});
 }
 function restore(frame){
   presentationPending=false;
   const saved=rollbackStates.get(frame);
   if(!saved||frame<confirmedPrefix)throw Error('游戏回滚状态已过期');
-  emulator.module.netRestore(frame);
-  ({ticks,emulatedTicks,oldP1,mailbox}=saved);blocked=saved.blocked.slice();
-  Object.assign(pauseMenu,saved.pause,{previous:saved.pause.previous.slice()});
-  for(const key of rollbackStates.keys())if(key>=frame)rollbackStates.delete(key);
-  for(const key of effects.keys())if(key>=frame)effects.delete(key);
+  const from=saved.nativeFrame,checkpoint=rollbackStates.get(from);
+  if(!checkpoint||(from!==frame&&!checkpoint.execution))throw Error('游戏回滚检查点缺失');
+  emulator.module.netRestore(from);
+  ({ticks,emulatedTicks,oldP1,mailbox}=checkpoint);blocked=checkpoint.blocked.slice();
+  Object.assign(pauseMenu,checkpoint.pause,{previous:checkpoint.pause.previous.slice()});
+  for(const key of rollbackStates.keys())if(key>=from)rollbackStates.delete(key);
+  for(const key of effects.keys())if(key>=from)effects.delete(key);
+  if(from!==frame){
+    // Keep the rebuilt checkpoint available if another late input corrects
+    // this same pair. The prior tick's original input is immutable here:
+    // RollbackQueue has already selected the earliest changed input.
+    capture(from,true);
+    step(checkpoint.execution.inputs,{frame:from,replay:true,offlineMask:checkpoint.execution.offlineMask});
+    checkpointReplays++;
+    if(from<confirmedPrefix){
+      // Its effects were already delivered. Reconstruct simulation only.
+      effects.delete(from);emulator.module.netDiscardFrame(from);
+    }
+  }
+}
+function retainedCheckpoint(prefix){
+  const pending=rollbackStates.get(prefix);
+  if(pending)return pending.nativeFrame;
+  const previous=rollbackStates.get(prefix-1);
+  return previous?.nativeFrame===prefix-1?prefix-1:prefix;
 }
 function confirm(prefix){
   let exit=false;
   for(let frame=confirmedPrefix;frame<prefix;frame++){
     const effect=effects.get(frame);if(!effect)throw Error('确认帧缺少模拟结果');
     if(effect.flushAudio)emulator.module.netFlushAudio();
-    emulator.module.netConfirm(frame+1);
+    emulator.module.netConfirm(frame+1,retainedCheckpoint(frame+1));
     if(effect.musicError){musicError=true;musicStatus=`浏览器音乐错误（游戏继续）：${effect.musicError}`;}
     if(effect.music&&!musicError){try{observeMusic(effect.music);}catch(error){musicError=true;musicStatus=`浏览器音乐错误（游戏继续）：${error.message}`;}}
     if(effect.result==='exit')exit=true;
-    effects.delete(frame);rollbackStates.delete(frame);
+    effects.delete(frame);
   }
-  confirmedPrefix=prefix;return exit?'exit':undefined;
+  confirmedPrefix=prefix;
+  const retain=retainedCheckpoint(prefix);
+  for(const frame of rollbackStates.keys())if(frame<retain)rollbackStates.delete(frame);
+  return exit?'exit':undefined;
 }
 function snapshot(){
   if(mailbox<0)return null;
@@ -357,5 +388,5 @@ window.th04Sync={
   step,present,checksum,snapshot,capture,restore,confirm,
   readyForRollback:()=>mailbox>=0&&!!emulator?.module.netCapture,
   canPredict:()=>!predictionBlockReason(),predictionBlockReason,
-  rollbackInfo:()=>emulator?.module.netSnapshotInfo()
+  rollbackInfo:()=>({...emulator?.module.netSnapshotInfo(),checkpointFrames:2,checkpointReplays})
 };

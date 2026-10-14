@@ -673,6 +673,7 @@ function updateMetrics(now,waiting){
     +`已确认 ${Math.min(queue.frame,queue.confirmed)} · 预测领先 ${Math.max(0,queue.frame-queue.confirmed)}/${MAX_ROLLBACK} 步\n`
     +`最近周期最大领先 ${c.lead} 步 · 游戏帧 ${game?.gameFrame??'启动中'} · 预测条件：${runtime.predictionBlockReason()||'允许'} · 补算前提前发输入 ${earlyInputs} 次\n`
     +`回滚 ${rollbackCount} 次 · 重算 ${resimulated} 步 · 最长 ${maxRewind} 步 · 快照 ${((runtime.rollbackInfo()?.snapshotBytes||0)/1048576).toFixed(0)} MiB\n`
+    +`检查点每 ${runtime.rollbackInfo()?.checkpointFrames||1} 步 · 当前 ${runtime.rollbackInfo()?.snapshots||0} 个 · 边界重建 ${runtime.rollbackInfo()?.checkpointReplays||0} 步\n`
     +`当前等待 ${waitingSince?(now-waitingSince).toFixed(0):0} ms\n`
     +(waiting?waitDetail:queue.frame<replayUntil?`正在补算，还剩 ${replayUntil-queue.frame} 步`:'正常推进／等待下一步时刻')+`\n${gamepadStatus}`
     +(roomServiceError?'\n房间服务正在重试（游戏按玩家数据通道继续）：'+roomServiceError:'');

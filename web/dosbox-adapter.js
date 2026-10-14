@@ -42,8 +42,9 @@ export class DOSBoxPC98 {
     m.netKey=(type,event)=>this.key(event.code,type==='keydown');
     m.netBeginFrame=(frame,replay)=>{this.frame=frame;this.replaying=!!replay;this.outputs.set(frame,[]);};
     m.netEndFrame=()=>{this.snapshots?.seal();this.frame=null;this.replaying=false;};
-    m.netConfirm=prefix=>{this.snapshots?.confirm(prefix);for(const [frame,blocks]of this.outputs)if(frame<prefix){for(const samples of blocks)this.audio.push([samples]);this.outputs.delete(frame);}};
-    m.netCapture=frame=>{if(!this.snapshots)this.snapshots=createDosboxSnapshots(this);this.snapshots.capture(frame);};
+    m.netConfirm=(prefix,retainFrame=prefix)=>{this.snapshots?.confirm(prefix,retainFrame);for(const [frame,blocks]of this.outputs)if(frame<prefix){for(const samples of blocks)this.audio.push([samples]);this.outputs.delete(frame);}};
+    m.netDiscardFrame=frame=>this.outputs.delete(frame);
+    m.netCapture=(frame,restored=false)=>{if(!this.snapshots)this.snapshots=createDosboxSnapshots(this);this.snapshots.capture(frame,restored);};
     m.netRestore=frame=>{this.snapshots.restore(frame);for(const key of this.outputs.keys())if(key>=frame)this.outputs.delete(key);};
     m.netSnapshotInfo=()=>this.snapshots?.info()||{snapshotBytes:0,snapshots:0};
     m.netFlushAudio=()=>this.audio.flush();m.netInfo=()=>({tick:this.tick,...this.audio.info()});
