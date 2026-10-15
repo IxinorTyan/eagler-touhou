@@ -1,24 +1,24 @@
 {
   "dispatch": "dosbox-x-simple",
   "protocol": "th04-rollback/3",
-  "adapter": "dosbox-x-full-asyncify-v1",
+  "adapter": "dosbox-x-native-tablet-v1",
   "tick_hz": 60,
   "audio_hz": 44100,
   "epoch": 946684800000,
   "source_js_sha256": "8d44f76367bc2dd0222b37a51608b62c2c7958313ed27b2fb652f28bf90201cc",
-  "wasm_sha256": "23f41f943f4a7832d850e66aba0fe64d25e5538caf6121e6978dd755968d0c71",
+  "wasm_sha256": "318af02f807f494613083c444a35c1abcde2823a9ad2c81a160e785d8d7d3948",
   "rollback_wasm": {
-    "source_sha256": "bcf82c465a012bd19c0999a31c5fb15efcee6d32b28bd4f7d23ca1a030e92cee",
-    "sha256": "23f41f943f4a7832d850e66aba0fe64d25e5538caf6121e6978dd755968d0c71",
+    "source_sha256": "712c88bb8177cb0e4f8821437ca82c9bc3c7ce137235d91f1eab34de717e89cc",
+    "sha256": "318af02f807f494613083c444a35c1abcde2823a9ad2c81a160e785d8d7d3948",
     "memory_bytes": 67108864,
     "maximum_memory_bytes": 268435456,
-    "continuation": "full Asyncify",
+    "continuation": "Asyncify boundary with native frame scheduling and guarded CPU",
     "binaryen": "132"
   },
-  "generated_js_sha256": "6fb03bd9c26c7361e681c7d2d0cd31a2e89db6f25cb82751263d811ca6fca068",
-  "mobile_wasm_sha256": "23f41f943f4a7832d850e66aba0fe64d25e5538caf6121e6978dd755968d0c71",
+  "generated_js_sha256": "b86ffabafe90b43c0e12745ebd2d03e0da3353a53f765ad50a2008d12e291e8e",
+  "mobile_wasm_sha256": "318af02f807f494613083c444a35c1abcde2823a9ad2c81a160e785d8d7d3948",
   "presentation_sha256": "17e12ac03bb27ecb38b35c3e2698b9fbeb840f6ed56fb81d11f55cdc56695774",
-  "clock_sha256": "59ce84e8288d2b51fb2ad727aae8d9ad83f23ccbf54261f0ca78bc9106951cb5",
+  "clock_sha256": "f7ee49706f7d18308e9b39daa06602141107b6675aa6767132f90fdd6f75471f",
   "audio_output_sha256": "18760a612db5dfff8a8dd63bef48f12df51c62474a7cd465084ffbe0fc90a214",
   "rollback_queue_sha256": "3e9690c1eecbfd9dd71c1d171608144ca58afbfb473bd53406dc72ee3ec4db04",
   "native_snapshots_sha256": "d6413ec1ef0c6ba4c10421e68cefce031f2fc009320a7993346b93de061a3daa",
@@ -357,7 +357,7 @@
       }
     }
   },
-  "dosbox_adapter_sha256": "59ce84e8288d2b51fb2ad727aae8d9ad83f23ccbf54261f0ca78bc9106951cb5",
+  "dosbox_adapter_sha256": "f7ee49706f7d18308e9b39daa06602141107b6675aa6767132f90fdd6f75471f",
   "dosbox_disk_sha256": "2c456baa5ceff1b5ccbe4a73a442a6f5652002274c263b35825ed7d570dc55a8",
   "dosbox_memory_diff_sha256": "74d030e2728d792d71c84110b16f649dbc928a12138b1d80564972caf3549c6b",
   "snapshot_diff_wasm_sha256": "20235d6360a49d633f2db03832ef5ad3fbe6daffd4f44e4d7f8e790875a4662f",
@@ -368,8 +368,8 @@
   "write_journal": {
     "schema": 1,
     "page_bytes": 4096,
-    "wasm_sha256": "bc7fd56d753667dd11026328c70c86367e905266c157119feca1aea740d76ca1",
-    "glue_sha256": "7a137790f5d51bd2f37843d870706145f14c8bb52457fb5ba7a481d214bc21f8",
+    "wasm_sha256": "075a3dead5f49cf3a38b7d382fd0460ac7ad23935cec0f55db0d4bb4ea5c848d",
+    "glue_sha256": "f7224bcb7e5ea881525760f3b71b194d01e127acf31103a5400a06d9d004d048",
     "diff_sha256": "fb69ccf0818caa9199ac3f357435528622413b690af90a353b99c88d81adb5c2"
   }
 }
