@@ -1,0 +1,823 @@
+import {startFrameLoop} from '../frame-limit.js';
+import {readNetworkMode,networkUrl} from './network-mode.js';
+import {PROTOCOL,RollbackQueue,TICK_MS,MAX_ROLLBACK,BOOT_DELAY,MAX_INPUT_DELAY,lockstepDelayForRtt} from './rollback-queue.js';
+import {mountPlayer} from '../player-ui.js';
+import {isBound,keyboardBits,gamepadBits,gamepadStatus,normalize} from './controls.js';
+import {mountFocusSettings} from './focus-display.js';
+import {mountControlSettings,controlSnapshot,isFormTarget} from '../control-settings.js';
+import {InputLatch} from './input-latch.js';
+const downloadFaultReport=(value,name)=>{const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+import {createRelay} from './relay.js';
+import {loadRtcConfiguration,refreshRtcPath,describeRtcConfiguration,countIceCandidate,describeIceCandidates,recordIceServerError} from './connection.js';
+const $=id=>document.getElementById(id),roles=['host','guest','guest2'];
+const label=role=>({host:'房主',guest:'客机 1',guest2:'客机 2'})[role];
+const status=text=>{$('status').textContent=text;player.note(text);};
+const settingNames=['players','stage','difficulty','lives','bombs'];
+let session,state,iframe,runtime,queue,localReady;
+const mode=readNetworkMode();
+let useRelay=mode.transport==='ws';
+// Legacy URL preference only seeds a newly created room. Joining clients
+// always use the host's server-authoritative setting, frozen at game start.
+const defaultRollback=mode.rollback!=='off';
+const inputLatch=new InputLatch();
+let inputPolicy;
+let timingSent=false,runDelay=null;
+let relay;
+let preparing=false,running=false,stopped=false,busy=false,runRequested=false;
+let pollTimer,heartbeatTimer,loadTimer,raf,wakeTimer=null,wakeAt=0;
+let wakePending=false,wakeToken=0;
+const wakeChannel=new MessageChannel();
+wakeChannel.port1.onmessage=event=>{
+  if(event.data!==wakeToken||!wakePending)return;
+  wakePending=false;wakeTimer=null;pump(performance.now());
+};
+let waitingSince=0,replayUntil=0,rollbackCount=0,resimulated=0,maxRewind=0;
+let waitedMs=0,measuredWaitMs=0,waitPercent=0,measuredGame=null,gameHz=null;
+const performanceHistory=[];
+function endWait(){if(waitingSince){waitedMs+=performance.now()-waitingSince;waitingSince=0;}}
+const pendingHashes=new Map();
+let keys=new Set(),childBits=0,pendingAction=0,bits=0,inputChangedAt=0;
+let peers=new Map(),hashes=new Map(),captureTimes=new Map();
+let pumping=false,lastNow=0,accumulator=0,lastUi=0,lastMeasure=0,measureFrame=0;
+let stepCost=0,stepCount=0,maxCost=0,hz=0,averageCost=0,peakCost=0,inputAge=0,lastApplied=0,receivedInputs=0;
+const newCosts=()=>({capture:0,captures:0,simulate:0,steps:0,present:0,presentations:0,hash:0,restore:0,restores:0,confirm:0,replay:0,replays:0,lead:0});
+let costs=newCosts(),measuredCosts=newCosts(),waitDetail='',earlyInputs=0;
+const activeRoles=()=>roles.slice(0,state.settings.players);
+const onlinePeers=()=>[...peers.values()].filter(peer=>!peer.offline);
+const GRACE_MS=5000;
+let pollFailedAt=0,roomServiceError='';
+let bootStage='等待加载游戏页面';
+let bootStep=0,bootStartedAt=0;
+let connectionConfigPending=false,pendingConnectionSignals=[];
+let connectionAttempt=0,connectionReadySent=false,fallbackPending=false;
+let connectionConfigSummary='尚未读取';
+let stopReason='';
+const player=mountPlayer($('game'),{onChange:()=>{if(running){observeInput();wake();}},onGesture:async()=>{
+  if(!runtime)return;
+  if(await runtime.unlockAudio())player.note('声音已启用。低速停火靠近队友可救援；按住“停火救援”即可。');
+  else player.note('声音尚未就绪，进入游戏后点击“启用声音”。');
+}});
+const rawView=document.createElement('button');rawView.type='button';let rawEnabled=false;
+rawView.textContent='显示：本机判定点';rawView.setAttribute('aria-pressed','false');
+rawView.onclick=()=>{rawEnabled=!rawEnabled;runtime?.setRawPresentation(rawEnabled);rawView.textContent=rawEnabled?'显示：原始画面':'显示：本机判定点';rawView.setAttribute('aria-pressed',String(rawEnabled));};
+$('game').querySelector('.player-toolbar').append(rawView);
+const musicControl=document.createElement('label');musicControl.textContent='音乐 ';
+const musicVolume=document.createElement('input');musicVolume.type='range';musicVolume.min=0;musicVolume.max=100;musicVolume.value=70;musicVolume.setAttribute('aria-label','浏览器 BGM 音量');musicVolume.style.width='100px';
+try{const saved=localStorage.getItem('th02.network.bgmVolume');if(saved!==null)musicVolume.value=Math.max(0,Math.min(100,Number(saved)||0));}catch{}
+musicControl.append(musicVolume);$('game').querySelector('.player-toolbar').append(musicControl);
+musicVolume.oninput=()=>{runtime?.setMusicVolume(Number(musicVolume.value)/100);try{localStorage.setItem('th02.network.bgmVolume',musicVolume.value);}catch{}};
+const faultDownload=document.createElement('button');faultDownload.type='button';faultDownload.dataset.faultDownload='';faultDownload.textContent='下载故障信息';
+faultDownload.onclick=()=>{
+  if(!runtime){player.note('请先启动游戏。');return;}
+  try{downloadFaultReport({schema:'touhou-network-fault/1',recordedAt:new Date().toISOString(),
+    environment:{userAgent:navigator.userAgent,visibility:document.visibilityState},
+    settings:state?.settings,slot:queue?.slot,frame:queue?.frame,confirmed:queue?.confirmed,
+    running,stopped,stopReason,inputPolicy,lockstepDelay:queue?.lockstepDelay,
+    predictionLeadLimit:queue?.active?Math.max(1,queue.directionPrediction):0,
+    rollbackSafetyWindow:MAX_ROLLBACK,render:runtime.renderInfo(),performanceHistory,
+    diagnostics:$('diagnostics').textContent,runtime:runtime.faultReport()},'th02-network-fault.json');
+    player.note('故障信息已下载，只保存在本机。');
+  }catch(error){player.note('读取故障信息失败：'+error.message);}
+};
+$('game').querySelector('.player-toolbar').append(faultDownload);
+
+function startupFailure(reason){
+  if(!preparing)return;
+  if(!running)showStartup();
+  const panel=$('startup-progress');panel.hidden=false;
+  const message=document.createElement('p');message.setAttribute('role','alert');
+  message.textContent=`本局已停止：${reason}。下面是停止前的最后状态，不再更新。`;
+  panel.prepend(message);
+  $('diagnostics').textContent=`本局已停止：${reason}\n${$('diagnostics').textContent}`;
+  player.diagnostics($('diagnostics').textContent,{show:true});
+  // Publish even when WebRTC never opened. This is a diagnostic, not an
+  // authoritative gameplay departure or a reason to alter other peers' state.
+  if(session){
+    const q=new URLSearchParams({room:session.room,token:session.token,boot_stage:`启动已停止：${reason}`.slice(0,300),boot_step:String(bootStep)});
+    fetch(`/api/events?${q}`,{signal:AbortSignal.timeout(5000)}).catch(()=>{});
+  }
+}
+function showStartup(){
+  const panel=$('startup-progress');
+  if(running){panel.hidden=true;return;}
+  if(!preparing||stopped)return;
+  panel.hidden=false;panel.replaceChildren();
+  const rows=[{name:'本机',stage:bootStage,step:bootStep},...onlinePeers().map(p=>({
+    name:label(p.role),stage:p.ready?'资源已就绪':p.bootStage||'尚未收到加载状态（不代表正在下载）',
+    step:p.ready?7:p.bootStep??0,connection:useRelay?`数据通道 ${p.channel?.readyState||'未建立'} · WebSocket 中继${p.iceWarning?' · '+p.iceWarning:''}`:`数据通道 ${p.channel?.readyState||'未建立'} / ICE ${p.pc.iceConnectionState} / 协商 ${p.pc.signalingState} · ${p.path||'路径待确认'} · ${p.signalStage||'等待协商'} · 候选 本机 ${p.localCandidates||0} / 收到 ${p.remoteCandidates||0} / 已提交 ${p.appliedCandidates||0}${p.iceWarning?' · '+p.iceWarning:''}`,
+    iceDetails:useRelay?'WebSocket 中继：不使用 ICE/STUN/TURN，等待全员连入同一中继房间。':`候选收集 ${p.pc.iceGatheringState}；本机：${describeIceCandidates(p.localCandidateTypes)}；收到：${describeIceCandidates(p.remoteCandidateTypes)}。服务错误：${p.iceServerErrors.join('；')||'未报告'}。`,
+    age:p.bootReportedAt==null?null:(performance.now()-p.bootReportedAt)/1000
+  }))];
+  for(const row of rows){
+    const box=document.createElement('div'),caption=document.createElement('p'),bar=document.createElement('progress');
+    caption.textContent=`${row.name}：${row.stage}${row.connection?' · '+row.connection:''}${row.age>5?` · 状态已 ${Math.floor(row.age)} 秒未更新`:''}`;
+    bar.max=7;bar.value=row.step;bar.style.width='100%';bar.setAttribute('aria-label',`${row.name} 已完成 ${row.step}/7 个加载阶段`);
+    const note=document.createElement('small');note.textContent=`已完成 ${row.step}/7 个阶段（不是下载百分比）`;
+    box.append(caption,bar,note);panel.append(box);
+    if(row.iceDetails){const details=document.createElement('p');details.textContent=row.iceDetails;box.append(details);}
+  }
+  $('diagnostics').textContent=`启动已用 ${Math.floor((performance.now()-bootStartedAt)/1000)} 秒。资源加载与连接建立是两个独立过程。\n`
+    +`本机实际连接配置：${connectionConfigSummary}\n`
+    +`开局链路测量：${onlinePeers().map(peer=>`${label(peer.role)} ${peer.timingSamples?.length||0}/3`).join(' · ')}；全员测量完成后统一输入缓冲。\n`
+    +'资源就绪但通道仍 connecting：正在建立网络连接，不是继续下载资源。\n'
+    +(useRelay?'本局通过房间服务转发可靠有序消息；不进行 NAT 穿透。':'候选类型：host 本地地址，srflx 服务器反射地址，relay 中继地址，prflx 对端反射地址。计数不代表连接成功；701 表示某次 ICE 服务访问失败，不代表所有候选都失败。');
+  if(roomServiceError)$('diagnostics').textContent+='\n房间服务正在重试：'+roomServiceError;
+  player.diagnostics(`${rows.map(row=>`${row.name}：${row.step}/7 · ${row.stage}${row.connection?'\n'+row.connection:''}`).join('\n\n')}\n\n${$('diagnostics').textContent}`);
+  player.note(`启动 ${Math.floor((performance.now()-bootStartedAt)/1000)} 秒 · 本机 ${bootStep}/7：${bootStage}。点击“启动／运行详情”查看各端状态。`);
+  if(localReady&&onlinePeers().some(peer=>peer.channel?.readyState!=='open')){
+    player.note(useRelay?'游戏已加载，等待所有玩家连接服务器转发。':'游戏已加载，正在尝试设备直连；8 秒内未连通将自动改用服务器转发。');
+  }
+}
+function closeDisconnected(reason){
+  if(stopped)return;
+  stopReason=String(reason);startupFailure(stopReason);
+  stopped=true;running=false;clearInput();runtime?.stop();iframe?.remove();runtime=null;
+  clearTimers();disconnect();render();status(`${reason}。本局游戏已关闭。`);
+}
+function suspect(peer){
+  if(stopped||peer.offline||peers.get(peer.role)!==peer)return;
+  if(!running){
+    // No gameplay membership change during boot. A broken direct channel
+    // still requests the shared fallback, including after it briefly opened.
+    peer.iceWarning=`开局连接等待：${peer.pc.connectionState}（由建连/加载期限处理）`;
+    if(!useRelay)requestRelayFallback(`${label(peer.role)}设备直连中断`);
+    showStartup();
+    return;
+  }
+  peer.suspectAt??=performance.now();
+  status(`${label(peer.role)}连接中断，等待恢复（5 秒）…`);
+}
+function reportDeparture(role){fail(Error(`${label(role)}连接已断开，请所有玩家重新建房`));}
+function beginDeparture(){fail(Error('有玩家连接断开，本局停止，请重新建房'));}
+async function request(action,data={}){
+  const response=await fetch(`/api/${action}`,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({protocol:PROTOCOL,transport:useRelay?'ws':'rtc',room:session?.room,token:session?.token,...data}),signal:AbortSignal.timeout(10000)});
+  const result=await response.json();if(!response.ok)throw Error(result.error||`HTTP ${response.status}`);return result;
+}
+function signal(peer,message){return request('signal',{to:peer.role,message});}
+function send(peer,message){
+  if(!peer||peer.offline)return;
+  if(peer.channel?.readyState!=='open'){suspect(peer);return;}
+  if(peer.channel.bufferedAmount>262144){suspect(peer);return;}
+  try{peer.channel.send(JSON.stringify({...message,protocol:PROTOCOL,generation:state.generation}));}
+  catch{suspect(peer);}
+}
+function broadcast(message){for(const peer of onlinePeers())send(peer,message);}
+function pingPeer(peer){
+  const id=++peer.pingId;peer.pings.set(id,{at:performance.now(),startup:!!peer.timingStarted&&!running});trim(peer.pings);
+  send(peer,{type:'ping',id});
+}
+function recordPong(peer,id){
+  if(!peer.pings.has(id))return;
+  const ping=peer.pings.get(id);peer.rtt=performance.now()-ping.at;peer.pings.delete(id);
+  if(ping.startup&&(peer.timingSamples?.length||0)<3){
+    (peer.timingSamples??=[]).push(peer.rtt);
+    if(peer.timingSamples.length<3)pingPeer(peer);
+    maybeRun();
+  }
+}
+function clearInput(){keys.clear();childBits=0;pendingAction=0;bits=0;inputLatch.clear();player.reset();}
+function clearTimers(){
+  player.setActive(false);player.exit();
+  clearTimeout(pollTimer);clearTimeout(loadTimer);clearInterval(heartbeatTimer);
+  cancelWake();raf?.();raf=null;
+  for(const peer of peers.values())clearTimeout(peer.connectTimer);
+}
+function disconnect(){relay?.close();for(const peer of peers.values()){peer.channel?.close();peer.pc.close();}}
+function fail(error){
+  if(stopped)return;
+  stopReason=String(error.message||error);startupFailure(stopReason);
+  stopped=true;running=false;clearInput();
+  for(const peer of peers.values())if(peer.channel?.readyState==='open'){
+    try{send(peer,{type:'fatal',reason:String(error.message||error).slice(0,600)});}catch{}
+  }
+  runtime?.stop();clearTimers();disconnect();render();
+  status(`本局已停止：${error.message||error}。所有玩家点击“结束并返回”后重新建房。`);
+}
+function closeFinishedRoom(){
+  if(session.role!=='host'||!stopped||!onlinePeers().every(peer=>peer.ended))return;
+  disconnect();request('leave').catch(()=>{});
+}
+function finishGame(){
+  if(stopped)return;stopped=true;running=false;clearInput();
+  runtime?.stop();iframe?.remove();runtime=null;clearTimers();
+  if(session.role==='host'){broadcast({type:'end'});closeFinishedRoom();}
+  else send(peers.get('host'),{type:'end-ack'});
+  status('房主已退出，本局游戏已关闭。');render();
+}
+function render(){
+  if(!session||!state)return;
+  const slot=state.slots[session.role],lobby=state.phase==='lobby'&&!stopped,active=activeRoles();
+  $('entry').hidden=true;$('lobby').hidden=false;$('transport').disabled=true;
+  $('room-info').textContent=`房间 ${session.room} · ${state.settings.players} 人模式 · ${state.settings.language==='jp'?'日文版':'汉化版'} · 你是${label(session.role)} · ${slot===null?'尚未选座':`P${slot+1}`}`;
+  $('seats').textContent=Array.from({length:state.settings.players},(_,n)=>{
+    const role=active.find(r=>state.slots[r]===n);return `P${n+1}：${role?`${label(role)}${peers.get(role)?.offline?'（已离线）':state.ready[role]?'（已准备）':''}`:'空位'}`;
+  }).join(' / ');
+  for(let n=0;n<3;n++){
+    $(`seat${n}`).hidden=n>=state.settings.players;
+    $(`seat${n}`).disabled=!lobby||busy||active.some(r=>r!==session.role&&state.slots[r]===n);
+    $(`seat${n}`).textContent=slot===n?`已选择 P${n+1}`:`选择 P${n+1}`;
+    $(`seat${n}`).setAttribute('aria-pressed',String(slot===n));
+  }
+  $('settings').disabled=!lobby||busy||session.role!=='host';
+  for(const key of [...settingNames,'language'])$(key).value=state.settings[key];
+  $('difficulty').disabled=state.settings.stage===5;
+  $('launch-summary').textContent=`${state.settings.stage===5?'Extra（固定 Extra 难度）':`第 ${state.settings.stage+1} 关 · ${['Easy','Normal','Hard','Lunatic'][state.settings.difficulty]}`} · 每人 ${state.settings.lives} 残机 / ${state.settings.bombs} Bomb · 机体 ${Array.from({length:state.settings.players},(_,i)=>`P${i+1} ${['高速','平衡','低速'][state.settings[`p${i+1}`]]}`).join(' / ')}`;
+  if(!busy)$('rollback').checked=state.settings.rollback;
+  const loadoutSlot=slot===null?null:`p${slot+1}`;
+  $('loadout-panel').hidden=slot===null||!lobby;
+  if(loadoutSlot){
+    const selected=state.settings[loadoutSlot];
+    for(const card of document.querySelectorAll('[data-loadout]')){
+      const active=Number(card.dataset.loadout)===selected;
+      card.setAttribute('aria-pressed',String(active));card.disabled=!lobby||busy;
+    }
+    $('loadout-status').textContent=`当前座位 P${slot+1} · ${['高速机体','平衡机体','低速机体'][selected]}`;
+  }
+  $('ready').disabled=!lobby||busy||slot===null;
+  $('ready').textContent=state.ready[session.role]?'取消准备':'准备';
+  $('start').hidden=session.role!=='host';
+  $('start').disabled=!lobby||busy||!active.every(role=>state.present[role]&&state.ready[role]);
+}
+function update(value){
+  if(stopped)return;
+  if(!value||value.protocol!==PROTOCOL||typeof value.settings?.rollback!=='boolean'||'cpuMultiplier' in value.settings||!['cn','jp'].includes(value.settings?.language)||!['ws','rtc'].includes(value.transport)||typeof value.connectionCommitted!=='boolean')throw Error('请关闭旧服务窗口，重新运行新版 start-lan.bat（公网使用 start-public.bat），并刷新所有玩家的页面');
+  if(state&&value.revision<=state.revision)return;
+  const changed=state&&value.transport!==state.transport;
+  if(changed&&running)throw Error('游戏运行期间连接方式发生变化，请重新建房');
+  state=value;useRelay=state.transport==='ws';mode.transport=state.transport;
+  $('transport').value=state.transport;history.replaceState(null,'',networkUrl(mode));render();
+  if(changed&&preparing){
+    status('设备直连未连通，正在自动改用服务器转发；保留房间、座位和已加载的游戏…');
+    setupConnections().catch(fail);
+  }
+  if(state.phase==='ended'){closeDisconnected('房主已离开');return;}
+  if(running)for(const peer of onlinePeers())if(!state.present[peer.role])suspect(peer);
+  if(state.phase==='loading'&&!preparing){
+    preparing=true;
+    // Every browser enters the same TH06-style immersive layout. Only the
+    // host can usually satisfy the browser's user-activation requirement for
+    // native fullscreen; guests still lose the old top/bottom chrome.
+    player.enter({native:true}).catch(()=>{});
+    beginGame().catch(fail);
+  }
+  if(preparing)maybeRun();
+}
+async function action(name,data={}){
+  if(busy)return;busy=true;render();
+  try{const result=await request(name,data);if(result.state)update(result.state);}
+  catch(error){status(error.message);}finally{busy=false;render();}
+}
+async function enter(role){
+  if(busy||session)return;busy=true;$('create').disabled=true;$('join').disabled=true;
+  try{
+    if(role!=='host'&&!/^[0-9]{4}$/.test($('room').value.trim()))throw Error('请输入四位数字房间号');
+    const result=await request(role==='host'?'create':'join',{room:$('room').value.trim().toUpperCase(),...(role==='host'?{rollback:defaultRollback}:{})});
+    if(result.protocol!==PROTOCOL)throw Error('请重新启动新版 start-lan.bat');
+    session={room:result.room,token:result.token,role:result.role};update(result.state);
+    status('房主选择双人或三人模式；所有玩家分别选座并准备后开始。');poll();
+  }catch(error){status(error.message);}finally{busy=false;$('create').disabled=false;$('join').disabled=false;render();}
+}
+async function poll(){
+  if(stopped)return;
+  let result;
+  try{
+    const q=new URLSearchParams({room:session.room,token:session.token});
+    if(preparing&&!running){q.set('boot_stage',bootStage);q.set('boot_step',String(bootStep));}
+    const response=await fetch(`/api/events?${q}`,{signal:AbortSignal.timeout(10000)});
+    result=await response.json();if(!response.ok)throw Error(result.error||`HTTP ${response.status}`);
+    pollFailedAt=0;roomServiceError='';
+  }catch(error){
+    if(stopped)return;
+    pollFailedAt||=performance.now();roomServiceError=String(error.message||error).slice(0,300);
+    // Once started, gameplay membership is governed by authenticated player
+    // channels and their watchdog. HTTP signaling loss does not close the game.
+    // Loading uses its resource deadline; a slow CPU must not pay a 5 s grace.
+    if(!running&&!preparing&&performance.now()-pollFailedAt>=30000){closeDisconnected('房间服务连接失败：'+roomServiceError);return;}
+    if(!running)status('房间服务暂时无响应，正在重试：'+roomServiceError);
+    pollTimer=setTimeout(poll,1000);return;
+  }
+  try{
+    update(result.state);
+    for(const [role,progress]of Object.entries(result.startup||{})){
+      const peer=peers.get(role);if(!peer)continue;
+      peer.bootStage=progress.stage;peer.bootStep=progress.step;
+      peer.bootReportedAt=performance.now()-progress.age*1000;
+    }
+    showStartup();
+    // HTTP polling must not wait for browser ICE/mDNS operations. Preserve
+    // description ordering per peer, while candidate resolution is separate.
+    for(const event of result.events)if(!stopped)dispatchSignal(event);
+    if(!stopped)pollTimer=setTimeout(poll,400);
+  }catch(error){
+    if(stopped)return;
+    fail(error);
+  }
+}
+function trim(map){while(map.size>60)map.delete(map.keys().next().value);}
+function compare(peer,tick){
+  if(peer.offline)return;
+  const a=hashes.get(tick),b=peer.hashes.get(tick);if(!a||!b)return;
+  if(a.hash!==b.hash||a.gameFrame!==b.gameFrame)throw Error(`${label(peer.role)}在同步步 ${tick} 不一致：本机 ${a.hash}/${a.gameFrame}，对方 ${b.hash}/${b.gameFrame}`);
+  peer.confirmed=tick;peer.hashes.delete(tick);
+}
+function attachChannel(peer,channel){
+  if(channel.label!=='th02-inputs')throw Error('未知连接通道');
+  if(peer.channel)throw Error('重复操作通道');peer.channel=channel;
+  channel.onopen=()=>{
+    if(stopped||peers.get(peer.role)!==peer){channel.close();return;}
+    clearTimeout(peer.connectTimer);peer.lastPacket=performance.now();
+    try{send(peer,{type:'hello',settings:state.settings,slots:state.slots,inputPolicy});pingPeer(peer);if(localReady)send(peer,{type:'ready',build:localReady});}
+    catch(error){fail(error);}
+  };
+  channel.onmessage=event=>{
+    try{
+      if(peer.offline||peers.get(peer.role)!==peer)return;
+      if(typeof event.data!=='string'||event.data.length>65536)throw Error('无效同步消息');
+      const m=JSON.parse(event.data);
+      if(m.protocol!==PROTOCOL||m.generation!==state.generation)throw Error('同步消息不属于本局');
+      peer.lastPacket=performance.now();peer.suspectAt=null;
+      if(stopped&&m.type!=='end'&&m.type!=='end-ack')return;
+      switch(m.type){
+        case 'hello':
+          if(JSON.stringify(m.settings)!==JSON.stringify(state.settings)||JSON.stringify(m.slots)!==JSON.stringify(state.slots))throw Error('开局设置不一致');
+          if(m.inputPolicy?.inputDelay!==inputPolicy.inputDelay||m.inputPolicy?.directionPrediction!==inputPolicy.directionPrediction||m.inputPolicy?.rollbackEnabled!==inputPolicy.rollbackEnabled)throw Error('联机性能策略不一致，请全员刷新并使用相同网络模式');
+          peer.hello=true;maybeRun();break;
+        case 'ready':peer.ready=m.build;maybeRun();break;
+        case 'timing':
+          if(!Number.isFinite(m.rtt)||m.rtt<0||m.rtt>30000)throw Error('无效网络测量');
+          peer.startRtt=m.rtt;maybeRun();break;
+        case 'run':
+          if(peer.role!=='host'||session.role==='host')throw Error('无效开局通知');
+          if(runRequested)throw Error('重复开局通知');
+          if(!Number.isInteger(m.delay)||m.delay<BOOT_DELAY||m.delay>MAX_INPUT_DELAY)throw Error('无效开局输入缓冲');
+          runDelay=m.delay;
+          runRequested=true;maybeRun();break;
+        case 'input':
+          if(m.slot!==state.slots[peer.role])throw Error('玩家输入身份不匹配');
+          queue.receive(m.frame,m.buttons,m.slot);receivedInputs++;wake();break;
+        case 'input-tail':
+          if(m.slot!==state.slots[peer.role]||!Array.isArray(m.inputs)||m.inputs.length>160)throw Error('无效输入补包');
+          for(const [frame,buttons]of m.inputs)queue.receive(frame,buttons,m.slot);
+          wake();break;
+        case 'rollback':
+          if(peer.role!=='host'||session.role==='host')throw Error('无效回滚启用通知');
+          queue.arm(m.frame);break;
+        case 'hash':
+          if(!Number.isSafeInteger(m.tick)||m.tick<0||m.tick>queue.frame+120||typeof m.hash!=='string'||m.hash.length>16||!Number.isInteger(m.gameFrame))throw Error('无效状态摘要');
+          peer.hashes.set(m.tick,m);compare(peer,m.tick);trim(peer.hashes);
+          if(m.boot===true)peer.rollbackReady=true;armRollback();break;
+        case 'heartbeat':
+          peer.hidden=!!m.hidden;
+          if(typeof m.bootStage==='string')peer.bootStage=m.bootStage.slice(0,300);
+          showStartup();break;
+        case 'ping':if(Number.isSafeInteger(m.id))send(peer,{type:'pong',id:m.id});break;
+        case 'pong':recordPong(peer,m.id);break;
+        case 'suspect':
+          if(session.role!=='host'||!peers.has(m.role)||m.role==='host'||m.role===peer.role)throw Error('无效断链报告');
+          if(!peers.get(m.role).offline)beginDeparture();break;
+        case 'end':
+          if(peer.role!=='host'||session.role==='host')throw Error('只有房主能退出本局');
+          if(stopped)send(peer,{type:'end-ack'});else finishGame();break;
+        case 'end-ack':if(session.role!=='host')throw Error('无效退出确认');peer.ended=true;closeFinishedRoom();break;
+        case 'fatal':
+          if(!running){fail(Error(`${label(peer.role)}启动失败：${String(m.reason).slice(0,600)}`));return;}
+          if(peer.role==='host'){closeDisconnected('房主已停止游戏');return;}
+          suspect(peer);break;
+        default:throw Error('未知同步消息');
+      }
+    }catch(error){fail(error);}
+  };
+  channel.onclose=()=>{if(stopped||peer.offline)peer.pc.close();else suspect(peer);};
+  channel.onerror=()=>suspect(peer);
+}
+function makePeer(role,rtcConfiguration){
+  const pc=new RTCPeerConnection(rtcConfiguration);
+  const peer={role,pc,candidates:[],localCandidateTypes:{},remoteCandidateTypes:{},iceServerErrors:[],hashes:new Map(),pings:new Map(),confirmed:0,lastPacket:performance.now(),pingId:0};peers.set(role,peer);
+  peer.signalChain=Promise.resolve();
+  pc.onicecandidate=event=>{if(event.candidate&&currentRtcPeer(peer)){peer.localCandidates=(peer.localCandidates||0)+1;countIceCandidate(peer.localCandidateTypes,event.candidate);signal(peer,{type:'ice',candidate:event.candidate.toJSON()}).catch(error=>rtcFailure(peer,error));showStartup();}};
+  pc.onicecandidateerror=event=>{if(stopped)return;recordIceServerError(peer.iceServerErrors,event);showStartup();};
+  pc.onicegatheringstatechange=showStartup;
+  pc.onconnectionstatechange=()=>{
+    if(!currentRtcPeer(peer))return;
+    showStartup();
+    if(pc.connectionState==='failed'&&!running){rtcFailure(peer,Error(`${label(role)}直连失败`));return;}
+    if(['failed','disconnected'].includes(pc.connectionState))suspect(peer);
+  };
+  pc.oniceconnectionstatechange=showStartup;
+  pc.onsignalingstatechange=showStartup;
+  pc.ondatachannel=event=>{if(!currentRtcPeer(peer)){event.channel.close();return;}try{attachChannel(peer,event.channel);}catch(error){rtcFailure(peer,error);}};
+  peer.connectTimer=setTimeout(()=>rtcFailure(peer,Error(`与${label(role)}直连等待超过 8 秒（ICE ${pc.iceConnectionState}）`)),8000);return peer;
+}
+function makeRelayPeer(role){
+  const channel=relay.channelFor(role);
+  // Minimal lifecycle view for existing per-peer departure handling; not RTC.
+  const pc={get connectionState(){return channel.readyState==='open'?'connected':channel.readyState==='closed'?'closed':'connecting';},
+    iceConnectionState:'不适用',signalingState:'中继',close(){channel.close();}};
+  const peer={role,pc,hashes:new Map(),pings:new Map(),confirmed:0,lastPacket:performance.now(),pingId:0,path:'WebSocket 中继',signalStage:'等待全员中继就绪'};
+  peers.set(role,peer);attachChannel(peer,channel);
+  peer.connectTimer=setTimeout(()=>fail(Error('等待全员服务器转发连接超过 30 秒，请确认所有玩家的页面仍打开，且房间服务／公网隧道窗口仍在运行')),30000);
+}
+function currentRtcPeer(peer){return !stopped&&!useRelay&&peers.get(peer.role)===peer;}
+function rtcFailure(peer,error){if(currentRtcPeer(peer))requestRelayFallback(String(error.message||error));}
+async function requestRelayFallback(reason){
+  if(stopped||useRelay||fallbackPending)return;
+  if(running){fail(Error(reason));return;}
+  fallbackPending=true;
+  status(`${reason}，正在为全房间切换服务器转发…`);
+  try{
+    const result=await request('fallback');if(stopped)return;
+    update(result.state);
+    if(!useRelay)fail(Error(`${reason}；本局已完成连接确认，请重新建房`));
+  }catch(error){if(!stopped&&!useRelay)fail(Error(`${reason}；请求服务器转发失败：${error.message||error}`));}
+  finally{fallbackPending=false;}
+}
+async function setupConnections(){
+  const attempt=++connectionAttempt,relayMode=useRelay;
+  connectionReadySent=false;runRequested=false;timingSent=false;runDelay=null;connectionConfigPending=true;pendingConnectionSignals=[];
+  const oldPeers=[...peers.values()];peers.clear();
+  for(const peer of oldPeers){clearTimeout(peer.connectTimer);peer.channel?.close();peer.pc.close();}
+  relay?.close();relay=null;
+  inputPolicy=Object.freeze({inputDelay:0,directionPrediction:6,rollbackEnabled:state.settings.rollback});
+  queue=new RollbackQueue(state.slots[session.role],state.settings.players,inputPolicy);
+  let rtcConfiguration=null;
+  if(!relayMode){
+    try{
+      if(!window.RTCPeerConnection)throw Error('浏览器不支持设备直连');
+      rtcConfiguration=await loadRtcConfiguration(session);
+    }catch(error){
+      if(attempt===connectionAttempt&&!stopped)await requestRelayFallback(String(error.message||error));
+      return;
+    }
+  }
+  if(stopped||attempt!==connectionAttempt)return;
+  connectionConfigSummary=relayMode?'服务器转发（不需要 STUN/TURN 账号）':describeRtcConfiguration(rtcConfiguration);
+  if(relayMode){
+    relay=createRelay(session,state.generation,roles,fail);
+    for(const role of activeRoles())if(role!==session.role)makeRelayPeer(role);
+    relay.connect();
+  }else{
+    try{
+      for(const role of activeRoles())if(role!==session.role)makePeer(role,rtcConfiguration);
+      for(const peer of peers.values())if(roles.indexOf(session.role)<roles.indexOf(peer.role)){
+        attachChannel(peer,peer.pc.createDataChannel('th02-inputs',{ordered:true}));
+        peer.signalChain=signalingStep(peer,'生成连接邀请',async()=>peer.pc.setLocalDescription(await peer.pc.createOffer()))
+          .then(async()=>{if(currentRtcPeer(peer)){await signal(peer,{type:'offer',description:peer.pc.localDescription.toJSON()});if(currentRtcPeer(peer)){peer.signalStage='已发送邀请，等待应答';showStartup();}}}).catch(error=>rtcFailure(peer,error));
+      }
+    }catch(error){await requestRelayFallback(String(error.message||error));return;}
+  }
+  connectionConfigPending=false;
+  for(const event of pendingConnectionSignals.splice(0))dispatchSignal(event);
+  showStartup();
+}
+async function signalingStep(peer,name,operation){
+  peer.signalStage=name;showStartup();
+  let timer;
+  try{
+    return await Promise.race([operation(),new Promise((_,reject)=>{
+      timer=setTimeout(()=>reject(Error(`${label(peer.role)}：${name}超过 15 秒（ICE ${peer.pc.iceConnectionState}）`)),15000);
+    })]);
+  }finally{clearTimeout(timer);}
+}
+function submitCandidate(peer,candidate){
+  // A single unresolved/unsupported candidate must not hold up the SDP answer
+  // or other candidates. Overall connection timeout still bounds the attempt.
+  let settled=false;
+  const timer=setTimeout(()=>{if(!settled&&!stopped&&!peer.offline){peer.iceWarning='有候选解析超过 8 秒，继续尝试其他候选';showStartup();}},8000);
+  Promise.resolve().then(()=>peer.pc.addIceCandidate(candidate)).then(()=>{
+    peer.appliedCandidates=(peer.appliedCandidates||0)+1;
+  }).catch(error=>{peer.iceWarning=`候选处理失败：${String(error.message||error).slice(0,120)}`;})
+    .finally(()=>{settled=true;clearTimeout(timer);showStartup();});
+}
+function dispatchSignal(event){
+  if(useRelay)return;
+  // Other browsers may finish fetching TURN credentials before this browser.
+  // Keep polling, but do not dispatch their offers until our peers exist.
+  if(connectionConfigPending){
+    if(pendingConnectionSignals.length>=256)throw Error('等待连接配置期间收到过多信令');
+    pendingConnectionSignals.push(event);return;
+  }
+  const peer=peers.get(event?.from);
+  if(!peer||!event.message)throw Error('未知信令来源');
+  if(peer.offline)return;
+  if(event.message.type==='ice'){
+    peer.remoteCandidates=(peer.remoteCandidates||0)+1;
+    countIceCandidate(peer.remoteCandidateTypes,event.message.candidate);
+    if(peer.pc.remoteDescription)submitCandidate(peer,event.message.candidate);
+    else peer.candidates.push(event.message.candidate);
+    showStartup();return;
+  }
+  peer.signalChain=peer.signalChain.then(()=>{
+    if(currentRtcPeer(peer)&&!peer.offline)return receivedSignal(event);
+  }).catch(error=>rtcFailure(peer,error));
+}
+async function remoteDescription(peer,description){
+  await signalingStep(peer,'应用远端连接描述',()=>peer.pc.setRemoteDescription(description));
+  for(const candidate of peer.candidates.splice(0))submitCandidate(peer,candidate);
+}
+async function receivedSignal({from,message}){
+  const peer=peers.get(from);if(!peer||!message)throw Error('未知信令来源');
+  if(peer.offline)return;
+  if(message.type==='offer'){
+    if(roles.indexOf(from)>=roles.indexOf(session.role)||peer.pc.remoteDescription)throw Error('重复或无效连接请求');
+    await remoteDescription(peer,message.description);
+    await signalingStep(peer,'生成连接应答',async()=>peer.pc.setLocalDescription(await peer.pc.createAnswer()));
+    if(!currentRtcPeer(peer))return;
+    await signal(peer,{type:'answer',description:peer.pc.localDescription.toJSON()});
+    peer.signalStage='已发送应答，等待连接';showStartup();
+  }else if(message.type==='answer'){
+    if(roles.indexOf(from)<=roles.indexOf(session.role)||peer.pc.remoteDescription)throw Error('无效连接响应');
+    await remoteDescription(peer,message.description);
+    peer.signalStage='已接收应答，等待连接';showStartup();
+  }else throw Error('未知信令');
+}
+async function beginGame(){
+  bootStartedAt=performance.now();
+  bootStage='获取网络连接配置';showStartup();
+  await setupConnections();
+  if(stopped)return;
+  heartbeatTimer=setInterval(()=>{
+    try{
+      const now=performance.now();
+      showStartup();
+      for(const peer of onlinePeers()){
+        if(!useRelay)void refreshRtcPath(peer);
+        // Connecting/loading have their own 30 s / 10 min deadlines. A mobile
+        // browser compiling WASM must not be evicted by the in-game watchdog.
+        if(running&&now-peer.lastPacket>3000)suspect(peer);
+        if(running&&peer.suspectAt!=null&&now-peer.suspectAt>=GRACE_MS){
+          if(peer.role==='host'){closeDisconnected('主机连接已断开');return;}
+          reportDeparture(peer.role);
+        }
+        if(peer.channel?.readyState==='open'){
+          pingPeer(peer);send(peer,{type:'heartbeat',hidden:document.hidden,bootStage:running?undefined:bootStage});
+          send(peer,{type:'input-tail',slot:queue.slot,inputs:[...queue.inputs[queue.slot]].filter(([at])=>at>=queue.frame-32)});
+        }
+      }
+    }catch(error){fail(error);}
+  },1000);
+  status('所有玩家正在各自加载游戏并建立网络连接…');
+  loadTimer=setTimeout(()=>fail(Error(`等待全员资源就绪超过 10 分钟；本机：${bootStage}。请查看下方各端加载状态`)),600000);
+  bootStage='加载游戏页面与 JavaScript 模块';showStartup();
+  iframe=document.createElement('iframe');iframe.title='本机游戏模拟器';iframe.allow='autoplay; gamepad; fullscreen';iframe.allowFullscreen=true;
+  const loaded=new Promise((resolve,reject)=>{iframe.onload=resolve;iframe.onerror=()=>reject(Error('游戏页面加载失败'));});
+  iframe.src='netplay/runtime.html';player.stage.append(iframe);await loaded;if(stopped)return;
+  if(!iframe.contentWindow.th02RuntimeReady)throw Error('游戏页面版本不匹配，请刷新所有页面');
+  if(!await iframe.contentWindow.th02RuntimeReady)throw Error('游戏模块加载失败，详情见游戏页面');
+  if(stopped)return;
+  runtime=iframe.contentWindow.th02Sync;if(!runtime)throw Error('游戏模块没有就绪');
+  runtime.setMusicVolume(Number(musicVolume.value)/100);
+  runtime.configure(state.slots.host,state.slots[session.role],state.settings.players);
+  runtime.setRawPresentation(rawEnabled);
+  // Pointer controls live in the parent; desktop keyboards still focus the
+  // runtime canvas. Reset when crossing either document's lifecycle boundary.
+  iframe.contentWindow.addEventListener('blur',()=>player.reset());
+  player.setLabel(`你操作 P${state.slots[session.role]+1}`);
+  runtime.updateControls(controlSnapshot(),controlEditor.isEditing());
+  runtime.onInput(value=>{childBits=value;observeInput();wake();});runtime.onMenuAction(value=>{pendingAction|=value;observeInput();wake();});
+  localReady=await runtime.load({...state.settings});if(stopped){runtime.stop();return;}
+  for(const peer of peers.values())if(peer.channel?.readyState==='open')send(peer,{type:'ready',build:localReady});maybeRun();
+}
+function maybeRun(){
+  showStartup();
+  if(running||stopped||!localReady||![...peers.values()].every(peer=>peer.channel?.readyState==='open'&&peer.hello&&peer.ready))return;
+  if([...peers.values()].some(peer=>JSON.stringify(peer.ready)!==JSON.stringify(localReady)))throw Error('游戏资源版本不一致，请所有玩家刷新页面');
+  // Boot can block the browser for far longer than the actual network RTT.
+  // Start the three policy samples only after everyone's native stage is ready;
+  // loading pings remain diagnostic and never set the match's fixed delay.
+  for(const peer of peers.values())if(!peer.timingStarted){peer.timingStarted=true;peer.pings.clear();peer.timingSamples=[];pingPeer(peer);}
+  if(![...peers.values()].every(peer=>peer.timingSamples?.length===3))return;
+  if(!timingSent){
+    timingSent=true;
+    broadcast({type:'timing',rtt:Math.max(...[...peers.values()].flatMap(peer=>peer.timingSamples))});
+  }
+  // All browsers acknowledge the same route before the host can send run.
+  // An atomic server decision prevents a 3P partial mesh from splitting into
+  // running RTC peers and fallback WS peers during a timeout race.
+  if(!state.connectionCommitted){
+    if(!connectionReadySent){
+      connectionReadySent=true;const attempt=connectionAttempt;
+      request('connected').then(result=>{if(!stopped&&attempt===connectionAttempt)update(result.state);})
+        .catch(error=>{if(!stopped&&attempt===connectionAttempt){if(useRelay)fail(error);else requestRelayFallback(String(error.message||error));}});
+    }
+    return;
+  }
+  if(session.role==='host'){
+    if(![...peers.values()].every(peer=>Number.isFinite(peer.startRtt)))return;
+    runDelay=inputPolicy.rollbackEnabled?BOOT_DELAY:lockstepDelayForRtt(Math.max(...[...peers.values()].flatMap(peer=>[peer.startRtt,...peer.timingSamples])));
+    broadcast({type:'run',delay:runDelay});runRequested=true;
+  }
+  if(!runRequested)return;
+  queue.setLockstepDelay(runDelay);
+  if(inputPolicy.rollbackEnabled)queue.arm(0);
+  clearTimeout(loadTimer);runtime.start();running=true;player.setActive(true);
+  for(const peer of onlinePeers()){peer.lastPacket=performance.now();peer.suspectAt=null;}
+  lastNow=lastMeasure=performance.now();measureFrame=queue.frame;accumulator=0;
+  status(`${state.settings.players} 人已同步入关，你操作 P${queue.slot+1}。方向键移动，Z 射击，X Bomb，Shift 低速。`);raf=startFrameLoop(tick);
+  showStartup();
+}
+function cancelWake(){
+  clearTimeout(wakeTimer);wakeTimer=null;wakePending=false;wakeToken++;
+}
+function wake(delay=0){
+  if(!running||stopped||document.hidden)return;
+  delay=Math.max(0,delay);
+  const deadline=performance.now()+delay;if(wakePending&&wakeAt<=deadline)return;
+  cancelWake();wakeAt=deadline;wakePending=true;
+  const token=wakeToken;
+  // Replay still yields after its bounded work slice, but does not pay the
+  // nested setTimeout minimum on every expensive emulator step.
+  if(delay===0)wakeChannel.port2.postMessage(token);
+  else wakeTimer=setTimeout(()=>{
+    if(token!==wakeToken||!wakePending)return;
+    wakePending=false;wakeTimer=null;pump(performance.now());
+  },delay);
+}
+function tick(now){if(running&&!stopped){observeInput();pump(now);}}
+function armRollback(){
+  if(!inputPolicy.rollbackEnabled||session.role!=='host'||!running||queue.activation!==null||!runtime.readyForRollback()||
+     !onlinePeers().every(peer=>peer.rollbackReady))return;
+  // DOS boot remains confirmed-only. All devices/audio are initialized before
+  // taking snapshots; every peer switches at the same future simulation tick.
+  const frame=queue.frame+120;queue.arm(frame);broadcast({type:'rollback',frame});
+}
+function confirmFrames(){
+  const before=performance.now();
+  const prefix=Math.min(queue.frame,queue.confirmed);
+  if(runtime.confirm(prefix)==='exit'){finishGame();return;}
+  for(const [tick,sample]of pendingHashes)if(tick<=prefix){
+    hashes.set(tick,sample);broadcast({type:'hash',...sample});
+    for(const peer of onlinePeers())compare(peer,tick);
+    pendingHashes.delete(tick);trim(hashes);
+  }
+  queue.prune();armRollback();
+  costs.confirm+=performance.now()-before;
+}
+function simulate(pair,replay){
+  const before=performance.now();
+  const frame=queue.frame;
+  if(queue.active&&frame>=queue.confirmed){
+    const at=performance.now();runtime.capture(frame);costs.capture+=performance.now()-at;costs.captures++;
+  }
+  const stepAt=performance.now();
+  runtime.step(pair,{frame,replay,offlineMask:queue.offlineMask(frame)});queue.commit(pair);
+  costs.simulate+=performance.now()-stepAt;costs.steps++;
+  costs.lead=Math.max(costs.lead,queue.frame-queue.confirmed);
+  if(queue.frame%120===0){
+    const at=performance.now();pendingHashes.set(queue.frame,{...runtime.checksum(),boot:runtime.readyForRollback()});costs.hash+=performance.now()-at;
+  }
+  const cost=performance.now()-before;stepCost+=cost;stepCount++;maxCost=Math.max(maxCost,cost);
+}
+function observeInput(){
+  if(!running)return;
+  inputLatch.observe(controlEditor.isEditing()?0:normalize(player.sample(keyboardBits(keys)|childBits|gamepadBits())|pendingAction));
+}
+function captureLocalInput(){
+  player.setContext(runtime.touchContext());
+  runtime.setPointPreferences({focus:!!focusSettings(),always:player.alwaysPoint()});
+  observeInput();const value=normalize(inputLatch.sample());
+  if(value!==bits){bits=value;inputChangedAt=performance.now();}
+  const captured=queue.capture(player.pack(bits|pendingAction,{includePointPreference:false}));
+  if(!captured)return false;
+  player.consume();inputLatch.consume();
+  pendingAction=0;captureTimes.set(captured.frame,performance.now());broadcast(captured);return true;
+}
+function nextInputs(){
+  // A held direction is only predicted for six steps. Letting the faster
+  // peer run further invents releases that each arriving held input undoes.
+  // Bound speculative work, retaining the full twelve-step restore window.
+  // confirmed is a contiguous authoritative prefix; late packets wake pump.
+  const leadLimit=Math.max(1,queue.directionPrediction);
+  if(queue.active&&queue.frame>=queue.confirmed+leadLimit){
+    waitDetail=`等待对端输入 · 预测领先 ${queue.frame-queue.confirmed}/${leadLimit} 步`;
+    return null;
+  }
+  const allowed=runtime.canPredict(),pair=queue.peek(allowed);
+  if(pair){waitDetail='';return pair;}
+  const missing=queue.inputs.flatMap((lane,slot)=>queue.isOffline(slot,queue.frame)||lane.has(queue.frame)?[]:[`P${slot+1}`]);
+  const reasons={window:`预测窗口已满（${MAX_ROLLBACK} 步）`,boot:'启动阶段等待真实输入',
+    'prediction-disabled':`禁止预测：${runtime.predictionBlockReason()}`,'local-input':'本步本机输入尚未采样'};
+  waitDetail=`${reasons[queue.waitReason]||'等待真实输入'} · 当前步缺 ${missing.join('、')||'无'} · 连续输入确认到 ${queue.confirmed}`;
+  return null;
+}
+function updateMetrics(now,waiting){
+  const span=now-lastMeasure;
+  costs.lead=Math.max(costs.lead,queue.frame-queue.confirmed);
+  if(span>=1000){
+    hz=(queue.frame-measureFrame)*1000/span;averageCost=stepCount?stepCost/stepCount:0;peakCost=maxCost;measuredCosts=costs;
+    const totalWait=waitedMs+(waitingSince?now-waitingSince:0),game=runtime.snapshot();
+    waitPercent=Math.min(100,Math.max(0,(totalWait-measuredWaitMs)*100/span));measuredWaitMs=totalWait;
+    gameHz=game&&measuredGame&&game.generation===measuredGame.generation&&game.stage===measuredGame.stage&&game.gameFrame>=measuredGame.gameFrame?(game.gameFrame-measuredGame.gameFrame)*1000/span:null;
+    measuredGame=game;
+    performanceHistory.push({timeMs:Math.round(now),frame:queue.frame,hz,gameHz,waitPercent,stepMs:averageCost,lockstepDelay:queue.lockstepDelay,predictionLeadLimit:queue.active?Math.max(1,queue.directionPrediction):0,rollbackCount,resimulated,maxRewind,costs:{...costs},rtt:onlinePeers().map(peer=>({role:peer.role,ms:peer.rtt}))});
+    if(performanceHistory.length>120)performanceHistory.shift();
+    costs=newCosts();lastMeasure=now;measureFrame=queue.frame;stepCost=stepCount=maxCost=0;
+  }
+  if(now-lastUi<250)return;lastUi=now;
+  const links=[...peers.values()].map(p=>p.offline?`${label(p.role)}：已离线`:`${label(p.role)}：往返 ${p.rtt==null?'—':p.rtt.toFixed(1)} ms · ${p.path||'路径待确认'} · 相同状态步 ${p.confirmed||'等待'}${p.hidden?' · 页面隐藏':''}`).join('\n');
+  const c=measuredCosts,game=runtime.snapshot();
+  const own=game?.players?.[queue.slot];player.setLabel(`你操作 P${queue.slot+1}${own?' · 个人分数 '+own.score.toLocaleString('zh-CN'):''}`);
+  $('diagnostics').textContent=`${label(session.role)} · P${queue.slot+1} · ${state.settings.players} 人 · 同步步 ${queue.frame}\n`
+    +`本机 ${hz.toFixed(1)}/60 步每秒 · 执行平均 ${averageCost.toFixed(1)} / 最慢 ${peakCost.toFixed(1)} ms\n`
+    +`游戏逻辑 ${gameHz===null?'待统计':gameHz.toFixed(1)} 帧/秒 · 等输入时间 ${waitPercent.toFixed(0)}%（最近周期）\n`
+    +`性能诊断 v2 · 最近统计周期：模拟 ${(c.simulate/Math.max(1,c.steps)).toFixed(1)} ms/步 · 呈现 ${(c.present/Math.max(1,c.presentations)).toFixed(1)} ms/批 · 快照 ${(c.capture/Math.max(1,c.captures)).toFixed(1)} ms/次（${c.captures} 次）\n`
+    +`恢复 ${c.restore.toFixed(1)} ms（${c.restores} 次） · 重算 ${c.replay.toFixed(1)} ms（${c.replays} 步，含模拟和快照） · 确认 ${c.confirm.toFixed(1)} ms · 校验 ${c.hash.toFixed(1)} ms\n`
+    +`${queue.active?`预测回滚 · 本地缓冲 ${queue.inputDelay} 步 · 方向预测 ${queue.directionPrediction} 步`:`确认锁步 · 自适应缓冲 ${queue.lockstepDelay} 步（${Math.round(queue.lockstepDelay*TICK_MS)} ms） · ${inputPolicy.rollbackEnabled?'等待回滚启用':'回滚已关闭'}`} · 最近输入至应用 ${inputAge.toFixed(1)} ms · 已收输入 ${receivedInputs}\n${links}\n`
+    +`已确认 ${Math.min(queue.frame,queue.confirmed)} · 预测领先 ${Math.max(0,queue.frame-queue.confirmed)}/${queue.active?Math.max(1,queue.directionPrediction):0} 步 · 回滚安全窗口 ${MAX_ROLLBACK} 步\n`
+    +`最近周期最大领先 ${c.lead} 步 · 游戏帧 ${game?.gameFrame??'启动中'} · 预测条件：${runtime.predictionBlockReason()||'允许'} · 补算前提前发输入 ${earlyInputs} 次\n`
+    +`回滚 ${rollbackCount} 次 · 重算 ${resimulated} 步 · 最长 ${maxRewind} 步 · 快照 ${((runtime.rollbackInfo()?.snapshotBytes||0)/1048576).toFixed(0)} MiB\n`
+    +`检查点每 ${runtime.rollbackInfo()?.checkpointFrames||1} 步 · 当前 ${runtime.rollbackInfo()?.snapshots||0} 个 · 边界重建 ${runtime.rollbackInfo()?.checkpointReplays||0} 步\n`
+    +`当前等待 ${waitingSince?(now-waitingSince).toFixed(0):0} ms\n`
+    +(waiting?waitDetail:queue.frame<replayUntil?`正在补算，还剩 ${replayUntil-queue.frame} 步`:'正常推进／等待下一步时刻')+`\n${gamepadStatus}`
+    +(roomServiceError?'\n房间服务正在重试（游戏按玩家数据通道继续）：'+roomServiceError:'');
+  player.diagnostics(`${runtime.diagnosticText()}\n\n${$('diagnostics').textContent}`);
+  if(!game)player.note(`正在启动 DOS／游戏 · 同步步 ${queue.frame} · ${waiting?waitDetail:'正在推进'}。详情可查看当前状态。`);
+}
+function pump(now){
+  if(!running||stopped||pumping)return;
+  if(document.hidden){lastNow=now;accumulator=0;return;}pumping=true;
+  try{
+    accumulator=Math.min(accumulator+Math.max(0,now-lastNow),TICK_MS*4);lastNow=now;
+    let count=0,waiting=false;const budgetStart=performance.now();
+    if(queue.dirty!==null){
+      // Publish the due frontier input before costly replay. Never sample a
+      // historical replay frame, and never resample an already captured frame.
+      if(queue.frame>=replayUntil&&accumulator>=TICK_MS&&captureLocalInput())earlyInputs++;
+      const from=queue.dirty;replayUntil=Math.max(replayUntil,queue.frame);
+      maxRewind=Math.max(maxRewind,replayUntil-from);rollbackCount++;
+      const restoreAt=performance.now();
+      runtime.restore(from);queue.rewind(from);
+      costs.restore+=performance.now()-restoreAt;costs.restores++;
+      for(const at of pendingHashes.keys())if(at>from)pendingHashes.delete(at);
+    }
+    while(queue.frame<replayUntil&&count<4&&(count===0||performance.now()-budgetStart<6)){
+      const pair=nextInputs();if(!pair){waiting=true;break;}
+      endWait();const replayAt=performance.now();
+      simulate(pair,queue.frame+1<replayUntil);resimulated++;count++;
+      costs.replay+=performance.now()-replayAt;costs.replays++;
+    }
+    confirmFrames();if(stopped)return;
+    if(queue.frame<replayUntil){
+      if(waiting&&!waitingSince)waitingSince=performance.now();
+      updateMetrics(performance.now(),waiting);wake(waiting?16:0);return;
+    }
+    while(accumulator>=TICK_MS&&count<4&&(count===0||performance.now()-budgetStart<6)){
+      captureLocalInput();
+      const pair=nextInputs();if(!pair){waiting=true;break;}
+      endWait();
+      simulate(pair,false);
+      const after=performance.now();
+      const at=captureTimes.get(queue.frame-1);if(pair[queue.slot]!==lastApplied&&at)inputAge=after-at;
+      lastApplied=pair[queue.slot];captureTimes.delete(queue.frame-1);accumulator-=TICK_MS;count++;
+      confirmFrames();if(stopped)return;
+    }
+    const presentAt=performance.now();
+    if(runtime.present()){costs.present+=performance.now()-presentAt;costs.presentations++;}
+    const after=performance.now();
+    if(waiting&&!waitingSince)waitingSince=after;
+    updateMetrics(after,waiting);
+    // Native execution time counts toward this tick's budget. The old timer
+    // waited another full interval after a 15 ms step, reducing throughput.
+    wake(waiting?16:Math.max(0,TICK_MS-accumulator-(after-lastNow)));
+  }catch(error){fail(error);}finally{pumping=false;}
+}
+const focusSettings=mountFocusSettings($('control-settings'),{alwaysPointControl:player.alwaysPointControl});
+const controlEditor=mountControlSettings($('control-settings'),{
+  onChange:value=>{clearInput();runtime?.updateControls(value,controlEditor.isEditing());},
+  onEditing:editing=>{clearInput();runtime?.updateControls(controlSnapshot(),editing);}
+});
+window.addEventListener('keydown',event=>{if(!running||controlEditor.isEditing()||isFormTarget(event.target)||event.metaKey||event.ctrlKey||event.altKey||!isBound(event.code))return;event.preventDefault();keys.add(event.code);observeInput();wake();});
+document.addEventListener('focusin',event=>{if(isFormTarget(event.target))clearInput();});
+window.addEventListener('keyup',event=>{keys.delete(event.code);observeInput();wake();});window.addEventListener('blur',clearInput);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)clearInput();else wake();});
+window.addEventListener('message',event=>{if(event.origin===location.origin&&event.source===iframe?.contentWindow&&event.data?.protocol===PROTOCOL&&event.data?.event==='runtime-exit')fail(Error('游戏模拟器已经退出'));});
+window.addEventListener('message',event=>{
+  if(event.origin!==location.origin||event.source!==iframe?.contentWindow||event.data?.protocol!==PROTOCOL||stopped)return;
+  if(event.data.event==='boot-progress'){
+    bootStage=String(event.data.message).slice(0,300);
+    player.note(bootStage);
+    if(Number.isInteger(event.data.step)&&event.data.step>=0&&event.data.step<=7)bootStep=event.data.step;
+    showStartup();
+    for(const peer of onlinePeers())if(peer.channel?.readyState==='open')send(peer,{type:'heartbeat',hidden:document.hidden,bootStage});
+  }else if(event.data.event==='boot-error')fail(Error(`游戏页面：${String(event.data.message).slice(0,600)}`));
+  else if(event.data.event==='page-warning'){
+    let warning=$('page-warning');
+    if(!warning){warning=document.createElement('pre');warning.id='page-warning';$('diagnostics').after(warning);}
+    warning.textContent=`页面异常记录（未自动结束游戏）：\n${String(event.data.message).slice(0,1500)}`;
+    if(event.data.externalScript)warning.textContent+='\n堆栈包含站外脚本。请暂停此站点上的相关用户脚本／扩展并刷新复测；尚不能据此认定它导致了网络连接失败。';
+  }
+});
+window.addEventListener('pagehide',()=>{if(session)navigator.sendBeacon('/api/leave',new Blob([JSON.stringify(session)],{type:'application/json'}));});
+$('create').onclick=()=>enter('host');$('join').onclick=()=>enter('guest');
+for(let n=0;n<3;n++)$(`seat${n}`).onclick=()=>action('seat',{slot:n});
+for(const card of document.querySelectorAll('[data-loadout]'))card.onclick=()=>action('loadout',{loadout:Number(card.dataset.loadout)});
+for(const name of [...settingNames,'language','rollback'])$(name).onchange=()=>{
+  if(session?.role!=='host'||state?.phase!=='lobby')return;
+  action('settings',{settings:{...Object.fromEntries(settingNames.map(key=>[key,Number($(key).value)])),language:$('language').value,rollback:$('rollback').checked}});
+};
+$('ready').onclick=()=>{
+  if(!state.ready[session.role]&&session.role!=='host')player.note('已准备，等待房主开始。房主开始后进入游戏画面。');
+  action('ready');
+};
+$('start').onclick=()=>{action('start');};
+$('leave').onclick=async()=>{stopped=true;running=false;clearInput();runtime?.stop();clearTimers();disconnect();try{await request('leave');}finally{location.href=networkUrl(mode);}};

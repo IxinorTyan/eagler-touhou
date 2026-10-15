@@ -1,0 +1,83 @@
+# TH02 ready-to-run distribution, following th04-coop-lab's root allowlist.
+# Development sources, builds, reports and machine-specific files stay local.
+/*
+!/.gitignore
+!/.gitattributes
+!/README.md
+!/LAN-公网联机说明.md
+!/NOTICE-runtime.md
+!/联机同时操作卡顿优化记录.md
+!/web/
+!/server.py
+!/lan_server.py
+!/relay_server.py
+!/turn_service.py
+!/public_tunnel.py
+!/configure_turn.py
+!/requirements-relay.txt
+!/start.bat
+!/start-lan.bat
+!/start-public.bat
+!/start-public-tunnel.bat
+!/install-relay.bat
+!/configure-turn.bat
+
+# tools/, patches/, build/ and reports/ are excluded by the root allowlist.
+# This also excludes public-test-url.txt and turn-config.local.json.
+# Keep runtime JS/MJS/WASM, music, assets, manifests and bundled licenses.
+# Never ignore *.wasm, *.mjs, *.com or *.opus globally.
+
+# Only the four reviewed TH02 disks ship; source disks and raw images stay local.
+/web/*.hdi
+/web/*.hdi.gz
+!/web/th02-local-cn.hdi.gz
+!/web/th02-local-jp.hdi.gz
+!/web/th02-solo-cn.hdi.gz
+!/web/th02-solo-jp.hdi.gz
+/web/disks/
+
+# Development output copied into the site is not part of the distribution.
+/web/baseline/
+/web/build/
+/web/extracted/
+/web/reports/
+/web/screenshots/
+/web/backups/
+/web/tools/
+/web/vendor-source/
+/web/**/test-results/
+/web/**/playwright-report/
+/web/**/guest-*.wasm
+/web/**/*-candidate.wasm
+/web/**/*-probe.wasm
+/web/**/*.wat
+/web/**/*.lst
+/web/**/*.cpuprofile
+/web/**/*.heapsnapshot
+/web/vendor/dosbox-x/*.map
+/web/vendor/dosbox-x/*.symbols
+/web/vendor/dosbox-x/*.tgz
+/web/vendor/dosbox-x/*-dbg.*
+
+# Caches, editor files, local credentials and downloaded fault reports.
+__pycache__/
+*.py[cod]
+node_modules/
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log
+*.tmp
+*.swp
+*.bak
+*.orig
+*~
+.idea/
+.vscode/
+.env
+.env.*
+turn-config.local.json
+public-test-url.txt
+th02-*-fault.json

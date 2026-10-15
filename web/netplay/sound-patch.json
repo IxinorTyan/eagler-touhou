@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "nativeBgm": false,
+  "nativeEffects": true,
+  "sequence": 37704,
+  "command": 37706,
+  "filename": 9534,
+  "fmEffects": 9530,
+  "edits": [
+    {
+      "imageOffset": 63993,
+      "expected": "803e9a080074108b4606803e3b25017404cd60eb02cd61",
+      "replacement": "8b460680fc02760580fc197507a34a93ff064893909090"
+    },
+    {
+      "imageOffset": 63507,
+      "expected": "8b460a3d00067520803e3b2500741933db4380bf3e250075f8c6873e256dc6873f2564c687402500",
+      "replacement": "817e0a000675041f5e5dcb9090909090909090909090909090909090909090909090909090909090"
+    },
+    {
+      "imageOffset": 63454,
+      "expected": "55",
+      "replacement": "cb"
+    },
+    {
+      "imageOffset": 64021,
+      "expected": "803e9a08007509",
+      "replacement": "90909090909090"
+    }
+  ]
+}

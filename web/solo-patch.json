@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "disks": {
+    "jp": {
+      "file": "th02-solo-jp.hdi.gz",
+      "size": 21415936,
+      "sha256": "c5096b5579f64092ae6c1d10a4902e4f73f5d404e3cd6eb1ff2786a09b44485d",
+      "signature": "TH02SOLOINPUTv1!",
+      "entries": {
+        "stage": 19053,
+        "update": 19076,
+        "move": 19091,
+        "pause": 19105,
+        "render": 19132,
+        "exit": 19149,
+        "mailbox": 18862,
+        "touch": 19628,
+        "currentInput": 18970
+      },
+      "headerSize": 6656,
+      "codeSegment": 2838,
+      "dataSegment": 7673,
+      "gap": 1312,
+      "originalMainSha256": "9e9a323781e793738c8e3a5b575d99c0cb6a71bac8c3d581178976b4977f0a92",
+      "mainSha256": "528ba75c248331c6f2e5990e7157852fb873ef8e466d1ab50e2e17177386ad6e",
+      "hooks": [
+        {
+          "offset": 46619,
+          "original": "e8920f",
+          "entry": "stage"
+        },
+        {
+          "offset": 47531,
+          "original": "e8020c",
+          "entry": "stage"
+        },
+        {
+          "offset": 48588,
+          "original": "e80934",
+          "entry": "update"
+        },
+        {
+          "offset": 62203,
+          "original": "5657e8c3fb",
+          "entry": "move"
+        },
+        {
+          "offset": 48643,
+          "original": "e8dcfb",
+          "entry": "pause"
+        },
+        {
+          "offset": 48616,
+          "original": "e84b31",
+          "entry": "render"
+        },
+        {
+          "offset": 50551,
+          "original": "e8d01c",
+          "entry": "exit"
+        }
+      ]
+    },
+    "cn": {
+      "file": "th02-solo-cn.hdi.gz",
+      "size": 21415936,
+      "sha256": "d4b4b9c66ddbf6049c52a74bba038a8721b231cb91cb57fcac48dc8c794236b2",
+      "signature": "TH02SOLOINPUTv1!",
+      "entries": {
+        "stage": 19053,
+        "update": 19076,
+        "move": 19091,
+        "pause": 19105,
+        "render": 19132,
+        "exit": 19149,
+        "mailbox": 18862,
+        "touch": 19628,
+        "currentInput": 18970
+      },
+      "headerSize": 6656,
+      "codeSegment": 2838,
+      "dataSegment": 7673,
+      "gap": 1312,
+      "originalMainSha256": "d54640c76acab16c3f0bdf34774c5153468172d7ca132426ab845ef2a1c8dce8",
+      "mainSha256": "7bd8dd753e41e63ccbf308ffd59b9f25240902166249cb69e805196176cc8df9",
+      "hooks": [
+        {
+          "offset": 46619,
+          "original": "e8920f",
+          "entry": "stage"
+        },
+        {
+          "offset": 47531,
+          "original": "e8020c",
+          "entry": "stage"
+        },
+        {
+          "offset": 48588,
+          "original": "e80934",
+          "entry": "update"
+        },
+        {
+          "offset": 62203,
+          "original": "5657e8c3fb",
+          "entry": "move"
+        },
+        {
+          "offset": 48643,
+          "original": "e8dcfb",
+          "entry": "pause"
+        },
+        {
+          "offset": 48616,
+          "original": "e84b31",
+          "entry": "render"
+        },
+        {
+          "offset": 50551,
+          "original": "e8d01c",
+          "entry": "exit"
+        }
+      ]
+    }
+  }
+}

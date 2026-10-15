@@ -1,0 +1,1162 @@
+{
+  "schema": 2,
+  "game": "th02",
+  "mode": "local-coop",
+  "core": "dosbox-x-jspi",
+  "insert": 64192,
+  "gap": 13952,
+  "codeSegment": 2838,
+  "dataSegment": 8463,
+  "headerSize": 6656,
+  "entries": {
+    "stage_hook": 19138,
+    "continue_hook": 19620,
+    "invalidate_hook": 19711,
+    "input_hook": 19754,
+    "render_hook": 19997,
+    "item_hook": 20132,
+    "mailbox": 32590,
+    "run_config": 32423,
+    "swap_player": 20338,
+    "guest_bank": 32468,
+    "snapshot": 20577,
+    "apply_loadout": 19630,
+    "p1_out": 32430,
+    "p2_out": 32431,
+    "update_one": 19967,
+    "guest_collision_allowed": 20253,
+    "exit_hook": 20310,
+    "respawn_x_hook": 20320,
+    "coop_tick": 23514,
+    "rescue_state": 23443,
+    "rescue_clear": 23452,
+    "ghosts_render": 24351,
+    "hud_render": 25721,
+    "ghost_match_palette": 24144,
+    "ghost_palette_map": 23453,
+    "boss_gauge_update": 27957,
+    "boss_gauge_reset": 27939,
+    "boss_current": 27763,
+    "boss_max": 27765,
+    "boss_bar": 27767,
+    "boss_visible": 27768,
+    "active": 32427,
+    "power_hook": 25701,
+    "debug_protect": 19854,
+    "debug_applied": 32433,
+    "debug_saved": 32436,
+    "boss_world": 28778,
+    "aim_vector": 28832,
+    "aim_vector_pointer": 28919,
+    "aim_angle": 28923,
+    "aim_angle_pointer": 28984,
+    "aim_special": 28988,
+    "target_count": 28387,
+    "target_players": 28388,
+    "targets_refresh": 28453,
+    "target_choose": 28597,
+    "target_counts": 28412,
+    "attack_counts": 28424,
+    "target_slot": 28436,
+    "focus_move": 29082,
+    "focus_remainder": 29067,
+    "focus_points_render": 29295,
+    "select_player": 20352,
+    "player_input": 20550,
+    "player_count": 32428,
+    "third_bank": 32529,
+    "p3_out": 32432,
+    "guest_types": 32439,
+    "rescue_target": 23449,
+    "touch_state": 29527,
+    "touch_remainder": 29551,
+    "touch_move": 29723,
+    "touch_reset": 29564,
+    "touch_paused": 29563,
+    "pause_hook": 29619,
+    "personal_stats": 30165,
+    "team_score": 30213,
+    "score_factor": 30217,
+    "damage_denominator": 30219,
+    "hit_weights": 30221,
+    "hit_owner": 30227,
+    "bomb_owner": 30228,
+    "shot_owners": 30229,
+    "shot_levels": 30267,
+    "damage_remainder": 30344,
+    "balance_credit_raw": 30939,
+    "balance_credit_points": 30958,
+    "balance_world_raw": 31189,
+    "balance_kill_raw": 31279,
+    "balance_refresh": 31305,
+    "balance_scale": 31619,
+    "balance_hit_reset": 31377,
+    "balance_hit_slot": 31406,
+    "balance_hit_base": 31507,
+    "balance_hit_explosion": 31523,
+    "balance_hit_finish": 31533,
+    "collision_0": 20878,
+    "collision_1": 21072,
+    "collision_2": 21195,
+    "collision_3": 21323,
+    "collision_4": 21448,
+    "collision_5": 21698,
+    "collision_6": 21869,
+    "collision_7": 22008,
+    "collision_8": 22128,
+    "collision_9": 22248,
+    "collision_10": 22368,
+    "collision_11": 22531,
+    "collision_12": 22706,
+    "collision_13": 22952,
+    "collision_14": 23061,
+    "collision_15": 23235,
+    "balance_hit_heavy_high": 31651,
+    "balance_hit_heavy_medium": 31670,
+    "balance_reset_102b9": 31684,
+    "balance_reset_1393f": 31698,
+    "balance_reset_13b08": 31712,
+    "balance_reset_14289": 31726,
+    "balance_reset_152c1": 31740,
+    "balance_reset_1672e": 31754,
+    "balance_reset_169d4": 31768,
+    "balance_reset_195c2": 31782,
+    "balance_reset_1973a": 31796,
+    "balance_reset_197fc": 31810,
+    "balance_reset_198ea": 31824,
+    "balance_reset_19b50": 31838,
+    "balance_reset_1a25e": 31852,
+    "balance_reset_1a9d6": 31866,
+    "balance_reset_10298": 31880,
+    "balance_reset_1278f": 31894,
+    "balance_damage_13a39": 31908,
+    "balance_damage_13ee9": 31928,
+    "balance_damage_1437b": 31948,
+    "balance_damage_14648": 31968,
+    "balance_damage_15940": 32004,
+    "balance_damage_17cd0": 32024,
+    "balance_damage_1a068": 32044,
+    "balance_damage_1aaab": 32064,
+    "balance_damage_115d9": 32087,
+    "balance_damage_11655": 32129,
+    "balance_damage_118c1": 32152,
+    "balance_kill_1167a": 32176,
+    "balance_kill_118eb": 32190,
+    "balance_kill_13a7a": 32204,
+    "balance_kill_13f1d": 32218,
+    "balance_kill_143bc": 32232,
+    "balance_kill_14679": 32246,
+    "balance_kill_1a0a0": 32260,
+    "balance_kill_1aac8": 32274,
+    "balance_kill_1abe5": 32288,
+    "balance_kill_16939": 32302,
+    "balance_kill_17ceb": 32316,
+    "balance_enemy_kill": 32330,
+    "balance_bonus_fdf0": 32334,
+    "balance_bonus_ff6f": 32350,
+    "balance_world_19d37": 32366,
+    "balance_world_19e11": 32380
+  },
+  "bankMap": {
+    "2722": 0,
+    "2723": 1,
+    "2724": 2,
+    "2725": 3,
+    "2726": 4,
+    "2727": 5,
+    "2728": 6,
+    "2729": 7,
+    "2730": 8,
+    "2731": 9,
+    "2732": 10,
+    "2733": 11,
+    "2860": 12,
+    "2861": 13,
+    "11126": 14,
+    "11127": 15,
+    "11128": 16,
+    "11129": 17,
+    "11130": 18,
+    "11131": 19,
+    "11132": 20,
+    "11133": 21,
+    "11134": 22,
+    "11135": 23,
+    "11136": 24,
+    "11137": 25,
+    "11138": 26,
+    "11139": 27,
+    "11140": 28,
+    "11141": 29,
+    "11142": 30,
+    "11143": 31,
+    "11144": 32,
+    "11145": 33,
+    "11146": 34,
+    "11147": 35,
+    "11148": 36,
+    "11149": 37,
+    "11150": 38,
+    "11151": 39,
+    "11152": 40,
+    "11153": 41,
+    "11154": 42,
+    "11155": 43,
+    "11156": 44,
+    "11157": 45,
+    "11158": 46,
+    "11161": 47,
+    "11162": 48,
+    "11163": 49,
+    "11164": 50,
+    "11165": 51,
+    "11166": 52,
+    "11167": 53,
+    "11168": 54,
+    "11169": 55,
+    "15938": 56,
+    "4253": 57,
+    "4254": 58,
+    "21210": 59,
+    "21211": 60
+  },
+  "disks": {
+    "jp": {
+      "file": "th02-local-jp.hdi.gz",
+      "sha256": "0295b93b08644ae5bb3977afd354461ce246233a649a0962bf252d22c638e02f",
+      "compressedSha256": "446f3a3ab8b01d66b88f69d14953f284354659c6a84df39571e548fecbaff09a",
+      "size": 21415936,
+      "mainSha256": "26d08bfb441096ded99097b43e9ec4b230cc2438e84b5aa8d6dd0494b745127d",
+      "opSha256": "e2022a3a4725cc53499eccfd46fd73816dda222a43d00c499b014852276f7731",
+      "originalOpMD5": "9fb2839db50f38119d0b98d4fb70cd0e"
+    },
+    "cn": {
+      "file": "th02-local-cn.hdi.gz",
+      "sha256": "9750707f57aea60f9d5ba0b2166b0b97e353efa81e83ed37757fd84fb766f9fd",
+      "compressedSha256": "8ddb43e244e75dd8b5267486893c372a60498fb220ebf503cba8e7292903b7d7",
+      "size": 21415936,
+      "mainSha256": "8a1ab76f84d80c2538057873b3a3a8881e76fa8bb17d58447e2000789db533ff",
+      "opSha256": "4260d79cd3287b750283b3a4d0f7a7588e902203834b43b86d0cbafee7dccd41",
+      "originalOpMD5": "b17105388f7289e08dd80815f82ab0bb"
+    }
+  },
+  "source": {
+    "jp": {
+      "sha256": "7f8a97fee102c762b6c8800ffe788ebc555111e443aa1d2d53842a2c3976dbe6",
+      "mainMD5": "96cee07713a8e6460ae72276f3a9f909"
+    },
+    "cn": {
+      "sha256": "c2a6f3eefddeddf29232aaa6eba9030b8ee47acde3222887d5ebfc3f3d58179d",
+      "mainMD5": "c054e96ed57e26f00198f29b282737dd"
+    }
+  },
+  "hooks": [
+    {
+      "at": 46619,
+      "expected": "e8920f",
+      "entry": "stage_hook"
+    },
+    {
+      "at": 47531,
+      "expected": "e8020c",
+      "entry": "continue_hook"
+    },
+    {
+      "at": 48381,
+      "expected": "e8b209",
+      "entry": "invalidate_hook"
+    },
+    {
+      "at": 48588,
+      "expected": "e80934",
+      "entry": "input_hook"
+    },
+    {
+      "at": 48598,
+      "expected": "ff1e0c1a",
+      "entry": "boss_world"
+    },
+    {
+      "at": 62203,
+      "expected": "5657e8c3fb",
+      "entry": "focus_move"
+    },
+    {
+      "at": 48643,
+      "expected": "e8dcfb",
+      "entry": "pause_hook"
+    },
+    {
+      "at": 48616,
+      "expected": "e84b31",
+      "entry": "render_hook"
+    },
+    {
+      "at": 50551,
+      "expected": "e8d01c",
+      "entry": "exit_hook"
+    },
+    {
+      "at": 61828,
+      "expected": "b8d000",
+      "entry": "respawn_x_hook"
+    },
+    {
+      "at": 57005,
+      "expected": "558bec83ec18",
+      "entry": "power_hook"
+    },
+    {
+      "at": 56641,
+      "expected": "558bec83ec04",
+      "entry": "balance_refresh"
+    },
+    {
+      "at": 56574,
+      "expected": "558bec66a13c3e",
+      "entry": "balance_refresh"
+    },
+    {
+      "at": 56910,
+      "expected": "558bec66a13c3e",
+      "entry": "balance_refresh"
+    },
+    {
+      "at": 56227,
+      "expected": "803e942b007520a1862b05f8ff3b062a3e7f14a1862b0518003b062a3e7c0856e840fd0bc07530",
+      "entry": "item_hook"
+    },
+    {
+      "at": 68722,
+      "end": 68821,
+      "name": "ordinary_bullets",
+      "entry": "collision_0",
+      "length": 7,
+      "expected": "8a4401983d0100"
+    },
+    {
+      "at": 76651,
+      "end": 76691,
+      "name": "stage1_laser",
+      "entry": "collision_1",
+      "length": 6,
+      "expected": "a1fc5f05e8ff"
+    },
+    {
+      "at": 83432,
+      "end": 83477,
+      "name": "meira_contact",
+      "entry": "collision_2",
+      "length": 6,
+      "expected": "8b1eee2b8b37"
+    },
+    {
+      "at": 83817,
+      "end": 83867,
+      "name": "meira_particles",
+      "entry": "collision_3",
+      "length": 6,
+      "expected": "8b440205f0ff"
+    },
+    {
+      "at": 87963,
+      "end": 88129,
+      "name": "stones_contact",
+      "entry": "collision_4",
+      "length": 7,
+      "expected": "c45efc268b4702"
+    },
+    {
+      "at": 88394,
+      "end": 88479,
+      "name": "marisa_contact",
+      "entry": "collision_5",
+      "length": 5,
+      "expected": "a0a92bb400"
+    },
+    {
+      "at": 88857,
+      "end": 88914,
+      "name": "marisa_laser_growing",
+      "entry": "collision_6",
+      "length": 5,
+      "expected": "a01e7bb400"
+    },
+    {
+      "at": 89075,
+      "end": 89117,
+      "name": "marisa_laser_hold",
+      "entry": "collision_7",
+      "length": 5,
+      "expected": "a0a92bb400"
+    },
+    {
+      "at": 89194,
+      "end": 89232,
+      "name": "marisa_laser_flash",
+      "entry": "collision_8",
+      "length": 5,
+      "expected": "a0a92bb400"
+    },
+    {
+      "at": 89327,
+      "end": 89365,
+      "name": "marisa_laser_final",
+      "entry": "collision_9",
+      "length": 5,
+      "expected": "a0a92bb400"
+    },
+    {
+      "at": 95617,
+      "end": 95679,
+      "name": "ordinary_enemies",
+      "entry": "collision_10",
+      "length": 5,
+      "expected": "a0a92bb400"
+    },
+    {
+      "at": 97529,
+      "end": 97618,
+      "name": "mima_contact",
+      "entry": "collision_11",
+      "length": 5,
+      "expected": "a0a92bb400"
+    },
+    {
+      "at": 97711,
+      "end": 97867,
+      "name": "mima_summons",
+      "entry": "collision_12",
+      "length": 5,
+      "expected": "a0a82bb400"
+    },
+    {
+      "at": 99116,
+      "end": 99142,
+      "name": "mima_lightning",
+      "entry": "collision_13",
+      "length": 6,
+      "expected": "8b1eec2b8b07"
+    },
+    {
+      "at": 109270,
+      "end": 109358,
+      "name": "extra_contact",
+      "entry": "collision_14",
+      "length": 5,
+      "expected": "a0a92bb400"
+    },
+    {
+      "at": 109550,
+      "end": 109670,
+      "name": "extra_turrets",
+      "entry": "collision_15",
+      "length": 5,
+      "expected": "a0a92bb400"
+    },
+    {
+      "at": 67197,
+      "expected": "9a6101450f",
+      "entry": "aim_vector"
+    },
+    {
+      "at": 91265,
+      "expected": "9a6101450f",
+      "entry": "aim_vector"
+    },
+    {
+      "at": 92990,
+      "expected": "9a6101450f",
+      "entry": "aim_vector"
+    },
+    {
+      "at": 100595,
+      "expected": "9a6101450f",
+      "entry": "aim_vector"
+    },
+    {
+      "at": 101268,
+      "expected": "9a6101450f",
+      "entry": "aim_vector"
+    },
+    {
+      "at": 72885,
+      "expected": "9a781e0000",
+      "entry": "aim_angle"
+    },
+    {
+      "at": 72984,
+      "expected": "9a781e0000",
+      "entry": "aim_angle"
+    },
+    {
+      "at": 73792,
+      "expected": "9a781e0000",
+      "entry": "aim_angle"
+    },
+    {
+      "at": 101579,
+      "expected": "9a781e0000",
+      "entry": "aim_angle"
+    },
+    {
+      "at": 102901,
+      "expected": "9a781e0000",
+      "entry": "aim_angle"
+    },
+    {
+      "at": 68017,
+      "expected": "a1882b050800",
+      "entry": "aim_special"
+    },
+    {
+      "at": 75873,
+      "expected": "c746f80000",
+      "entry": "balance_hit_reset"
+    },
+    {
+      "at": 75919,
+      "expected": "803c017403",
+      "entry": "balance_hit_slot"
+    },
+    {
+      "at": 76012,
+      "expected": "ff46f8837c0e32",
+      "entry": "balance_hit_base"
+    },
+    {
+      "at": 76197,
+      "expected": "8b46f00146f8",
+      "entry": "balance_hit_explosion"
+    },
+    {
+      "at": 76237,
+      "expected": "8b46f801063c3e8b46f8",
+      "entry": "balance_hit_finish"
+    },
+    {
+      "at": 76055,
+      "expected": "8b46eeeb07",
+      "entry": "balance_hit_heavy_high"
+    },
+    {
+      "at": 76060,
+      "expected": "c64401028b46f20146f8",
+      "entry": "balance_hit_heavy_medium"
+    },
+    {
+      "at": 66233,
+      "expected": "c706ea2b0000",
+      "entry": "balance_reset_102b9"
+    },
+    {
+      "at": 80191,
+      "expected": "c706ea2b0000",
+      "entry": "balance_reset_1393f"
+    },
+    {
+      "at": 80648,
+      "expected": "c706ea2b0000",
+      "entry": "balance_reset_13b08"
+    },
+    {
+      "at": 82569,
+      "expected": "c706ea2b0000",
+      "entry": "balance_reset_14289"
+    },
+    {
+      "at": 86721,
+      "expected": "c706ea2b0000",
+      "entry": "balance_reset_152c1"
+    },
+    {
+      "at": 91950,
+      "expected": "c706ea2b0000",
+      "entry": "balance_reset_1672e"
+    },
+    {
+      "at": 92628,
+      "expected": "c706ea2b0000",
+      "entry": "balance_reset_169d4"
+    },
+    {
+      "at": 103874,
+      "expected": "c706ea2b0000",
+      "entry": "balance_reset_195c2"
+    },
+    {
+      "at": 104250,
+      "expected": "c706ea2b0000",
+      "entry": "balance_reset_1973a"
+    },
+    {
+      "at": 104444,
+      "expected": "c706ea2b0000",
+      "entry": "balance_reset_197fc"
+    },
+    {
+      "at": 104682,
+      "expected": "c706ea2b0000",
+      "entry": "balance_reset_198ea"
+    },
+    {
+      "at": 105296,
+      "expected": "c706ea2b0000",
+      "entry": "balance_reset_19b50"
+    },
+    {
+      "at": 107102,
+      "expected": "c706ea2b0000",
+      "entry": "balance_reset_1a25e"
+    },
+    {
+      "at": 109014,
+      "expected": "c706ea2b0000",
+      "entry": "balance_reset_1a9d6"
+    },
+    {
+      "at": 66200,
+      "expected": "c787d42b0000",
+      "entry": "balance_reset_10298"
+    },
+    {
+      "at": 75663,
+      "expected": "c787d42b0000",
+      "entry": "balance_reset_1278f"
+    },
+    {
+      "at": 80441,
+      "expected": "0106ea2b813eea2b2c01",
+      "entry": "balance_damage_13a39"
+    },
+    {
+      "at": 81641,
+      "expected": "0106ea2b813eea2bd408",
+      "entry": "balance_damage_13ee9"
+    },
+    {
+      "at": 82811,
+      "expected": "0106ea2b813eea2b7c01",
+      "entry": "balance_damage_1437b"
+    },
+    {
+      "at": 83528,
+      "expected": "0106ea2b6a04",
+      "entry": "balance_damage_14648"
+    },
+    {
+      "at": 88384,
+      "expected": "c706de2b82000106ea2b",
+      "entry": "balance_damage_15940"
+    },
+    {
+      "at": 97488,
+      "expected": "0106ea2b813eea2b7017",
+      "entry": "balance_damage_17cd0"
+    },
+    {
+      "at": 106600,
+      "expected": "013eea2b8b360893",
+      "entry": "balance_damage_1a068"
+    },
+    {
+      "at": 109227,
+      "expected": "0106ea2beb0a",
+      "entry": "balance_damage_1aaab"
+    },
+    {
+      "at": 71129,
+      "expected": "01bfd42b56",
+      "entry": "balance_damage_115d9"
+    },
+    {
+      "at": 71253,
+      "expected": "01bfd42b8bde",
+      "entry": "balance_damage_11655"
+    },
+    {
+      "at": 71873,
+      "expected": "01bfd42b83fe04",
+      "entry": "balance_damage_118c1"
+    },
+    {
+      "at": 71290,
+      "expected": "6681063c3e204e0000",
+      "entry": "balance_kill_1167a"
+    },
+    {
+      "at": 71915,
+      "expected": "6681063c3e30750000",
+      "entry": "balance_kill_118eb"
+    },
+    {
+      "at": 80506,
+      "expected": "6681063c3e10270000",
+      "entry": "balance_kill_13a7a"
+    },
+    {
+      "at": 81693,
+      "expected": "6681063c3e204e0000",
+      "entry": "balance_kill_13f1d"
+    },
+    {
+      "at": 82876,
+      "expected": "6681063c3e204e0000",
+      "entry": "balance_kill_143bc"
+    },
+    {
+      "at": 83577,
+      "expected": "6681063c3e30750000",
+      "entry": "balance_kill_14679"
+    },
+    {
+      "at": 106656,
+      "expected": "6681063c3e50c30000",
+      "entry": "balance_kill_1a0a0"
+    },
+    {
+      "at": 109256,
+      "expected": "6681063c3e204e0000",
+      "entry": "balance_kill_1aac8"
+    },
+    {
+      "at": 109541,
+      "expected": "6681063c3e88130000",
+      "entry": "balance_kill_1abe5"
+    },
+    {
+      "at": 92473,
+      "expected": "668106280be0930400",
+      "entry": "balance_kill_16939"
+    },
+    {
+      "at": 97515,
+      "expected": "668106280b20a10700",
+      "entry": "balance_kill_17ceb"
+    },
+    {
+      "at": 96374,
+      "expected": "6601063c3e",
+      "entry": "balance_enemy_kill"
+    },
+    {
+      "at": 65008,
+      "expected": "6601063c3e",
+      "entry": "balance_bonus_fdf0"
+    },
+    {
+      "at": 65391,
+      "expected": "6601063c3e",
+      "entry": "balance_bonus_ff6f"
+    },
+    {
+      "at": 105783,
+      "expected": "668106280b50c30000",
+      "entry": "balance_world_19d37"
+    },
+    {
+      "at": 106001,
+      "expected": "668106280ba0860100",
+      "entry": "balance_world_19e11"
+    },
+    {
+      "at": 72053,
+      "expected": "833e882b60",
+      "targetCoordinate": 37698
+    },
+    {
+      "at": 72802,
+      "expected": "a1862b",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 84256,
+      "expected": "3b06862b",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 85138,
+      "expected": "3b06862b",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 89458,
+      "expected": "813e862bd000",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 89869,
+      "expected": "813e862bd000",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 90070,
+      "expected": "a1862b",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 90079,
+      "expected": "a1882b",
+      "targetCoordinate": 37698
+    },
+    {
+      "at": 91384,
+      "expected": "a1862b",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 91403,
+      "expected": "a1862b",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 91420,
+      "expected": "a1862b",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 91439,
+      "expected": "a1862b",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 91510,
+      "expected": "a1862b",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 91517,
+      "expected": "a1882b",
+      "targetCoordinate": 37698
+    },
+    {
+      "at": 91579,
+      "expected": "813e862bd000",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 91683,
+      "expected": "a1862b",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 91690,
+      "expected": "a1882b",
+      "targetCoordinate": 37698
+    },
+    {
+      "at": 91819,
+      "expected": "a1862b",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 91826,
+      "expected": "a1882b",
+      "targetCoordinate": 37698
+    },
+    {
+      "at": 98778,
+      "expected": "3b06862b",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 100647,
+      "expected": "3b06862b",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 100925,
+      "expected": "3b06862b",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 101484,
+      "expected": "3b06862b",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 101587,
+      "expected": "813e862bd000",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 101890,
+      "expected": "3b06862b",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 104596,
+      "expected": "3b06862b",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 111983,
+      "expected": "3b06862b",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 114313,
+      "expected": "3b06862b",
+      "targetCoordinate": 37696
+    },
+    {
+      "at": 68038,
+      "expected": "a1862b",
+      "targetCoordinate": 37700
+    }
+  ],
+  "contextRanges": [
+    [
+      2722,
+      12
+    ],
+    [
+      2860,
+      2
+    ],
+    [
+      11126,
+      33
+    ],
+    [
+      11161,
+      9
+    ],
+    [
+      15938,
+      1
+    ],
+    [
+      4253,
+      2
+    ],
+    [
+      21210,
+      2
+    ]
+  ],
+  "runtimeSha256": "bcf82c465a012bd19c0999a31c5fb15efcee6d32b28bd4f7d23ca1a030e92cee",
+  "ghost": {
+    "file": "assets/reimu-ghost-32.png",
+    "sha256": "661811629f6219fd19f77841dbf51e99aba1b51aa9143d4fa4bce9a126e15c33",
+    "colors": 9,
+    "native": true
+  },
+  "players": {
+    "capacity": 3,
+    "countOffset": 110,
+    "configCountOffset": 2,
+    "mailboxSize": 144,
+    "inputOffsets": [
+      24,
+      26,
+      108
+    ],
+    "stateOffsets": [
+      32,
+      48,
+      112
+    ],
+    "itemOffsets": [
+      76,
+      80,
+      128
+    ],
+    "progressOffsets": [
+      84,
+      85,
+      132
+    ],
+    "latchOffsets": [
+      86,
+      87,
+      133
+    ],
+    "recipientOffsets": [
+      134,
+      135,
+      136
+    ]
+  },
+  "debug": {
+    "invincibilityMailboxOffset": 89,
+    "defaultEnabled": false
+  },
+  "touch": {
+    "stride": 8,
+    "unitsPerPixel": 16,
+    "movement": "native",
+    "bounds": [
+      28,
+      390,
+      16,
+      344
+    ]
+  },
+  "balance": {
+    "version": 1,
+    "fixedStartingCount": true,
+    "powerMultipliers": [
+      1.5,
+      2
+    ],
+    "bossMultipliers": [
+      1.5,
+      2.2
+    ],
+    "scoreMultipliers": [
+      1.5,
+      2.2
+    ],
+    "maxPower": 80,
+    "maxSpareLives": 5,
+    "maxBombs": 5,
+    "bombItem": "all-living",
+    "lifeItem": "all-living-and-revive-ghosts",
+    "statsEntry": "personal_stats",
+    "statsStride": 16,
+    "scoreOffset": 0,
+    "extendsOffset": 4,
+    "nextExtendOffset": 8,
+    "powerRemainderOffset": 12,
+    "teamScoreEntry": "team_score",
+    "scoreUnits": "displayed-points",
+    "extends": [
+      1000000,
+      2000000,
+      3000000,
+      5000000,
+      8000000
+    ],
+    "personalScoreVisible": false
+  },
+  "extraUnlock": {
+    "imageOffset": 47367,
+    "expected": "8bc7",
+    "replacement": "b001"
+  },
+  "targeting": {
+    "policy": "nearest-live",
+    "capacity": 3,
+    "players": 3,
+    "enabledOffset": 104,
+    "defaultEnabled": true,
+    "bossReads": [
+      72053,
+      72802,
+      84256,
+      85138,
+      89458,
+      89869,
+      90070,
+      90079,
+      91384,
+      91403,
+      91420,
+      91439,
+      91510,
+      91517,
+      91579,
+      91683,
+      91690,
+      91819,
+      91826,
+      98778,
+      100647,
+      100925,
+      101484,
+      101587,
+      101890,
+      104596,
+      111983,
+      114313
+    ],
+    "vectors": [
+      67197,
+      91265,
+      92990,
+      100595,
+      101268
+    ],
+    "angles": [
+      72885,
+      72984,
+      73792,
+      101579,
+      102901
+    ],
+    "special": 68017,
+    "scratch": [
+      37696,
+      37698,
+      37700,
+      37702
+    ]
+  },
+  "focus": {
+    "percentOffsets": [
+      100,
+      101,
+      137
+    ],
+    "enabledOffset": 102,
+    "pointOffset": 103,
+    "defaultPercent": 50,
+    "defaultEnabledMask": 7,
+    "defaultPointMask": 7,
+    "range": [
+      10,
+      100
+    ],
+    "pointCenter": [
+      16,
+      21
+    ]
+  },
+  "rescue": {
+    "frames": 90,
+    "invincibilityFrames": 150,
+    "bulletClearFrames": 20,
+    "maxSpareLives": 5,
+    "hudRows": [
+      0,
+      1,
+      2
+    ]
+  },
+  "bossHud": {
+    "steps": 128,
+    "style": "th04-native",
+    "scope": "whole-fight",
+    "limits": [
+      2261,
+      2400,
+      1450,
+      900,
+      4700,
+      8500
+    ],
+    "stones": [
+      140,
+      140,
+      120,
+      120,
+      930
+    ],
+    "mimaPhases": [
+      600,
+      700,
+      800,
+      1500,
+      1100
+    ],
+    "sigmaPhases": [
+      1800,
+      1800,
+      1800,
+      1800,
+      1300
+    ],
+    "sigmaFinal": 1300
+  }
+}
