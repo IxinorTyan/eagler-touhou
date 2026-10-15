@@ -15,7 +15,7 @@
     "se_part": 15
   },
   "files": {
-    "app.js": "c2070d8022b6e01dc32fb8fbed70a1a870b99ebdf48b54dfb97484ea58bb8a1f",
+    "app.js": "5206c0c79d30a1fbb434c5c5489ba56eec2d9d4893e763f42b095b63c1c818b7",
     "bgm/manifest.json": "b31757c63d8454083b56e80a32f8911f39072725dd645be1ca6a545942e18cd8",
     "controls.js": "1b0eeb3ffc542b189982015d7195a02d49d9ddc26770ee87c11e661b364754b3",
     "disk.js": "c0816922b7672edd4792d03b188b9dbb70509132b54fbfcffb7b8fd56718b0a8",
@@ -29,11 +29,11 @@
     "fire-control.js": "5a97f636996386694884cf110c20db9478df19e00b7ab79de0e3ac915f123c2f",
     "frame-limit.js": "e86164464b488361ae7b32bda2a38d323f7cfd68af66510246d32ee9c04ed6e3",
     "frame-presenter.js": "78f43396c4ac9a0b7acf10659626f9c8c877bf65603be9554ad46745cdc1ba8a",
-    "frame-queue.js": "c14dd162d656f76606e1e91e993b95a89093df22b26416ba230667558ca9c568",
+    "frame-queue.js": "2968a7c13f4d9f6e70286865932d4936d558483eabebf271c7adabb541f10d34",
     "local-bgm.js": "c59b4752a0e1d412d13e9447de4ecb562349c053a3a24648a609d92a23db42b1",
     "local-worker-client.js": "d39d0b521a49101608069cba342ea7301cee854aa17bb14c6965117cc9f17aa7",
     "local.html": "1731de0b9107aee141d03d63ff72e5a405385a466cd7c41eaae92b8f9707bc7e",
-    "lockstep.js": "bfaf45dd48112af263b197ba3b3c2969ecd77dff64f68fdc47d2c9023c547b57",
+    "lockstep.js": "4d9b2903154e81d0ae383d256c52aa19887c9a86448d66c0d62370183b35d865",
     "native-music.js": "3c64d5eafd35cfc1da86f2a23394d80424e5b36833daa60768856e0e57bdb976",
     "native-patch.json": "11ff9c5473d2497d96b0ada615685155decda5078c6bb3340722e5b47159a2ac",
     "native-pause.js": "5c524b38cddc1816bc0a06a47032213d2d8a53f4433b2ba491599ef5b4f63cd1",
@@ -60,11 +60,11 @@
     "vendor/dosbox-x/LICENSE": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
     "vendor/dosbox-x/NOTICE.md": "39fe71fe22fd9ab82192f39715b372a3345713f660fb51ff41cfebb2aff00eee",
     "vendor/dosbox-x/audio-worklet.js": "e1e8912f986479b1926cca0d8342f6b504defca873d3a51aac1172e5fbbf4c5d",
-    "vendor/dosbox-x/core-build.json": "cf8ea8171d878ab3c0317b532c4a7bf72c358dab903bbd7394b671ab411a5756",
+    "vendor/dosbox-x/core-build.json": "1cd41dfef4ba424a8ee1e2c4fa876664fc4ba525578d387af280b9ace9af0585",
     "vendor/dosbox-x/dosbox-rollback-tracked.mjs": "6519cdb4b4d0bef1b63e534d5f25f3de2124c1859b5783462120d8147b6ee5aa",
     "vendor/dosbox-x/dosbox-rollback.mjs": "6413468063aab490225edaf90d0fc5af42675ab83220f599bb45c5b78e4dc7dd",
     "vendor/dosbox-x/emulators.js": "066176a9e9e6babfb5388552a5154f3c1f81ed778af3bf4a1f9f904161e3c4bb",
-    "vendor/dosbox-x/runtime.json": "d2994bf8284cbf17caf6ee12374cee6aa54ae392bff18347ec68ec50079dd187",
+    "vendor/dosbox-x/runtime.json": "9eddd559e2e961ec19dfdb93b381d205d453abfd3533468b65e09d7c3bab5802",
     "vendor/dosbox-x/snapshot-diff-tracked.wasm": "d3eff5c0bb6c0dd7df1abb1f61ae38ff15b7139b7fdb3142bab465e13c564bec",
     "vendor/dosbox-x/snapshot-diff.wasm": "20235d6360a49d633f2db03832ef5ad3fbe6daffd4f44e4d7f8e790875a4662f",
     "vendor/dosbox-x/wdosbox-x-rollback-tracked.wasm": "270d5d491e09f04028d4f89cf828c1d6c4a8ad462ecdcfb326193117f8602a99",
@@ -74,5 +74,11 @@
   "nativeScheduling": true,
   "nativeCpu": true,
   "nativePlanar": false,
-  "idleFusion": "th03-battle-wait-four-instructions"
+  "idleFusion": "th03-battle-wait-four-instructions",
+  "inputPolicy": {
+    "inputDelay": 0,
+    "directionPrediction": 6,
+    "maxPredictionLead": 6,
+    "maxRollback": 12
+  }
 }

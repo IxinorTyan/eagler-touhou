@@ -70,7 +70,7 @@
     "controls.js": "1b0eeb3ffc542b189982015d7195a02d49d9ddc26770ee87c11e661b364754b3",
     "fire-control.js": "5a97f636996386694884cf110c20db9478df19e00b7ab79de0e3ac915f123c2f",
     "native-music.js": "3c64d5eafd35cfc1da86f2a23394d80424e5b36833daa60768856e0e57bdb976",
-    "lockstep.js": "bfaf45dd48112af263b197ba3b3c2969ecd77dff64f68fdc47d2c9023c547b57",
+    "lockstep.js": "4d9b2903154e81d0ae383d256c52aa19887c9a86448d66c0d62370183b35d865",
     "dosbox-disk.js": "37ebddc4bfe02cfb3d53bfaee5cde69efbc1a63d8b1c4672332b18fdf0860694"
   },
   "browserTextEol": "LF",
@@ -144,5 +144,11 @@
       "wdosbox-x-rollback.wasm": "3712f15fcf85f49fc1a5f3dd97f53071114e15ced190e113c92d075c03b3d520",
       "wdosbox-x-rollback-tracked.wasm": "e28fec0e9bb9ca212e5c911d9c19a11cfba5f894f2ba53d6136a8c44a6193745"
     }
+  },
+  "inputPolicy": {
+    "inputDelay": 0,
+    "directionPrediction": 6,
+    "maxPredictionLead": 6,
+    "maxRollback": 12
   }
 }

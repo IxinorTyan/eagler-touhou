@@ -18,6 +18,10 @@ if(build){
  for(const [name,expected]of Object.entries(build.behaviorFiles))assert.equal(sha(read(name)),expected,'Preserved behavior resource '+name);
  for(const [key,value]of Object.entries(build.releaseProfile))assert.equal(runtime.network[key],value,'Native profile '+key);
  assert.equal(network.snapshotScan,build.snapshotScan);
+ if(build.inputPolicy){
+  assert.deepEqual(build.inputPolicy,{inputDelay:0,directionPrediction:6,maxPredictionLead:6,maxRollback:12});
+  assert.deepEqual(network.inputPolicy,build.inputPolicy);assert.deepEqual(runtime.network.inputPolicy,build.inputPolicy);
+ }
  assert(read('dosbox-adapter.js').includes(Buffer.from('deterministic:net,nativeScheduling:true,nativeCpu:true,nativePlanar:false,nativeFramePresentation:false,')));
 }else{
  const before=JSON.parse(fs.readFileSync(path.join(root,'build/before-dirty-pages-20261014/web/vendor/dosbox-x/runtime.json')));
@@ -25,6 +29,11 @@ if(build){
 }
 for(const name of ['disks/manifest.json','native-patch.json','native/main.exe','native/start.com','native/music.com','controls.js','fire-control.js','native-music.js','lockstep.js','dosbox-disk.js']){
  const old=spawnSync('git',['show','HEAD:web/'+name],{cwd:root,maxBuffer:64*1024*1024});assert.equal(old.status,0);
+ // The input-pacing migration intentionally changes the scheduler; its exact
+ // current bytes are still covered by behaviorFiles and both release manifests.
+ if(name==='lockstep.js'&&build?.inputPolicy){
+  assert(build.behaviorFiles[name]);continue;
+ }
  if(/\.(js|json)$/.test(name))assert.equal(read(name).toString().replace(/\r\n/g,'\n'),old.stdout.toString().replace(/\r\n/g,'\n'),'Behavior resource changed '+name);
  else assert(read(name).equals(old.stdout),'Behavior resource changed '+name);
 }

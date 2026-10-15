@@ -22,6 +22,7 @@ function write() {
     runtime.sourceRevisions=build.sourceRevisions;
     Object.assign(runtime.network,build.releaseProfile,{idleFusion:build.idleFusion,snapshotScan:build.snapshotScan,
       continuation:'full Asyncify, TH03 zero-time native scheduling',gameplayAccepted:build.gameplayAccepted});
+    if(build.inputPolicy)runtime.network.inputPolicy=build.inputPolicy;
   }
   for (const name of fs.readdirSync(vendor).sort()) if (name !== 'runtime.json') runtime.files[name] = sha(fs.readFileSync(path.join(vendor, name)));
   fs.writeFileSync(path.join(vendor, 'runtime.json'), JSON.stringify(runtime, null, 2) + '\n');
@@ -45,6 +46,7 @@ function write() {
   if(build)Object.assign(network,{adapter:'dosbox-x-th03-native-v1',snapshotScan:build.snapshotScan,
     nativeScheduling:build.releaseProfile.nativeScheduling,nativeCpu:build.releaseProfile.nativeCpu,
     nativePlanar:build.releaseProfile.nativePlanar,idleFusion:build.idleFusion});
+  if(build?.inputPolicy)network.inputPolicy=build.inputPolicy;
   for (const name of paths.sort()) network.files[name] = sha(fs.readFileSync(path.join(web, name)));
   fs.writeFileSync(path.join(web, 'lockstep-runtime.json'), JSON.stringify(network, null, 2) + '\n');
   console.log(`Updated TH03 DOSBox-X manifests (${paths.length} network resources)`);
