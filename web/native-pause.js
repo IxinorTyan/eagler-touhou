@@ -1,4 +1,5 @@
 import {unpackTouch, ALWAYS_POINT} from './touch-input.js';
+import {createPauseSearch} from './pause-search.js';
 export class NativePause {
   constructor(getEmulator, meta) {
     this.getEmulator = getEmulator;
@@ -19,6 +20,10 @@ export class NativePause {
     const emulator = this.getEmulator(), heap = emulator?.module.HEAPU8;
     if (!heap) return null;
     const view = new DataView(heap.buffer, heap.byteOffset, heap.byteLength), f = this.meta.fields;
+    const memory=emulator.module.nativeExports?.().memory;
+    if(memory&&this.searchMemory!==memory){
+      this.searchMemory=memory;this.search=createPauseSearch(memory,this.meta.signature);
+    }
     if (emulator.state === 'running') {
       // Raw disk buffers also contain the signature. Only a changing heartbeat
       // with plausible relocated CS/DS can identify the running DOS allocation.
@@ -27,12 +32,12 @@ export class NativePause {
         if(this.cursor<scanStart||this.cursor>=scanEnd)this.cursor=scanStart;
         const end = Math.min(this.cursor + 2 * 1024 * 1024, scanEnd);
         const slice = heap.subarray(this.cursor, Math.min(end + this.signature.length - 1, heap.length));
-        for (let i = slice.indexOf(this.signature[0]); i >= 0 && this.cursor + i < end; i = slice.indexOf(this.signature[0], i + 1)) {
-          const at = this.cursor + i;
+        const find=(kind,start)=>this.search?this.search(kind,start,end):
+          (()=>{const i=slice.indexOf(kind===0?this.signature[0]:this.residentSignature[0],start-this.cursor);return i<0?-1:this.cursor+i;})();
+        for (let at = find(0,this.cursor); at >= 0 && at < end; at = find(0,at+1)) {
           if (this.valid(heap, at) && !this.candidates.has(at)) this.candidates.set(at, {ticks: view.getUint32(at + f.ticks, true), changed: -Infinity});
         }
-        for (let i = slice.indexOf(this.residentSignature[0]); i >= 0 && this.cursor + i < end; i = slice.indexOf(this.residentSignature[0], i + 1)) {
-          const at = this.cursor + i;
+        for (let at = find(1,this.cursor); at >= 0 && at < end; at = find(1,at+1)) {
           if (at + 58 <= heap.length && this.residentSignature.every((b, j) => heap[at + j] === b) && !this.residents.has(at)) {
             this.residents.set(at, {rand: view.getUint32(at + 0x10, true), changes: 0, changed: -Infinity});
           }

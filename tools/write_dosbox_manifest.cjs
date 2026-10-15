@@ -20,14 +20,14 @@ function write() {
     runtime.local.sourceWasm=runtime.sourceWasm;
     runtime.sourceWasm=build.rawWasmSha256;
     runtime.sourceRevisions=build.sourceRevisions;
-    Object.assign(runtime.network,build.releaseProfile,{idleFusion:false,snapshotScan:build.snapshotScan,
+    Object.assign(runtime.network,build.releaseProfile,{idleFusion:build.idleFusion,snapshotScan:build.snapshotScan,
       continuation:'full Asyncify, TH03 zero-time native scheduling',gameplayAccepted:build.gameplayAccepted});
   }
   for (const name of fs.readdirSync(vendor).sort()) if (name !== 'runtime.json') runtime.files[name] = sha(fs.readFileSync(path.join(vendor, name)));
   fs.writeFileSync(path.join(vendor, 'runtime.json'), JSON.stringify(runtime, null, 2) + '\n');
   const paths = [
     'app.js','network-performance.js','netplay.js','netplay/udp-config.js','lockstep.js','frame-queue.js','controls.js',
-    'native-pause.js','native-patch.json','native/main.exe','native/start.com','native/music.com',
+    'native-pause.js','pause-search.js','native-patch.json','native/main.exe','native/start.com','native/music.com',
     'native/game-jp.bat','native/game-cn.bat','native-music.js','local-bgm.js','bgm/manifest.json',
     'fire-control.js','player-ui.js','player-ui.css','touch-input.js','touch-layout.js','disk.js','scores.js','sha256.js',
     'netplay/native-hash.js','frame-limit.js','frame-presenter.js','startup-assets.js','dosbox-adapter.js','dosbox-disk.js',
@@ -44,7 +44,7 @@ function write() {
   };
   if(build)Object.assign(network,{adapter:'dosbox-x-th03-native-v1',snapshotScan:build.snapshotScan,
     nativeScheduling:build.releaseProfile.nativeScheduling,nativeCpu:build.releaseProfile.nativeCpu,
-    nativePlanar:build.releaseProfile.nativePlanar});
+    nativePlanar:build.releaseProfile.nativePlanar,idleFusion:build.idleFusion});
   for (const name of paths.sort()) network.files[name] = sha(fs.readFileSync(path.join(web, name)));
   fs.writeFileSync(path.join(web, 'lockstep-runtime.json'), JSON.stringify(network, null, 2) + '\n');
   console.log(`Updated TH03 DOSBox-X manifests (${paths.length} network resources)`);

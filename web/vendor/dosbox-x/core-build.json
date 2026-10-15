@@ -3,7 +3,7 @@
   "cycles": 16000,
   "tickHz": 60,
   "snapshotStride": 2,
-  "idleFusion": false,
+  "idleFusion": "th03-battle-wait-four-instructions",
   "zeroTimeCooperativeYields": true,
   "sourceRevisions": {
     "emulators": "6bbf0925d221a7304ea8e0dda1e89b8dc01569b2",
@@ -13,8 +13,8 @@
   "files": {
     "dosbox-rollback.mjs": "6413468063aab490225edaf90d0fc5af42675ab83220f599bb45c5b78e4dc7dd",
     "dosbox-rollback-tracked.mjs": "6519cdb4b4d0bef1b63e534d5f25f3de2124c1859b5783462120d8147b6ee5aa",
-    "wdosbox-x-rollback.wasm": "3712f15fcf85f49fc1a5f3dd97f53071114e15ced190e113c92d075c03b3d520",
-    "wdosbox-x-rollback-tracked.wasm": "e28fec0e9bb9ca212e5c911d9c19a11cfba5f894f2ba53d6136a8c44a6193745",
+    "wdosbox-x-rollback.wasm": "cc557b7af3651f166c59968310863d300e7caa23830fff300cde2a1a9c3c2bd3",
+    "wdosbox-x-rollback-tracked.wasm": "270d5d491e09f04028d4f89cf828c1d6c4a8ad462ecdcfb326193117f8602a99",
     "snapshot-diff-tracked.wasm": "d3eff5c0bb6c0dd7df1abb1f61ae38ff15b7139b7fdb3142bab465e13c564bec"
   },
   "sourceTools": {
@@ -110,6 +110,39 @@
     "disks/manifest.json": {
       "before": "76872109412660d892c69a62dcf2b8bbe7068837280590928858271c390e2460",
       "after": "7ae3cfd3bbb1c3af1e1a89d635c5ec6e3eeca13dd680d9758e21117e5091edda"
+    }
+  },
+  "battleIdle": {
+    "loops": [
+      {
+        "file": "main.exe",
+        "sha256": "70e1b6ccb6b0d4491117ff16e794a31d99c8ddf07dbdcf5fca3bc44e2f57ac90",
+        "offsets": [
+          45631,
+          45668
+        ]
+      },
+      {
+        "file": "solo-main.exe",
+        "sha256": "338f066d59a5f7c106af9b6d4a1154b8c04a1db91175e10262c01be6d58e6da5",
+        "offsets": [
+          45631,
+          45668
+        ]
+      },
+      {
+        "file": "original-main.exe",
+        "sha256": "f41fde47ea36bf4d985ff9127b67fe93d5ecb58cc36e7cffab86959db7f2ce6b",
+        "offsets": [
+          45631,
+          45668
+        ]
+      }
+    ],
+    "builderSha256": "f9c0fdd5cece8b6f57ade253407a7e143d415e1da5ad6b669f82ca124d49a0ef",
+    "parentCores": {
+      "wdosbox-x-rollback.wasm": "3712f15fcf85f49fc1a5f3dd97f53071114e15ced190e113c92d075c03b3d520",
+      "wdosbox-x-rollback-tracked.wasm": "e28fec0e9bb9ca212e5c911d9c19a11cfba5f894f2ba53d6136a8c44a6193745"
     }
   }
 }

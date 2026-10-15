@@ -1,5 +1,9 @@
 # TH03 DOSBox-X 开发交接
 
+2026-10-15 第三轮：针对 TH03 选人/切换的 NativePause 双签名搜索，新增只读 WASM SIMD helper web/pause-search.js（tools/build_pause_search.cjs 生成，524 bytes），保持扫描时机、范围、游标、候选验证与快照字段不变。按 16 字节筛首字节并在 WASM 内核对完整签名，避免逐个候选跨 JS/TypedArray 验证；未知签名或无 SIMD/原生 memory 时回退旧 JS 路径。20,960 项搜索对照、280 次原 NativePause 状态机/恢复对照、堆末端/增长/只读/JS 回退通过。桌面 640 KiB 全零/随机合成扫描约 0.326/0.721 ms 降至 0.068/0.104 ms；前缀密集人工压力例约 56.36 降至 1.41 ms，不能当成真实 TH03 内存或手机收益。报告 reports/th03-pause-search-20261015.json。
+
+同时发现 app.js 只创建日志历史，没有调用 mountNetworkPerformance，导致 README 所称下载入口不存在；已在普通/播放器工具栏挂回“日志”，只在联机模式显示。日志增加资源身份、只读 CPU 开关/同步指令/单指令回退原始计数和搜索实现。原生计数 uint32 可溢出且会随回滚倒退，整体模式/映射回退不计入该 fallback 字段，不能用它计算精确快路径百分比。下载内容无房间令牌或 URL，保留 600 条采样及 100 条错误。清单更新至 54 联机资源，46 模块静态审计、原有 write-journal 检查通过。尚未启动游戏/浏览器/服务，未证明 TH03 忙等热点，也未启用显存查表。本轮工作区改动未自动提交或推送。
+
 2026-10-15 正式接入：用户明确同意将两轮优化合入 main，准备自行上传 GitHub。普通 web 已使用 runtime-snapshot-adaptive-raw 的五文件集（原生调度/同步 CPU 开，显存查表关，adaptive-word8）；新增 web/vendor/dosbox-x/core-build.json 记录构建身份与保留资源摘要。发行清单更新为 53 个联机资源、14 个核心资源，16000 cycles/60 Hz/stride 2/零时间等待保持。切换前文件和工作区补丁保存在 build/core-optimization/before-main-promotion-20261015。固定浏览器文本 LF，web/native 保留原始字节，避免 Git 自动 CRLF 导致 GitHub 下载包摘要不符；额外检查暂存区实际 blob。历史“正式 web 未替换”描述对应当时的候选阶段。未自动运行游戏、浏览器或服务器，也未推送。
 
 2026-10-15 第二轮：新增回滚脏页 adaptive-word8 扫描候选，冻结于 build/native-scheduler/runtime-snapshot-adaptive-raw。只替换 tracked snapshot helper，上一轮四个核心/包装器文件与正式 web 均保留；手动 tools/start_snapshot_candidate.bat 使用 19874 和 cpu profile。26,292 项精确差分、真实 JS 快照栈的 64 次全扫描对照/文件/全局/mailbox/增长、真实追踪核心的时钟回滚、四 profile 双清单和 127 个原网页摘要检查通过。合成稀疏 scan 约快 2.6–8.3 倍、真实静态页面分布的合成场景约快 1.2–1.8 倍；全页相等的 256 MiB 场景约慢 3%，不宣称所有负载提速。测量只涵盖 scan，不等于游戏/手机帧率。没有运行 DOS、游戏、浏览器或服务器。详见 CORE-OPTIMIZATION.md 第二轮及 reports/th03-snapshot-scan-20261015.json。整 helper O2 与其他过渡实验未作为最终入口。

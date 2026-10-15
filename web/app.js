@@ -13,7 +13,7 @@ import {Lockstep} from './lockstep.js';
 import {createFrameGate} from './frame-limit.js';
 import {LocalBgm} from './local-bgm.js';
 import {NativeMusic, ConfirmedMusic} from './native-music.js';
-import {createNetworkHistory} from './network-performance.js';
+import {createNetworkHistory,mountNetworkPerformance,readNativeCoreDiagnostics} from './network-performance.js';
 
 const $ = id => document.getElementById(id);
 const netQuery = new URLSearchParams(location.search);
@@ -72,7 +72,7 @@ function performanceTotals(){
     executed:costs?.steps??module?.localFrameCount??0,simulate:costs?.simulate??module?.localStepMs??0,
     uploads:module?.frameUploads||0,presentations:online?presentationCount:module?.frameUploads||0,
     capture:costs?.capture||0,captures:costs?.captures||0,hash:costs?.hash||0,
-    restore:costs?.restore||0,replays:costs?.replays||0,presentationMs,
+    restore:costs?.restore||0,restores:costs?.restores||0,replays:costs?.replays||0,presentationMs,
     native:module?.stepMetrics?.totalMs||0,nativeSteps:module?.stepMetrics?.count||0};
 }
 setInterval(()=>{
@@ -84,14 +84,17 @@ setInterval(()=>{
   const stats={stepsHz:rate('steps'),uploadsHz:rate('uploads'),presentationsHz:rate('presentations'),
     simulateMs:delta('simulate')/Math.max(1,delta('executed')),
     snapshotMs:delta('capture')/Math.max(1,delta('captures')),hashMs:delta('hash'),
-    replaySteps:delta('replays'),restoreMs:delta('restore'),snapshotBytes:emulator.module.netSnapshotInfo?.().snapshotBytes||0,
+    replaySteps:delta('replays'),rollbackCount:delta('restores'),restoreMs:delta('restore'),snapshotBytes:emulator.module.netSnapshotInfo?.().snapshotBytes||0,
     nativeMs:delta('native')/Math.max(1,delta('nativeSteps')),presentationMs:delta('presentationMs')/Math.max(1,delta('presentations'))};
   window.th03Performance=stats;
   if(online)networkHistory.push({at:next.at,intervalMs:dt,...stats,frame:sync?.queue.frame??null,confirmed:sync?.queue.confirmed??null,
     tick:emulator.tick,virtualNow:emulator.module.virtualNow,waitReason:sync?.queue.waitReason??'',replayUntil:sync?.replayUntil??null,
+    predictionLead:Math.max(0,(sync?.queue.frame??0)-(sync?.queue.confirmed??0)),directionPrediction:sync?.queue.directionPrediction??null,
+    predictionLeadLimit:sync?.queue.active?Math.max(1,sync.queue.directionPrediction):0,
     phase:nativeState?.phase??0,selecting:nativePause?.selecting??false,pauseSeat,hiddenSeats:[...hiddenSeats],documentHidden:document.hidden,
     nativeMaxMs:emulator.module.stepMetrics?.maxMs??0,program:emulator.module.programReads?.at(-1)?.name??null,
     snapshotStorage:emulator.module.netSnapshotInfo?.().storage??'disabled',writeJournal:emulator.module.mobileRuntime.writeJournal,heapBytes:emulator.module.HEAPU8.length,
+    nativeCore:readNativeCoreDiagnostics(emulator.module),pauseSearch:nativePause?.search?'wasm-simd':'javascript',
     audioState:emulator.audio.context.state,status:$('status').textContent,connection:$('connection-path').textContent});
   $('performance-stats').textContent=`模拟 ${stats.stepsHz.toFixed(1)}/60 步/秒 · 画面上传 ${stats.uploadsHz.toFixed(1)} 次/秒 · 显示提交 ${stats.presentationsHz.toFixed(1)} 次/秒\n模拟 ${stats.simulateMs.toFixed(2)} ms/步 · 快照 ${stats.snapshotMs.toFixed(2)} ms/次 · 校验 ${stats.hashMs.toFixed(2)} ms\n补算 ${stats.replaySteps} 步 · 恢复 ${stats.restoreMs.toFixed(2)} ms · 快照 ${(stats.snapshotBytes/1048576).toFixed(1)} MiB\n${localBgm?.status||'音乐准备中'}`;
 },1000);
@@ -131,6 +134,12 @@ function drawLocalPoints(){
   requestAnimationFrame(drawLocalPoints);
 }
 requestAnimationFrame(drawLocalPoints);
+if(online)mountNetworkPerformance({host:$('screen'),toolbar:document.querySelector('nav.toolbar .commands'),
+  getReport:()=>({schema:2,game:'TH03',seat:netplay?.localSeat??null,language:activeLang,
+    rollbackEnabled,transport:netQuery.get('net'),userAgent:navigator.userAgent,
+    identity:syncIdentity?{protocol:syncIdentity.protocol,files:syncIdentity.files}:null,
+    samples:networkHistory.read(),errors:networkEvents.read(),
+    programReads:emulator?.module.programReads??[],slowSteps:emulator?.module.stepMetrics?.slowSteps??[]})});
 if(online||controlsOnly){
   $('settings').querySelector('h2').textContent='本机按键与手柄';
   $('pad-0').parentElement.firstChild.textContent='本机手柄';
@@ -552,7 +561,7 @@ $('start').addEventListener('click', async () => {
       status('本机资源已就绪，等待另一位玩家完成加载');
       await netplay.start();
       status('双方已连接，正在校验开局状态');
-      sync=new Lockstep({network:netplay,rollbackEnabled,snapshotStride:2,directionPrediction:netQuery.get('net')==='relay'?6:3,step:stepSynchronized,present:()=>{if(presentationDue(performance.now()))presentFrame();},hash:syncHash,capture:captureSynchronized,restore:restoreSynchronized,confirm:confirmSynchronized,onError:report,
+      sync=new Lockstep({network:netplay,rollbackEnabled,snapshotStride:2,step:stepSynchronized,present:()=>{if(presentationDue(performance.now()))presentFrame();},hash:syncHash,capture:captureSynchronized,restore:restoreSynchronized,confirm:confirmSynchronized,onError:report,
         onState:message=>status(message)});
       await netplay.synchronize(syncIdentity);
     }

@@ -29,7 +29,7 @@
     "nativeCpu": true,
     "nativePlanar": false,
     "nativeFramePresentation": false,
-    "idleFusion": false,
+    "idleFusion": "th03-battle-wait-four-instructions",
     "snapshotScan": "adaptive-word8",
     "gameplayAccepted": false
   },
@@ -53,9 +53,9 @@
   },
   "files": {
     "LICENSE": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
-    "NOTICE.md": "eb68c17962e723e60db68dd0eccfde09229e5b63064f04fd067ce7ea17ee52e5",
+    "NOTICE.md": "39fe71fe22fd9ab82192f39715b372a3345713f660fb51ff41cfebb2aff00eee",
     "audio-worklet.js": "e1e8912f986479b1926cca0d8342f6b504defca873d3a51aac1172e5fbbf4c5d",
-    "core-build.json": "dd3a1a733122a7bb20ee9919962edeb9ac35530b30beda19d2f446f1f9925722",
+    "core-build.json": "cf8ea8171d878ab3c0317b532c4a7bf72c358dab903bbd7394b671ab411a5756",
     "dosbox-jspi.mjs": "b762346410a2ca8d66af37a6e48024bb8b28376bbb83d3b84020f305e94a677e",
     "dosbox-rollback-tracked.mjs": "6519cdb4b4d0bef1b63e534d5f25f3de2124c1859b5783462120d8147b6ee5aa",
     "dosbox-rollback.mjs": "6413468063aab490225edaf90d0fc5af42675ab83220f599bb45c5b78e4dc7dd",
@@ -64,8 +64,8 @@
     "snapshot-diff.wasm": "20235d6360a49d633f2db03832ef5ad3fbe6daffd4f44e4d7f8e790875a4662f",
     "wdosbox-x-fast.wasm": "bcf82c465a012bd19c0999a31c5fb15efcee6d32b28bd4f7d23ca1a030e92cee",
     "wdosbox-x-jspi.wasm": "c154235667747e613be00d0955f068b54cbf8e1fb8e5c34d34e5552292f4c72a",
-    "wdosbox-x-rollback-tracked.wasm": "e28fec0e9bb9ca212e5c911d9c19a11cfba5f894f2ba53d6136a8c44a6193745",
-    "wdosbox-x-rollback.wasm": "3712f15fcf85f49fc1a5f3dd97f53071114e15ced190e113c92d075c03b3d520"
+    "wdosbox-x-rollback-tracked.wasm": "270d5d491e09f04028d4f89cf828c1d6c4a8ad462ecdcfb326193117f8602a99",
+    "wdosbox-x-rollback.wasm": "cc557b7af3651f166c59968310863d300e7caa23830fff300cde2a1a9c3c2bd3"
   },
   "sourceRevisions": {
     "emulators": "6bbf0925d221a7304ea8e0dda1e89b8dc01569b2",

@@ -1,4 +1,5 @@
 export const BOOT_DELAY=2,INPUT_DELAY=0,TICK_MS=1000/60,MAX_ROLLBACK=12;
+export const DIRECTION_PREDICTION=6;
 export const neutral=()=>({actions:[],touch:0,focusEnabled:true,points:true,commands:[]});
 const HELD=new Set(['shot','rapid','attack','focus']);
 const DIRECTIONS=new Set(['up','down','left','right']);
@@ -11,7 +12,7 @@ export function validInput(input){
 }
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 export class FrameQueue {
-  constructor(slot,{rollbackEnabled=false,directionPrediction=3}={}){
+  constructor(slot,{rollbackEnabled=false,directionPrediction=DIRECTION_PREDICTION}={}){
     if(![0,1].includes(slot)||typeof rollbackEnabled!=='boolean'||!Number.isInteger(directionPrediction)||directionPrediction<0||directionPrediction>MAX_ROLLBACK)throw Error('无效预测策略');
     this.slot=slot;this.rollbackEnabled=rollbackEnabled;this.directionPrediction=directionPrediction;this.frame=0;this.confirmed=BOOT_DELAY;
     this.activation=null;this.dirty=null;this.waitReason='';this.inputs=[new Map(),new Map()];this.used=new Map();

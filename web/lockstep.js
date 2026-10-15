@@ -1,6 +1,6 @@
-import {FrameQueue,TICK_MS} from './frame-queue.js';
+import {FrameQueue,TICK_MS,DIRECTION_PREDICTION} from './frame-queue.js';
 export class Lockstep {
-  constructor({network,step,present,hash,onError,onState,capture,restore,confirm,rollbackEnabled=false,directionPrediction=3,snapshotStride=1}){
+  constructor({network,step,present,hash,onError,onState,capture,restore,confirm,rollbackEnabled=false,directionPrediction=DIRECTION_PREDICTION,snapshotStride=1}){
     if(!Number.isInteger(snapshotStride)||snapshotStride<1||snapshotStride>2)throw Error('无效回滚检查点间隔');
     Object.assign(this,{network,step,present,hash,onError,onState,capture,restore,confirm,rollbackEnabled,snapshotStride});
     this.checkpoints=new Set();
@@ -67,6 +67,16 @@ export class Lockstep {
       this.wakePending=false;this.wakeTimer=null;this.pump(performance.now());
     },Math.max(0,delay));
   }
+  nextInputs(repairing=false){
+    // Bound new speculative work to the useful direction prediction horizon.
+    // Historical repair must still reach its old frontier; peek retains the
+    // independent 12-frame safety window and authoritative-input checks.
+    const queue=this.queue,limit=Math.max(1,queue.directionPrediction);
+    if(!repairing&&queue.active&&queue.frame-queue.confirmed>=limit){
+      queue.waitReason='prediction-lead';return null;
+    }
+    return queue.peek();
+  }
   pump(now=performance.now()){
     if(!this.running||this.pumping)return;
     this.pumping=true;
@@ -81,8 +91,8 @@ export class Lockstep {
       if(this.queue.waitReason)this.budget=Math.min(this.budget,TICK_MS);
       const started=performance.now();let steps=0;
       const timed=(kind,fn)=>{const at=performance.now();const result=fn();this.costs[kind]+=performance.now()-at;return result;};
-      const simulate=replay=>{
-        const pair=this.queue.peek();if(!pair)return false;
+      const simulate=(replay,repairing=false)=>{
+        const pair=this.nextInputs(repairing);if(!pair)return false;
         const frame=this.queue.frame;
         const previous=[...this.checkpoints].at(-1);
         if(this.queue.active&&frame>=this.queue.confirmed&&(previous===undefined||frame-previous>=this.snapshotStride)){
@@ -111,7 +121,7 @@ export class Lockstep {
       // Replay repairs historical frames; it must not consume the real-time
       // budget for new frames. Limit each JS task to TH04's 4 steps / 6 ms.
       while(this.replayUntil!==null&&this.queue.frame<this.replayUntil&&steps<4&&(steps===0||performance.now()-started<6)){
-        if(!simulate(this.queue.frame+1<this.replayUntil))break;
+        if(!simulate(this.queue.frame+1<this.replayUntil,true))break;
         this.costs.replays++;
       }
       if(this.replayUntil!==null&&this.queue.frame>=this.replayUntil)this.replayUntil=null;
@@ -123,7 +133,7 @@ export class Lockstep {
         this.budget-=TICK_MS;
       }
       const after=performance.now(),wait=after-this.lastProgress;
-      if(wait>15000&&this.queue.waitReason==='window')throw Error('联机延迟超过回滚窗口，请双方检查网络连接');
+      if(wait>15000&&['window','prediction-lead'].includes(this.queue.waitReason))throw Error('联机等待对端输入超时，请双方检查网络连接');
       if(wait>600)this.onState?.(`等待另一端第 ${this.queue.frame} 帧输入`);
       else if(steps&&this.queue.frame%120===0)this.onState?.(`帧同步运行中 · ${this.queue.frame}`);
       if(this.replayUntil===null)this.present?.();

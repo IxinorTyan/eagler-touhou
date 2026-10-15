@@ -8,7 +8,9 @@ for(const [name,hash]of Object.entries(runtime.files))assert.equal(sha(read('ven
 const buildPath=path.join(web,'vendor/dosbox-x/core-build.json');
 const build=fs.existsSync(buildPath)?JSON.parse(fs.readFileSync(buildPath)):null;
 if(build){
- assert.equal(build.game,'TH03');assert.equal(build.idleFusion,false);assert.equal(build.zeroTimeCooperativeYields,true);
+ assert.equal(build.game,'TH03');assert([false,'th03-battle-wait-four-instructions'].includes(build.idleFusion));assert.equal(build.zeroTimeCooperativeYields,true);
+ assert.equal(runtime.network.idleFusion,build.idleFusion);
+ if(build.idleFusion)assert.equal(network.idleFusion,build.idleFusion);
  assert.equal(build.cycles,16000);assert.equal(build.tickHz,60);assert.equal(build.snapshotStride,2);
  assert.equal(build.snapshotScan,'adaptive-word8');assert.equal(runtime.sourceWasm,build.rawWasmSha256);
  for(const [name,expected]of Object.entries({...build.localRuntimeFiles,...build.files}))

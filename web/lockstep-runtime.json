@@ -15,7 +15,7 @@
     "se_part": 15
   },
   "files": {
-    "app.js": "70dad03a31843b3bb9bcc8b40966477d02992353a598416d5986f640a15ac9da",
+    "app.js": "c2070d8022b6e01dc32fb8fbed70a1a870b99ebdf48b54dfb97484ea58bb8a1f",
     "bgm/manifest.json": "b31757c63d8454083b56e80a32f8911f39072725dd645be1ca6a545942e18cd8",
     "controls.js": "1b0eeb3ffc542b189982015d7195a02d49d9ddc26770ee87c11e661b364754b3",
     "disk.js": "c0816922b7672edd4792d03b188b9dbb70509132b54fbfcffb7b8fd56718b0a8",
@@ -36,7 +36,7 @@
     "lockstep.js": "bfaf45dd48112af263b197ba3b3c2969ecd77dff64f68fdc47d2c9023c547b57",
     "native-music.js": "3c64d5eafd35cfc1da86f2a23394d80424e5b36833daa60768856e0e57bdb976",
     "native-patch.json": "11ff9c5473d2497d96b0ada615685155decda5078c6bb3340722e5b47159a2ac",
-    "native-pause.js": "c46760bfb0a4428eb9f1a53c282036a6dbcafed10b519e8ced8f2683f346fb87",
+    "native-pause.js": "5c524b38cddc1816bc0a06a47032213d2d8a53f4433b2ba491599ef5b4f63cd1",
     "native/game-cn.bat": "9c49519c9879479f1f3f2ce88ea80a9159d3f43b1cadb09df0e1cf05247919e1",
     "native/game-jp.bat": "9c49519c9879479f1f3f2ce88ea80a9159d3f43b1cadb09df0e1cf05247919e1",
     "native/main.exe": "70e1b6ccb6b0d4491117ff16e794a31d99c8ddf07dbdcf5fca3bc44e2f57ac90",
@@ -45,7 +45,8 @@
     "netplay.js": "c85cd047da7982a46e2ddb5c1c9064a632d547bd383601944417f2d9c45c05ce",
     "netplay/native-hash.js": "9948ae91b471e3b67ecbc5997899dc0e953d8162c15135be9c9e5879600d874c",
     "netplay/udp-config.js": "4c7d8c60e0a723c8a4c530af6b060ed41f19b88184b79f9b1e146d24aeb265f7",
-    "network-performance.js": "7276c4bc56e812d8b26e6cf9216d296c818bfbe130edf28bb3367ca895deb6d1",
+    "network-performance.js": "2888cbfc383f767d1cfec80c72b11176449a33876ffd80de05f92cd315d97fc9",
+    "pause-search.js": "588cdb51f6c78d86b33a20cc6da471469d785f858800b3dc38aa7e9b5e7602d0",
     "player-ui.css": "b0ade5c1127a26c493f4409bd6fd1f0c04cb77fbc4479ab9b607c1de5afb0699",
     "player-ui.js": "61761d4e7c16349610d2465794fac683340791339897b5df2fad8ba1d8c3b63c",
     "scores.js": "8e4bb9dc606f09ce010d3791921ffd255e8a9da3ecb292a79d9a57f00268b205",
@@ -57,20 +58,21 @@
     "touch-input.js": "30d7118724392a68e322f5649766f0c94eeb877aaa8be33f56247b1431442130",
     "touch-layout.js": "9a189a6d503b3425d7e78948f9d3031cceb41f2e2dba9833a0d68f77ee86c45f",
     "vendor/dosbox-x/LICENSE": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
-    "vendor/dosbox-x/NOTICE.md": "eb68c17962e723e60db68dd0eccfde09229e5b63064f04fd067ce7ea17ee52e5",
+    "vendor/dosbox-x/NOTICE.md": "39fe71fe22fd9ab82192f39715b372a3345713f660fb51ff41cfebb2aff00eee",
     "vendor/dosbox-x/audio-worklet.js": "e1e8912f986479b1926cca0d8342f6b504defca873d3a51aac1172e5fbbf4c5d",
-    "vendor/dosbox-x/core-build.json": "dd3a1a733122a7bb20ee9919962edeb9ac35530b30beda19d2f446f1f9925722",
+    "vendor/dosbox-x/core-build.json": "cf8ea8171d878ab3c0317b532c4a7bf72c358dab903bbd7394b671ab411a5756",
     "vendor/dosbox-x/dosbox-rollback-tracked.mjs": "6519cdb4b4d0bef1b63e534d5f25f3de2124c1859b5783462120d8147b6ee5aa",
     "vendor/dosbox-x/dosbox-rollback.mjs": "6413468063aab490225edaf90d0fc5af42675ab83220f599bb45c5b78e4dc7dd",
     "vendor/dosbox-x/emulators.js": "066176a9e9e6babfb5388552a5154f3c1f81ed778af3bf4a1f9f904161e3c4bb",
-    "vendor/dosbox-x/runtime.json": "9ae70097896d461b019e05c5461aea0d5ff6b9bd5cd4f28cbfde1fad9c4874ba",
+    "vendor/dosbox-x/runtime.json": "d2994bf8284cbf17caf6ee12374cee6aa54ae392bff18347ec68ec50079dd187",
     "vendor/dosbox-x/snapshot-diff-tracked.wasm": "d3eff5c0bb6c0dd7df1abb1f61ae38ff15b7139b7fdb3142bab465e13c564bec",
     "vendor/dosbox-x/snapshot-diff.wasm": "20235d6360a49d633f2db03832ef5ad3fbe6daffd4f44e4d7f8e790875a4662f",
-    "vendor/dosbox-x/wdosbox-x-rollback-tracked.wasm": "e28fec0e9bb9ca212e5c911d9c19a11cfba5f894f2ba53d6136a8c44a6193745",
-    "vendor/dosbox-x/wdosbox-x-rollback.wasm": "3712f15fcf85f49fc1a5f3dd97f53071114e15ced190e113c92d075c03b3d520"
+    "vendor/dosbox-x/wdosbox-x-rollback-tracked.wasm": "270d5d491e09f04028d4f89cf828c1d6c4a8ad462ecdcfb326193117f8602a99",
+    "vendor/dosbox-x/wdosbox-x-rollback.wasm": "cc557b7af3651f166c59968310863d300e7caa23830fff300cde2a1a9c3c2bd3"
   },
   "snapshotScan": "adaptive-word8",
   "nativeScheduling": true,
   "nativeCpu": true,
-  "nativePlanar": false
+  "nativePlanar": false,
+  "idleFusion": "th03-battle-wait-four-instructions"
 }

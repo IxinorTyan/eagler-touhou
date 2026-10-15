@@ -66,3 +66,13 @@ comparator, packed before-images and restore layout are preserved. Standalone
 differential/storage checks passed; TH03 gameplay and mobile performance remain
 unverified. The distribution manifests select native scheduling and CPU, with
 planar lookup disabled (`cpu` profile plus `adaptive-word8` snapshots).
+
+2026-10-15 battle update: `tools/build_battle_idle_candidate.mjs` applies a
+pinned Binaryen transform to both TH03 network cores. It recognizes the exact
+TH03 RAM wait sequence MOV AL,[6599]; MOV AH,0; CMP AX,[11ea]; JA back. It charges
+complete four-instruction iterations against the existing budget and executes
+the final iterations normally. The guarded synchronous lane and direct RAM
+checks remain mandatory. No new mutable state or guest executable edits are
+introduced. Synthetic instruction parity (862 cases per core), restored replay,
+tracked-store coverage and helper initialization passed without booting DOS.
+Actual battle performance and multi-client gameplay still need manual testing.
