@@ -1,0 +1,125 @@
+{
+  "game": "TH05",
+  "mode": "original-solo",
+  "inputVersion": 1,
+  "languages": {
+    "cn": {
+      "url": "th05-solo-cn.hdi.gz",
+      "size": 21415936,
+      "sha256": "dd8b24f67e4140b5dae83cbf248b63403876575ec6535b7ca2180327e9a88701",
+      "source": "baseline/5-cn.hdi.gz",
+      "inputPatch": {
+        "signature": "TH05SOLOINPUTv1!",
+        "mailbox_size": 36,
+        "code_segment": 2785,
+        "data_segment": 8384,
+        "mailbox_cs_offset": 40124,
+        "entries": {
+          "init_hook": 40249,
+          "update_hook": 40272,
+          "touch_move": 40347,
+          "pause_hook": 40287,
+          "world_hook": 40332,
+          "mailbox": 40124
+        },
+        "insert_size": 560,
+        "hooks": [
+          {
+            "name": "init_hook",
+            "image_offset": 45833,
+            "original": "e84e02",
+            "entry": 40249
+          },
+          {
+            "name": "update_hook",
+            "image_offset": 44793,
+            "original": "e8411d",
+            "entry": 40272
+          },
+          {
+            "name": "touch_move",
+            "image_offset": 52442,
+            "original": "e8f5fd",
+            "entry": 40347
+          },
+          {
+            "name": "pause_hook",
+            "image_offset": 44747,
+            "original": "e86907",
+            "entry": 40287
+          },
+          {
+            "name": "world_hook",
+            "image_offset": 44684,
+            "original": "e81700",
+            "entry": 40332
+          }
+        ],
+        "source_main_md5": "553eee5ff79429f45284913870380549",
+        "main_sha256": "6608d9c4c5d91df26e7f04ba139b9c4877c3021375eb1b6d480bfb20e30d0276",
+        "changed_files": [
+          "KAIKI/MAIN.EXE"
+        ]
+      }
+    },
+    "jp": {
+      "url": "th05-solo-jp.hdi.gz",
+      "size": 21415936,
+      "sha256": "e9393eb0d1fa2cb3ca620011d51f7b5758a82005ab7c2d50f44deb6b3c36584f",
+      "source": "baseline/5-jp.hdi.gz",
+      "inputPatch": {
+        "signature": "TH05SOLOINPUTv1!",
+        "mailbox_size": 36,
+        "code_segment": 2785,
+        "data_segment": 8384,
+        "mailbox_cs_offset": 40124,
+        "entries": {
+          "init_hook": 40249,
+          "update_hook": 40272,
+          "touch_move": 40347,
+          "pause_hook": 40287,
+          "world_hook": 40332,
+          "mailbox": 40124
+        },
+        "insert_size": 560,
+        "hooks": [
+          {
+            "name": "init_hook",
+            "image_offset": 45833,
+            "original": "e84e02",
+            "entry": 40249
+          },
+          {
+            "name": "update_hook",
+            "image_offset": 44793,
+            "original": "e8411d",
+            "entry": 40272
+          },
+          {
+            "name": "touch_move",
+            "image_offset": 52442,
+            "original": "e8f5fd",
+            "entry": 40347
+          },
+          {
+            "name": "pause_hook",
+            "image_offset": 44747,
+            "original": "e86907",
+            "entry": 40287
+          },
+          {
+            "name": "world_hook",
+            "image_offset": 44684,
+            "original": "e81700",
+            "entry": 40332
+          }
+        ],
+        "source_main_md5": "952585e02435c3b3b111975a78b05983",
+        "main_sha256": "5a586507e18b6ac57819217849dd7742da287be6b508a70b9f2b7fdceae828d7",
+        "changed_files": [
+          "KAIKI/MAIN.EXE"
+        ]
+      }
+    }
+  }
+}

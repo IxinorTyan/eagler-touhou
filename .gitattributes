@@ -1,0 +1,22 @@
+# Normalize documentation, preserve all bytes covered by runtime manifests
+# and the room build fingerprint, including third-party LICENSE files.
+* text=auto
+/web/** -text
+/server.py -text
+/lan_server.py -text
+/lan_relay.py -text
+
+# Windows launchers and build resources must retain their original bytes.
+*.bat -text
+*.wasm -text
+*.gz -text
+*.hdi -text
+*.com -text
+*.exe -text
+*.bin -text
+*.opus -text
+*.png -text
+*.jpg -text
+*.bmp -text
+*.woff -text
+*.woff2 -text

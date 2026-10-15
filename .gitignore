@@ -1,0 +1,85 @@
+# Ready-to-run DOSBox-X release, following th04-coop-lab's root allowlist.
+/*
+!/.gitignore
+!/.gitattributes
+!/README.md
+!/README-PUBLIC.md
+!/server.py
+!/lan_server.py
+!/lan_relay.py
+!/requirements-lan.txt
+!/start.bat
+!/start-lan.bat
+!/start-public.bat
+!/web/
+
+# Original disks, extracted files, toolchains, reports, backups and local
+# developer notes stay outside the release. Ship only these four game disks.
+/web/*.hdi
+/web/*.hdi.gz
+!/web/th05-local-cn.hdi.gz
+!/web/th05-local-jp.hdi.gz
+!/web/th05-solo-cn.hdi.gz
+!/web/th05-solo-jp.hdi.gz
+/web/disks/
+/web/baseline/
+/web/build/
+/web/extracted/
+/web/reports/
+/web/screenshots/
+/web/backups/
+/web/tools/
+/web/vendor-source/
+
+# Current entries use DOSBox-X. Retired NP21 resources remain local.
+/web/vendor/np2/
+
+# Keep runtime JS/MJS/WASM, music, images, fonts, manifests and licenses.
+# Ignore only diagnostics, source maps and experimental build outputs.
+/web/**/test-results/
+/web/**/playwright-report/
+/web/**/*.wat
+/web/**/*.lst
+/web/**/*.cpuprofile
+/web/**/*.heapsnapshot
+/web/vendor/**/*.map
+/web/vendor/**/*.symbols
+/web/vendor/**/*.tgz
+/web/vendor/**/*-candidate.wasm
+/web/vendor/**/*-probe.wasm
+/web/vendor/**/*-dbg.*
+/web/**/guest-*.wasm
+
+# Reviewed TH05 core adaptation sources. Toolchains and frozen build inputs
+# remain in the full local development workspace, as documented in README.
+!/tools/
+/tools/*
+!/tools/build_th05_idle.mjs
+!/tools/build_native_candidate.cjs
+!/tools/audit_native_candidate.mjs
+!/tools/build_lan_runtime.py
+!/tools/snapshot-diff.wat
+
+# Caches, editor configuration, credentials and device diagnostics.
+__pycache__/
+*.py[cod]
+node_modules/
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+.idea/
+.vscode/
+.env
+.env.*
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log
+*.tmp
+*.swp
+*.bak
+*.orig
+*~
+th05-*-fault.json
+th05-*-diagnostics.json

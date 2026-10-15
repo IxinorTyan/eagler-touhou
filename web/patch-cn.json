@@ -1,0 +1,921 @@
+{
+  "language": "cn",
+  "sha256": "7d06ef6aa5474fb4ef4e8296b167627dcdb09bbd595faa6edf6850e9076587ae",
+  "size": 21415936,
+  "source_main_md5": "553eee5ff79429f45284913870380549",
+  "insert_offset": 84656,
+  "insert_size": 14608,
+  "payload_bytes": 14595,
+  "heap_bytes": 376000,
+  "heap_by_players": {
+    "2": 291200,
+    "3": 376000
+  },
+  "code_segment": 2785,
+  "data_segment": 9262,
+  "mailbox_cs_offset": 47696,
+  "swap_cs_offset": 40696,
+  "native_pause_cs_offset": 54620,
+  "entries": [
+    40367,
+    40964,
+    41223,
+    41257,
+    47696,
+    40696,
+    40344,
+    41048,
+    41099,
+    41124,
+    41163,
+    41193,
+    41418,
+    41448,
+    41716,
+    41653,
+    41674,
+    41916,
+    42033,
+    42053,
+    42116,
+    42142,
+    41695,
+    42556,
+    42528,
+    42974,
+    47788,
+    47791,
+    47797,
+    47799,
+    47784,
+    47811,
+    47817,
+    40529,
+    41503,
+    42257,
+    42327,
+    41489,
+    41496,
+    41246,
+    42078,
+    49861,
+    50117,
+    50341,
+    50109,
+    50113,
+    50586,
+    50642,
+    50654,
+    50741,
+    50775,
+    50802,
+    50836,
+    50844,
+    50865,
+    49879,
+    49873,
+    51836,
+    51924,
+    51944,
+    52086,
+    51785,
+    51773,
+    52037,
+    52203,
+    52227,
+    49872,
+    48647,
+    48648,
+    48650,
+    48651,
+    48655,
+    48697,
+    48699,
+    48703,
+    48705,
+    48710,
+    48806,
+    49162,
+    48849,
+    49973,
+    50053,
+    48708,
+    48706,
+    49878,
+    48625,
+    52629,
+    52725,
+    52738,
+    52744,
+    52750,
+    53781,
+    52931,
+    53041,
+    53526,
+    53278,
+    53290,
+    53302,
+    53317,
+    53332,
+    53347,
+    53362,
+    53381,
+    53957,
+    53963,
+    53487,
+    53497,
+    54516,
+    54351,
+    54366,
+    54381,
+    54327,
+    53678,
+    53729,
+    54621,
+    54620
+  ],
+  "entry_map": {
+    "init_hook": 40367,
+    "update_hook": 40964,
+    "render_hook": 41223,
+    "invalidate_hook": 41257,
+    "mailbox": 47696,
+    "swap_player": 40696,
+    "run_stage": 40344,
+    "retire_hook": 41048,
+    "bomb_start": 41099,
+    "bomb_render": 41124,
+    "bomb_x": 41163,
+    "bomb_y": 41193,
+    "aim_hook": 41418,
+    "atan_pointer": 41448,
+    "hit_bullet": 41716,
+    "hit_square8": 41653,
+    "hit_square7": 41674,
+    "hit_enemy": 41916,
+    "hit_pellet": 42033,
+    "hit_laser": 42053,
+    "hit_cheeto": 42116,
+    "hit_firewave": 42142,
+    "hit_boss": 41695,
+    "publish": 42556,
+    "rescue_tick": 42528,
+    "ghosts_render": 42974,
+    "out_flags": 47788,
+    "rescue_progress": 47791,
+    "invincible": 47797,
+    "stats": 47799,
+    "p2_overflow": 47784,
+    "hit_counts": 47811,
+    "target_counts": 47817,
+    "restart_players": 40529,
+    "p2_check": 41503,
+    "hit_wall_left": 42257,
+    "hit_wall_right": 42327,
+    "aim_x_one": 41489,
+    "aim_x_two": 41496,
+    "hud_hook": 41246,
+    "laser_test": 42078,
+    "run_config": 49861,
+    "configure_players": 50117,
+    "assets_load": 50341,
+    "bft_pointer": 50109,
+    "tiny_pointer": 50113,
+    "shot_tag": 50586,
+    "shot_draw": 50642,
+    "hit_draw": 50654,
+    "hit_tag": 50741,
+    "damage_begin": 50775,
+    "damage_add": 50802,
+    "damage_bomb": 50836,
+    "bomb_character": 50844,
+    "damage_finish": 50865,
+    "shot_owners": 49879,
+    "p2_character": 49873,
+    "item_hittest": 51836,
+    "item_award_leave": 51924,
+    "item_team_1up": 51944,
+    "item_aim": 52086,
+    "item_sound_pointer": 51785,
+    "item_pickups": 51773,
+    "item_team_bomb": 52037,
+    "touch_state": 52203,
+    "touch_move": 52227,
+    "player_count": 49872,
+    "guest_slot": 48647,
+    "p3_input": 48648,
+    "p3_focus": 48650,
+    "p3_xy": 48651,
+    "p3_state": 48655,
+    "p3_resources": 48697,
+    "p3_shots": 48699,
+    "p3_overflow": 48703,
+    "p3_character": 48705,
+    "p3_patterns": 48710,
+    "rescue_target": 48806,
+    "bind_player": 49162,
+    "guest_bank": 48849,
+    "guest_patterns": 49973,
+    "guest_cdg": 50053,
+    "p3_bb": 48708,
+    "p3_bomb_func": 48706,
+    "assets_ready": 49878,
+    "heap_config": 48625,
+    "personal_stats": 52629,
+    "personal_bonus": 52725,
+    "power_fraction": 52738,
+    "hit_weights": 52744,
+    "hit_owner": 52750,
+    "stats_frame": 53781,
+    "stats_restart": 52931,
+    "stats_stage_reset": 53041,
+    "stats_damage_award": 53526,
+    "stats_active_add": 53278,
+    "stats_kill_add": 53290,
+    "stats_kill_550": 53302,
+    "stats_kill_100": 53317,
+    "stats_clear_big": 53332,
+    "stats_clear_small": 53347,
+    "stats_clear_add": 53362,
+    "stats_world_add": 53381,
+    "stats_stage_bonus": 53957,
+    "stats_allclear_bonus": 53963,
+    "stats_damage_second_begin": 53487,
+    "stats_damage_second_add": 53497,
+    "power_pickup_bonus": 54516,
+    "boss_main_damage": 54351,
+    "boss_other_damage": 54366,
+    "boss_mid_damage": 54381,
+    "boss_balance": 54327,
+    "stats_world_dream_grow": 53678,
+    "stats_world_dream_drop": 53729,
+    "native_pause_hook": 54621,
+    "native_pause_state": 54620
+  },
+  "hooks": [
+    {
+      "name": "stage_init",
+      "image_offset": 45833,
+      "expected": "e84e02",
+      "entry": 40367
+    },
+    {
+      "name": "native_pause",
+      "image_offset": 44747,
+      "expected": "e86907",
+      "entry": 54621
+    },
+    {
+      "name": "player_update",
+      "image_offset": 44793,
+      "expected": "e8411d",
+      "entry": 40964
+    },
+    {
+      "name": "player_render",
+      "image_offset": 44859,
+      "expected": "e8181e",
+      "entry": 41223
+    },
+    {
+      "name": "stage_lifecycle",
+      "image_offset": 44684,
+      "expected": "e81700",
+      "entry": 40344
+    },
+    {
+      "name": "last_life",
+      "image_offset": 52277,
+      "expected": "e8240c",
+      "entry": 41048
+    },
+    {
+      "name": "player_invalidate",
+      "image_offset": 48468,
+      "expected": "e8630c",
+      "entry": 41257
+    },
+    {
+      "name": "laser_test",
+      "image_offset": 76819,
+      "expected": "e8b0aa",
+      "entry": 42078
+    },
+    {
+      "name": "laser_test",
+      "image_offset": 76880,
+      "expected": "e873aa",
+      "entry": 42078
+    },
+    {
+      "name": "assets_load",
+      "image_offset": 46028,
+      "expected": "e8c009",
+      "entry": 50341
+    },
+    {
+      "name": "heap_config",
+      "image_offset": 44610,
+      "expected": "c70624081847",
+      "entry": 48625
+    },
+    {
+      "name": "touch_move",
+      "image_offset": 52442,
+      "expected": "e8f5fd",
+      "entry": 52227
+    },
+    {
+      "name": "shot_tag",
+      "image_offset": 58272,
+      "expected": "c7070100",
+      "entry": 50586
+    },
+    {
+      "name": "shot_draw",
+      "image_offset": 79293,
+      "expected": "e8bc8a",
+      "entry": 50642
+    },
+    {
+      "name": "hit_draw",
+      "image_offset": 79358,
+      "expected": "e87b8a",
+      "entry": 50654
+    },
+    {
+      "name": "hit_tag",
+      "image_offset": 79429,
+      "expected": "c60401",
+      "entry": 50741
+    },
+    {
+      "name": "damage_begin",
+      "image_offset": 79533,
+      "expected": "33f6c646f500",
+      "entry": 50775
+    },
+    {
+      "name": "damage_add",
+      "image_offset": 79598,
+      "expected": "03f0fe064ec6",
+      "entry": 50802
+    },
+    {
+      "name": "damage_bomb",
+      "image_offset": 79652,
+      "expected": "803e064200",
+      "entry": 50836
+    },
+    {
+      "name": "bomb_character",
+      "image_offset": 79699,
+      "expected": "803e735701",
+      "entry": 50844
+    },
+    {
+      "name": "damage_finish",
+      "image_offset": 79757,
+      "expected": "803ec01d007436803e7357007607803e735703724f803e6e5706750eb80500f7ee8bf08bc6c1e802eb4a803e7357007545b80800f7ee8bf0bb0700eb31803e6e57067519803e7357007512b80400f7ee8bf0bb05008bc633d2f7f38bf0803e7357037512b80400f7ee8bf0bb05008bc633d2f7f38bf0",
+      "entry": 50865
+    },
+    {
+      "name": "stats_damage_second_begin",
+      "image_offset": 79932,
+      "expected": "33ffc646f500",
+      "entry": 53487
+    },
+    {
+      "name": "stats_damage_second_add",
+      "image_offset": 79997,
+      "expected": "03f8fe064ec6",
+      "entry": 53497
+    },
+    {
+      "name": "stats_frame",
+      "image_offset": 44906,
+      "expected": "e80c16",
+      "entry": 53781
+    },
+    {
+      "name": "stats_damage_award",
+      "image_offset": 79879,
+      "expected": "6601061237",
+      "entry": 53526
+    },
+    {
+      "name": "stats_damage_award",
+      "image_offset": 80089,
+      "expected": "6601061237",
+      "entry": 53526
+    },
+    {
+      "name": "stats_kill_add",
+      "image_offset": 93442,
+      "expected": "6601061237",
+      "entry": 53290
+    },
+    {
+      "name": "stats_kill_550",
+      "image_offset": 99614,
+      "expected": "668106123726020000",
+      "entry": 53302
+    },
+    {
+      "name": "stats_clear_big",
+      "image_offset": 115014,
+      "expected": "668306123764",
+      "entry": 53332
+    },
+    {
+      "name": "stats_clear_small",
+      "image_offset": 115022,
+      "expected": "66830612370a",
+      "entry": 53347
+    },
+    {
+      "name": "stats_active_add",
+      "image_offset": 115479,
+      "expected": "6601061237",
+      "entry": 53278
+    },
+    {
+      "name": "stats_clear_add",
+      "image_offset": 115734,
+      "expected": "6601061237",
+      "entry": 53362
+    },
+    {
+      "name": "stats_world_add",
+      "image_offset": 116063,
+      "expected": "6601061237",
+      "entry": 53381
+    },
+    {
+      "name": "stats_world_add",
+      "image_offset": 116170,
+      "expected": "6601061237",
+      "entry": 53381
+    },
+    {
+      "name": "stats_stage_bonus",
+      "image_offset": 117187,
+      "expected": "6601061237",
+      "entry": 53957
+    },
+    {
+      "name": "stats_allclear_bonus",
+      "image_offset": 117766,
+      "expected": "6601061237",
+      "entry": 53963
+    },
+    {
+      "name": "stats_active_add",
+      "image_offset": 118807,
+      "expected": "6601061237",
+      "entry": 53278
+    },
+    {
+      "name": "stats_kill_100",
+      "image_offset": 123284,
+      "expected": "668306123764",
+      "entry": 53317
+    },
+    {
+      "name": "stats_world_dream_grow",
+      "image_offset": 93715,
+      "expected": "803ef636807309fe06f6369abd23e10a",
+      "entry": 53678
+    },
+    {
+      "name": "stats_world_dream_drop",
+      "image_offset": 118916,
+      "expected": "803ef636017618803ef636807311fe0ef636",
+      "entry": 53729
+    },
+    {
+      "name": "power_pickup_bonus",
+      "image_offset": 118280,
+      "expected": "8a450eb4008bd8",
+      "entry": 54516
+    },
+    {
+      "name": "boss_main_damage",
+      "image_offset": 129763,
+      "expected": "b4002906c65a",
+      "entry": 54351
+    },
+    {
+      "name": "boss_mid_damage",
+      "image_offset": 96328,
+      "expected": "b4002906de5a",
+      "entry": 54381
+    },
+    {
+      "name": "boss_other_damage",
+      "image_offset": 89112,
+      "expected": "b4002906b25a",
+      "entry": 54366
+    },
+    {
+      "name": "boss_other_damage",
+      "image_offset": 89711,
+      "expected": "b4002906b25a",
+      "entry": 54366
+    },
+    {
+      "name": "boss_other_damage",
+      "image_offset": 89847,
+      "expected": "b4002906b25a",
+      "entry": 54366
+    },
+    {
+      "name": "boss_other_damage",
+      "image_offset": 90852,
+      "expected": "b4002906b25a",
+      "entry": 54366
+    },
+    {
+      "name": "boss_other_damage",
+      "image_offset": 91816,
+      "expected": "b4002906b25a",
+      "entry": 54366
+    },
+    {
+      "name": "boss_other_damage",
+      "image_offset": 92603,
+      "expected": "b4002906b25a",
+      "entry": 54366
+    },
+    {
+      "name": "boss_other_damage",
+      "image_offset": 114128,
+      "expected": "b4002906b25a",
+      "entry": 54366
+    },
+    {
+      "name": "bomb_start",
+      "image_offset": 64162,
+      "expected": "c606064201",
+      "entry": 41099
+    },
+    {
+      "name": "bomb_render",
+      "image_offset": 44841,
+      "expected": "ff160842",
+      "entry": 41124
+    },
+    {
+      "name": "hud_hook",
+      "image_offset": 44902,
+      "expected": "ff16c04a",
+      "entry": 41246
+    },
+    {
+      "name": "item_hittest",
+      "image_offset": 119117,
+      "expected": "803ef4360075308b1ed23681c3800129c381fb000377208b1ed43681c3800129d381fb60027710",
+      "entry": 51836
+    },
+    {
+      "name": "item_award_leave",
+      "image_offset": 119160,
+      "expected": "6a0b9a3202ab14",
+      "entry": 51924
+    },
+    {
+      "name": "item_team_1up",
+      "image_offset": 118738,
+      "expected": "fe06d44a9a2522e10a",
+      "entry": 51944
+    },
+    {
+      "name": "item_team_bomb",
+      "image_offset": 118717,
+      "expected": "fe06d54abe6400",
+      "entry": 52037
+    },
+    {
+      "name": "item_aim",
+      "image_offset": 119006,
+      "expected": "a1d4362b440450a1d2362b4402509a3a1f0000",
+      "entry": 52086
+    },
+    {
+      "name": "bomb_x",
+      "image_offset": 79735,
+      "expected": "a1d236",
+      "entry": 41163
+    },
+    {
+      "name": "bomb_y",
+      "image_offset": 79746,
+      "expected": "a1d436",
+      "entry": 41193
+    },
+    {
+      "name": "hit_wall_left",
+      "image_offset": 72715,
+      "expected": "a1d436bb1000",
+      "entry": 42257
+    },
+    {
+      "name": "hit_wall_right",
+      "image_offset": 72782,
+      "expected": "a1d436bb1000",
+      "entry": 42327
+    },
+    {
+      "name": "hit_bullet",
+      "image_offset": 115369,
+      "expected": "2b06d2362b16d436",
+      "entry": 41716
+    },
+    {
+      "name": "hit_square8",
+      "image_offset": 99493,
+      "expected": "2b06d2362b16d436",
+      "entry": 41653
+    },
+    {
+      "name": "hit_square8",
+      "image_offset": 108931,
+      "expected": "2b06d2362b16d436",
+      "entry": 41653
+    },
+    {
+      "name": "hit_square8",
+      "image_offset": 109360,
+      "expected": "2b06d2362b16d436",
+      "entry": 41653
+    },
+    {
+      "name": "hit_square7",
+      "image_offset": 126555,
+      "expected": "2b06d2362b16d436",
+      "entry": 41674
+    },
+    {
+      "name": "hit_boss",
+      "image_offset": 130393,
+      "expected": "2b06d2362b16d436",
+      "entry": 41695
+    },
+    {
+      "name": "hit_enemy",
+      "image_offset": 93239,
+      "expected": "8b44022b06d236",
+      "entry": 41916
+    },
+    {
+      "name": "hit_enemy",
+      "image_offset": 123182,
+      "expected": "8b44022b06d236",
+      "entry": 41916
+    },
+    {
+      "name": "hit_pellet",
+      "image_offset": 95243,
+      "expected": "2b06d236054000",
+      "entry": 42033
+    },
+    {
+      "name": "hit_cheeto",
+      "image_offset": 108814,
+      "expected": "8b41022b06d236",
+      "entry": 42116
+    },
+    {
+      "name": "hit_firewave",
+      "image_offset": 124655,
+      "expected": "a1d2362b06f6b3",
+      "entry": 42142
+    },
+    {
+      "name": "aim_x_one",
+      "image_offset": 106734,
+      "expected": "a1d236a39a19",
+      "entry": 41489
+    },
+    {
+      "name": "aim_x_two",
+      "image_offset": 113345,
+      "expected": "a1d236a3a45a",
+      "entry": 41496
+    },
+    {
+      "name": "aim_hook",
+      "image_offset": 94685,
+      "expected": "9a3a1f0000",
+      "entry": 41418
+    },
+    {
+      "name": "aim_hook",
+      "image_offset": 97177,
+      "expected": "9a3a1f0000",
+      "entry": 41418
+    },
+    {
+      "name": "aim_hook",
+      "image_offset": 97269,
+      "expected": "9a3a1f0000",
+      "entry": 41418
+    },
+    {
+      "name": "aim_hook",
+      "image_offset": 114498,
+      "expected": "9a3a1f0000",
+      "entry": 41418
+    },
+    {
+      "name": "aim_hook",
+      "image_offset": 124874,
+      "expected": "9a3a1f0000",
+      "entry": 41418
+    }
+  ],
+  "performance_hooks": [
+    {
+      "image_offset": 48603,
+      "original": "b90800268b0426890583c65083c750e2f281ef8002",
+      "replacement": "e9e3b7909090909090909090909090909090909090",
+      "target_cs_offset": 51121,
+      "name": "fixed eight-row EGC tile copy; original read/write order"
+    },
+    {
+      "image_offset": 49396,
+      "original": "add3c88af022c226890532c674042688450283c750fecd75e7",
+      "replacement": "e934b590909090909090909090909090909090909090909090",
+      "target_cs_offset": 51227,
+      "name": "16x16 even four-row blit; equivalent SHRD rotation"
+    },
+    {
+      "image_offset": 49500,
+      "original": "add3c88af022c226880532c686e02689450183c750fecd75e7",
+      "replacement": "e94eb590909090909090909090909090909090909090909090",
+      "target_cs_offset": 51357,
+      "name": "16x16 odd four-row blit; equivalent SHRD rotation"
+    },
+    {
+      "image_offset": 49080,
+      "original": "e8550075fb",
+      "replacement": "e974b79090",
+      "target_cs_offset": 51487,
+      "name": "32x32 even inline cloud rows"
+    },
+    {
+      "image_offset": 49126,
+      "original": "e8590075fb",
+      "replacement": "e97bb79090",
+      "target_cs_offset": 51540,
+      "name": "32x32 odd inline cloud rows"
+    },
+    {
+      "image_offset": 48762,
+      "original": "ad0ae47405268905eb070ac0740326880583c750e2ea",
+      "replacement": "e925b990909090909090909090909090909090909090",
+      "target_cs_offset": 51602,
+      "name": "spark four-row blit"
+    },
+    {
+      "image_offset": 50033,
+      "original": "a583c74ee2fa",
+      "replacement": "e9a4b4909090",
+      "target_cs_offset": 51720,
+      "name": "point-bullet full six-row blit"
+    }
+  ],
+  "changed_files": [
+    "COOP.COM",
+    "KAIKI/GAME.BAT",
+    "KAIKI/MAIN.EXE"
+  ],
+  "mailbox_offsets": {
+    "out_flags": 92,
+    "rescue_progress": 95,
+    "invincible": 101,
+    "stats": 103,
+    "p2_overflow": 88,
+    "hit_counts": 115,
+    "target_counts": 121,
+    "p3_input": 952,
+    "p3_focus": 954,
+    "p3_xy": 955,
+    "p3_state": 959,
+    "p3_resources": 1001,
+    "p3_shots": 1003,
+    "p3_overflow": 1007,
+    "player_count": 2176,
+    "rescue_target": 1110
+  },
+  "launch_config": {
+    "defaults": [
+      1,
+      1,
+      0,
+      3,
+      3,
+      1,
+      3,
+      3,
+      2,
+      3,
+      3,
+      2
+    ],
+    "targets": [
+      [
+        334865,
+        334866,
+        334867,
+        334868,
+        334869,
+        334870,
+        334871,
+        334872,
+        334873,
+        334874,
+        334875,
+        334876
+      ],
+      [
+        10665285,
+        10665286,
+        10665287,
+        10665288,
+        10665289,
+        10665290,
+        10665291,
+        10665292,
+        10665293,
+        10665294,
+        10665295,
+        10665296
+      ]
+    ]
+  },
+  "touch": {
+    "stride": 8,
+    "players": 3,
+    "native_movement_hook": 52442
+  },
+  "stage": "local-independent-characters",
+  "personal_stats": {
+    "cs_offset": 52629,
+    "stride": 32,
+    "score": 0,
+    "high_score": 4,
+    "stage_point": 8,
+    "extend_point": 10,
+    "dream": 12,
+    "dream_count": 13,
+    "graze": 14,
+    "total_items": 16,
+    "total_point": 18,
+    "max_point": 20,
+    "point_extends": 22,
+    "score_extends": 23,
+    "misses": 24,
+    "bombs": 26,
+    "stage_miss_start": 28,
+    "stage_bomb_start": 30,
+    "bonus_cs_offset": 52725,
+    "extends": [
+      3000000,
+      8000000,
+      15000000,
+      22000000,
+      30000000
+    ],
+    "score_cap": 99999999
+  },
+  "balance": {
+    "score": {
+      "2": 1.5,
+      "3": 2.2
+    },
+    "boss_hp": {
+      "2": 1.5,
+      "3": 2.2
+    },
+    "power": {
+      "2": 1.5,
+      "3": 2
+    },
+    "power_cap": 128,
+    "boss_method": "final damage with per-phase remainder"
+  },
+  "items": {
+    "player_count": 3,
+    "pickup_counts": 51773,
+    "owner_priority": "first eligible canonical seat, one award per item",
+    "power": "collector only",
+    "bomb": "living seats only; retired teammates excluded; 99 cap",
+    "one_up": "all seats; retired teammate revives; 100 total lives cap",
+    "point_dream_score": "independent logical-seat counters",
+    "hud_power_pattern": 36
+  },
+  "limitations": [
+    "one original Bomb effect at a time; stocks independent"
+  ]
+}
