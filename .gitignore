@@ -137,3 +137,5 @@ th04-network-fault.json
 !/tools/measure_usb_phone_room.cjs
 !/tools/build_idle_loop_candidate.mjs
 !/tools/test_idle_instruction_parity.cjs
+!/tools/test_prediction_pacing.cjs
+!/联机同时操作卡顿优化记录.md

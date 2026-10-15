@@ -506,7 +506,9 @@ async function receivedSignal({from,message}){
   }else throw Error('未知信令');
 }
 async function beginGame(){
-  inputPolicy=Object.freeze({inputDelay:0,directionPrediction:useRelay?6:3,rollbackEnabled:state.settings.rollback});
+  // Six steps cover a slow peer's input delivery without the old twelve-step
+  // speculative tail. Real input still corrects a predicted release immediately.
+  inputPolicy=Object.freeze({inputDelay:0,directionPrediction:6,rollbackEnabled:state.settings.rollback});
   bootStartedAt=performance.now();
   if(!useRelay&&!window.RTCPeerConnection)throw Error('请使用新版 Chrome 或 Edge');
   connectionConfigPending=true;
@@ -650,6 +652,14 @@ function captureLocalInput(){
   pendingAction=0;captureTimes.set(captured.frame,performance.now());broadcast(captured);return true;
 }
 function nextInputs(){
+  // Do not let the faster peer speculate beyond the direction predictor's
+  // useful horizon. Otherwise a held direction expires and every arriving
+  // input invalidates a long tail. Keep the full rollback history unchanged.
+  const leadLimit=Math.max(1,queue.directionPrediction);
+  if(queue.active&&queue.frame>=queue.confirmed+leadLimit){
+    waitDetail=`等待对端输入 · 预测领先 ${queue.frame-queue.confirmed}/${leadLimit} 步`;
+    return null;
+  }
   const allowed=runtime.canPredict(),pair=queue.peek(allowed);
   if(pair){waitDetail='';return pair;}
   const missing=queue.inputs.flatMap((lane,slot)=>queue.isOffline(slot,queue.frame)||lane.has(queue.frame)?[]:[`P${slot+1}`]);

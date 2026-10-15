@@ -24,7 +24,7 @@ function stats(values){const sorted=[...values].sort((a,b)=>a-b);return {count:v
 async function state(page){return page.evaluate(()=>usbRoomQA.read());}
 async function observe(page,label){
  page.on('pageerror',e=>errors.push({label,message:e.message}));
- await page.route('**/netplay/room.js',async r=>{const response=await r.fetch();await r.fulfill({response,body:await response.text()+roomProbe});});
+ await page.route('**/netplay/room.js',async r=>{const response=await r.fetch();const source=process.env.ROOM_SOURCE?fs.readFileSync(path.resolve(root,process.env.ROOM_SOURCE),'utf8'):await response.text();await r.fulfill({response,body:source+roomProbe});});
  await page.route('**/netplay/runtime.js',async r=>{const response=await r.fetch();await r.fulfill({response,body:await response.text()+runtimeProbe});});
 }
 async function press(page,key){await page.keyboard.press(key,{delay:60});}
@@ -55,10 +55,11 @@ async function run(rollback){
  await pause(3000);for(const p of pages)await p.evaluate(()=>usbRoomQA.begin());
  const start=await Promise.all(pages.map(state)),samples=[];
  for(let i=0;i<seconds;i++){
+  if(process.env.BOTH_MOVE==='1')for(const p of pages){await p.keyboard.up('ArrowLeft');await p.keyboard.up('ArrowRight');await p.keyboard.down(i%2?'ArrowLeft':'ArrowRight');}
   // Ordinary short direction changes exercise actual input prediction. No
   // injected packet delays, skipped stages, invulnerability or CPU throttling.
-  if(i%5===1)await phonePage.keyboard.down(i%10<5?'ArrowRight':'ArrowLeft');
-  if(i%5===2){await phonePage.keyboard.up('ArrowRight');await phonePage.keyboard.up('ArrowLeft');}
+  if(process.env.BOTH_MOVE!=='1'&&i%5===1)await phonePage.keyboard.down(i%10<5?'ArrowRight':'ArrowLeft');
+  if(process.env.BOTH_MOVE!=='1'&&i%5===2){await phonePage.keyboard.up('ArrowRight');await phonePage.keyboard.up('ArrowLeft');}
   await pause(1000);const values=await Promise.all(pages.map(state));
   for(const s of values)assert(s.running&&!s.stopped,s.stopReason);
   samples.push(values);if(i%5===4)console.log('SAMPLE',rollback,i+1,values.map(s=>({stepHz:s.hz,ms:s.averageCost,frame:s.frame,game:s.game.gameFrame,rollbacks:s.rollbacks})));
@@ -69,17 +70,17 @@ async function run(rollback){
  for(const [tick,hash]of common)assert.deepEqual(end[1].hashes.find(([other])=>other===tick)[1],hash,'desktop and phone confirmed state');
  const summary=pages.map((p,i)=>{const elapsed=(end[i].time-start[i].time)/1000;return {device:i?(process.env.DEVICE||'Redmi K70, real USB-connected Edge'):'desktop Edge headless',seconds:elapsed,syncHz:(end[i].frame-start[i].frame)/elapsed,gameHz:(end[i].game.gameFrame-start[i].game.gameFrame)/elapsed,drawHz:(end[i].render.drawn-start[i].render.drawn)/elapsed,canvasHz:(end[i].render.canvasSubmitted-start[i].render.canvasSubmitted)/elapsed,rollbacks:end[i].rollbacks-start[i].rollbacks,replayed:end[i].replayed-start[i].replayed,waitingSampleFraction:end[i].wait.waiting/Math.max(1,end[i].wait.samples),hiddenSamples:end[i].wait.hidden,metrics:Object.fromEntries(Object.entries(probes[i].metrics).map(([key,v])=>[key,stats(v)])),heap:probes[i].heap,engine:probes[i].environment,audio:probes[i].audio,render:end[i].render,snapshot:end[i].info,rttMeanMs:samples.reduce((sum,v)=>sum+(Number(/往返 ([\d.]+) ms/.exec(v[i].details)?.[1])||0),0)/samples.length};});
  await phonePage.screenshot({path:path.join(root,`reports/${process.env.DEVICE_TAG||'k70'}-room-${rollback?'rollback':'lockstep'}.png`)});
- const result={rollback,transport:'WebRTC over local LAN; page served over LAN; USB carries debugging',language:'cn',difficulty:'Normal',players:2,stage:'ordinary beginning of stage 1, both firing, phone changing directions',bootSeconds,summary,start,end,samples,commonChecksums:common,paths,errors:[...errors]};
+ const result={rollback,transport:'WebRTC over local LAN; page served over LAN; USB carries debugging',language:'cn',difficulty:'Normal',players:2,stage:process.env.BOTH_MOVE==='1'?'ordinary beginning of stage 1, both firing and changing directions':'ordinary beginning of stage 1, both firing, phone changing directions',bootSeconds,summary,start,end,samples,commonChecksums:common,paths,errors:[...errors]};
  results.push(result);fs.writeFileSync(output,JSON.stringify({schema:'th04-real-usb-phone-room/1',commit:process.env.REVISION||'1a55f37',browser:phone.version(),recordedAt:new Date().toISOString(),results,limitations:'Short stage-1 test; does not establish dense-stage, full-session, other-device or physical-screen refresh performance.'},null,2));
  console.log('RESULT',JSON.stringify({rollback,summary,paths}));
- for(const p of pages)await p.click('#leave').catch(()=>{});await pause(500);
+ for(const p of [...pages].reverse())await p.evaluate(()=>usbRoomQA.stop());await pause(500);
 }
 (async()=>{
  phone=await chromium.connectOverCDP('http://127.0.0.1:9224');
  const context=phone.contexts()[0];phonePage=await context.newPage();
  desktop=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});host=await desktop.newPage();
  await observe(host,'desktop');await observe(phonePage,'phone');
- console.log('CONNECTED',phone.version());await run(false);if(process.env.ONLY_LOCKSTEP!=='1')await run(true);assert.deepEqual(errors,[]);console.log('PASS real device LAN measurements');
+ console.log('CONNECTED',phone.version());if(process.env.ONLY_ROLLBACK!=='1')await run(false);if(process.env.ONLY_LOCKSTEP!=='1')await run(true);assert.deepEqual(errors,[]);console.log('PASS real device LAN measurements');
 })().catch(async error=>{console.error(error.stack);for(const p of [host,phonePage])if(p)console.error('FAIL STATE',await state(p).catch(()=>null));fs.writeFileSync(output,JSON.stringify({failure:String(error),results,errors},null,2));process.exitCode=1;}).finally(async()=>{
  for(const p of [host,phonePage])if(p&&!p.isClosed()){await p.evaluate(()=>globalThis.usbRoomQA?.stop()).catch(()=>{});await p.unrouteAll({behavior:'ignoreErrors'}).catch(()=>{});}
  if(desktop)await desktop.close();if(phonePage&&!phonePage.isClosed())await phonePage.close();
