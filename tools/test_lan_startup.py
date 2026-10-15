@@ -40,7 +40,7 @@ def main():
         api('start', h, 409)
         api('settings', {**g, 'settings': {'language': 'cn', 'difficulty': 3, 'clock': 8, 'rollback': True, 'focusEnabled': False, 'touchUnlimitedAllowed': False}}, 403)
         api('ready', h); api('ready', g)
-        settings = {'language': 'cn', 'difficulty': 3, 'clock': 8, 'rollback': True, 'focusEnabled': False, 'touchUnlimitedAllowed': False, 'hostSeat': 1}
+        settings = {'language': 'cn', 'difficulty': 3, 'clock': 32, 'rollback': True, 'focusEnabled': False, 'touchUnlimitedAllowed': False, 'hostSeat': 1}
         api('settings', {**g, 'settings': settings}, 403)
         for invalid_seat in (-1, 2, True, '1', None):
             api('settings', {**h, 'settings': {**settings, 'hostSeat': invalid_seat}}, 400)
@@ -67,23 +67,42 @@ def main():
                 async with websockets.connect(url({**h, 'token': 'invalid'}, 'host'), origin=base):
                     raise AssertionError('Invalid relay identity accepted')
             except websockets.exceptions.InvalidStatus: pass
-            async with websockets.connect(url(h, 'host'), origin=base) as a, websockets.connect(url(g, 'guest'), origin=base) as b:
-                assert json.loads(await a.recv())['type'] == 'ready'
-                assert json.loads(await b.recv())['type'] == 'ready'
-                packet = {'type': 'input', 'seq': 7, 'actions': ['up', 'focus'],
-                          'touch': 2**42 + 2**41 + 2**40 + 160 * 4096 + 16304 * 2**26}
-                await a.send(json.dumps(packet)); assert json.loads(await asyncio.wait_for(b.recv(), 3)) == packet
-                packet = {'type': 'input', 'seq': 8, 'actions': []}
-                await b.send(json.dumps(packet)); assert json.loads(await asyncio.wait_for(a.recv(), 3)) == packet
-                for packet in [
-                    {'sync': 'th03-rollback/1', 'type': 'rollback', 'frame': 120},
-                    {'sync': 'th03-rollback/1', 'type': 'sync-ready', 'identity': {'disk': 'same'}},
-                    {'sync': 'th03-rollback/1', 'type': 'frame', 'frame': 4,
-                     'input': {'actions': ['shot', 'rapid'], 'touch': 0, 'focusEnabled': True, 'points': False, 'commands': ['pause']}},
-                    {'sync': 'th03-rollback/1', 'type': 'check', 'frame': 120, 'hash': 'abc123'},
-                ]:
-                    await a.send(json.dumps(packet)); assert json.loads(await asyncio.wait_for(b.recv(), 3)) == packet
-                await b.close(); assert json.loads(await asyncio.wait_for(a.recv(), 3))['type'] == 'peer-left'
+            for first_role in ('host', 'guest'):
+                second_role = 'guest' if first_role == 'host' else 'host'
+                identities = {'host': h, 'guest': g}
+                async with websockets.connect(url(identities[first_role], first_role), origin=base) as first:
+                    # A lone authenticated connection must wait for its peer.
+                    try:
+                        early = await asyncio.wait_for(first.recv(), 0.2)
+                    except asyncio.TimeoutError: pass
+                    else: raise AssertionError(f'{first_role} received a message before peer joined: {early}')
+                    async with websockets.connect(url(identities[first_role], first_role), origin=base) as duplicate:
+                        assert json.loads(await asyncio.wait_for(duplicate.recv(), 3))['type'] == 'error'
+                    async with websockets.connect(url(identities[second_role], second_role), origin=base) as second:
+                        peers = {first_role: first, second_role: second}
+                        sync = {'sync': 'th03-rollback/5', 'type': 'sync-ready', 'identity': {'disk': 'same'}}
+                        async def synchronize(role):
+                            peer = peers[role]
+                            assert json.loads(await asyncio.wait_for(peer.recv(), 3)) == {'type': 'ready', 'role': role}
+                            # Match the client: send immediately when ready arrives.
+                            await peer.send(json.dumps(sync))
+                            assert json.loads(await asyncio.wait_for(peer.recv(), 3)) == sync
+                        await asyncio.gather(synchronize('host'), synchronize('guest'))
+                        a, b = peers['host'], peers['guest']
+                        packet = {'type': 'input', 'seq': 7, 'actions': ['up', 'focus'],
+                                  'touch': 2**42 + 2**41 + 2**40 + 160 * 4096 + 16304 * 2**26}
+                        await a.send(json.dumps(packet)); assert json.loads(await asyncio.wait_for(b.recv(), 3)) == packet
+                        packet = {'type': 'input', 'seq': 8, 'actions': []}
+                        await b.send(json.dumps(packet)); assert json.loads(await asyncio.wait_for(a.recv(), 3)) == packet
+                        for packet in [
+                            {'sync': 'th03-rollback/5', 'type': 'rollback', 'frame': 120},
+                            {'sync': 'th03-rollback/5', 'type': 'frame', 'frame': 4,
+                             'input': {'actions': ['shot', 'rapid'], 'touch': 0, 'focusEnabled': True, 'points': False, 'commands': ['pause']}},
+                            {'sync': 'th03-rollback/5', 'type': 'check', 'frame': 120, 'hash': 'abc123'},
+                        ]:
+                            await a.send(json.dumps(packet)); assert json.loads(await asyncio.wait_for(b.recv(), 3)) == packet
+                        await second.close()
+                        assert json.loads(await asyncio.wait_for(first.recv(), 3))['type'] == 'peer-left'
         asyncio.run(relay())
         api('leave', g); state = api('ready', h)
         assert not state['present']['guest'] and not state['started']
@@ -104,7 +123,7 @@ def main():
         assert custom_guest['state']['settings'] == settings, 'Guests must see restored settings on first join'
         for invalid in (None, {}, {**settings, 'clock': True}, {**settings, 'rollback': 'true'}, {**settings, 'extra': 1}):
             api('create', {'mode': 'relay', 'settings': invalid}, 400)
-        print('PASS: room readiness, host settings, invalidation, progress barrier, same-port Relay auth/input/release/disconnect, RTC signals')
+        print('PASS: room readiness, host settings, invalidation, progress barrier, Relay auth/paired readiness/both join orders/immediate sync/input/release/disconnect, RTC signals')
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=2)
 

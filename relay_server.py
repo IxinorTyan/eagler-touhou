@@ -104,7 +104,11 @@ def handle(handler, rooms, room_lock, ttl):
             hub = HUBS.setdefault(key, {})
             if role in hub: send({'type': 'error', 'message': '重复连接'}); return
             hub[role] = entry
-        send({'type': 'ready', 'role': role})
+            if 'host' in hub and 'guest' in hub:
+                # Clients send sync-ready as soon as they receive ready. Keep
+                # registration and both notifications atomic with forwarding.
+                for peer_role, peer in hub.items():
+                    peer['send']({'type': 'ready', 'role': peer_role})
         fragments = bytearray(); last_data = time.monotonic()
         while True:
             with room_lock:
