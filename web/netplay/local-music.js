@@ -4,22 +4,29 @@ const MAGIC=new TextEncoder().encode('TH01-MUSIC-v01!!');
 const DRIVER=new TextEncoder().encode('Mdrv2System');
 export class NativeMusic {
   constructor(){this.cursor=0;this.mailbox=-1;this.epoch=0;this.sequences=new Map();this.candidates=[];}
-  valid(heap,at){
+  valid(heap,at,guestBase=null){
     if(at<0||at+24+32*16+2>heap.length||!MAGIC.every((b,i)=>heap[at+i]===b))return false;
     const v=new DataView(heap.buffer),segment=v.getUint16(at+16,true),offset=v.getUint16(at+18,true),base=at-segment*16-offset;
-    if(!segment||v.getUint16(at+22,true)!==1||base<0||base+0xa0000>heap.length)return false;
+    if(!segment||v.getUint16(at+22,true)!==1||base<0||base+0xa0000>heap.length||(guestBase!==null&&base!==guestBase))return false;
     const driver=base+v.getUint16(base+0xf2*4+2,true)*16+0x102;
     return DRIVER.every((b,i)=>heap[driver+i]===b);
   }
-  read(heap){
+  read(heap,guestBase=null){
     const v=new DataView(heap.buffer),out=[];
     // Executable transitions leave stale mailboxes. Scan in bounded chunks and
     // follow whichever validated resident game copy publishes a new sequence.
-    const end=Math.min(heap.length,this.cursor+1024*1024),slice=heap.subarray(this.cursor,Math.min(heap.length,end+MAGIC.length));
+    // DOSBox exposes physical RAM independently of the current executable.
+    // Its mailboxes live in conventional RAM, not in copies of EXEs elsewhere
+    // in the WASM heap. Visit that 640 KiB range in at most ten reads, while
+    // still draining every known mailbox on every step (including silence).
+    const bounded=Number.isInteger(guestBase)&&guestBase>=0&&guestBase+0xa0000<=heap.length;
+    const start=bounded?guestBase:0,limit=bounded?guestBase+0xa0000:heap.length;
+    if(this.cursor<start||this.cursor>=limit)this.cursor=start;
+    const end=Math.min(limit,this.cursor+(bounded?65536:1024*1024)),slice=heap.subarray(this.cursor,Math.min(limit,end+MAGIC.length));
     for(let p=slice.indexOf(MAGIC[0]);p>=0&&this.cursor+p<end;p=slice.indexOf(MAGIC[0],p+1)){
-      const candidate=this.cursor+p;if(this.valid(heap,candidate)&&!this.candidates.includes(candidate))this.candidates.push(candidate);
+      const candidate=this.cursor+p;if(this.valid(heap,candidate,bounded?guestBase:null)&&!this.candidates.includes(candidate))this.candidates.push(candidate);
     }
-    this.cursor=end===heap.length?0:end;this.candidates=this.candidates.filter(at=>this.valid(heap,at));
+    this.cursor=end===limit?start:end;this.candidates=this.candidates.filter(at=>at>=start&&at+538<=limit&&this.valid(heap,at,bounded?guestBase:null));
     for(const at of this.sequences.keys())if(!this.candidates.includes(at))this.sequences.delete(at);
     const newest=this.candidates.reduce((best,at)=>{const epoch=v.getUint16(at+536,true);return ((epoch-best)&65535)<32768&&epoch!==best?epoch:best;},this.epoch);
     if(newest!==this.epoch)this.epoch=newest;

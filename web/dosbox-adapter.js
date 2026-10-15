@@ -29,7 +29,7 @@ export class DOSBoxPC98{
     const queue=[];let receiver;
     const m=this.module={canvas:this.config.canvas,wasmBinary,SDL2:{audioContext:context},
       virtualDate:VirtualDate,virtualNow:0,targetNow:0,deterministic:net,
-      nativeScheduling:true,nativeCpu:true,nativePlanar:false,nativeFramePresentation:false,
+      nativeScheduling:true,nativeCpu:true,nativePlanar:net,nativeFramePresentation:false,
       mobileRuntime:{core:'dosbox-x',cpuCore:'simple',continuation:net?'Asyncify':'JSPI',cycles:net?(this.config.cycles??NETWORK_CYCLES):'auto',idleFusion:false},
       locateFile:f=>new URL(f.endsWith('.wasm')?wasm:f,vendor).href,
       postMessage:(name,props)=>{if(receiver)receiver(name,props);else queue.push([name,props]);},

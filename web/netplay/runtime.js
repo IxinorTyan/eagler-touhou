@@ -47,11 +47,9 @@ export class GameRuntime{
     this.emulator=await DOSBoxPC98.create({canvas:this.canvas,lockstep:true,lockstepEpoch:version.epoch,wasmBinary,
       onError:error=>this.onFailure?.(error),onExit:()=>this.onFailure?.(Error('模拟器已退出'))});
     this.emulator.addDiskImage('th01.hdi',disk);await this.emulator.setHdd(0,'th01.hdi');
-    this.emulator.module.shouldPresentFrame=()=>{
-      const state=this.state(false);
-      if(state&&[1,2].includes(state.phase)&&this.view().getUint16(this.bridge+144,true)!==0)return false;
-      return this.presentation.allow(performance.now(),this.frame);
-    };
+    // The presenter receives complete DOSBox raster frames; a guest drawing
+    // flag describes CPU work, not the validity of that completed RGB buffer.
+    this.emulator.module.shouldPresentFrame=()=>this.presentation.allow(performance.now(),this.frame);
     this.fingerprint=await sha256(new TextEncoder().encode(JSON.stringify({version,disk:meta.sha256,settings,
       selectedWasm:this.emulator.module.mobileRuntime})));
     return this.fingerprint;
@@ -170,7 +168,7 @@ export class GameRuntime{
     // The BGM reader never writes guest state or gates the next simulation tick.
     this.ensureMusic();
     if(!this.musicReaderFailed)try{
-      for(const event of this.nativeMusic.read(m.HEAPU8)){
+      for(const event of this.nativeMusic.read(m.HEAPU8,m.nativeExports().thCoreState(0))){
         if(this.music)this.music.command(event);else{this.musicEvents.push(event);if(this.musicEvents.length>64)this.musicEvents.shift();}
       }
     }catch(error){

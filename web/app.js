@@ -132,16 +132,10 @@ $('start').addEventListener('click',async()=>{
     }
     emulator=await DOSBoxPC98.create({canvas:$('canvas'),onExit:()=>status('模拟器已关闭'),onError:error=>status(error.message)});
     emulator.module.observeLocalFrame=ms=>{perfSamples.push(ms);if(perfSamples.length>240)perfSamples.shift();};
-    emulator.module.shouldPresentFrame=()=>{
-      const allow=()=>presentation.allow(performance.now(),emulator.module.localFrameCount);
-      if(baseline||bridge<0)return allow();
-      const heap=emulator.module.HEAPU8;
-      if(!signature.every((byte,i)=>heap[bridge+i]===byte))return allow();
-      const view=new DataView(heap.buffer);
-      const phase=view.getUint16(bridge+18,true);
-      if((phase===1||phase===2)&&view.getUint16(bridge+144,true)!==0)return false;
-      return allow();
-    };
+    // DOSBox submits completed raster frames. The guest can already be drawing
+    // the next frame at that instant; its old NP21 busy flag can suppress every
+    // submission on a slow device. Limit presentation by completed submissions.
+    emulator.module.shouldPresentFrame=()=>presentation.allow(performance.now(),emulator.module.frameUploads);
     emulator.addDiskImage('th01.hdi',disk);await emulator.setHdd(0,'th01.hdi');emulator.run();
     $('cover').hidden=true;$('setup').hidden=true;$('rank').disabled=true;$('count').disabled=true;
     $('pause').disabled=false;$('restart').disabled=false;$('canvas').focus();

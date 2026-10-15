@@ -4,6 +4,7 @@
 !/.gitattributes
 !/README.md
 !/README-PUBLIC.md
+!/三星平板性能优化记录.md
 !/web/
 !/server.py
 !/lan_server.py
