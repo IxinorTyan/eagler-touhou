@@ -19,7 +19,7 @@ ROLES = ('host', 'guest', 'guest2')
 TTL = 60
 ALLOW_QA = False
 ICE_SERVERS = []
-PROTOCOL = 'th01-lockstep/2'
+PROTOCOL = 'th01-dosbox-lockstep/3'
 
 def settings(value):
     if not isinstance(value, dict): raise ValueError('设置格式无效')
@@ -275,6 +275,7 @@ def main():
     ICE_SERVERS = [{'urls': url} for url in args.stun]
     server = LanHTTPServer((args.bind, args.port), partial(Handler, directory=str(ROOT)))
     print(f'TH01 LAN · http://127.0.0.1:{args.port}/lan.html', flush=True)
+    print(f'Engine: DOSBox-X / PC-98; protocol: {PROTOCOL}', flush=True)
     if ALLOW_QA: print('QA mode: synchronized host test commands enabled.', flush=True)
     print(f'Public UDP: default STUN enabled; TURN {"configured" if TURN_CONFIG_PATH.exists() else "not configured"}.', flush=True)
     print('Public UDP URL: https://YOUR-HOST/lan.html?network=public', flush=True)

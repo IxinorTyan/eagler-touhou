@@ -30,7 +30,7 @@
 
 运行 `configure-turn.bat`，填写 Cloudflare TURN Key ID 和配套的专用 API Token，与 TH03 / TH04 使用同一种格式。本项目独立保存配置，**不会复制其他项目的密钥**。配置在项目根目录 `turn-config.local.json`，不在 `web/`，已加入忽略列表。配置过程不访问提供方；开始连接时才验证账号。已经配置但提供方报错时明确停止并提示原因，可重建 TCP 房间。
 
-浏览器向同源 `/api/ice` POST `{protocol:"th01-lockstep/2",room,token,role}`。服务验证房间身份、已经开始的 RTC 房间、角色和请求频率，在房间锁之外取得临时凭据，返回前再次确认房间有效。长期 API Token 不发给浏览器。短期凭据有效 4 小时；接近 4 小时时需结束并重新建房，目前没有局内续期。
+浏览器向同源 `/api/ice` POST `{protocol:"th01-dosbox-lockstep/3",room,token,role}`。当前使用 DOSBox-X 内核，与旧 NP21 版不兼容，全员须更新网页、内核及服务端并重新建房。服务验证房间身份、已经开始的 RTC 房间、角色和请求频率，在房间锁之外取得临时凭据，返回前再次确认房间有效。长期 API Token 不发给浏览器。短期凭据有效 4 小时；接近 4 小时时需结束并重新建房，目前没有局内续期。
 
 随附的 TURN 配置入口使用 Cloudflare 凭据服务。接入自建 coturn 凭据服务需要维护者适配同源认证接口，并重新生成配套的运行清单后成套发布；运行包不包含开发工具。接口须验证房间身份，返回标准 `{iceServers,iceTransportPolicy}`；强制 TURN 房间必须返回 `iceTransportPolicy:"relay"`。永久共享密钥留在服务端，不要直接修改已发布网页绕过资源校验。
 

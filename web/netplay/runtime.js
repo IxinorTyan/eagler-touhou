@@ -1,4 +1,4 @@
-import {NP21} from '../vendor/np2/np2-wasm.js';
+import {DOSBoxPC98} from '../dosbox-adapter.js';
 import {sha256} from './sha256.js';
 import {readCoopState,coopInputOffset} from '../coop.js';
 import {TOUCH_BOMB,readHitRecovery} from '../touch-input.js';
@@ -24,9 +24,11 @@ export class GameRuntime{
     const meta=await (await get('th01-multiorb.json')).json();
     this.touchStateOffsets=meta.touch_state;
     const version=await (await get('netplay/runtime.json')).json();
+    let wasmBinary;
     for(const [name,hash] of Object.entries(version.files)){
       const bytes=new Uint8Array(await (await get(name)).arrayBuffer());
       if(await sha256(bytes)!==hash)throw Error(`运行时校验失败：${name}`);
+      if(name==='vendor/dosbox-x/wdosbox-x-rollback.wasm')wasmBinary=bytes;
     }
     const compressed=await get(meta.url);
     const disk=new Uint8Array(await new Response(compressed.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
@@ -42,11 +44,9 @@ export class GameRuntime{
     if(!lifeConfig)throw Error('游戏镜像需要更新，缺少生命补偿配置');
     disk[lifeConfig.offset]=settings.lifeCompensation?49:48;
     progress('初始化固定时钟模拟器…');
-    this.emulator=await NP21.create({canvas:this.canvas,lockstep:true,lockstepEpoch:version.epoch,
-      clk_base:2457600,clk_mult:settings.count>=6?32:16,ExMemory:7,Latencys:100,
-      SampleHz:44100,SNDboard:4,no_mouse:true,use_menu:false,fontfile:'font.bmp',
-      onExit:()=>this.onFailure?.(Error('模拟器已退出'))});
-    this.emulator.addDiskImage('th01.hdi',disk);this.emulator.setHdd(0,'th01.hdi');
+    this.emulator=await DOSBoxPC98.create({canvas:this.canvas,lockstep:true,lockstepEpoch:version.epoch,wasmBinary,
+      onError:error=>this.onFailure?.(error),onExit:()=>this.onFailure?.(Error('模拟器已退出'))});
+    this.emulator.addDiskImage('th01.hdi',disk);await this.emulator.setHdd(0,'th01.hdi');
     this.emulator.module.shouldPresentFrame=()=>{
       const state=this.state(false);
       if(state&&[1,2].includes(state.phase)&&this.view().getUint16(this.bridge+144,true)!==0)return false;
@@ -111,6 +111,7 @@ export class GameRuntime{
     return base;
   }
   start(){this.emulator.run();}
+  present(){return this.emulator.module.netPresent();}
   setPresentationMode(mode){this.presentation.setMode(mode);}
   stop(){this.stopped=true;this.music?.dispose();this.musicEvents=[];this.emulator?.module.netFlushAudio();this.emulator?.pause();}
   setMusicVolume(value){this.musicVolume=value;this.music?.setVolume(value);}

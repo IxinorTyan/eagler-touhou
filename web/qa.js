@@ -3,7 +3,7 @@
 export function installQA(api){
   const area=document.createElement('div'),report=document.createElement('pre');
   area.className='toolbar';report.id='qa-report';report.textContent='浏览器实测准备就绪。';
-  document.querySelector('details').before(area,report);
+  document.getElementById('player').before(area,report);
   const godLabel=document.createElement('label'),god=document.createElement('input');
   god.type='checkbox';god.id='qa-invincible';god.disabled=api.baseline;
   godLabel.style.cssText='display:flex;align-items:center;gap:8px;';
@@ -89,14 +89,15 @@ export function installQA(api){
     const symbols=await (await fetch('player-draw-symbols.json')).json();
     if(symbols.exe_sha256!==window.th01Lab.manifest.exe_sha256)throw Error('绘制符号与程序不一致');
     const module=api.emulator().module,results=[];let current;
-    module.inspectPresented565=(pixels,pitch)=>{
-      const state=api.state();if(!current||state?.phase!==2||pitch!==1280)return;
+    module.inspectPresentedRGB=(pixels,pitch)=>{
+      const state=api.state();if(!current||state?.phase!==2||pitch!==1920)return;
       const heap=module.HEAPU8,v=new DataView(heap.buffer),bridge=api.bridge();
       const at=name=>bridge+symbols.relative[name];
       const word=p=>v.getUint16(p,true),signed=p=>v.getInt16(p,true);
       if(heap[at('PLAYER_IS_HIT')])return;
       const kind=word(at('PLAYER_DRAW_KIND')),left=signed(at('PLAYER_DRAW_LEFT'))>>3<<3,top=signed(at('PLAYER_DRAW_TOP')),cel=word(at('PLAYER_DRAW_CEL'));
-      const far=p=>symbols.ram_base+word(p)+word(p+2)*16;
+      const ramBase=bridge-word(bridge+218)*16-word(bridge+220);
+      const far=p=>ramBase+word(p)+word(p+2)*16;
       const balls=Array.from({length:word(at('ORB_COUNT'))},(_,i)=>{
         const p=at('ORBS')+i*62;return {x:signed(p),y:signed(p+4),portal:!!word(p+8)};
       });
@@ -113,7 +114,7 @@ export function installQA(api){
         // New orbs legitimately cover the player; don't count their pixels.
         if(balls.some(b=>!b.portal&&xx>=(b.x>>3<<3)&&xx<(b.x>>3<<3)+32&&yy>=b.y&&yy<b.y+32))continue;
         let col=0;for(let i=0;i<4;i++)if(heap[planes[i]+p]&bit)col|=1<<i;
-        const rgb=word(pixels+(yy*640+xx)*2),r=(rgb>>11)*255/31,g=((rgb>>5)&63)*255/63,b=(rgb&31)*255/31;
+        const rgb=pixels+(yy*640+xx)*3,r=heap[rgb],g=heap[rgb+1],b=heap[rgb+2];
         const expected=[heap[palette+col*3]*17,heap[palette+col*3+1]*17,heap[palette+col*3+2]*17];
         const q=(y*width+x)*4;
         actualImage.data.set([r,g,b,255],q);expectedImage.data.set([...expected,255],q);
@@ -149,7 +150,7 @@ export function installQA(api){
         }finally{for(const code of codes)api.key(code,false);}
         results.push(current);report.textContent=JSON.stringify({running:true,results});
       }
-    }finally{delete module.inspectPresented565;}
+    }finally{delete module.inspectPresentedRGB;}
     document.getElementById('qa-player-frames')?.remove();
     const sheet=document.createElement('div');sheet.id='qa-player-frames';report.after(sheet);
     for(const result of results){const line=document.createElement('p'),img=document.createElement('img');line.textContent=result.name+'：最差帧，左实际 / 右动作原图';img.src=result.worst?.src||'';img.style.cssText='image-rendering:pixelated;width:192px';sheet.append(line,img);delete result.worst?.src;}

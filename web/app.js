@@ -1,4 +1,4 @@
-import {NP21} from './vendor/np2/np2-wasm.js';
+import {DOSBoxPC98} from './dosbox-adapter.js';
 import {sha256} from './netplay/sha256.js';
 import {installQA} from './qa.js';
 import {createCoopControls,createCoopFeedback,readCoopState,coopInputOffset} from './coop.js';
@@ -13,7 +13,6 @@ const $=id=>document.getElementById(id);
 const baseline=new URLSearchParams(location.search).get('baseline')==='1';
 const solo=document.body.dataset.page==='solo';
 if(new URLSearchParams(location.search).get('qa')==='1')document.querySelector('.debug-disclosure').open=true;
-const qaClock=new URLSearchParams(location.search).get('qa')==='1'?Number(new URLSearchParams(location.search).get('cpu')):0;
 let emulator,manifest,busy=false;
 const presentation=createPresentationLimiter();
 const pollDue=createFrameGate();let hudAt=-Infinity;
@@ -131,8 +130,7 @@ $('start').addEventListener('click',async()=>{
       if(!lifeConfig)throw Error('游戏镜像需要更新，缺少生命补偿配置');
       disk[lifeConfig.offset]=sessionSettings.lifeCompensation?49:48;
     }
-    const clockMultiplier=[16,24,32].includes(qaClock)?qaClock:(!baseline&&sessionSettings.count>=6?32:16);
-    emulator=await NP21.create({canvas:$('canvas'),clk_base:2457600,clk_mult:clockMultiplier,ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,nativeSoloAudio:true,no_mouse:true,use_menu:false,fontfile:'font.bmp',onExit:()=>status('模拟器已关闭')});
+    emulator=await DOSBoxPC98.create({canvas:$('canvas'),onExit:()=>status('模拟器已关闭'),onError:error=>status(error.message)});
     emulator.module.observeLocalFrame=ms=>{perfSamples.push(ms);if(perfSamples.length>240)perfSamples.shift();};
     emulator.module.shouldPresentFrame=()=>{
       const allow=()=>presentation.allow(performance.now(),emulator.module.localFrameCount);
@@ -144,18 +142,18 @@ $('start').addEventListener('click',async()=>{
       if((phase===1||phase===2)&&view.getUint16(bridge+144,true)!==0)return false;
       return allow();
     };
-    emulator.addDiskImage('th01.hdi',disk);emulator.setHdd(0,'th01.hdi');emulator.run();
+    emulator.addDiskImage('th01.hdi',disk);await emulator.setHdd(0,'th01.hdi');emulator.run();
     $('cover').hidden=true;$('setup').hidden=true;$('rank').disabled=true;$('count').disabled=true;
     $('pause').disabled=false;$('restart').disabled=false;$('canvas').focus();
-    status(baseline?'源码基线运行中':'游戏运行中');
+    status(baseline?'源码基线运行中':'DOSBox-X 游戏运行中');
     updateSessionSettings();
     $('diagnostics').textContent=`模式：${baseline?'源码基线':'多玉'}\n源码：ReC98 debloated ${manifest.upstream.commit}\n编译器：${manifest.compiler}\n程序 SHA-256：${manifest.exe_sha256}\n本次难度：${$('rank').selectedOptions[0].textContent}\n本次玉数：${baseline?1:$('count').value}`;
     window.th01Lab={emulator,manifest};
     requestAnimationFrame(poll);
-  }catch(error){status(error.message);$('start').disabled=false;busy=false;
+  }catch(error){emulator?.dispose();emulator=null;status(error.message);$('start').disabled=false;busy=false;
     $('rank').disabled=false;$('players').disabled=baseline||solo;$('count').disabled=baseline;$('life-compensation').disabled=baseline;$('debug-enabled').disabled=baseline;updateSetup();console.error(error);}
 });
-$('pause').addEventListener('click',()=>{releaseInputs();if(emulator?.state==='running'){emulator.pause();$('pause').textContent='继续模拟器';status('模拟器已暂停');}else if(emulator){emulator.run();$('pause').textContent='暂停模拟器';status('游戏运行中');$('canvas').focus();}});
+$('pause').addEventListener('click',()=>{releaseInputs();if(emulator?.state==='running'){emulator.pause();$('pause').textContent='继续模拟器';status('模拟器已暂停');}else if(emulator){emulator.run();$('pause').textContent='暂停模拟器';status('DOSBox-X 游戏运行中');$('canvas').focus();}});
 $('restart').addEventListener('click',()=>{releaseInputs();location.reload();});
 $('runtime-invincible').addEventListener('change',()=>setInvincible($('runtime-invincible').checked));
 for(let slot=0;slot<3;slot++)$(`test-p${slot+1}-ghost`).addEventListener('click',()=>{
@@ -224,7 +222,7 @@ function poll(now){
     const sorted=perfSamples.slice().sort((a,b)=>a-b);
     const gameHz=state?.phase===2&&perfGame?.phase===2&&perfGame.stage===state.stage&&state.ticks>=perfGame.ticks?(state.ticks-perfGame.ticks)/elapsed:0;
     const presented=emulator.module.presentedFrameCount||0;
-    perfReport={loopHz:(frames-perfFrame)/elapsed,gameHz,presentationHz:(presented-perfPresented)/elapsed,averageMs:perfSamples.length?perfSamples.reduce((a,b)=>a+b,0)/perfSamples.length:0,p95Ms:sorted[Math.floor(sorted.length*.95)]||0,clockMultiplier:emulator.config.clk_mult,runtime:emulator.module.mobileRuntime||'np21.wasm'};
+    perfReport={loopHz:(frames-perfFrame)/elapsed,gameHz,presentationHz:(presented-perfPresented)/elapsed,averageMs:perfSamples.length?perfSamples.reduce((a,b)=>a+b,0)/perfSamples.length:0,p95Ms:sorted[Math.floor(sorted.length*.95)]||0,cycles:emulator.module.mobileRuntime.cycles,runtime:emulator.module.mobileRuntime||'dosbox-x'};
     $('runtime').dataset.performance=JSON.stringify(perfReport);
     perfAt=now;perfFrame=frames;perfPresented=presented;perfGame=state?{stage:state.stage,phase:state.phase,ticks:state.ticks}:null;perfSamples=[];
   }

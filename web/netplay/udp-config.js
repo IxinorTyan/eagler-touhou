@@ -15,7 +15,7 @@ export async function deploymentIceConfiguration(session,signal){
   if(session.network==='public'){
     const response=await fetch('/api/ice',{method:'POST',headers:{'Content-Type':'application/json'},
       credentials:'same-origin',redirect:'error',cache:'no-store',signal,
-      body:JSON.stringify({protocol:'th01-lockstep/2',room:session.room,token:session.token,role:session.role})});
+      body:JSON.stringify({protocol:'th01-dosbox-lockstep/3',room:session.room,token:session.token,role:session.role})});
     const value=await response.json();
     if(!response.ok)throw Error(value.error||`获取公网打洞配置失败 (${response.status})`);
     return value;

@@ -1,4 +1,4 @@
-export const PROTOCOL='th01-lockstep/2';
+export const PROTOCOL='th01-dosbox-lockstep/3';
 export const VALID_INPUT=16383;
 // Every input is immutable once sampled. No prediction or wall-clock game state.
 export class FrameQueue{

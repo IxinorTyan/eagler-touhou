@@ -10,7 +10,7 @@ import webbrowser
 ROOT=Path(__file__).resolve().parent/'web'
 
 class Handler(SimpleHTTPRequestHandler):
-    extensions_map={**SimpleHTTPRequestHandler.extensions_map,'.js':'text/javascript','.wasm':'application/wasm','.gz':'application/octet-stream'}
+    extensions_map={**SimpleHTTPRequestHandler.extensions_map,'.js':'text/javascript','.mjs':'text/javascript','.wasm':'application/wasm','.gz':'application/octet-stream'}
     def send_head(self):
         path=unquote(urlsplit(self.path).path)
         if '\\' in path or any(part.startswith('.') for part in path.split('/') if part):
@@ -27,7 +27,7 @@ def main():
         except OSError as error:
             if error.errno not in (98,10048):raise
     else:raise SystemExit('No free local port')
-    url=f'http://127.0.0.1:{port}/';print(f'TH01 multiorb\n{url}\nKeep this window open. Ctrl+C to stop.',flush=True)
+    url=f'http://127.0.0.1:{port}/';print(f'TH01 multiorb · DOSBox-X / PC-98\n{url}\nKeep this window open. Ctrl+C to stop.',flush=True)
     if not args.no_browser:threading.Timer(.5,lambda:webbrowser.open(url)).start()
     try:server.serve_forever()
     except KeyboardInterrupt:pass
