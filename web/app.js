@@ -91,7 +91,7 @@ setInterval(()=>{
     tick:emulator.tick,virtualNow:emulator.module.virtualNow,waitReason:sync?.queue.waitReason??'',replayUntil:sync?.replayUntil??null,
     phase:nativeState?.phase??0,selecting:nativePause?.selecting??false,pauseSeat,hiddenSeats:[...hiddenSeats],documentHidden:document.hidden,
     nativeMaxMs:emulator.module.stepMetrics?.maxMs??0,program:emulator.module.programReads?.at(-1)?.name??null,
-    snapshotStorage:emulator.module.netSnapshotInfo?.().storage??'disabled',heapBytes:emulator.module.HEAPU8.length,
+    snapshotStorage:emulator.module.netSnapshotInfo?.().storage??'disabled',writeJournal:emulator.module.mobileRuntime.writeJournal,heapBytes:emulator.module.HEAPU8.length,
     audioState:emulator.audio.context.state,status:$('status').textContent,connection:$('connection-path').textContent});
   $('performance-stats').textContent=`模拟 ${stats.stepsHz.toFixed(1)}/60 步/秒 · 画面上传 ${stats.uploadsHz.toFixed(1)} 次/秒 · 显示提交 ${stats.presentationsHz.toFixed(1)} 次/秒\n模拟 ${stats.simulateMs.toFixed(2)} ms/步 · 快照 ${stats.snapshotMs.toFixed(2)} ms/次 · 校验 ${stats.hashMs.toFixed(2)} ms\n补算 ${stats.replaySteps} 步 · 恢复 ${stats.restoreMs.toFixed(2)} ms · 快照 ${(stats.snapshotBytes/1048576).toFixed(1)} MiB\n${localBgm?.status||'音乐准备中'}`;
 },1000);
@@ -500,7 +500,7 @@ $('start').addEventListener('click', async () => {
       const response=await fetch('lockstep-runtime.json',{cache:'no-store'});
       if(!response.ok)throw Error('同步引擎清单缺失');
       const runtime=await response.json();
-      return {runtime,wasmBinary:await loadNetworkAssets(runtime,message=>status(message))};
+      return {runtime,wasmBinary:await loadNetworkAssets(runtime,message=>status(message),{rollbackEnabled})};
     })():null;
     const [disk,networkAssets]=await Promise.all([loadDisk(activeLang),networkTask]);
     const wasmBinary=networkAssets?.wasmBinary;

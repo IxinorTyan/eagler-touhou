@@ -1,5 +1,17 @@
 # TH03 DOSBox-X 开发交接
 
+2026-10-15 正式接入：用户明确同意将两轮优化合入 main，准备自行上传 GitHub。普通 web 已使用 runtime-snapshot-adaptive-raw 的五文件集（原生调度/同步 CPU 开，显存查表关，adaptive-word8）；新增 web/vendor/dosbox-x/core-build.json 记录构建身份与保留资源摘要。发行清单更新为 53 个联机资源、14 个核心资源，16000 cycles/60 Hz/stride 2/零时间等待保持。切换前文件和工作区补丁保存在 build/core-optimization/before-main-promotion-20261015。固定浏览器文本 LF，web/native 保留原始字节，避免 Git 自动 CRLF 导致 GitHub 下载包摘要不符；额外检查暂存区实际 blob。历史“正式 web 未替换”描述对应当时的候选阶段。未自动运行游戏、浏览器或服务器，也未推送。
+
+2026-10-15 第二轮：新增回滚脏页 adaptive-word8 扫描候选，冻结于 build/native-scheduler/runtime-snapshot-adaptive-raw。只替换 tracked snapshot helper，上一轮四个核心/包装器文件与正式 web 均保留；手动 tools/start_snapshot_candidate.bat 使用 19874 和 cpu profile。26,292 项精确差分、真实 JS 快照栈的 64 次全扫描对照/文件/全局/mailbox/增长、真实追踪核心的时钟回滚、四 profile 双清单和 127 个原网页摘要检查通过。合成稀疏 scan 约快 2.6–8.3 倍、真实静态页面分布的合成场景约快 1.2–1.8 倍；全页相等的 256 MiB 场景约慢 3%，不宣称所有负载提速。测量只涵盖 scan，不等于游戏/手机帧率。没有运行 DOS、游戏、浏览器或服务器。详见 CORE-OPTIMIZATION.md 第二轮及 reports/th03-snapshot-scan-20261015.json。整 helper O2 与其他过渡实验未作为最终入口。
+
+2026-10-15：参照 TH04 的《DOSBox-PC98核心优化与五部作品迁移指南》建立独立 TH03 源码候选。详情见 CORE-OPTIMIZATION.md。保留 16000 cycles、零时间协作等待、stride 2 和现有 RGB 呈现器，移除 TH04 的地址专用忙等识别；迁入原生调度、受保护同步解释器、8 字节 memcmp 与可开关显存查表。最终五文件集在 build/native-scheduler/runtime-candidate，默认启动 tools/start_core_candidate.bat（19873，cpu profile，显存查表关闭）。两套核心各 72,774 memcmp、20,000 调度、20,480 显存对照通过；真实追踪核心的时钟分组回滚、宿主时钟脏页、双清单身份和 127 个原 web 文件未变检查通过。没有启动 DOS/游戏、浏览器、服务或真实联机；CPU 游戏中对照与弱设备性能仍未验收，不发布、不声称已提速。原版本和工作区补丁保存在 build/core-optimization/baseline-20261015。新增工具、报告、候选和 CORE-OPTIMIZATION.md 默认受发行白名单忽略，尚未提交。构建只读借用相邻 TH04 固定上游与工具链，不修改 TH04 源码或冻结产物。
+
+2026-10-14：已从 TH04 迁入原生页面写入记录、批量撤销块与缓冲复用。TH03 原有 JSPI／未记录 Asyncify 的二进制和包装器指纹保持不变；16000 cycles、零等待合并、12 帧窗口、stride 2、确认音频前沿保持。新包装器从 TH03 自己的 dosbox-rollback.mjs 生成，NativePause 的 request/setFocus/setTouch/result 在写 mailbox 前标记完整 44 字节范围。startup-assets 和 adapter 共用 usesWriteJournal，校验后传入对应 WASM；资源身份保留两种变体指纹，各端只下载自己执行的变体。
+
+重建：node tools/build_dosbox_runtime.cjs 已接入 build_write_journal.cjs，需要 build/binaryen-132、build/acorn 和原有 Binaryen native 132。存储 helper 已改用 TH04 的 packed undo 布局，shadow 数据偏移 262144，不再使用后文历史 zero flags 布局；seal/restore 可能为同一检查点积累多个块，按逆序恢复。旧 helper 测试中的 copyRange/refreshFlag 不适用于新布局。当前静态审计入口 node tools/audit_assets.mjs 使用 audit_runtime.cjs，旧 audit_dosbox_migration.mjs 是迁移早期记录，不应作为现版验收。
+
+本轮只做构建、45 个模块语法、所有发布指纹、独立内存／文件／全局撤销和核心选择校验，不运行游戏、浏览器、服务器或设备联机。运行 node tools/test_packed_snapshot_diff.cjs 和 node tools/test_write_journal.mjs 可检查 helper 稀疏页、重复修改、shadow 增长、跨页 mailbox、回退完整复制和预加载核心匹配。新记录核心与 TH04 最终 tracked WASM 的 SHA-256 完全相同，但 TH03 实际游戏状态下的页面覆盖和提速仍待试玩确认。原始改动文件备份在 build/before-dirty-pages-20261014；日志增加 writeJournal 字段。
+
 当前工作目录为 `th03-netplay-lab`，用户已把 `th03-pc98-fast` 覆盖回此目录。先读 README.md、MIGRATION.md；原 NP21 说明存于 build/NP21-README.md、build/NP21-DEVELOPMENT.md，属于历史，不能作为当前运行验收。
 
 用户要求由他亲自逐步试玩，本次另已明确授权本机无窗口内核诊断，可自动选人并记录执行状态。已完成 Node 内核中日文选人到战斗、切换与战斗 12 帧完整内存回滚检查；旧调度对照复现黑屏停顿。未启动浏览器、真实音频设备、服务器或两台设备联机；这些仍由用户试玩，扩大测试范围需尊重原授权。按键和玩法沿用 TH03 原设计。

@@ -38,14 +38,25 @@ export async function loadVerifiedBytes(url, expected, {gzip = false} = {}) {
   return bytes;
 }
 
-export async function loadNetworkAssets(runtime, progress = () => {}) {
-  const files = Object.entries(runtime.files);
+export function usesWriteJournal(rollbackEnabled = true) {
+  return rollbackEnabled !== false && WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,5,2,0,1,0,1]));
+}
+
+export async function loadNetworkAssets(runtime, progress = () => {}, {rollbackEnabled = true} = {}) {
+  const core = usesWriteJournal(rollbackEnabled) ? 'wdosbox-x-rollback-tracked.wasm' : 'wdosbox-x-rollback.wasm';
+  // The identity retains hashes for both variants. Download only the variant
+  // this device executes, along with all shared assets.
+  const tracked = core.includes('-tracked');
+  const unused = new Set(tracked ? ['wdosbox-x-rollback.wasm','dosbox-rollback.mjs','snapshot-diff.wasm']
+    : ['wdosbox-x-rollback-tracked.wasm','dosbox-rollback-tracked.mjs','snapshot-diff-tracked.wasm']);
+  if (rollbackEnabled === false) unused.add('snapshot-diff.wasm');
+  const files = Object.entries(runtime.files).filter(([path]) => !path.startsWith('vendor/dosbox-x/') || !unused.has(path.split('/').at(-1)));
   let next = 0, completed = 0, wasmBinary;
   await Promise.all(Array.from({length: Math.min(4, files.length)}, async () => {
     while (next < files.length) {
       const [path, hash] = files[next++];
       const bytes = await loadVerifiedBytes(path, hash);
-      if (path === 'vendor/dosbox-x/wdosbox-x-rollback.wasm') wasmBinary = bytes;
+      if (path === 'vendor/dosbox-x/' + core) wasmBinary = bytes;
       progress(`正在校验联机资源：${++completed}/${files.length}`);
     }
   }));

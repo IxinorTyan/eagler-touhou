@@ -74,6 +74,7 @@ export class NativePause {
     const state = this.update(now);
     if (!state || state.phase !== 1 || state.command || this.pending || ![1, 2].includes(command) || ![0, 1].includes(seat)) return false;
     const heap = this.getEmulator().module.HEAPU8, f = this.meta.fields;
+    this.getEmulator().module.thDirtyMark?.(state.at,this.meta.mailboxSize);
     heap[state.at + f.seat] = seat;
     heap[state.at + f.ack] = 0;
     heap[state.at + f.command] = command;
@@ -84,6 +85,7 @@ export class NativePause {
     const emulator = this.getEmulator(), heap = emulator?.module.HEAPU8;
     if (!heap || !this.valid(heap, this.live)) return;
     const at = this.live, f = this.meta.fields;
+    emulator.module.thDirtyMark?.(at,this.meta.mailboxSize);
     heap[at + f.points] = 0; // Draw browser-local markers outside emulated VRAM.
     heap[at + f.focus] = emulator.state === 'running' && heap[at + f.phase] === 1 ? mask & 3 : 0;
   }
@@ -91,6 +93,7 @@ export class NativePause {
     const emulator=this.getEmulator(),heap=emulator?.module.HEAPU8,f=this.meta.fields;
     if(!heap||!this.valid(heap,this.live)||f.touch===undefined)return;
     const view=new DataView(heap.buffer,heap.byteOffset,heap.byteLength),at=this.live;
+    emulator.module.thDirtyMark?.(at,this.meta.mailboxSize);
     const running=emulator.state==='running'&&heap[at+f.phase]===1;
     let points=0;
     for(let slot=0;slot<2;slot++){
@@ -123,6 +126,7 @@ export class NativePause {
     if (!this.pending) return null;
     const {at, generation, started} = this.pending, heap = this.getEmulator()?.module.HEAPU8, f = this.meta.fields;
     if (!heap || !this.valid(heap, at)) { this.pending = null; return 'unknown'; }
+    this.getEmulator().module.thDirtyMark?.(at,this.meta.mailboxSize);
     const view = new DataView(heap.buffer, heap.byteOffset, heap.byteLength);
     const ack = heap[at + f.ack];
     if (!heap[at + f.command] && (ack === 1 || ack === 2)) {

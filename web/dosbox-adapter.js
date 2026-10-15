@@ -5,7 +5,7 @@ import {createDosboxSnapshots} from './dosbox-snapshots.js';
 import {makeMemoryDiff} from './dosbox-memory-diff.js';
 import {installFramePresenter} from './frame-presenter.js';
 import {dosboxKeyCode} from './dosbox-keys.js';
-import {loadVerifiedBytes} from './startup-assets.js';
+import {loadVerifiedBytes,usesWriteJournal} from './startup-assets.js';
 import {hashNativeMemory} from './netplay/native-hash.js';
 export class DOSBoxPC98 {
   static async create(config){const emulator=new DOSBoxPC98(config);await emulator.initialize();return emulator;}
@@ -13,6 +13,7 @@ export class DOSBoxPC98 {
   async initialize(){
     this.failure=null;
     const net=!!this.config.lockstep;
+    const tracked=net&&usesWriteJournal(this.config.rollbackEnabled);
     if(!net&&(typeof WebAssembly.Suspending!=='function'||typeof WebAssembly.promising!=='function'))throw Error('DOSBox-X 性能版需要支持 JSPI 的新版 Chrome / Edge。');
     const context=(this.config.audioContext?.state!=='closed'&&this.config.audioContext)||new AudioContext({sampleRate:44100,latencyHint:'interactive'});
     context.resume().catch(()=>{});this.audio=new LocalAudioOutput(context,1);
@@ -29,9 +30,9 @@ export class DOSBoxPC98 {
     const NativeDate=globalThis.Date;
     class VirtualDate extends NativeDate {constructor(...args){super(...(args.length?args:[epoch+(emulator.module?.virtualNow||0)]));}static now(){return epoch+(emulator.module?.virtualNow||0);}getTimezoneOffset(){return 0;}getFullYear(){return this.getUTCFullYear();}getMonth(){return this.getUTCMonth();}getDate(){return this.getUTCDate();}getDay(){return this.getUTCDay();}getHours(){return this.getUTCHours();}getMinutes(){return this.getUTCMinutes();}getSeconds(){return this.getUTCSeconds();}}
     const queue=[];let receiver;
-    this.module={canvas:this.config.canvas,wasmBinary,worker:!!this.config.workerRuntime,SDL2:{audioContext:context},virtualDate:VirtualDate,virtualNow:0,targetNow:0,deterministic:net,
-      mobileRuntime:{core:'dosbox-x',cpuCore:'simple',continuation:net?'Asyncify':'JSPI'},
-      locateFile:f=>new URL(f==='wdosbox-x-jspi.wasm'?(net?'wdosbox-x-rollback.wasm':'wdosbox-x-fast.wasm'):f==='wdosbox-x.wasm'?'wdosbox-x-rollback.wasm':f,vendor).href,
+    this.module={canvas:this.config.canvas,wasmBinary,worker:!!this.config.workerRuntime,SDL2:{audioContext:context},virtualDate:VirtualDate,virtualNow:0,targetNow:0,deterministic:net,nativeScheduling:true,nativeCpu:true,nativePlanar:false,nativeFramePresentation:false,
+      mobileRuntime:{core:'dosbox-x',cpuCore:'simple',continuation:net?'Asyncify':'JSPI',writeJournal:tracked},
+      locateFile:f=>new URL(f==='wdosbox-x-jspi.wasm'?(net?(tracked?'wdosbox-x-rollback-tracked.wasm':'wdosbox-x-rollback.wasm'):'wdosbox-x-fast.wasm'):f==='wdosbox-x.wasm'?(tracked?'wdosbox-x-rollback-tracked.wasm':'wdosbox-x-rollback.wasm'):f,vendor).href,
       postMessage:(name,props)=>{if(receiver)receiver(name,props);else queue.push([name,props]);},
       onAbort:error=>{this.failure=Error(String(error));this.state='failed';this.config.onError?.(this.failure);}};
     this.module.installFramePresenter=()=>{
@@ -41,7 +42,7 @@ export class DOSBoxPC98 {
     this.transport={sessionId:'th03-dosbox',module:this.module,net:null,
       sendMessageToServer:(name,props)=>this.module.messageHandler({data:{name,props}}),
       initMessageHandler:handler=>{receiver=handler;for(const [name,props]of queue)handler(name,props);queue.length=0;},exit:()=>{}};
-    const factory=(await import(net?'./vendor/dosbox-x/dosbox-rollback.mjs':'./vendor/dosbox-x/dosbox-jspi.mjs')).default;
+    const factory=(await import(net?(tracked?'./vendor/dosbox-x/dosbox-rollback-tracked.mjs':'./vendor/dosbox-x/dosbox-rollback.mjs'):'./vendor/dosbox-x/dosbox-jspi.mjs')).default;
     await factory(this.module);this.module.callMain([this.transport.sessionId]);
     this.installDiskNotifications();
     if(net&&this.config.rollbackEnabled!==false)this.module.memoryDiff=await makeMemoryDiff(this.module);
