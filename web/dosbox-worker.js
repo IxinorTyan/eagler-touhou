@@ -201,6 +201,7 @@ if(data.action==='power')for(let i=0;i<layout.count;i++){
     }
     const cs=mailbox-patch.mailbox_cs_offset,word=at=>v.getUint16(at,true);
     const inspection={state:state(),rank:h[d+0x576f],stage:h[d+0x576e],characters:layout.characters,
+      artVariants:Array.from(h.slice(cs+patch.entry_map.art_variants,cs+patch.entry_map.art_variants+layout.count)),
       nativePositions:layout.states.slice(0,layout.count).map(at=>[v.getInt16(at+2,true)/16,v.getInt16(at+4,true)/16]),
       playerTimers:Array.from(h.slice(d+0x36ee,d+0x36f4)),activePlayer:h[mailbox+90],guestSlot:h[cs+patch.entry_map.guest_slot],
       nativeInput:word(d+0x3064),nativeFocus:h[d+0x3066],miss:h[d+0x36f4],
