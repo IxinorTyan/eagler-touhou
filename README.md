@@ -37,7 +37,7 @@
 
 磁盘导入／导出接口保留，运行时文件变更写回私有 FAT12 镜像；刷新或重启恢复初始资源。
 
-多人美术按同一角色的重复次数自动分配：按 P1→P2→P3 顺序，该角色第一次出现保留原色，第二次使用蓝色，第三次使用绿色；灵梦和魔理沙分别计数，A/B 射击类型不影响配色。不同角色各自第一次出现都用原色。幽灵沿用相同分配，救援、换关和离线后不重新排色；玄爷、扫把、肤色、头发与透明区域保留原样。自机和幽灵配饰使用原作调色板中的蓝／绿渐层，幽灵其余颜色匹配当前关卡调色板。右侧机型图标使用灵梦符札／魔理沙星弹，并跟随该角色本局原色、蓝色或绿色配色，旁边保留 A/B 标记；场内射击、激光和 Bomb 沿用原素材。此规则适用于中／日文本地双人与两／三人联机。
+多人美术按同一角色的重复次数自动分配：按 P1→P2→P3 顺序，该角色第一次出现保留原色，第二次使用蓝色，第三次使用绿色；灵梦和魔理沙分别计数，A/B 射击类型不影响配色。不同角色各自第一次出现都用原色。幽灵沿用相同分配，救援、换关和离线后不重新排色；玄爷、扫把、肤色、头发与透明区域保留原样。自机和幽灵配饰使用原作调色板中的蓝／绿渐层，幽灵其余颜色匹配当前关卡调色板。场内主弹、辅弹、命中特效和魔理沙激光按发射者使用相同配色，保留白色高光、暗色轮廓、弹形与动画。右侧机型图标使用灵梦符札／魔理沙星弹，并同步配色，旁边保留 A/B 标记。Bomb 保留原素材。此规则适用于中／日文本地双人与两／三人联机。
 
 ## 性能与验证
 
@@ -71,7 +71,7 @@ Git 仓库按 `.gitignore` 的发行白名单管理，包含网页、DOSBox-X JS
 
 修改合作原生补丁后，依次运行 `python tools/build_lab.py --keep-vendor` 和 `python tools/build_lockstep_runtime.py`；后一步先刷新中／日文磁盘声音策略，再重建引擎包装器和版本摘要。只改运行时适配 JS 时也需更新摘要。
 
-仅修改游戏盘或多人美术时，第二步使用 `python tools/build_lockstep_runtime.py --game-only`，更新磁盘声音元数据并保留当前优化核心。美术构建读取同级 `ghost-preview/th05-four-player-colors/` 中已审核的灵梦／魔理沙幽灵 PNG，生成文件和来源哈希保存在本机 `build/`、`reports/player-art.json`；原生配色回归运行 `python -B tools/test_player_art_cpu.py`，右侧机型图标回归运行 `python -B tools/test_hud_shot_art_cpu.py`。
+仅修改游戏盘或多人美术时，第二步使用 `python tools/build_lockstep_runtime.py --game-only`，更新磁盘声音元数据并保留当前优化核心。美术构建读取同级 `ghost-preview/th05-four-player-colors/` 中已审核的灵梦／魔理沙幽灵 PNG，生成文件和来源哈希保存在本机 `build/`、`reports/player-art.json`；原生配色回归运行 `python -B tools/test_player_art_cpu.py`，右侧机型图标回归运行 `python -B tools/test_hud_shot_art_cpu.py`，实际射弹／激光回归运行 `python -B tools/test_projectile_art_cpu.py`。
 
 完整回滚插桩需要 Binaryen 132，执行 `tools/build_asyncify.ps1 -WasmOpt <wasm-opt.exe路径>`；已有插桩中间文件时，`node tools/build_dosbox_runtime.cjs` 可重建包装器及摘要。编译工具和中间文件放在 `build/`，不使用上游不完整的 Asyncify PC-98 构建。迁移／小 P 完整性审计以本机 `../th04-np21/web/` 为原版对照；该备份仅用于开发审计。
 
