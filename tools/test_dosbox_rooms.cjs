@@ -15,6 +15,10 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
   for(let i=1;i<players;i++){await pages[i].fill('#room',code);await pages[i].click('#join');await pages[i].locator('#lobby').waitFor({state:'visible'});}
   // Host takes P2 to verify host authority is independent of seat.
   const seats=players===2?[1,0]:[1,2,0];for(let i=0;i<players;i++)await pages[i].click('#seat'+seats[i]);
+  if(process.env.ART_DUPLICATES==='1')for(let i=0;i<players;i++){
+   const loadout=seats[i]%2;await pages[i].click('[data-loadout="'+loadout+'"]');
+   await pages[i].waitForFunction(value=>document.querySelector('[data-loadout="'+value+'"]').getAttribute('aria-pressed')==='true',loadout);
+  }
   for(const page of pages)await page.click('#ready');await host.waitForFunction(()=>!document.querySelector('#start').disabled);await host.click('#start');
   try{for(const page of pages)await page.waitForFunction(rollback=>{const s=window.roomQA.read();return s.stopped||(s.s?.gameFrame>100&&(!rollback||s.active));},rollback,{timeout:60000});}catch(error){for(let i=0;i<pages.length;i++){console.log('ROOM FAILURE',i,await pages[i].evaluate(()=>({qa:window.roomQA.read(),status:document.querySelector('#status').textContent,startup:document.querySelector('#startup-progress').textContent})));await pages[i].screenshot({path:path.resolve(__dirname,`../reports/dosbox-room-failure-${i}.png`)});}throw error;}
   const boot=await Promise.all(pages.map(p=>p.evaluate(()=>window.roomQA.read())));for(let i=0;i<boot.length;i++){const s=boot[i];if(!s.running||s.stopped){for(const f of pages[i].frames())console.log('BOOT FRAME',i,f.url(),await f.evaluate(()=>({details:document.querySelector('#details')?.textContent,warning:document.querySelector('#page-warning')?.textContent})).catch(()=>null));}assert(s.running&&!s.stopped,s.stopReason);}console.log('rooms boot',players,boot.map(s=>({frame:s.frame,active:s.active})));

@@ -1,13 +1,50 @@
 {
   "original_md5": "e2b685961daaa8b668b3914461fbdb8a",
   "original_size": 156258,
-  "patched_size": 168546,
+  "patched_size": 168738,
   "insert_image_offset": 78048,
-  "insert_size": 12288,
-  "payload_size": 12288,
-  "heap_bytes": 381440,
+  "insert_size": 12480,
+  "payload_size": 12477,
+  "heap_bytes": 381248,
   "payload_and_heap_bytes": 393728,
-  "payload_padding_bytes": 0,
+  "payload_padding_bytes": 3,
+  "player_art": {
+    "assignment": "occurrence of the same character in seat order",
+    "variants": [
+      "p1-original",
+      "p2-blue",
+      "p3-green"
+    ],
+    "characters": [
+      "reimu",
+      "marisa"
+    ],
+    "mount_start_row": {
+      "reimu": 30,
+      "marisa": 37
+    },
+    "ghost_colors": 12,
+    "ghost_shape_offsets": [
+      0,
+      143
+    ],
+    "ghost_rgb_bytes": 66,
+    "ghost_color_id_bytes": 72,
+    "ghost_mask_bytes": 278,
+    "accessory_palette": "native blue 8/9 and green 4/5; other pixels nearest stage RGB",
+    "ghost_dictionary_rows": 119,
+    "source_sha256": {
+      "ghost-preview\\th05-four-player-colors\\reimu\\p1-original\\ghost-32.png": "b65bde17c040b32d2c3ca90436a8905006c4c4fc4dabb899876fecf2374674d2",
+      "ghost-preview\\th05-four-player-colors\\reimu\\p2-blue\\ghost-32.png": "e81a19bb2b30822165f5de413eea0c9d21cf0d8d1b82fb12b68de9d886a1ae55",
+      "ghost-preview\\th05-four-player-colors\\reimu\\p3-green\\ghost-32.png": "e1bbc19fdf6de4f4e9d0abea54951ecd233327856923aef6be8bc4e84d171017",
+      "ghost-preview\\th05-four-player-colors\\marisa\\p1-original\\ghost-32.png": "33d89334ccdc04ca428bc4d1233d4d84c179274a10d2f628ec8b4e4071e8bf8d",
+      "ghost-preview\\th05-four-player-colors\\marisa\\p2-blue\\ghost-32.png": "01320a87ff717696d0dea392f7824c3b85b4686bf5e852573970f3b5beacfb95",
+      "ghost-preview\\th05-four-player-colors\\marisa\\p3-green\\ghost-32.png": "c830cca4eb9f53e56ee29e47378b6b4e7c431ad367a894670862c9a261ab0ced"
+    },
+    "select_cs_offset": 39409,
+    "render_cs_offset": 39572,
+    "minimum_heap_bytes": 379584
+  },
   "entries": [
     34446,
     34829,
@@ -42,52 +79,52 @@
     39303,
     39192,
     38925,
-    39457,
-    40157,
-    39963,
-    39401,
-    40003,
-    40350,
+    39831,
+    40561,
+    40337,
+    39768,
+    40377,
+    40838,
     35220,
-    42078,
-    42081,
-    43244,
-    43279,
-    43292,
-    43098,
-    43324,
-    43450,
-    43471,
-    43492,
-    43434,
-    43438,
-    43442,
-    43446,
-    43572,
-    43559,
-    43560,
-    43745,
-    44033,
-    44918,
-    44487,
-    44541,
-    44691,
-    44661,
-    44676,
-    44499,
-    44511,
-    44526,
-    45101,
+    42267,
+    42270,
+    43433,
+    43468,
+    43481,
+    43287,
+    43513,
+    43639,
+    43660,
+    43681,
+    43623,
+    43627,
+    43631,
+    43635,
+    43761,
+    43748,
+    43749,
+    43934,
+    44222,
     45107,
-    44712,
-    44736,
-    44774,
-    44799,
-    44813,
-    44093,
-    45616,
-    45405,
-    45429
+    44676,
+    44730,
+    44880,
+    44850,
+    44865,
+    44688,
+    44700,
+    44715,
+    45290,
+    45296,
+    44901,
+    44925,
+    44963,
+    44988,
+    45002,
+    44282,
+    45805,
+    45594,
+    45618
   ],
   "near_code_guard": {
     "image_offset": 78048,
@@ -95,14 +132,14 @@
   },
   "mailbox_cs_offset": 38008,
   "relocations_rebased": 1136,
-  "native_pause_cs_offset": 43434,
-  "offline_mask_cs_offset": 43559,
-  "focus_visible_mask_cs_offset": 43745,
+  "native_pause_cs_offset": 43623,
+  "offline_mask_cs_offset": 43748,
+  "focus_visible_mask_cs_offset": 43934,
   "personal_stats": {
-    "cs_offset": 44033,
+    "cs_offset": 44222,
     "stride": 20,
     "players": 3,
-    "bonus_cs_offset": 44093,
+    "bonus_cs_offset": 44282,
     "score": 0,
     "high_score": 4,
     "point": 8,
@@ -142,12 +179,12 @@
   "loadout_file_offset": 88601,
   "bomb_owner_cs_offset": 39192,
   "entry_count": 79,
-  "touch_cs_offset": 45405,
+  "touch_cs_offset": 45594,
   "touch_stride": 8,
-  "touch_status_cs_offset": 45429,
-  "rescue_cs_offset": 39401,
-  "p3_input_cs_offset": 42078,
-  "p3_motion_cs_offset": 42081,
+  "touch_status_cs_offset": 45618,
+  "rescue_cs_offset": 39768,
+  "p3_input_cs_offset": 42267,
+  "p3_motion_cs_offset": 42270,
   "boss_damage_call_sites": [
     124409,
     111620,
@@ -200,37 +237,37 @@
     {
       "image_offset": 68469,
       "original": "e8d8fd",
-      "target_cs_offset": 45616,
+      "target_cs_offset": 45805,
       "name": "synchronized direct touch velocity"
     },
     {
       "image_offset": 43934,
       "original": "9ac4060e13",
-      "target_cs_offset": 43572,
+      "target_cs_offset": 43761,
       "name": "offline seats before world update"
     },
     {
       "image_offset": 43950,
       "original": "e81e07",
-      "target_cs_offset": 43450,
+      "target_cs_offset": 43639,
       "name": "native pause entry"
     },
     {
       "image_offset": 45783,
       "original": "9abc060e13",
-      "target_cs_offset": 43471,
+      "target_cs_offset": 43660,
       "name": "pause release at entry"
     },
     {
       "image_offset": 45851,
       "original": "9a33010e13",
-      "target_cs_offset": 43492,
+      "target_cs_offset": 43681,
       "name": "pause synchronized menu input"
     },
     {
       "image_offset": 45991,
       "original": "9abc060e13",
-      "target_cs_offset": 43471,
+      "target_cs_offset": 43660,
       "name": "pause release at resume"
     },
     {
@@ -314,31 +351,31 @@
     {
       "image_offset": 67043,
       "original": "33ffc646f100",
-      "target_cs_offset": 44712,
+      "target_cs_offset": 44901,
       "name": "reset hit ownership"
     },
     {
       "image_offset": 67135,
       "original": "03f8fe064046",
-      "target_cs_offset": 44736,
+      "target_cs_offset": 44925,
       "name": "record shot damage owner"
     },
     {
       "image_offset": 67195,
       "original": "83c705803e5c1b00",
-      "target_cs_offset": 44774,
+      "target_cs_offset": 44963,
       "name": "record Bomb damage owner"
     },
     {
       "image_offset": 67252,
       "original": "83c703fe064046",
-      "target_cs_offset": 44799,
+      "target_cs_offset": 44988,
       "name": "record first P1 laser"
     },
     {
       "image_offset": 67300,
       "original": "83c703fe064046",
-      "target_cs_offset": 44799,
+      "target_cs_offset": 44988,
       "name": "record second P1 laser"
     },
     {
@@ -350,47 +387,47 @@
     {
       "image_offset": 48081,
       "original": "b90800268b0426890583c65083c750e2f281ef8002",
-      "target_cs_offset": 45933,
+      "target_cs_offset": 46122,
       "name": "fixed eight-row EGC tile copy; original read/write order"
     },
     {
       "image_offset": 50622,
       "original": "add3c88af022c226890532c674042688450283c750fecd75e7",
-      "target_cs_offset": 46039,
+      "target_cs_offset": 46228,
       "name": "16x16 even four-row blit; equivalent SHRD rotation"
     },
     {
       "image_offset": 50726,
       "original": "add3c88af022c226880532c686e02689450183c750fecd75e7",
-      "target_cs_offset": 46169,
+      "target_cs_offset": 46358,
       "name": "16x16 odd four-row blit; equivalent SHRD rotation"
     },
     {
       "image_offset": 50306,
       "original": "e8550075fb",
-      "target_cs_offset": 46299,
+      "target_cs_offset": 46488,
       "name": "32x32 even inline cloud rows"
     },
     {
       "image_offset": 50352,
       "original": "e8590075fb",
-      "target_cs_offset": 46352,
+      "target_cs_offset": 46541,
       "name": "32x32 odd inline cloud rows"
     },
     {
       "image_offset": 49728,
       "original": "ad0ae47405268905eb070ac0740326880583c750e2ea",
-      "target_cs_offset": 46414,
+      "target_cs_offset": 46603,
       "name": "spark four-row blit"
     },
     {
       "image_offset": 51691,
       "original": "a583c74ee2fa",
-      "target_cs_offset": 46532,
+      "target_cs_offset": 46721,
       "name": "point-bullet full six-row blit"
     }
   ],
-  "sha256": "8622df0210786100f8d4ad7cf7953541ec9d8f5a7e7b08e69d38a99f0261812a",
+  "sha256": "1c460795b8eb1f00f5743aa2e7f8f823da6833d83454f56e1e9593e565539aba",
   "source": {
     "language": "zh-CN",
     "file": "4-cn.hdi.gz",
@@ -398,7 +435,7 @@
     "main_md5": "e2b685961daaa8b668b3914461fbdb8a"
   },
   "code_segment": 2735,
-  "data_segment": 9268,
+  "data_segment": 9280,
   "launch_config": {
     "schema": 2,
     "defaults": [
