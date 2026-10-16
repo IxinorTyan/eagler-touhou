@@ -189,7 +189,7 @@ $('start').onclick=async()=>{
     const configOffset=metadata.headerSize+metadata.codeSegment*16+metadata.entries.run_config;
     exe[configOffset]=Number($('p2-shot').value);exe[configOffset+1]=Number($('p3-shot').value);
     exe[configOffset+2]=Number($('player-count').value);fat.replace(main,exe);
-    emulator=await DOSBoxPC98.create({canvas:$('canvas'),onError:error=>status('DOSBox-X 停止：'+error.message),onExit:()=>status('游戏已退出，可重新启动')});
+    emulator=await DOSBoxPC98.create({canvas:$('canvas'),artPatch:metadata,onError:error=>status('DOSBox-X 停止：'+error.message),onExit:()=>status('游戏已退出，可重新启动')});
     emulator.addDiskImage('th02-local.hdi',bytes);await emulator.setHdd(0,'th02-local.hdi');emulator.run();
     document.body.dataset.running='true';for(const id of ['pause','menu','confirm','restart','diagnostics'])$(id).disabled=false;
     $('language').disabled=true;$('p2-shot').disabled=true;$('p3-shot').disabled=true;$('player-count').disabled=true;$('canvas').focus();

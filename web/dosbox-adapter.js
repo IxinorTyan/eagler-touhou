@@ -4,6 +4,7 @@ import {LocalAudioOutput} from './netplay/audio-output.js';
 import {createDosboxSnapshots} from './dosbox-snapshots.js';
 import {makeMemoryDiff} from './dosbox-memory-diff.js';
 import {installFramePresenter} from './frame-presenter.js';
+import {loadPlayerArt,installPlayerArt} from './player-art.js';
 const codes={ArrowUp:265,ArrowDown:264,ArrowLeft:263,ArrowRight:262,KeyZ:90,KeyX:88,ShiftLeft:340,ShiftRight:344,Escape:256,Enter:257,Space:32};
 export const supportsWriteJournal=()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,5,2,0,1,0,1]));
 export class DOSBoxPC98 {
@@ -11,6 +12,7 @@ export class DOSBoxPC98 {
   constructor(config){this.config=config;this.state='loading';this.disks=new Map();this.keys=new Set();this.outputs=new Map();this.frame=null;this.replaying=false;this.tick=0;this.audioChunks=[];}
   async initialize(){
     const net=!!this.config.lockstep;
+    const art=this.config.artPatch?await loadPlayerArt(this.config.artPatch):null;
     const tracked=net&&this.config.rollbackEnabled!==false&&supportsWriteJournal();
     if(!net&&(typeof WebAssembly.Suspending!=='function'||typeof WebAssembly.promising!=='function'))throw Error('DOSBox-X 性能版需要支持 JSPI 的新版 Chrome / Edge。');
     const context=(this.config.audioContext?.state!=='closed'&&this.config.audioContext)||new AudioContext({sampleRate:44100,latencyHint:'interactive'});
@@ -35,7 +37,9 @@ export class DOSBoxPC98 {
       sendMessageToServer:(name,props)=>this.module.messageHandler({data:{name,props}}),
       initMessageHandler:handler=>{receiver=handler;for(const [name,props]of queue)handler(name,props);queue.length=0;},exit:()=>{}};
     const factory=(await import(net?(tracked?'./vendor/dosbox-x/dosbox-rollback-tracked.mjs':'./vendor/dosbox-x/dosbox-rollback.mjs'):'./vendor/dosbox-x/dosbox-jspi.mjs')).default;
-    await factory(this.module);this.module.callMain([this.transport.sessionId]);
+    await factory(this.module);
+    if(art)this.module.playerArt=installPlayerArt(this.module,this.config.artPatch,art);
+    this.module.callMain([this.transport.sessionId]);
     if(net&&this.config.rollbackEnabled!==false)this.module.memoryDiff=await makeMemoryDiff(this.module);
     this.onSleep=({data})=>{if(!net&&data?.name==='ws-sync-sleep'&&data.props.sessionId===this.transport.sessionId)globalThis.postMessage({name:'wc-sync-sleep',props:data.props},'*');};
     if(!net&&typeof window!=='undefined'&&window.postMessage)window.addEventListener('message',this.onSleep);

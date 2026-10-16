@@ -61,7 +61,7 @@ async function boot(settings){
  const launcher=new Uint8Array(await get('./th02-launch.com','arrayBuffer'));
  if(await sha256(launcher)!==version.assets['netplay/th02-launch.com'])throw Error('TH02 网页启动器校验失败');
  await progress('初始化确定性 DOSBox-X 核心与音频',5);
- emulator=await DOSBoxPC98.create({canvas:nativeCanvas,lockstep:true,rollbackEnabled:config.rollback,lockstepEpoch:version.epoch,wasmBinary,
+ emulator=await DOSBoxPC98.create({canvas:nativeCanvas,artPatch:patch,lockstep:true,rollbackEnabled:config.rollback,lockstepEpoch:version.epoch,wasmBinary,
   launchFiles:[{path:'game/HUMAROKU/WEBSTART.COM',contents:configureLauncher(launcher,config)}],
   onError:error=>window.parent.postMessage({protocol:PROTOCOL,event:'boot-error',message:error.message},location.origin),
   onExit:()=>window.parent.postMessage({protocol:PROTOCOL,event:'runtime-exit'},location.origin)});

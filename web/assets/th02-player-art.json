@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "game": "TH02",
+  "file": "assets/th02-player-art.bin",
+  "sha256": "1d78549c121239e1f76e52f03a59b78c7129fdddba2779398a1ac266449f6945",
+  "bytes": 221188,
+  "variants": [
+    "p1-original",
+    "p2-blue",
+    "p3-green"
+  ],
+  "framesPerSeat": 12,
+  "pixelsPerFrame": 1536,
+  "bodyFrames": 10,
+  "bodySize": [
+    32,
+    48
+  ],
+  "ghostFrame": 10,
+  "ghostSize": [
+    32,
+    32
+  ],
+  "bodySource": "ghost-preview/th02-player-colors",
+  "ghostSource": "ghost-preview/th05-four-player-colors/reimu",
+  "originalGenjiiPreserved": true,
+  "sources": {
+    "th02-player-colors/p1-original/player-00.png": "16660b5b9d23d3d048b58c655e23300b647b12164b0cc03be7af8841e9c5a9d1",
+    "th02-player-colors/p1-original/player-01.png": "81ffa27fbd2b5077a3d6b64ea81703af09911e1b8043a00cc909a5eba85bec5e",
+    "th02-player-colors/p1-original/player-02.png": "e5641b831d1f3f55e8c7f7ca957f77fb4cbaadb0f1e071b743fa1e9e1e56a86a",
+    "th02-player-colors/p1-original/player-03.png": "ceed4eafff6cef8f50b47cbfca47dba5dbe9952d362a8839454a7dbcd0281517",
+    "th02-player-colors/p1-original/player-04.png": "4b72ab59da7969139f8674ff766f410649feae201455ef623796697597f2f8ac",
+    "th02-player-colors/p1-original/player-05.png": "d4b979bfccf6b8d8ff9f2ca960d2c5a5340212e29b0f6ce770da603abb62d658",
+    "th02-player-colors/p1-original/player-06.png": "702135a92ac25498c9387524d1e86fee190b65878faa6e5dd01403d44336c654",
+    "th02-player-colors/p1-original/player-07.png": "3903f008b2a0c2d6495cb45f1767a2598c1776f2f4462bcd777e7c5353fda799",
+    "th02-player-colors/p1-original/player-08.png": "87d3e84c9295cae5ae558112872997376c7a19426f6dd10d3c0b7cb29229400f",
+    "th02-player-colors/p1-original/player-09.png": "8718e6cc9a208079ef6be038addc3e3f727950c85890a3e804109aaef3d2f371",
+    "th05-four-player-colors/reimu/p1-original/ghost-32.png": "b65bde17c040b32d2c3ca90436a8905006c4c4fc4dabb899876fecf2374674d2",
+    "th02-player-colors/p2-blue/player-00.png": "f8a4cc40e728a0e1b7d29545b2317de869a40f82ba6ca04ed2f4a68b3d2c7283",
+    "th02-player-colors/p2-blue/player-01.png": "6310bd01ff3f78259062a08cc157dfc1631fab34d0c811a76cf9a31a02be8619",
+    "th02-player-colors/p2-blue/player-02.png": "edbd1e26d21add8417e4a61b2fd4ef851db9a74e369ca421daed96e48244ab63",
+    "th02-player-colors/p2-blue/player-03.png": "01734f036fb084f8e75f238263768d936774f3b931ebb5af53affed4aac621ec",
+    "th02-player-colors/p2-blue/player-04.png": "d9a140a0dc806c2dc66e9e42aab004e4751e6f9f40c65ea17651e0e929b0ad1e",
+    "th02-player-colors/p2-blue/player-05.png": "c598918e52901ac22919b22ff8a7fd8faf7a1a1ed8cfd858f876e90f92cafa28",
+    "th02-player-colors/p2-blue/player-06.png": "ea7bc0341ee8f0f13b59bbfad6a90d3099d79f2980da20c0a313ffc208b6995b",
+    "th02-player-colors/p2-blue/player-07.png": "640f5ae093bef2daa26d6602b86ff6902ad16a6c66b900d34eca89f4084c8408",
+    "th02-player-colors/p2-blue/player-08.png": "51279e1bfb47452238d5abd1b27d10d7cbc0ad2f5e8cd38fd05cdf7d330c2fc5",
+    "th02-player-colors/p2-blue/player-09.png": "8718e6cc9a208079ef6be038addc3e3f727950c85890a3e804109aaef3d2f371",
+    "th05-four-player-colors/reimu/p2-blue/ghost-32.png": "e81a19bb2b30822165f5de413eea0c9d21cf0d8d1b82fb12b68de9d886a1ae55",
+    "th02-player-colors/p3-green/player-00.png": "4ae8993fcf4b374ccf75bee2d79b5b132068faad42424da7deb10d9f3a1c4cb9",
+    "th02-player-colors/p3-green/player-01.png": "9a89ffb92e5b64cc5ddf69c41d76e9cbeb42e1668d3f06127b262b0104e488db",
+    "th02-player-colors/p3-green/player-02.png": "2c5412aa1ca67dd333a2082058c0fcd1f8cce058bbd193cfb89bd92bc2ce7f7a",
+    "th02-player-colors/p3-green/player-03.png": "66f268cb35c59c1e0ef16fbe95dfff520910c5cfc258a8a94e736260fb25e764",
+    "th02-player-colors/p3-green/player-04.png": "5c00dc1e2ab27fa0e4a6817c3ab90a49ae2c0823ca6d40f88508044b9eafb1a6",
+    "th02-player-colors/p3-green/player-05.png": "f9b3018a43cf227b97f7b826e7bb1cf022d0df9a764fa2d8279bf447ed9a86a6",
+    "th02-player-colors/p3-green/player-06.png": "a9758a5585087ebb31baa869ee937cb3b817fdaa29f239624514b73c37f9fd6d",
+    "th02-player-colors/p3-green/player-07.png": "b9e4f20c029c94bd5538facd2c442d7608c2c18d99f57851842a61b37bc1de6c",
+    "th02-player-colors/p3-green/player-08.png": "f9c9e05dc34cad0ada2e8188f53260e8f7c8d1886b33e0c2ce5384a5ecfa1327",
+    "th02-player-colors/p3-green/player-09.png": "8718e6cc9a208079ef6be038addc3e3f727950c85890a3e804109aaef3d2f371",
+    "th05-four-player-colors/reimu/p3-green/ghost-32.png": "e1bbc19fdf6de4f4e9d0abea54951ecd233327856923aef6be8bc4e84d171017"
+  },
+  "hudShot": {
+    "source": "TH02 MIKO16.BFT frame 4",
+    "sourceSha256": "f5728c03573095815b9483201bccabd71b1658c0188f259dc74abe1abbc4a759",
+    "pattern": 52,
+    "frame": 11,
+    "size": [
+      16,
+      16
+    ],
+    "bulletX": 480,
+    "optionX": 504,
+    "gapPixels": 8,
+    "files": {
+      "p1-original": "assets/hud-ofuda-p1-original.png",
+      "p2-blue": "assets/hud-ofuda-p2-blue.png",
+      "p3-green": "assets/hud-ofuda-p3-green.png"
+    },
+    "sha256": {
+      "p1-original": "b37e36b50161916c1888eda080dcda79132286b06758b9ae2ed0431e7ceab7fa",
+      "p2-blue": "581192e5ee4e668c2daa9c4e3069f526061f8865ea37dbee3c2182a640f3f05f",
+      "p3-green": "a5b7d234f1e280ddc382911a6b8f76c5180d78f256186142aeb31db08243cbe2"
+    }
+  }
+}

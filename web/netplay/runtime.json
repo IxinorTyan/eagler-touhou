@@ -10,16 +10,17 @@
   "nativeCpu": true,
   "th04IdleOptimization": false,
   "th02IdleOptimization": true,
+  "th02PlayerArt": true,
   "assets": {
     "control-settings.css": "8428afa28a1f29d46d5d4bf73da25066a87e6e1714a91405a30661446345e54c",
     "control-settings.js": "4eba3f22cd132473274d44147efe2633e10b388eea402de53074025623b73517",
-    "dosbox-adapter.js": "7cdce1243ea4eb025afdd4889c7f140ae9fcf1d7ac070ab7d27db9b12c217b79",
+    "dosbox-adapter.js": "fad1ffdecc68484345631025ba0315c917b684c25079015366841d41519d02b3",
     "dosbox-disk.js": "068332c07fe1d3f705e01ebd376324790c3fcb93dcc70b63e977ea4b89be176f",
     "dosbox-memory-diff.js": "2040999963615c5464fa6c6beb4316838d6769ffdda7728f72e84e32e2c09994",
     "dosbox-snapshots.js": "2dbb05b6625b7ebbc2703d01654a84f7eb7381319541fea5b66372fbcd82d236",
     "focus-settings.js": "3b635e679abdb2c666d62e16d507eb17a76c2dafa53ade280e7b46e0de14e700",
     "frame-limit.js": "e984d0b2adcf5dce3828e5b6e15bb7cf6aebd1ddbd9f5d7950a5dfda11998d03",
-    "frame-presenter.js": "c98929e7015331a0a31729ec1118e8313d75849ebb4b047a84da9b54832e3bc2",
+    "frame-presenter.js": "7c9c834d6627ae044fa3b7d33b572e95fa20b7d79e7ac3d4a1cf0df3e016434a",
     "index.html": "efa7ae1750da73988a446f8d2cf53fc204df9c76204280332100063708a41e47",
     "lan.html": "31e030b68fc2a369dff5bc247e5608fdbdb0ecfd4852a4d24727dabe4e4e0297",
     "lan.js": "b2b260e540b195ae8dd09812412f81aa653bff0493beaee6dc11623580a4a49d",
@@ -40,11 +41,12 @@
     "netplay/rollback-queue.js": "b43c8f69d5e4e00acb4e9c4c0836cc887e3004e4b6566572cc895cf29ec06de6",
     "netplay/room.js": "6cd6defeeeb78c75cf974566a23d612f031a2681a7004f5b3f1a61088bfc3caa",
     "netplay/runtime.html": "2e1a5f3006b7b9ab9c0632596e56dcd8d869fdbb9f5a8e45d5afcc5cd627ad2b",
-    "netplay/runtime.js": "fc594b0e2040cfafbd08ee5a787f407811a11b04770cf6451a3703931d916b3f",
+    "netplay/runtime.js": "60551630ec162fe9d64e617a40194fd42d6d02ba5edefc9fc2cc49cfb9f9796d",
     "netplay/sha256.js": "9cb7be2bc039bcea2a4d727ef98bcd9047a78dfd4c11950355723147423e1f43",
     "netplay/th02-launch.com": "956a4d9d9ea3ff08f0d98c793a35d03cfaf3aeb129cdbdf5b3dbcf70be9b6dd0",
     "netplay/th02-state.js": "54c67cd74bb2e89bda1208d3ef2dcaaf5bdd9153de536b0fa09893f195be12ab",
     "netplay/udp-config.js": "244c1972f3d412455e007c01a7548375d43d38debe71cc077668ed2c977bdfa3",
+    "player-art.js": "74d7282128cd7bf8bd40ac1d0218b0c77e0a68469dbed00f06362ee43eb10873",
     "player-ui.css": "336426049fe26ab7dc605359bf230b081a2625a9905fc6bff7a4fcc671cc9a80",
     "player-ui.js": "876ac9b9b1258795ff792ae8ebfe8bf5505913d5e79e4790546b7c888ac43746",
     "room.css": "0941351b7196802708669da4464f3a17f83c1a5e4c54178d2797f3fb37609959",
@@ -59,11 +61,21 @@
     "touch-input.js": "1b16b18bb46e7ccf1943c05d17d762ff4393c05088c102fadaff633db7a08179",
     "touch-layout.js": "1d3ead2f73c675dbb62b960f4904df7b0e7d649ee8672138ac5a63f978808f71",
     "touch-overlay.css": "3ea83605ef5ce049ab10dff288e3a49e752d7a590f5b0e8f8cfc4117c1e35da9",
-    "vendor/dosbox-x/dosbox-jspi.mjs": "c8839f654946fdb3c3527fa4b9790360f73f16ac19c8b29557829be7668aea0f",
+    "vendor/dosbox-x/dosbox-jspi.mjs": "b8371d42179d968d1cf8dfdc65f6f32aa2462d8fff0152464105ca721ac42d4e",
     "vendor/dosbox-x/dosbox-rollback-tracked.mjs": "f7224bcb7e5ea881525760f3b71b194d01e127acf31103a5400a06d9d004d048",
     "vendor/dosbox-x/dosbox-rollback.mjs": "b86ffabafe90b43c0e12745ebd2d03e0da3353a53f765ad50a2008d12e291e8e",
     "vendor/dosbox-x/emulators.js": "066176a9e9e6babfb5388552a5154f3c1f81ed778af3bf4a1f9f904161e3c4bb",
-    "local-patch.json": "3a589bf4cebe5f60241f91068c350ad6938f69cd44d2b2467de817132cdf44bb",
+    "local-patch.json": "0a89418593adaf399384401070af69dd19500c0542d08cb384991d2aa111570e",
+    "assets/ghost-32.png": "b65bde17c040b32d2c3ca90436a8905006c4c4fc4dabb899876fecf2374674d2",
+    "assets/hud-ofuda-p1-original.png": "b37e36b50161916c1888eda080dcda79132286b06758b9ae2ed0431e7ceab7fa",
+    "assets/hud-ofuda-p2-blue.png": "581192e5ee4e668c2daa9c4e3069f526061f8865ea37dbee3c2182a640f3f05f",
+    "assets/hud-ofuda-p3-green.png": "a5b7d234f1e280ddc382911a6b8f76c5180d78f256186142aeb31db08243cbe2",
+    "assets/option-0.png": "4489fc2b85017661f8e3e6e8bd4c7cd3e352cf41fb7e7657a92164e9ef5f18c1",
+    "assets/option-1.png": "48cd7d73254c630692b7ea58a67540b5d1495c168dbed773c315c968f805fb61",
+    "assets/option-2.png": "8c42412047463af2848fc6ad070d8461ca5a2400a8156a4186a5086ea55e0d41",
+    "assets/reimu-ghost-32.png": "661811629f6219fd19f77841dbf51e99aba1b51aa9143d4fa4bce9a126e15c33",
+    "assets/th02-player-art.bin": "1d78549c121239e1f76e52f03a59b78c7129fdddba2779398a1ac266449f6945",
+    "assets/th02-player-art.json": "6f7d4c46cddd89a75e9e994b9157bbf44a5d6a475c90b2ce230edfac39a70cef",
     "netplay/sound-patch.json": "32954eb3bf378240d10e1f71eb9a982a8449bce3482911aea416d6b76207d657",
     "bgm/manifest.json": "7512e652e6dd1ce2e473e3bd230a0690d30093e7e2a1792f5c4c402816e34443",
     "solo-patch.json": "f3454898d48357ab97f0d82545ee811d40b135a753519f47c0c6058818b1d981",
@@ -74,12 +86,12 @@
   "cores": {
     "plain": {
       "file": "vendor/dosbox-x/wdosbox-x-rollback.wasm",
-      "sha256": "9b263012e6778a08d0738e5a35382d17299095c4c9e9f3bc71ad03b9b0f745c4"
+      "sha256": "ad5e7bb9a55f4ecb81f4937f078c36e9c905f70e3d753e13506f4350974145da"
     },
     "tracked": {
       "file": "vendor/dosbox-x/wdosbox-x-rollback-tracked.wasm",
-      "sha256": "672c53495ae3625088a9e6f4485f5c0ce4ae3f016044513b02b82c54e082e294"
+      "sha256": "1847f9e0e55b61307180d3e46a7734a7d1d6d5faad68251f5480772b1def2a26"
     }
   },
-  "build": "9a9ba53166e8a019d173505922a8c7d4348296ed79643a43498e16dbe2f726d5"
+  "build": "f63caa36264842682b60fa8199fe43ade06ed79746bf9382c27892b4edaa847c"
 }

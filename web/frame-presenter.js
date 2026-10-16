@@ -66,6 +66,7 @@ export function installFramePresenter(mod,{deferred=false,isReplaying=()=>false}
   }
   mod.updateTexture=(frame,frameWidth,frameHeight)=>{
     if(disposed)return;
+    mod.playerArt?.bind();
     metrics.submitted++;mod.frameUploads=(mod.frameUploads||0)+1;
     if(isReplaying())metrics.replaySubmitted++;
     if(dirty)metrics.coalesced++;
@@ -80,7 +81,7 @@ export function installFramePresenter(mod,{deferred=false,isReplaying=()=>false}
     info(){
       const sorted=Array.from(gaps.subarray(0,gapCount)).sort((a,b)=>a-b);
       const percentile=p=>sorted.length?sorted[Math.ceil(sorted.length*p)-1]:null;
-      return {...metrics,pending:dirty,intervals:{count:gapCount,p95Ms:percentile(.95),p99Ms:percentile(.99),maxMs:sorted.at(-1)??null},
+      return {...metrics,pending:dirty,playerArt:mod.playerArt?.info()??null,intervals:{count:gapCount,p95Ms:percentile(.95),p99Ms:percentile(.99),maxMs:sorted.at(-1)??null},
         intervalScope:'last 512 WebGL draw intervals; not physical screen refresh'};
     },
     dispose(){if(disposed)return;disposed=true;gl.deleteTexture(texture);gl.deleteBuffer(buffer);gl.deleteProgram(program);},

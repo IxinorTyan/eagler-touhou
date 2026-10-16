@@ -82,7 +82,11 @@ Esc／P 打开原生暂停菜单，主键盘 Enter 确认；本机 P3 的小键�
 - 目标为幽灵：施救者扣 1 个备用残机，Bomb 减半向下取整；目标以当前一命、1 个 Bomb、保留火力和 150 帧无敌复活，并短暂清弹。
 - 完成后须松开低速键才能再次救援，持续按住不会重复扣费。
 
-三人均使用原版同色灵梦精灵，出生位置分别在左、右、中间。测试无敌默认关闭，可在页面启用；开启不增加资源或自动复活，成绩应与正常游玩区分。
+P1 使用原版红色灵梦，P2 蓝色，P3 绿色，出生位置分别在左、右、中间；退场后的幽灵也按红、蓝、绿区分。本体使用 `ghost-preview/th02-player-colors` 的 **TH02 专用绿色玄爷**素材，包含全部 10 帧，保留玄爷、肤色、头发和透明区域。幽灵使用 `ghost-preview/th05-four-player-colors/reimu` 的三色灵梦幽灵，仅借用幽灵素材。本地合作与联机共用这套美术。
+
+右侧每位玩家的标题行增加同色札弹标识，采用 TH02 原版 `MIKO16.BFT` 第 4 帧。札弹位于 x=480，原僚机图标移至 x=504，中间保留 8 像素空隙；幽灵状态也显示席位颜色，僚机仍按所选机体显示。
+
+测试无敌默认关闭，可在页面启用；开启不增加资源或自动复活，成绩应与正常游玩区分。
 
 ## 联机、音乐与性能
 
@@ -118,6 +122,9 @@ python tools/build_local.py --keep-runtime
 python tools/build_launch.py
 python tools/build_network_sound.py
 
+# 修改原生布局或颜色核心后，重建本地、联机及写入追踪核心
+python tools/build_player_art_runtime.py
+
 # 重建独立单人盘
 python tools/build_solo.py
 
@@ -126,6 +133,8 @@ python tools/update_network_manifest.py
 python -B tools/audit_network_assets.py
 ```
 
-`python tools/build_network_runtime.py` 从 TH04 冻结公共核心派生 TH02 忙等优化与写入追踪核心，需要完整固定工具链。音乐构建使用 `tools/build_local_bgm_assets.py`、PMD 渲染器和 ffmpeg/libopus。普通游玩无需 Node.js、NASM、Binaryen 或上述源码工具。
+`tools/build_local.py` 保留 TH02 专用运行时，并从三色 PNG 生成 `web/assets/th02-player-art.bin` 与来源摘要。`tools/build_player_art_runtime.py` 从 `build/art-baseline-20261016` 固定核心派生带像素来源标记的 RGB 核心，重新生成写入追踪；须在原生补丁重建后运行，以匹配数据段布局。RGB 替换只作用于实际原生绘制出的服装／幽灵像素，保留原生遮挡、文字层及调色效果，来源标记随回滚恢复。
+
+`python tools/build_network_runtime.py` 是从 TH04 冻结公共核心派生基础 TH02 核心的旧入口，单独运行会替换多人配色核心。完整重建需要固定的基础核心和工具链。音乐构建使用 `tools/build_local_bgm_assets.py`、PMD 渲染器和 ffmpeg/libopus。普通游玩无需 Node.js、NASM、Binaryen 或上述源码工具。
 
 引擎来源及修改说明见 [运行时来源](NOTICE-runtime.md)、[DOSBox-X 说明](web/vendor/dosbox-x/NOTICE.md) 和 [GPL-2.0 许可证](web/vendor/dosbox-x/LICENSE)。游戏、美术及音乐的权利归各自权利人所有，模拟器许可证不改变游戏素材的权利归属。

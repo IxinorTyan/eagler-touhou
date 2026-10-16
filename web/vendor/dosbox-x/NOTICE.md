@@ -33,10 +33,28 @@ VSync wait fusion, preserving decoder instruction budgets and event boundaries.
 `tools/build_network_runtime.py` then derives a new complete write-tracked core.
 Native scheduling, guarded synchronous interpreter, memcmp and planar pixel
 conversion are retained. TH02 uses its own disk/input/state adapter and an
-independent `th02-rollback/6` protocol. Local JSPI assets are unchanged.
+independent `th02-rollback/6` protocol.
 GPL sources, pinned toolchain, patch scripts and license remain in the sibling
 TH04 development project; network deployment itself is self-contained here.
 `web/netplay/runtime.json` records the actual deployed resource hashes.
+
+TH02 multiplayer RGB art extends all three deployed cores (local JSPI,
+plain rollback and tracked rollback). `tools/build_player_art_core.mjs` and
+`tools/player-art.wat` add per-page sprite provenance at native GRCG writes
+and apply garment/ghost RGB during scanout, before the native text layer.
+`tools/build_player_art_runtime.py` regenerates write tracking for these stores.
+The local JSPI wrapper also exposes its native exports for art initialization.
+The original native palette and protected body pixels remain authoritative;
+the provenance heap is restored with emulator rollback state. The source
+baseline hashes and transformations are retained in the TH02 development
+workspace under `build/art-baseline-20261016` and `tools/`.
+`web/assets/th02-player-art.json` records all 33 source image hashes. All 10
+body frames come from TH02's green-Genjii set in `th02-player-colors`; only
+the three ghost PNGs come from `th05-four-player-colors/reimu`.
+Each seat also packs a HUD ofuda frame extracted from TH02 MIKO16.BFT frame 4,
+recolored with the same seat palette. `hudShot` records its source/image hashes
+and the separated bullet/option layout. It uses native tiny-sprite rendering
+with the same provenance tracking; no browser overlay is involved.
 
 Network play additionally applies validated, private in-memory MAIN edits to
 observe PMD music commands and disable native song loading/playback. FM sound
@@ -49,3 +67,11 @@ and change their fade/volume. Original source disks are never overwritten.
 
 The original game assets are supplied by the user's disks; their rights
 remain with their respective owners.
+
+Standalone single player uses separate TH02 disks. Its 16-bit status, optional
+focus/marker and touch hooks preserve all original resource/score/collision
+routines. The small resident INT 60h bridge derives from the workspace TH05/TH04
+PMD bridge: it masks music parts 0..14 while retaining FM effects part 15 and
+original PMD timing. Browser Web Audio plays the existing TH02 Opus assets.
+The bridge is installed only in the private running copy of GAME.BAT; original
+source disks and cooperative native layouts are unchanged.
