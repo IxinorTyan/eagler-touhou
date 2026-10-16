@@ -4,6 +4,7 @@ import {LocalAudioOutput} from './netplay/audio-output.js';
 import {createDosboxSnapshots} from './dosbox-snapshots.js';
 import {makeMemoryDiff} from './dosbox-memory-diff.js';
 import {installFramePresenter} from './frame-presenter.js';
+import {installProjectileArt} from './projectile-art.js';
 const codes={ArrowUp:265,ArrowDown:264,ArrowLeft:263,ArrowRight:262,KeyZ:90,KeyX:88,ShiftLeft:340,ShiftRight:344,Escape:256,Enter:257,Space:32};
 export class DOSBoxPC98 {
   static async create(config){const emulator=new DOSBoxPC98(config);await emulator.initialize();return emulator;}
@@ -32,7 +33,9 @@ export class DOSBoxPC98 {
       sendMessageToServer:(name,props)=>this.module.messageHandler({data:{name,props}}),
       initMessageHandler:handler=>{receiver=handler;for(const [name,props]of queue)handler(name,props);queue.length=0;},exit:()=>{}};
     const factory=(await import(net?(tracked?'./vendor/dosbox-x/dosbox-rollback-tracked.mjs':'./vendor/dosbox-x/dosbox-rollback.mjs'):'./vendor/dosbox-x/dosbox-jspi.mjs')).default;
-    await factory(this.module);this.module.callMain([this.transport.sessionId]);
+    await factory(this.module);
+    this.module.projectileArt=await installProjectileArt(this.module,this.config.artPatch);
+    this.module.callMain([this.transport.sessionId]);
     if(net&&this.config.rollbackEnabled!==false)this.module.memoryDiff=await makeMemoryDiff(this.module);
     this.onSleep=({data})=>{if(!net&&data?.name==='ws-sync-sleep'&&data.props.sessionId===this.transport.sessionId)globalThis.postMessage({name:'wc-sync-sleep',props:data.props},'*');};
     if(!net&&typeof window!=='undefined'&&window.postMessage)window.addEventListener('message',this.onSleep);

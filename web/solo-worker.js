@@ -64,7 +64,7 @@ async function dispatch(message){
     const setup=args[0];game=setup.game;patch=setup.patch;
     environment=workerEnvironment(setup.canvas,setup.sampleRate);
     const {NP21}=await import(game==='03'?'./vendor/np2/np2-original.js':'./dosbox-adapter.js');
-    emulator=await NP21.create({...setup.config,canvas:setup.canvas,workerRuntime:true,nativeSoloAudio:false,
+    emulator=await NP21.create({...setup.config,artPatch:game==='04coop'?patch:null,canvas:setup.canvas,workerRuntime:true,nativeSoloAudio:false,
       onDiskChange:()=>postMessage({type:'diskChange'}),onExit:()=>{clear();postMessage({type:'exit'});}});
     if(game==='03'){
       const {NativePause}=await import('./native-pause.js');bridge=new NativePause(()=>emulator,patch);

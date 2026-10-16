@@ -10,6 +10,7 @@ export function createLocalWorkerState(emulator,patch){
    }cursor=end;
   }
   const active=live();if(active.length===1)mailbox=active[0];else if(!active.includes(mailbox))mailbox=-1;
+  emulator.module.projectileArt?.bind(mailbox);
  }
  function read(){scan();if(mailbox<0)return null;const h=emulator.module.HEAPU8,v=new DataView(h.buffer),m=mailbox,cs=m-patch.mailbox_cs_offset;
   const players=[];if(h[m+605]===1)for(let i=0;i<Math.min(h[m+606],h[m+607]);i++){

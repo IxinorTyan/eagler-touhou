@@ -95,6 +95,7 @@ function scan(){
   const active=candidates.filter(at=>v.getUint32(at+16,true)>0&&v.getUint16(at+20,true)>0&&heap[at+25]===1);
   if(active.length===1)mailbox=active[0];
   else if(!active.includes(mailbox))mailbox=-1;
+  emulator.module.projectileArt?.bind(mailbox);
 }
 function snapshot(){
   if(emulator?.isWorker)return emulator.snapshot.state;
@@ -210,7 +211,7 @@ $('start').onclick=async()=>{
       try{await localMusic.install(musicDisk,'GENSO');data=musicDisk;}
       catch(error){localMusic.dispose();localMusic=null;status('独立音乐加载失败，将使用原声：'+error.message);}
     }
-    const runtimeConfig={canvas:$('canvas'),ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,no_mouse:true,use_menu:false,fontfile:'font.bmp'};
+    const runtimeConfig={canvas:$('canvas'),artPatch:patch,ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,no_mouse:true,use_menu:false,fontfile:'font.bmp'};
     const background=supportsSoloWorker()&&new URLSearchParams(location.search).get('runtime')!=='main';
     emulator=background?await WorkerNP21.create(runtimeConfig,{game:'04coop',patch,music:localMusic?.reader.patch,onError:error=>{localMusic?.suspend();status('模拟线程错误：'+error.message);}}):await NP21.create(runtimeConfig);
     if(emulator.isWorker)emulator.onMusic=(ax,hash)=>localMusic?.player.command(ax,hash);

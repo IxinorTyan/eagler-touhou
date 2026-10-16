@@ -113,7 +113,7 @@ async function boot(config){
   }
   for(const edit of sound.edits)edit.targets.forEach((at,i)=>{disk[at]=edit.values[i];});
   await bootProgress('下载、编译并初始化 DOSBox-X WASM 与音频设备',5);
-  emulator=await NP21.create({canvas:nativeCanvas,lockstep:true,rollbackEnabled:config.rollback!==false,lockstepEpoch:version.epoch,
+  emulator=await NP21.create({canvas:nativeCanvas,artPatch:patch,lockstep:true,rollbackEnabled:config.rollback!==false,lockstepEpoch:version.epoch,
     ExMemory:7,Latencys:40,SampleHz:44100,SNDboard:4,
     no_mouse:true,use_menu:false,fontfile:'font.bmp',
     onExit:()=>{enabled=false;closed=true;bgm?.dispose();window.parent.postMessage({protocol:'th04-rollback/3',event:'runtime-exit'},location.origin);}});
@@ -143,7 +143,7 @@ async function boot(config){
   // No music imports/downloads/decoding until an actual game frame is observed.
   musicSettings=config;
   await bootProgress('原游戏磁盘和引擎已就绪，等待全员同步开局',7);
-  return {presentation:version.presentation_sha256,disk:meta.sha256,runtime:version.generated_js_sha256,wasm:version.wasm_sha256,mobileWasm:version.mobile_wasm_sha256,clock:version.clock_sha256,cpuCycles:version.cpu_cycles,audio:version.audio_output_sha256,nativeSound:sound,queue:version.rollback_queue_sha256,snapshots:version.native_snapshots_sha256,controls:version.controls_sha256,pause:version.pause_sha256,game:version.game_adapter_sha256,room:version.room_sha256,membership:version.membership_sha256,startup:version.startup_sha256,hostSlot:pauseMenu.hostSlot,adapter:version.adapter,dosboxDisk:version.dosbox_disk_sha256,memoryDiff:version.dosbox_memory_diff_sha256,snapshotDiff:version.snapshot_diff_wasm_sha256,fault:version.fault_sha256,trackedWasm:version.write_journal?.wasm_sha256,trackedGlue:version.write_journal?.glue_sha256,trackedDiff:version.write_journal?.diff_sha256};
+  return {projectileArt:version.projectile_art_sha256,presentation:version.presentation_sha256,disk:meta.sha256,runtime:version.generated_js_sha256,wasm:version.wasm_sha256,mobileWasm:version.mobile_wasm_sha256,clock:version.clock_sha256,cpuCycles:version.cpu_cycles,audio:version.audio_output_sha256,nativeSound:sound,queue:version.rollback_queue_sha256,snapshots:version.native_snapshots_sha256,controls:version.controls_sha256,pause:version.pause_sha256,game:version.game_adapter_sha256,room:version.room_sha256,membership:version.membership_sha256,startup:version.startup_sha256,hostSlot:pauseMenu.hostSlot,adapter:version.adapter,dosboxDisk:version.dosbox_disk_sha256,memoryDiff:version.dosbox_memory_diff_sha256,snapshotDiff:version.snapshot_diff_wasm_sha256,fault:version.fault_sha256,trackedWasm:version.write_journal?.wasm_sha256,trackedGlue:version.write_journal?.glue_sha256,trackedDiff:version.write_journal?.diff_sha256};
 }
 function findMailbox(){
   const heap=emulator.module.HEAPU8,view=new DataView(heap.buffer);
@@ -154,6 +154,7 @@ function findMailbox(){
     if(at+675<heap.length&&signature.every((v,i)=>heap[at+i]===v)&&heap[at+25]===1&&view.getUint32(at+16,true)>0&&view.getUint16(at+20,true)>0)candidates.push(at);
   }
   if(candidates.length===1)mailbox=candidates[0];
+  emulator.module.projectileArt?.bind(mailbox);
 }
 function applyP1(bits){
   for(const [code,key,keyCode,bit]of keyTable){
