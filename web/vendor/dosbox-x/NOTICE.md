@@ -26,6 +26,11 @@ private WEBSTART.COM before boot, entering MAIN at the selected stage without
 OP's difficulty/shot menus. Browser settings supply each seat's shot type and
 initial resources. Multiplayer focus movement is fixed at 50%; network rooms
 freeze the host-owned focus and targeting switches before synchronized play.
+Direct multiplayer boot removes all six validated `zun zunsoft.com` logo
+branches from the private FASTBOOT.BAT only. ZUN initialization/resident setup,
+MMD, PMD selection and cleanup remain intact. The DOSBox-X `fastbioslogo`
+setting removes the BIOS splash delay. The local status scanner uses the
+core's conventional-RAM base instead of rotating through the entire WASM heap.
 The interpreter uses Simple CPU and JSPI. Newer Edge/Chrome is required.
 
 The network runtime now imports the pinned 2026-10-15 native scheduler core

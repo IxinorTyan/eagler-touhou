@@ -15,7 +15,7 @@
     "control-settings.css": "8428afa28a1f29d46d5d4bf73da25066a87e6e1714a91405a30661446345e54c",
     "control-settings.js": "4eba3f22cd132473274d44147efe2633e10b388eea402de53074025623b73517",
     "dosbox-adapter.js": "0417d1bee6b976bc829c56863b8bc9f3ff1f1c9e5de9bc28b7d09948d85bdaa3",
-    "dosbox-disk.js": "068332c07fe1d3f705e01ebd376324790c3fcb93dcc70b63e977ea4b89be176f",
+    "dosbox-disk.js": "d4202c2d4fc1a8014fe09c060d2e693233e93d0efa81de9e8aafa56e1e0546c2",
     "dosbox-memory-diff.js": "2040999963615c5464fa6c6beb4316838d6769ffdda7728f72e84e32e2c09994",
     "dosbox-snapshots.js": "2dbb05b6625b7ebbc2703d01654a84f7eb7381319541fea5b66372fbcd82d236",
     "focus-settings.js": "f565d1cadd3dcb5c7233edf5429f7443e114cef804aaf9ec84f7f2928212f29b",
@@ -93,5 +93,5 @@
       "sha256": "5fb459e5df9232cab4d55f3c36c0bb6b4d00a983fc023661245373ee59ca06d8"
     }
   },
-  "build": "c4ee859c917bf703a74b82bd3d8b5207f2df32f19a7cdc1f8b27f4901e15150d"
+  "build": "e6d4e703f0c8c7c254de078e0fc1062432d1b9c1619dba1b5ebff3303434e616"
 }

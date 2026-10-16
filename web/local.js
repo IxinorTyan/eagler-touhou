@@ -127,8 +127,12 @@ function scan(){
   const valid=()=>candidates.filter(at=>h[at+22]===1&&v.getUint16(at+20,true)>0);
   let active=valid();
   if(!active.length){
-    if(cursor>=h.length)cursor=0;
-    const end=Math.min(h.length,cursor+1024*1024),slice=h.subarray(cursor,Math.min(h.length,end+signature.length-1));
+    // The native core exposes conventional guest RAM. Searching its 640 KiB
+    // finds MAIN immediately instead of cycling through the whole WASM heap.
+    const ramBase=emulator.module.nativeExports?.().thCoreState?.(0);
+    const start=ramBase??0,limit=ramBase===undefined?h.length:Math.min(h.length,ramBase+0xa0000);
+    if(cursor<start||cursor>=limit)cursor=start;
+    const end=Math.min(limit,cursor+1024*1024),slice=h.subarray(cursor,Math.min(limit,end+signature.length-1));
     for(let i=slice.indexOf(signature[0]);i>=0&&cursor+i<end;i=slice.indexOf(signature[0],i+1)){
       const at=cursor+i;if(at+metadata.players.mailboxSize<=h.length&&signature.every((b,j)=>h[at+j]===b)&&!candidates.includes(at))candidates.push(at);
     }
