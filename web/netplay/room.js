@@ -13,6 +13,7 @@ const $=id=>document.getElementById(id),roles=['host','guest','guest2'];
 const label=role=>({host:'房主',guest:'客机 1',guest2:'客机 2'})[role];
 const status=text=>{$('status').textContent=text;player.note(text);};
 const settingNames=['players','stage','difficulty','lives','bombs'];
+const assistFlags=['focusEnabled','teamTargeting'];
 let session,state,iframe,runtime,queue,localReady;
 const mode=readNetworkMode();
 let useRelay=mode.transport==='ws';
@@ -222,7 +223,8 @@ function render(){
   $('settings').disabled=!lobby||busy||session.role!=='host';
   for(const key of [...settingNames,'language'])$(key).value=state.settings[key];
   $('difficulty').disabled=state.settings.stage===5;
-  $('launch-summary').textContent=`${state.settings.stage===5?'Extra（固定 Extra 难度）':`第 ${state.settings.stage+1} 关 · ${['Easy','Normal','Hard','Lunatic'][state.settings.difficulty]}`} · 每人 ${state.settings.lives} 残机 / ${state.settings.bombs} Bomb · 机体 ${Array.from({length:state.settings.players},(_,i)=>`P${i+1} ${['高速','平衡','低速'][state.settings[`p${i+1}`]]}`).join(' / ')}`;
+  if(!busy)for(const key of assistFlags)$(key).checked=state.settings[key];
+  $('launch-summary').textContent=`${state.settings.stage===5?'Extra（固定 Extra 难度）':`第 ${state.settings.stage+1} 关 · ${['Easy','Normal','Hard','Lunatic'][state.settings.difficulty]}`} · 每人 ${state.settings.lives} 残机 / ${state.settings.bombs} Bomb · 机体 ${Array.from({length:state.settings.players},(_,i)=>`P${i+1} ${['高速','平衡','低速'][state.settings[`p${i+1}`]]}`).join(' / ')} · 低速${state.settings.focusEnabled?` ${state.settings.focusPercent}%`:'关闭'} · ${state.settings.teamTargeting?'敌人瞄准全队':'敌人仅瞄准 P1'}`;
   if(!busy)$('rollback').checked=state.settings.rollback;
   const loadoutSlot=slot===null?null:`p${slot+1}`;
   $('loadout-panel').hidden=slot===null||!lobby;
@@ -241,7 +243,7 @@ function render(){
 }
 function update(value){
   if(stopped)return;
-  if(!value||value.protocol!==PROTOCOL||typeof value.settings?.rollback!=='boolean'||'cpuMultiplier' in value.settings||!['cn','jp'].includes(value.settings?.language)||!['ws','rtc'].includes(value.transport)||typeof value.connectionCommitted!=='boolean')throw Error('请关闭旧服务窗口，重新运行新版 start-lan.bat（公网使用 start-public.bat），并刷新所有玩家的页面');
+  if(!value||value.protocol!==PROTOCOL||typeof value.settings?.rollback!=='boolean'||assistFlags.some(key=>typeof value.settings?.[key]!=='boolean')||value.settings?.focusPercent!==50||'cpuMultiplier' in value.settings||!['cn','jp'].includes(value.settings?.language)||!['ws','rtc'].includes(value.transport)||typeof value.connectionCommitted!=='boolean')throw Error('请关闭旧服务窗口，重新运行新版 start-lan.bat（公网使用 start-public.bat），并刷新所有玩家的页面');
   if(state&&value.revision<=state.revision)return;
   const changed=state&&value.transport!==state.transport;
   if(changed&&running)throw Error('游戏运行期间连接方式发生变化，请重新建房');
@@ -811,9 +813,9 @@ window.addEventListener('pagehide',()=>{if(session)navigator.sendBeacon('/api/le
 $('create').onclick=()=>enter('host');$('join').onclick=()=>enter('guest');
 for(let n=0;n<3;n++)$(`seat${n}`).onclick=()=>action('seat',{slot:n});
 for(const card of document.querySelectorAll('[data-loadout]'))card.onclick=()=>action('loadout',{loadout:Number(card.dataset.loadout)});
-for(const name of [...settingNames,'language','rollback'])$(name).onchange=()=>{
+for(const name of [...settingNames,'language','rollback',...assistFlags])$(name).onchange=()=>{
   if(session?.role!=='host'||state?.phase!=='lobby')return;
-  action('settings',{settings:{...Object.fromEntries(settingNames.map(key=>[key,Number($(key).value)])),language:$('language').value,rollback:$('rollback').checked}});
+  action('settings',{settings:{...Object.fromEntries(settingNames.map(key=>[key,Number($(key).value)])),...Object.fromEntries(assistFlags.map(key=>[key,$(key).checked])),focusPercent:50,language:$('language').value,rollback:$('rollback').checked}});
 };
 $('ready').onclick=()=>{
   if(!state.ready[session.role]&&session.role!=='host')player.note('已准备，等待房主开始。房主开始后进入游戏画面。');

@@ -153,7 +153,8 @@ class Handler(SimpleHTTPRequestHandler):
                     'seen':{r:now for r in ROLES},'revision':1,'phase':'lobby','slots':{r:None for r in ROLES},
                     'ready':{r:False for r in ROLES},'generation':secrets.token_hex(8),
                     'settings':{'p1':0,'p2':1,'p3':2,'players':2,'language':'cn','rollback':rollback,
-                                'stage':0,'difficulty':1,'lives':2,'bombs':3}}
+                                'stage':0,'difficulty':1,'lives':2,'bombs':3,
+                                'focusEnabled':True,'focusPercent':50,'teamTargeting':True}}
                 return self.reply({'room':code,'token':token,'role':'host','protocol':PROTOCOL,'state':snapshot(ROOMS[code])})
             code=str(data.get('room','')).upper()
             if len(code)!=4 or any(c not in '0123456789' for c in code):
@@ -213,8 +214,9 @@ class Handler(SimpleHTTPRequestHandler):
                     if role!='host':
                         return self.reply({'error':'只有房主可以修改本局设置'},403)
                     value=data.get('settings',{})
-                    bounds={'players':(2,3),'stage':(0,5),'difficulty':(0,3),'lives':(0,5),'bombs':(0,5)}
-                    if not isinstance(value,dict) or set(value)!=(set(bounds)|{'rollback','language'}) or value.get('language') not in ('cn','jp') or type(value.get('rollback')) is not bool or any(type(value[k]) is not int or not lo<=value[k]<=hi for k,(lo,hi) in bounds.items()):
+                    bounds={'players':(2,3),'stage':(0,5),'difficulty':(0,3),'lives':(0,5),'bombs':(0,5),'focusPercent':(50,50)}
+                    flags={'rollback','focusEnabled','teamTargeting'}
+                    if not isinstance(value,dict) or set(value)!=(set(bounds)|flags|{'language'}) or value.get('language') not in ('cn','jp') or any(type(value.get(k)) is not bool for k in flags) or any(type(value[k]) is not int or not lo<=value[k]<=hi for k,(lo,hi) in bounds.items()) or value['focusPercent']%5:
                         return self.reply({'error':'开局设置无效'},400)
                     if value['players']==2 and (room['guest2'] or 2 in room['slots'].values()):
                         return self.reply({'error':'请先让第三位加入者离开，并腾出 P3 座位，再关闭 3P'},409)

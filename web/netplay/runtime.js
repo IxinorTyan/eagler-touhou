@@ -2,7 +2,7 @@ import {DOSBoxPC98,supportsWriteJournal} from '../dosbox-adapter.js';
 import {Fat12,sha256} from '../solo-fat12.js';
 import {keyboardBits,isBound,useControlSnapshot,isFormTarget,controlsSummary} from '../control-settings.js';
 import {nativeBits,locateMailbox,guestBase,nativePaused,writeInputs,readState} from './th02-state.js';
-import {configureLauncher,launchConfig} from './launch-config.js';
+import {configureLauncher,launchConfig,launchDefaults} from './launch-config.js';
 import {runBoot} from './boot-runner.js';
 const PROTOCOL='th02-rollback/6',canvas=document.getElementById('canvas'),details=document.getElementById('details');
 const nativeCanvas=document.createElement('canvas');nativeCanvas.width=640;nativeCanvas.height=400;nativeCanvas.hidden=true;document.body.append(nativeCanvas);
@@ -26,7 +26,7 @@ async function get(url,type='json'){
  const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error(`资源读取失败：${url}（${r.status}）`);return r[type]();
 }
 async function boot(settings){
- config={...settings};launchConfig(config);if(config.players!==players)throw Error('TH02 开局人数不匹配');await progress('读取 TH02 游戏磁盘和版本清单',1);
+ config={...launchDefaults,...settings};launchConfig(config);if(config.players!==players)throw Error('TH02 开局人数不匹配');await progress('读取 TH02 游戏磁盘和版本清单',1);
  [patch,version]=await Promise.all([get('../local-patch.json'),get('./runtime.json')]);
  if(version.protocol!==PROTOCOL)throw Error('联机清单版本不匹配');
  // Verify every adapter, imported module and core before declaring ready. The
@@ -81,6 +81,7 @@ async function boot(settings){
  emulator.module.bootCPUMetrics=emulator.module.UTF8ToString(emulator.module._getCPUMetrics());
  if(emulator.module.bootCPUMetrics.split('|')[0]!=='30000')throw Error('TH02 联机周期未恢复为 30000');
  const initial=state();if(initial.stage!==config.stage||initial.players.length!==players||initial.players.some((p,i)=>p.lives!==config.lives||p.bombs!==config.bombs||p.shot!==config[`p${i+1}`]))throw Error('TH02 原生开局配置未生效');
+ writeInputs(emulator.module.HEAPU8,mailbox,patch,Array(players).fill(0),players,config);
  const view=new DataView(emulator.module.HEAPU8.buffer);consumedNative=consumedNative.map((_,i)=>view.getUint16(mailbox+138+i*2,true));
  config.boot={steps:emulator.tick,wallMs:Math.round(performance.now()-started)};
  await progress('关卡已就绪，等待全员同步开始',7);
@@ -138,7 +139,7 @@ function step(inputs,{frame=ticks,replay=false,offlineMask=0}={}){
    m.thDirtyMark?.(mailbox,patch.players.mailboxSize);
    m.thDirtyMark?.(mailbox-patch.entries.mailbox+patch.entries.touch_state,2*patch.touch.stride+6);
   }
-  writeInputs(m.HEAPU8,mailbox,patch,nativeInput(inputs),players);
+ writeInputs(m.HEAPU8,mailbox,patch,nativeInput(inputs),players,config);
   // Before MAIN and inside native pause, P1 operates original menus. Every
   // seat can request pause/confirm; all key events carry the virtual timestamp.
   const mapped=inputs.map(nativeBits);

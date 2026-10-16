@@ -12,3 +12,14 @@
 body:not([data-running="true"]) #screen.th02-player{height:clamp(220px,40vw,360px);min-height:220px}
 body:not([data-running="true"]) #screen .player-stage:after{content:'选择设置，开始本机合作';position:absolute;color:var(--muted);font-size:13px}
 .controls .team-targeting{display:flex;flex-direction:row}
+/* Keep all pre-game choices together, including each seat's movement assists. */
+#launch{display:block}#launch>h2{margin-bottom:0}.launch-settings{margin-top:20px}
+.aircraft-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:22px 0}
+.aircraft-grid .shot-picker{min-width:0;padding:16px;border:1px solid var(--line);border-radius:14px}
+.aircraft-grid .shot-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.aircraft-grid .shot-choices button{flex-direction:column;padding:9px 4px;font-size:13px}
+.aircraft-grid .assist-settings{margin-top:8px;padding:14px 0 0;border:0;border-top:1px solid var(--line);border-radius:0;background:none}
+.aircraft-grid .assist-settings legend{padding:0;font-size:12px;color:var(--muted)}
+.aircraft-grid .assist-settings label{display:grid;gap:6px;font-size:13px}.aircraft-grid .assist-settings .check{display:flex}
+.aircraft-grid .assist-settings select{width:100%}#launch-assists{margin:16px 0}#launch-summary{margin-bottom:16px}
+@media(max-width:900px){.aircraft-grid{grid-template-columns:1fr}.aircraft-grid .shot-choices{max-width:400px}}

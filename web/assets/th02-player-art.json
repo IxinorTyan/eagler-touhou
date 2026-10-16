@@ -2,8 +2,8 @@
   "schema": 1,
   "game": "TH02",
   "file": "assets/th02-player-art.bin",
-  "sha256": "1d78549c121239e1f76e52f03a59b78c7129fdddba2779398a1ac266449f6945",
-  "bytes": 221188,
+  "sha256": "e4b8e4cf4b53884993307fa39b1cc3615afaf79d596171c52c5b675472cf9d30",
+  "bytes": 240256,
   "variants": [
     "p1-original",
     "p2-blue",
@@ -81,5 +81,65 @@
       "p2-blue": "581192e5ee4e668c2daa9c4e3069f526061f8865ea37dbee3c2182a640f3f05f",
       "p3-green": "a5b7d234f1e280ddc382911a6b8f76c5180d78f256186142aeb31db08243cbe2"
     }
+  },
+  "projectiles": {
+    "contextFrame": 13,
+    "tagBase": 60000,
+    "paletteTagBase": 60016,
+    "ownerEntry": "shot_owners",
+    "nativeShapesAndPhysics": true,
+    "colors": [
+      [
+        [
+          170,
+          0,
+          0
+        ],
+        [
+          255,
+          0,
+          0
+        ],
+        [
+          255,
+          102,
+          102
+        ]
+      ],
+      [
+        [
+          34,
+          68,
+          170
+        ],
+        [
+          68,
+          136,
+          255
+        ],
+        [
+          102,
+          187,
+          255
+        ]
+      ],
+      [
+        [
+          17,
+          119,
+          68
+        ],
+        [
+          51,
+          204,
+          119
+        ],
+        [
+          85,
+          221,
+          153
+        ]
+      ]
+    ]
   }
 }

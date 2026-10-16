@@ -18,7 +18,7 @@ export function guestBase(heap,mailbox,patch){
  return base;
 }
 export function nativePaused(heap,mailbox,patch){return mailbox>=0&&!!heap[mailbox-patch.entries.mailbox+patch.entries.touch_paused];}
-export function writeInputs(heap,mailbox,patch,inputs,players){
+export function writeInputs(heap,mailbox,patch,inputs,players,settings={}){
  if(mailbox<0)return;
  const v=new DataView(heap.buffer),cb=mailbox-patch.entries.mailbox,blocked=!heap[mailbox+22]||nativePaused(heap,mailbox,patch);
  for(let slot=0;slot<3;slot++){
@@ -32,10 +32,10 @@ export function writeInputs(heap,mailbox,patch,inputs,players){
   v.setInt16(at+2,allowed?clamp(v.getInt16(at+2,true)+motion.x):0,true);
   v.setInt16(at+4,allowed?clamp(v.getInt16(at+4,true)+motion.y):0,true);
  }
- heap[mailbox+patch.focus.enabledOffset]=(1<<players)-1;
+ heap[mailbox+patch.focus.enabledOffset]=settings.focusEnabled===false?0:(1<<players)-1;
  // Display preferences never write different native state on different peers.
  heap[mailbox+patch.focus.pointOffset]=0;
- heap[mailbox+patch.targeting.enabledOffset]=1;
+ heap[mailbox+patch.targeting.enabledOffset]=Number(settings.teamTargeting!==false);
  heap[mailbox+patch.debug.invincibilityMailboxOffset]=0;
 }
 export function readState(heap,mailbox,patch){

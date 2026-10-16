@@ -14,17 +14,17 @@
   "assets": {
     "control-settings.css": "8428afa28a1f29d46d5d4bf73da25066a87e6e1714a91405a30661446345e54c",
     "control-settings.js": "4eba3f22cd132473274d44147efe2633e10b388eea402de53074025623b73517",
-    "dosbox-adapter.js": "fad1ffdecc68484345631025ba0315c917b684c25079015366841d41519d02b3",
+    "dosbox-adapter.js": "0417d1bee6b976bc829c56863b8bc9f3ff1f1c9e5de9bc28b7d09948d85bdaa3",
     "dosbox-disk.js": "068332c07fe1d3f705e01ebd376324790c3fcb93dcc70b63e977ea4b89be176f",
     "dosbox-memory-diff.js": "2040999963615c5464fa6c6beb4316838d6769ffdda7728f72e84e32e2c09994",
     "dosbox-snapshots.js": "2dbb05b6625b7ebbc2703d01654a84f7eb7381319541fea5b66372fbcd82d236",
-    "focus-settings.js": "3b635e679abdb2c666d62e16d507eb17a76c2dafa53ade280e7b46e0de14e700",
+    "focus-settings.js": "f565d1cadd3dcb5c7233edf5429f7443e114cef804aaf9ec84f7f2928212f29b",
     "frame-limit.js": "e984d0b2adcf5dce3828e5b6e15bb7cf6aebd1ddbd9f5d7950a5dfda11998d03",
     "frame-presenter.js": "7c9c834d6627ae044fa3b7d33b572e95fa20b7d79e7ac3d4a1cf0df3e016434a",
     "index.html": "efa7ae1750da73988a446f8d2cf53fc204df9c76204280332100063708a41e47",
-    "lan.html": "31e030b68fc2a369dff5bc247e5608fdbdb0ecfd4852a4d24727dabe4e4e0297",
+    "lan.html": "bf97b10d25708417451a7824e8e974e4ee016fb3a9802e395669b2b7686c39db",
     "lan.js": "b2b260e540b195ae8dd09812412f81aa653bff0493beaee6dc11623580a4a49d",
-    "local.css": "54cb4c4199171b0316b0e236d0278ea8c510d6e6199e67c60e2914f5a819c8f7",
+    "local.css": "657647d9b6798cbb21d09bb8a6ef2eddf163b631b7453598b0a6f913e24c2b52",
     "native-touch.js": "4399ed78b5f4219458717669592e3e05de3c3ad3086ca76e724b555c557078a8",
     "navigation.js": "4f6e4844cbf35442b6bacb4d7428eec4156ca90d61ab2377a5f0511f8432cc9d",
     "netplay/audio-output.js": "18760a612db5dfff8a8dd63bef48f12df51c62474a7cd465084ffbe0fc90a214",
@@ -33,18 +33,18 @@
     "netplay/controls.js": "8d645c2fdf06c11e6a18a4d8a3746c3e0ec7feb488b6d5e207a566af1c7880ca",
     "netplay/focus-display.js": "077df650a677d1ec25a7c07b6f9dad7b6e2a9db903c5ac93fd1df2a6bf84b282",
     "netplay/input-latch.js": "676c4488886c0a243ebef1ad35b3640a8e0709190e5fa71e8a49c1d37af9f31c",
-    "netplay/launch-config.js": "59cad2c436519289bbf7900a0cf9c2f7ca6260bb29bc209ddb2c54a296b9dba4",
+    "netplay/launch-config.js": "8b935c440e8e407a97d4efa5a97ea99a58b465ec4798f3494e9401c490104f25",
     "netplay/local-bgm.js": "3765cf22782dd3b50da82679b03c64ec4fda71d9411b60b781ba8f56fd658daf",
     "netplay/membership.js": "a84a5b38066e29a876db2c900e2411f3d4168f329bcb83fb44a81226a88e6fca",
     "netplay/network-mode.js": "dda8c24274cb84bf50aa50ca9405ffa8d707f9567137cb80cb2133ea45fb019b",
     "netplay/relay.js": "353ad772d5a77d70150498434398d43568c388d27b850c2401919e7034423d54",
     "netplay/rollback-queue.js": "b43c8f69d5e4e00acb4e9c4c0836cc887e3004e4b6566572cc895cf29ec06de6",
-    "netplay/room.js": "6cd6defeeeb78c75cf974566a23d612f031a2681a7004f5b3f1a61088bfc3caa",
+    "netplay/room.js": "f8d30bdaa39fd6ef2231e7925e4f8945d519090e44b2115a72a6ad80483f7fed",
     "netplay/runtime.html": "2e1a5f3006b7b9ab9c0632596e56dcd8d869fdbb9f5a8e45d5afcc5cd627ad2b",
-    "netplay/runtime.js": "60551630ec162fe9d64e617a40194fd42d6d02ba5edefc9fc2cc49cfb9f9796d",
+    "netplay/runtime.js": "ccaa2b2626af86bac7ebbb1a54cfebfb1d462d7cb38e4dac2a0e85e840061be0",
     "netplay/sha256.js": "9cb7be2bc039bcea2a4d727ef98bcd9047a78dfd4c11950355723147423e1f43",
     "netplay/th02-launch.com": "956a4d9d9ea3ff08f0d98c793a35d03cfaf3aeb129cdbdf5b3dbcf70be9b6dd0",
-    "netplay/th02-state.js": "54c67cd74bb2e89bda1208d3ef2dcaaf5bdd9153de536b0fa09893f195be12ab",
+    "netplay/th02-state.js": "5d9668c72049aaa581e54d09d811dc11b1bb0ae5d552e1d4d1c1bcf0c1bb1461",
     "netplay/udp-config.js": "244c1972f3d412455e007c01a7548375d43d38debe71cc077668ed2c977bdfa3",
     "player-art.js": "74d7282128cd7bf8bd40ac1d0218b0c77e0a68469dbed00f06362ee43eb10873",
     "player-ui.css": "336426049fe26ab7dc605359bf230b081a2625a9905fc6bff7a4fcc671cc9a80",
@@ -65,7 +65,7 @@
     "vendor/dosbox-x/dosbox-rollback-tracked.mjs": "f7224bcb7e5ea881525760f3b71b194d01e127acf31103a5400a06d9d004d048",
     "vendor/dosbox-x/dosbox-rollback.mjs": "b86ffabafe90b43c0e12745ebd2d03e0da3353a53f765ad50a2008d12e291e8e",
     "vendor/dosbox-x/emulators.js": "066176a9e9e6babfb5388552a5154f3c1f81ed778af3bf4a1f9f904161e3c4bb",
-    "local-patch.json": "0a89418593adaf399384401070af69dd19500c0542d08cb384991d2aa111570e",
+    "local-patch.json": "c903c639b8816ed8c2cec4ec8c18a2823909890ffdac8f58ba12714e4528f312",
     "assets/ghost-32.png": "b65bde17c040b32d2c3ca90436a8905006c4c4fc4dabb899876fecf2374674d2",
     "assets/hud-ofuda-p1-original.png": "b37e36b50161916c1888eda080dcda79132286b06758b9ae2ed0431e7ceab7fa",
     "assets/hud-ofuda-p2-blue.png": "581192e5ee4e668c2daa9c4e3069f526061f8865ea37dbee3c2182a640f3f05f",
@@ -74,8 +74,8 @@
     "assets/option-1.png": "48cd7d73254c630692b7ea58a67540b5d1495c168dbed773c315c968f805fb61",
     "assets/option-2.png": "8c42412047463af2848fc6ad070d8461ca5a2400a8156a4186a5086ea55e0d41",
     "assets/reimu-ghost-32.png": "661811629f6219fd19f77841dbf51e99aba1b51aa9143d4fa4bce9a126e15c33",
-    "assets/th02-player-art.bin": "1d78549c121239e1f76e52f03a59b78c7129fdddba2779398a1ac266449f6945",
-    "assets/th02-player-art.json": "6f7d4c46cddd89a75e9e994b9157bbf44a5d6a475c90b2ce230edfac39a70cef",
+    "assets/th02-player-art.bin": "e4b8e4cf4b53884993307fa39b1cc3615afaf79d596171c52c5b675472cf9d30",
+    "assets/th02-player-art.json": "2300ce5ea4187d14daf4b6b5c69a62ba88adabb7b2fea5a9f395ce619bcfa776",
     "netplay/sound-patch.json": "32954eb3bf378240d10e1f71eb9a982a8449bce3482911aea416d6b76207d657",
     "bgm/manifest.json": "7512e652e6dd1ce2e473e3bd230a0690d30093e7e2a1792f5c4c402816e34443",
     "solo-patch.json": "f3454898d48357ab97f0d82545ee811d40b135a753519f47c0c6058818b1d981",
@@ -86,12 +86,12 @@
   "cores": {
     "plain": {
       "file": "vendor/dosbox-x/wdosbox-x-rollback.wasm",
-      "sha256": "ad5e7bb9a55f4ecb81f4937f078c36e9c905f70e3d753e13506f4350974145da"
+      "sha256": "15e5936aad50d61f18323b842212c784abe9fdf314e7c70cd17ff6519a042d8f"
     },
     "tracked": {
       "file": "vendor/dosbox-x/wdosbox-x-rollback-tracked.wasm",
-      "sha256": "1847f9e0e55b61307180d3e46a7734a7d1d6d5faad68251f5480772b1def2a26"
+      "sha256": "5fb459e5df9232cab4d55f3c36c0bb6b4d00a983fc023661245373ee59ca06d8"
     }
   },
-  "build": "f63caa36264842682b60fa8199fe43ade06ed79746bf9382c27892b4edaa847c"
+  "build": "f9c1261881fc3ed2455c0dde1540fd45a7e51acc792f656106741690804f1f99"
 }

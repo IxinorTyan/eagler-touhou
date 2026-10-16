@@ -15,7 +15,11 @@
 <label>难度 <select id="difficulty"><option value="0">Easy</option><option value="1">Normal</option><option value="2">Hard</option><option value="3">Lunatic</option></select></label>
 <label>每人备用残机 <select id="lives"><option value="0">0</option><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label>
 <label>每人起始 Bomb <select id="bombs"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></label>
-</div><p class="muted">Extra 固定使用原生 Extra 难度。残机不含当前自机；每位玩家独立持有资源。</p><label class="rollback-option"><input id="rollback" type="checkbox" role="switch"> 启用预测回滚</label><p class="muted">默认开启，零步本地输入缓冲。性能较弱时可关闭回滚，使用按单程延迟协商的锁步；修改设置后全员重新准备。</p></fieldset>
+</div><p class="muted">Extra 固定使用原生 Extra 难度。残机不含当前自机；每位玩家独立持有资源。</p>
+<label class="rollback-option"><input id="focusEnabled" type="checkbox" role="switch" checked> 启用低速移动（全体玩家 · 固定 50% 移速）</label>
+<p class="muted">房主统一设置，低速固定为各机体正常移动速度的 50%。关闭低速后，低速键仍可停火救援；判定点显示由各自浏览器设置。</p>
+<label class="rollback-option"><input id="teamTargeting" type="checkbox" checked> 敌人瞄准所有存活队友（关闭时仅瞄准 P1）</label>
+<label class="rollback-option"><input id="rollback" type="checkbox" role="switch"> 启用预测回滚</label><p class="muted">默认开启，零步本地输入缓冲。性能较弱时可关闭回滚，使用按单程延迟协商的锁步；修改设置后全员重新准备。</p></fieldset>
 <p id="launch-summary" role="status"></p><p>全员准备后直接进入所选关卡，跳过开场和选机菜单。键盘方向键移动、Z 射击、X Bomb、Shift 低速／停火救援；各端操作自己选择的座位。</p>
 <details><summary>合作规则与断线</summary><p>保留本机版的独立生命、Bomb、火力、个人分数、幽灵与救援。BGM 由各端浏览器独立播放，可单独调节音乐音量；原生 FM 音效保留。Boss、得分与道具倍率沿用本机双人／三人规则。</p><p>暂停菜单由 P1 操作；任何人可请求暂停或确认。连接中断会等待恢复，超过宽限期则本局停止，需要重新建房。</p></details>
 <div class="row"><button id="ready">准备</button><button id="start" class="primary">房主开始游戏</button><button id="leave">结束并返回</button></div></section>

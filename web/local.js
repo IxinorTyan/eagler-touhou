@@ -3,6 +3,7 @@ import {Fat12,sha256} from './solo-fat12.js';
 import {mountFocusSettings} from './focus-settings.js';
 import {mountPlayer} from './player-ui.js';
 import {writeNativeTouch} from './native-touch.js';
+import {configureLauncher,launchConfig} from './netplay/launch-config.js';
 
 const $=id=>document.getElementById(id),keyboard=new Set();
 const signature=new TextEncoder().encode('TH02COOPv0002!!\0');
@@ -14,6 +15,7 @@ const bindings=[
 const nativeKeys=[['ArrowUp',1],['ArrowDown',2],['ArrowLeft',4],['ArrowRight',8],['KeyZ',16],['KeyX',32],['Escape',64],['Enter',128]];
 let emulator=null,metadata=null,mailbox=-1,candidates=[],cursor=0,lastNative=0,focused=true,launching=false,lastHud=0;
 let debugInvincible=false;
+let launchSettings=null;
 let touch=null,touchSlot=0,touchPlay=false,touchMenu=true,touchActive=false;
 const focusSettings=mountFocusSettings(()=>syncInput());
 const status=text=>{$('status').textContent=text;};
@@ -22,12 +24,28 @@ for(const id of ['pad1','pad2'])$(id).add(new Option('第 3 个手柄','2'));
 const shotChoices=[...document.querySelectorAll('[data-shot]')];
 const shotSelect=button=>button.closest('.shot-picker').querySelector('select');
 function showShotChoice(){for(const button of shotChoices)button.setAttribute('aria-pressed',String(button.dataset.shot===shotSelect(button).value));}
-for(const id of ['p2-shot','p3-shot'])$(id).addEventListener('change',showShotChoice);
-for(const button of shotChoices)button.onclick=()=>{const select=shotSelect(button);if(select.disabled)return;select.value=button.dataset.shot;showShotChoice();};
+for(const id of ['p1-shot','p2-shot','p3-shot'])$(id).addEventListener('change',()=>{showShotChoice();showLaunchSettings();});
+for(const button of shotChoices)button.onclick=()=>{const select=shotSelect(button);if(select.disabled)return;select.value=button.dataset.shot;showShotChoice();showLaunchSettings();};
+const launchSelects=['language','player-count','stage','difficulty','lives','bombs','p1-shot','p2-shot','p3-shot'];
+function readLaunchSettings(){return {language:$('language').value,players:Number($('player-count').value),
+  ...Object.fromEntries(['stage','difficulty','lives','bombs'].map(key=>[key,Number($(key).value)])),
+  ...Object.fromEntries([1,2,3].map(id=>['p'+id,Number($('p'+id+'-shot').value)]))};}
+function showLaunchSettings(){
+  const s=readLaunchSettings();$('difficulty').disabled=launching||!!emulator||s.stage===5;
+  const f=focusSettings();
+  $('launch-summary').textContent=`${s.stage===5?'Extra（固定 Extra 难度）':`第 ${s.stage+1} 关 · ${['Easy','Normal','Hard','Lunatic'][s.difficulty]}`} · 每人 ${s.lives} 残机 / ${s.bombs} Bomb · ${Array.from({length:s.players},(_,i)=>`P${i+1} ${['高速','平衡','低速'][s['p'+(i+1)]]} / 低速${f.seats[i].enabled?f.seats[i].percent+'%':'关闭'}`).join(' · ')}`;
+}
+for(const id of launchSelects)$(id).addEventListener('change',showLaunchSettings);
+for(let seat=1;seat<=3;seat++){
+  const assist=$('focus-enabled-'+seat).closest('fieldset');
+  $('p'+seat+'-picker').append(assist);
+}
+$('launch-assists').append($('team-targeting').closest('label'));
+for(const event of ['change','input'])$('launch').addEventListener(event,showLaunchSettings);
 function showPlayerCount(){const count=Number($('player-count').value);document.body.dataset.players=String(count);
   document.querySelectorAll('.p3-seat').forEach(el=>el.hidden=count<3);if(count<3)$('pad3').value='none';
   if($('touch-seat')){ $('touch-seat').options[2].hidden=count<3;if(touchSlot>=count){touchSlot=0;$('touch-seat').value='0';} }
-  $('start').textContent=`启动${count===3?'三':'双'}人游戏`;release();}
+  $('start').textContent=`启动${count===3?'三':'双'}人游戏`;showLaunchSettings();release();}
 $('player-count').addEventListener('change',showPlayerCount);showPlayerCount();
 
 function bitsFor(player){let bits=0;for(const code of keyboard)bits|=bindings[player].get(code)||0;return bits;}
@@ -176,10 +194,17 @@ requestAnimationFrame(tick);
 
 $('start').onclick=async()=>{
   if(launching||emulator)return;launching=true;$('start').disabled=true;
+  for(const id of launchSelects)$(id).disabled=true;
+  for(const button of shotChoices)button.disabled=true;
   try{
-    status('加载 DOSBox-X 和 th02 合作磁盘…');
-    const response=await fetch('local-patch.json');if(!response.ok)throw Error('补丁清单加载失败');metadata=await response.json();
-    const language=$('language').value,entry=metadata.disks[language],diskResponse=await fetch(entry.file);
+    launchSettings=readLaunchSettings();launchConfig(launchSettings);
+    status('加载 DOSBox-X 和 TH02 合作磁盘，准备直接进入关卡…');
+    const [response,launcherResponse,versionResponse]=await Promise.all([fetch('local-patch.json',{cache:'no-store'}),fetch('netplay/th02-launch.com',{cache:'no-store'}),fetch('netplay/runtime.json',{cache:'no-store'})]);
+    if(!response.ok||!launcherResponse.ok||!versionResponse.ok)throw Error('开局资源加载失败');
+    metadata=await response.json();
+    const launcher=new Uint8Array(await launcherResponse.arrayBuffer()),version=await versionResponse.json();
+    if(await sha256(launcher)!==version.assets['netplay/th02-launch.com'])throw Error('网页启动器校验失败，请刷新页面');
+    const entry=metadata.disks[launchSettings.language],diskResponse=await fetch(entry.file);
     if(!diskResponse.ok)throw Error('游戏磁盘加载失败');
     const stream=diskResponse.body.pipeThrough(new DecompressionStream('gzip'));
     const bytes=new Uint8Array(await new Response(stream).arrayBuffer());
@@ -187,16 +212,19 @@ $('start').onclick=async()=>{
     const fat=new Fat12(bytes),main=fat.find('HUMAROKU/MAIN.EXE'),exe=fat.read(main);
     if(await sha256(exe)!==entry.mainSha256)throw Error('主程序校验失败');
     const configOffset=metadata.headerSize+metadata.codeSegment*16+metadata.entries.run_config;
-    exe[configOffset]=Number($('p2-shot').value);exe[configOffset+1]=Number($('p3-shot').value);
-    exe[configOffset+2]=Number($('player-count').value);fat.replace(main,exe);
-    emulator=await DOSBoxPC98.create({canvas:$('canvas'),artPatch:metadata,onError:error=>status('DOSBox-X 停止：'+error.message),onExit:()=>status('游戏已退出，可重新启动')});
+    exe[configOffset]=launchSettings.p2;exe[configOffset+1]=launchSettings.p3;
+    exe[configOffset+2]=launchSettings.players;fat.replace(main,exe);
+    emulator=await DOSBoxPC98.create({canvas:$('canvas'),artPatch:metadata,
+      launchFiles:[{path:'game/HUMAROKU/WEBSTART.COM',contents:configureLauncher(launcher,launchSettings)}],
+      onError:error=>status('DOSBox-X 停止：'+error.message),onExit:()=>status('游戏已退出，可重新启动')});
     emulator.addDiskImage('th02-local.hdi',bytes);await emulator.setHdd(0,'th02-local.hdi');emulator.run();
     document.body.dataset.running='true';for(const id of ['pause','menu','confirm','restart','diagnostics'])$(id).disabled=false;
-    $('language').disabled=true;$('p2-shot').disabled=true;$('p3-shot').disabled=true;$('player-count').disabled=true;$('canvas').focus();
-    for(const button of shotChoices)button.disabled=true;
-    status('正在启动原版菜单。使用 P1 方向键、Z／Enter 选择难度和射击类型。');
-  }catch(error){status('启动失败：'+error.message);emulator?.dispose();emulator=null;$('start').disabled=false;}
-  finally{launching=false;}
+    $('canvas').focus();
+    status('正在直接进入所选关卡，无需操作原版菜单…');
+  }catch(error){status('启动失败：'+error.message);emulator?.dispose();emulator=null;mailbox=-1;launchSettings=null;$('start').disabled=false;
+    for(const id of launchSelects)$(id).disabled=false;for(const button of shotChoices)button.disabled=false;
+  }
+  finally{launching=false;showLaunchSettings();}
 };
 async function tap(code){if(!emulator)return;emulator.key(code,true);await new Promise(r=>setTimeout(r,100));emulator.key(code,false);$('canvas').focus();}
 $('menu').onclick=()=>tap('Escape');$('confirm').onclick=()=>tap('Enter');
@@ -222,7 +250,7 @@ for(const id of ['pad1','pad2','pad3'])$(id).onchange=()=>{
 $('diagnostics').onclick=()=>{
   if(!emulator)return;
   const report={schema:1,game:'th02',mode:'local',at:new Date().toISOString(),status:$('status').textContent,
-    state:readState(),runtime:emulator.module.mobileRuntime,logs:emulator.logs,patch:metadata,
+    settings:launchSettings,state:readState(),runtime:emulator.module.mobileRuntime,logs:emulator.logs,patch:metadata,
     browser:navigator.userAgent,render:emulator.module.framePresenter?.metrics};
   const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
   a.href=url;a.download='th02-local-diagnostics.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);

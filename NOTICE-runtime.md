@@ -20,7 +20,12 @@ and pinned source archive are retained in the sibling TH04 project:
 TH02 uses `web/dosbox-disk.js` to extract HUMAROKU from a verified copy of
 the user's disk, mount it under internal DOS and run GAME.BAT via the
 FASTBOOT.BAT wrapper, with the game's PMD driver and PC-98 FM board86.
-`web/local.js` supplies local two-player inputs to the native patch.
+`web/local.js` supplies local two/three-player inputs to the native patch.
+Local two/three-player cooperation and network rooms both configure a verified
+private WEBSTART.COM before boot, entering MAIN at the selected stage without
+OP's difficulty/shot menus. Browser settings supply each seat's shot type and
+initial resources. Multiplayer focus movement is fixed at 50%; network rooms
+freeze the host-owned focus and targeting switches before synchronized play.
 The interpreter uses Simple CPU and JSPI. Newer Edge/Chrome is required.
 
 The network runtime now imports the pinned 2026-10-15 native scheduler core
@@ -55,6 +60,12 @@ Each seat also packs a HUD ofuda frame extracted from TH02 MIKO16.BFT frame 4,
 recolored with the same seat palette. `hudShot` records its source/image hashes
 and the separated bullet/option layout. It uses native tiny-sprite rendering
 with the same provenance tracking; no browser overlay is involved.
+Actual native main/option projectiles and hit animations use the existing
+per-shot owner records to tag both native blitters. Reserved 16-bit tags
+60000..60002 select per-seat RGB palettes in the same art table. Shapes,
+movement, collision, damage and scoring remain native; white/neutral details
+and hardware palette fade endpoints are preserved. All provenance writes
+participate in tracked rollback, including shared-shot-pool slot reuse.
 
 Network play additionally applies validated, private in-memory MAIN edits to
 observe PMD music commands and disable native song loading/playback. FM sound
