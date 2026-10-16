@@ -5,7 +5,7 @@ import {loadRtcConfiguration,refreshRtcPath,countIceCandidate,describeIceCandida
 import {deploymentIceConfiguration} from './udp-config.js';
 import {describeNetwork} from './network-mode.js';
 
-const ROLES=['host','guest','guest2'],TICK=1000/60;
+const ROLES=['host','guest','guest2'],TICK=1000*440/24830;
 const HASH_INTERVAL=120,HASH_WINDOW=2*HASH_INTERVAL,DISCONNECT_GRACE=10000;
 const BUFFER_PROBES=5,BUFFER_PROBE_TICK=120,BUFFER_PROBE_TIMEOUT=2500;
 export class NetSession{

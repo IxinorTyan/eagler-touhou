@@ -1,0 +1,47 @@
+import {musicRoomTracks} from '../music-room.js';
+
+// Sound is local presentation; downloads and audio clocks never gate a game step.
+export class LocalAudio{
+  constructor(){this.volume=.35;this.buffers=new Map();this.effects=new Map();this.cursor=0;this.stopped=false;}
+  async unlock(){
+    if(this.stopped)return;
+    this.context??=new AudioContext();this.gain??=this.context.createGain();this.gain.gain.value=this.volume;
+    if(!this.connected){this.gain.connect(this.context.destination);this.connected=true;}
+    await this.context.resume();this.onStatus?.('本机声音已启用');
+    if(this.core)this.update(this.core);
+  }
+  setVolume(value){this.volume=Math.max(0,Math.min(1,value));if(this.gain)this.gain.gain.value=this.volume;}
+  async track(key){
+    if(this.trackKey===key||this.stopped)return;
+    this.trackKey=key;this.source?.stop();this.source=null;
+    if(key==='silent')return;
+    try{
+      if(!this.buffers.has(key))this.buffers.set(key,Promise.all([
+        fetch(`bgm/${key}.opus`).then(async r=>{if(!r.ok)throw Error('音乐读取失败');return this.context.decodeAudioData(await r.arrayBuffer());}),
+        fetch(`bgm/${key}.json`).then(async r=>{if(!r.ok)throw Error('循环点读取失败');return r.json();})]));
+      const [buffer,loop]=await this.buffers.get(key);
+      if(this.stopped||this.trackKey!==key)return;
+      const source=this.context.createBufferSource();source.buffer=buffer;source.loop=true;
+      source.loopStart=loop.loopStart;source.loopEnd=loop.loopEnd;source.connect(this.gain);source.start();this.source=source;
+      this.onStatus?.(`本机音乐：${key}`);
+    }catch{this.buffers.delete(key);if(this.trackKey===key){this.trackKey=null;this.onStatus?.('本机音乐读取失败，可重新启用声音');}}
+  }
+  update(core){
+    this.core=core;const end=core.th_get(11,0)>>>0;
+    if(!this.context||this.context.state!=='running'||this.stopped){this.cursor=end;return;}
+    const cue=core.th_get(79,0),key=cue===2?'silent':musicRoomTracks[cue<2?cue:cue-3]?.key||'silent';
+    void this.track(key);
+    if(this.cursor>end)this.cursor=0;this.cursor=Math.max(this.cursor,end-128);
+    for(;this.cursor<end;this.cursor++){
+      const id=core.th_sound_event(this.cursor);if(!id)continue;
+      if(!this.effects.has(id)){
+        this.effects.set(id,null);
+        fetch(`sfx/${String(id).padStart(2,'0')}.wav`).then(async r=>{if(!r.ok)throw Error();return this.context.decodeAudioData(await r.arrayBuffer());})
+          .then(buffer=>this.effects.set(id,buffer)).catch(()=>this.effects.delete(id));
+      }
+      const buffer=this.effects.get(id);if(!buffer)continue;
+      this.effect?.stop();const source=this.context.createBufferSource();source.buffer=buffer;source.connect(this.gain);source.start();this.effect=source;
+    }
+  }
+  stop(){this.stopped=true;this.source?.stop();this.effect?.stop();void this.context?.close();}
+}

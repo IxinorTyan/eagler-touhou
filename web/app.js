@@ -1,300 +1,273 @@
-import {DOSBoxPC98} from './dosbox-adapter.js';
-import {sha256} from './netplay/sha256.js';
-import {installQA} from './qa.js';
-import {createCoopControls,createCoopFeedback,readCoopState,coopInputOffset} from './coop.js';
-import {mountTouchControls} from './touch-controls.js';
-import {TOUCH_BOMB,readHitRecovery} from './touch-input.js';
-import {createPresentationLimiter,nextPerformanceMode,performanceModeLabel} from './performance-mode.js';
-import {createFrameGate} from './frame-limit.js';
-import {mountBossBalance,bossBalanceText} from './boss-balance.js';
-import {mountLifeCompensation,lifeCompensationText} from './life-compensation.js';
-import './site-ui.js';
+import {musicRoomTracks} from './music-room.js';
 const $=id=>document.getElementById(id);
-const baseline=new URLSearchParams(location.search).get('baseline')==='1';
 const solo=document.body.dataset.page==='solo';
-if(new URLSearchParams(location.search).get('qa')==='1')document.querySelector('.debug-disclosure').open=true;
-let emulator,manifest,busy=false;
-const presentation=createPresentationLimiter();
-const pollDue=createFrameGate();let hudAt=-Infinity;
-let bridge=-1,scanCursor=0,candidates=[],lastPoll=0,pendingSkip=null;
-const bridgeHistory=new Map();let lastBridgeProgress=-Infinity;
-let testInvincible=false;
-let sessionSettings=null;
-let lastScan=-Infinity,perfAt=0,perfFrame=0,perfPresented=0,perfGame=null,perfSamples=[],perfReport=null;
-const signature=new TextEncoder().encode('TH01ORB-LAB-v03!');
-let touchControls,touchSlot=0,touchNativeBits=0;
-const physicalHeld=new Set();
-const touchNativeDeadlines=new Map();
-for(const id of ['rank','count','players']){
-  const storageId=solo&&id==='count'?'solo-count':id;
-  const saved=localStorage.getItem(`th01-multiorb-${storageId}`);
-  if([...$(id).options].some(option=>option.value===saved))$(id).value=saved;
-  $(id).addEventListener('change',()=>localStorage.setItem(`th01-multiorb-${storageId}`,$(id).value));
-}
-if(solo){$('players').value='1';$('players').disabled=true;}
-const updateLifeCompensation=mountLifeCompensation({remember:true,key:solo?'th01-solo-life-compensation':'th01-local-life-compensation'});
-const updateBossBalance=mountBossBalance({getSettings:()=>({players:baseline?1:Number($('players').value),count:baseline?1:Number($('count').value)})});
-function updateSetup(){
-  updateBossBalance();
-  updateLifeCompensation();
-  const debugging=!baseline&&$('debug-enabled').checked;
-  $('debug-options').hidden=!debugging;
-  $('test-invincible').disabled=!debugging||busy;
-  $('setup-summary').textContent=`本次启用 ${baseline?1:$('count').value} 玉 · ${debugging?'调试开启':'调试关闭'} · ${debugging&&$('test-invincible').checked?'玩家无敌':'正常受伤'}`;
-}
-for(const id of ['players','count','debug-enabled','test-invincible'])$(id).addEventListener('change',updateSetup);
-function status(message){$('status').textContent=message;}
-const performanceButton=document.createElement('button');performanceButton.id='performance-mode';performanceButton.type='button';performanceButton.textContent=performanceModeLabel();
-performanceButton.title='点击切换自动、流畅、省性能。省性能降低画面刷新，游戏速度与判定保持。';
-$('fullscreen').parentElement.append(performanceButton);
-performanceButton.onclick=()=>{const mode=nextPerformanceMode();presentation.setMode(mode);performanceButton.textContent=performanceModeLabel(mode);};
-function releaseInputs(){touchControls?.reset();coopControls.release();}
-let coopSampleKey='';
-const coopFeedback=createCoopFeedback();
-const coopControls=createCoopControls({enabled:()=>sessionSettings?.players>1,count:()=>sessionSettings?.players||2,
-  menu:()=>![1,2].includes(nativeState()?.phase),write:buttons=>{
-    if(!emulator||bridge<0||!(sessionSettings?.players>1))return;
-    const view=new DataView(emulator.module.HEAPU8.buffer);
-    for(let i=0;i<sessionSettings.players;i++)view.setUint16(bridge+coopInputOffset(i),buttons[i],true);
-  }});
-const keyCodes={ArrowLeft:37,ArrowUp:38,ArrowRight:39,ArrowDown:40,KeyZ:90,KeyX:88,Enter:13,Escape:27};
-function key(code,down){$('canvas').dispatchEvent(new KeyboardEvent(down?'keydown':'keyup',{code,key:code.startsWith('Key')?code.slice(3).toLowerCase():code,keyCode:keyCodes[code],which:keyCodes[code],bubbles:true}));}
-const touchKeyBits={ArrowLeft:1,ArrowRight:2,KeyZ:4,KeyX:8,ArrowUp:16,ArrowDown:32,Enter:64,Escape:128};
-function syncTouchInputs(){
-  if(!touchControls)return;
-  const bits=touchControls.sample(),state=nativeState(),coop=sessionSettings?.players>1;
-  if(coop){
-    const external=Array(sessionSettings.players).fill(0);external[touchSlot]=(bits&15)|((bits&TOUCH_BOMB)?16:0);
-    coopControls.setExternal(external);
-  }else if((bits&TOUCH_BOMB)&&!baseline&&state?.phase===2&&bridge>=0){
-    const view=new DataView(emulator.module.HEAPU8.buffer);
-    view.setUint16(bridge+182,view.getUint16(bridge+182,true)|16,true);
+let started=false,configuring=true,sessionConfig;
+const preferenceKey=`th01-native-${solo?'solo':'local'}-setup`;
+try{
+  const saved=JSON.parse(localStorage.getItem(preferenceKey)||'null');
+  if(saved){
+    for(const id of ['players','orbs','difficulty'])if([...$(id).options].some(o=>o.value===saved[id]))$(id).value=saved[id];
+    for(const id of ['compensation','reducedFlash'])if(typeof saved[id]==='boolean')$(id).checked=saved[id];
   }
-  let nativeBits=coop&&[1,2].includes(state?.phase)?bits&128:bits&255;
-  // Native menus / solo keyboard polling may miss a tap shorter than one game
-  // frame. Hold action edges briefly, while movement still releases at once.
-  const now=performance.now();
-  for(const bit of [4,8,16,32,64,128]){
-    if((nativeBits&bit)&&!(touchNativeBits&bit))touchNativeDeadlines.set(bit,now+90);
-    if((touchNativeDeadlines.get(bit)||0)>now)nativeBits|=bit;
-    else touchNativeDeadlines.delete(bit);
-  }
-  for(const [code,bit]of Object.entries(touchKeyBits)){
-    if((nativeBits&bit)===(touchNativeBits&bit))continue;
-    if((nativeBits&bit)||!physicalHeld.has(code))key(code,!!(nativeBits&bit));
-  }
-  touchNativeBits=nativeBits;
+}catch{}
+function setupSummary(){
+  $('setupSummary').textContent=`${solo?1:$('players').value} 人 · ${$('orbs').value} 玉 · ${$('difficulty').selectedOptions[0].textContent} · ${$('compensation').checked?'多玉生命补偿开启':'生命补偿关闭'}。${solo?'先进入标题菜单，再选择 START。':'跳过标题菜单，直接进入第一关过场。'}`;
 }
-touchControls=mountTouchControls({player:$('player'),screen:$('screen'),canvas:$('canvas'),
-  toolbar:$('fullscreen').parentElement,fullscreenButton:$('fullscreen'),getContext:()=>{
-    const state=nativeState(),p=state?.players?.[touchSlot];
-    return {active:emulator?.state==='running',play:[1,2].includes(state?.phase),phase:state?.phase,stage:state?.stage,recovering:state?.recovering,menu:state?.coopMenu>0,
-      key:`${touchSlot}:${state?.stage??0}:${state?.phase??'boot'}`,slot:touchSlot,
-      left:p?.left??state?.playerLeft,ghost:p?.ghost,bombs:baseline?0:p?.bombs??state?.playerBombs,
-      canMenu:true,players:sessionSettings?.players,localCoop:sessionSettings?.players>1};
-  },onSelectSlot:slot=>{coopControls.release();touchSlot=slot;syncTouchInputs();},
-  onReset:()=>touchNativeDeadlines.clear(),onChange:syncTouchInputs,onGesture:()=>emulator?.module.SDL2?.audioContext?.resume()});
-addEventListener('keydown',event=>{if(event.isTrusted&&touchKeyBits[event.code])physicalHeld.add(event.code);},true);
-addEventListener('keyup',event=>{
-  if(!event.isTrusted||!touchKeyBits[event.code])return;physicalHeld.delete(event.code);
-  if(touchNativeBits&touchKeyBits[event.code])queueMicrotask(()=>{if(touchNativeBits&touchKeyBits[event.code])key(event.code,true);});
-},true);
-addEventListener('blur',()=>physicalHeld.clear());
-addEventListener('blur',releaseInputs);
-document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseInputs();});
-document.addEventListener('keydown',event=>{if(emulator&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space','Escape'].includes(event.code))event.preventDefault();});
-$('start').addEventListener('click',async()=>{
-  if(busy||emulator)return;busy=true;$('start').disabled=true;
-  sessionSettings={rank:Number($('rank').value),count:baseline?1:Number($('count').value),players:baseline||solo?1:Number($('players').value),
-    lifeCompensation:!baseline&&$('life-compensation').checked,
-    debug:!baseline&&$('debug-enabled').checked,invincible:!baseline&&$('debug-enabled').checked&&$('test-invincible').checked};
-  testInvincible=sessionSettings.invincible;
-  for(const id of ['rank','count','players','life-compensation','debug-enabled','test-invincible'])$(id).disabled=true;
+setupSummary();
+const tick=440/24830*1000;
+const keys=[['ArrowLeft','ArrowRight','KeyZ','KeyX','KeyC'],['KeyA','KeyD','KeyJ','KeyK','KeyL'],['KeyF','KeyH','KeyT','KeyY','KeyU']];
+const held=new Set(),pressed=new Set(),touchOwners=new Map();
+let core,paused=false,last=0,accumulator=0,steps=0,logicMs=0,drawMs=0,draws=0,statsAt=performance.now(),lastDraw=-Infinity;
+let musicContext,musicBuffer,musicSource,musicGain,musicEnabled=false,musicWanted=true,musicLoading,musicLoop;
+let musicTrack=null;
+let scoreRevision=0,scoreSaveFailed=false;
+function loadScores(){
+  try{const saved=localStorage.getItem('th01-native-scores-v1');if(saved){const data=Uint8Array.from(atob(saved),c=>c.charCodeAt(0));
+    if(data.length===core.th_score_size()){new Uint8Array(core.memory.buffer,core.th_score_data(),data.length).set(data);core.th_score_load(data.length);}}}
+  catch(error){console.warn('成绩记录读取失败',error);}
+  scoreRevision=core.th_get(110,0);
+}
+function saveScores(){
+  const revision=core.th_get(110,0);if(revision===scoreRevision)return;
+  try{const data=new Uint8Array(core.memory.buffer,core.th_score_data(),core.th_score_size());localStorage.setItem('th01-native-scores-v1',btoa(String.fromCharCode(...data)));scoreSaveFailed=false;}
+  catch(error){scoreSaveFailed=true;console.warn('成绩记录未能保存到本机',error);}
+  scoreRevision=revision;
+}
+const musicTracks=new Map();
+function musicCue(){
+  const cue=core?.th_get(79,0)??0;
+  return cue===2?'silent':cue<2?musicRoomTracks[cue].key:musicRoomTracks[cue-3].key;
+}
+function stopMusicSource(){musicSource?.stop();musicSource?.disconnect();musicSource=null;musicEnabled=false;}
+let sfxEnabled=true,sfxReady=false,soundCursor=0,sfxLoading;
+const sfxBuffers=new Map(),sfxSources=new Set();
+function stopEffects(){for(const source of sfxSources)source.stop();sfxSources.clear();}
+async function unlockEffects(){
+  if(!sfxEnabled)return;
+  musicContext??=new AudioContext();await musicContext.resume();
+  sfxLoading??=Promise.all([1,2,3,4,5,8,9,11,14,15,16,17].map(async id=>{
+    const response=await fetch(`sfx/${String(id).padStart(2,'0')}.wav`);
+    if(!response.ok)throw Error(`音效 ${id} 读取失败`);
+    sfxBuffers.set(id,await musicContext.decodeAudioData(await response.arrayBuffer()));
+  })).then(()=>{sfxReady=true;});
+  try{await sfxLoading;}catch(error){$('sfx').textContent='音效读取失败';console.error(error);}
+}
+function playEffects(){
+  const end=core.th_get(11,0)>>>0;
+  if(soundCursor>end)soundCursor=0;
+  soundCursor=Math.max(soundCursor,end-128);
+  for(;soundCursor<end;++soundCursor){
+    const id=core.th_sound_event(soundCursor),buffer=sfxBuffers.get(id);
+    if(!sfxEnabled||!sfxReady||!buffer||paused||musicContext.state!=='running')continue;
+    // Original MDRV2 replaces an effect sharing PSG channels. One active
+    // effect is retained here, so rapid multi-player shots cannot stack loudly.
+    stopEffects();const source=musicContext.createBufferSource();source.buffer=buffer;
+    const gain=musicContext.createGain();gain.gain.value=.65;source.connect(gain);gain.connect(musicContext.destination);
+    source.onended=()=>sfxSources.delete(source);sfxSources.add(source);source.start();
+  }
+}
+const image=new ImageData(640,400),context=$('game').getContext('2d',{alpha:false});
+const phases=['等待开球','游戏中','关卡完成','全员阵亡'];
+const players=()=>solo?1:Number($('players').value)||2;
+
+function buttons(){
+  const result=keys.map(row=>row.reduce((mask,key,i)=>mask|((held.has(key)||pressed.has(key))?1<<i:0),0));
+  for(const {slot,bit} of touchOwners.values()) if(slot<players())result[slot]|=bit;
+  return result;
+}
+function release(){held.clear();pressed.clear();touchOwners.clear();for(const b of document.querySelectorAll('[data-bit]'))b.classList.remove('active');}
+function previewBoss(stage=5,route=0){
+  if(!core)return;
+  core.th_stage_command(14,0,stage,route,0,0);paused=false;core.th_set_pause_overlay(0);
+  $('pause').textContent='暂停';release();accumulator=0;updatePhase();void startMusic();
+}
+function setPaused(value){
+  if(!value&&core?.th_get(50,0)&&core.th_get(50,0)!==3)return;
+  if(value&&core&&!core.th_get(50,0))core.th_menu_open(3,$('compensation').checked?1:0);
+  if(!value&&core?.th_get(50,0)===3)core.th_menu_input(5);
+  paused=value;core?.th_set_pause_overlay(value?1:0);if(value)stopEffects();release();accumulator=0;$('pause').textContent=paused?'继续':'暂停';updatePhase();
+}
+function menuInput(key){
+  const action=core.th_menu_input(key);
+  saveScores();
+  if(action===1){
+    $('difficulty').value=String(core.th_get(52,0));$('players').value=String(core.th_get(53,0));$('orbs').value=String(core.th_get(54,0));
+    $('compensation').checked=!!core.th_get(55,0);$('god').checked=!!core.th_get(56,0);reset();
+  }else if(action===2)setPaused(false);
+  else if(action===3||action===4){paused=true;stopEffects();release();}
+  updatePhase();present();
+}
+function updatePhase(){
+  if(!core)return;
+  const phase=core.th_get(0,0),stage=core.th_get(27,0),overlay=$('overlay');
+  const menu=core.th_get(50,0);$('menuControls').hidden=!menu;
+  $('saveName').hidden=menu!==12;
+  if(menu>=10&&menu<=13){
+    overlay.hidden=true;$('phase').textContent=menu===10?'结尾演出':menu===11?'成绩评定':menu===12?'姓名登记':'成绩记录';
+    $('launch').hidden=true;$('pause').disabled=true;
+    $('scoreStatus').textContent=scoreSaveFailed?'成绩仍在本次会话中，本机保存失败':'方向键选择 · Z 确认／逐段快进 · X 删除／跳过结尾 · Enter 保存姓名';return;
+  }
+  $('pause').disabled=false;$('scoreStatus').textContent='';
+  if(menu){
+    overlay.hidden=false;$('phase').textContent='菜单';$('phaseLabel').textContent=menu===9?'CONTINUE':menu===8?'MUSIC ROOM':menu===6?'ROUTE':menu===7?'ROUND CLEAR':menu===3?'PAUSE':'TITLE';
+    $('phaseTitle').textContent=menu===9?'是否全员续关？':menu===8?musicRoomTracks[core.th_get(76,0)].title:menu===6?'选择下一条路线':menu===7?'第 20 关调试清关':menu===2?'选项':menu===4?'确认退出':menu===3?'暂停':'东方灵异传';
+    $('phaseHint').textContent=menu===9?'上下选择 Yes / No，Z 或 Enter 确认；Yes 从当前关重开，分数清零，全员恢复残机和 1 枚 Bomb':menu===8?'方向键切换并试听，Z / Enter 播放或停止，X / Esc 返回；音乐开关保持有效':menu===6?'方向键选择魔界／地狱，Z 或 Enter 确认并查看结算':menu===7?'调试命令跳过了 Boss 击破流程；确认返回标题':menu===2?'方向键调整；返回标题后 START 应用设置，CONTINUE 恢复当前局':'方向键选择，Z 或 Enter 确认，X 或 Esc 返回';
+    $('launch').hidden=false;$('launch').textContent='确定';return;
+  }
+  if(core.th_get(117,0)&&!paused){
+    overlay.hidden=true;$('phase').textContent='关卡过场';$('launch').hidden=true;return;
+  }
+  $('phase').textContent=paused?'已暂停':phases[phase];
+  overlay.hidden=!paused&&phase===1;
+  $('phaseLabel').textContent=paused?'PAUSED':`STAGE ${String(stage).padStart(2,'0')}`;
+  $('phaseTitle').textContent=paused?'游戏已暂停':phase===0?'准备好了吗？':phase===2?`第 ${stage} 关完成`:'全员阵亡';
+  $('phaseHint').textContent=paused?'点击继续或按 Esc 恢复':phase===0?`按 Z，或由任意玩家射击开球${core.th_get(81,0)?'；本 Boss 关暂用第一关占位':''}`:phase===2?`通关奖励 ${core.th_get(28,0)} 分。${core.th_get(60,0)>=0?'按 Enter 跳过结算动画，再按一次进入下一关':stage===20?'按 Enter 完成本路线':'按 Enter 进入下一关，保留残机和 Bomb'}`:'继续从当前关开始，恢复每人的残机与 Bomb';
+  $('launch').hidden=false;$('launch').textContent=paused?'继续':phase===0?'开球':phase===2?(stage===5||stage===20?'继续':'下一关'):'全员续关';
+}
+function reset(){
+  if(!core)return;
+  release();accumulator=0;last=0;
+  core.th_init(players(),Number($('orbs').value),0x12345678,$('compensation').checked?1:0);
+  core.th_set_difficulty(Number($('difficulty').value));
+  core.th_start_stage_entrance();
+  soundCursor=0;stopEffects();
+  $('touchSlot').value=String(Math.min(Number($('touchSlot').value),players()-1));
+  for(const option of $('touchSlot').options)option.disabled=Number(option.value)>=players();
+  core.th_debug_invincible($('god').checked?1:0);setPaused(false);present();updatePhase();
+}
+function present(){
+  const start=performance.now();saveScores();core.th_render();
+  image.data.set(new Uint8Array(core.memory.buffer,core.th_pixels(),640*400*4));context.putImageData(image,0,0);
+  drawMs+=performance.now()-start;++draws;
+}
+function loop(now){
+  if(configuring){last=now;accumulator=0;requestAnimationFrame(loop);return;}
+  if(!last)last=now;
+  const elapsed=Math.min(250,now-last);last=now;
+  if(!paused&&!document.hidden)accumulator+=elapsed;
+  let budget=8;
+  while(accumulator>=tick&&budget-->0&&!paused){
+    const input=buttons(),start=performance.now();core.th_step(...input);pressed.clear();logicMs+=performance.now()-start;
+    playEffects();
+    accumulator-=tick;++steps;
+  }
+  if(now-lastDraw>=1000/60-.5){present();lastDraw=now;}
+  if(musicWanted&&musicContext&&musicTrack!==musicCue())void startMusic();
+  if(now-statsAt>=500){
+    $('rate').textContent=`${(steps*1000/(now-statsAt)).toFixed(1)} 步/秒`;
+    $('compute').textContent=`逻辑 ${(logicMs/Math.max(1,steps)).toFixed(3)} ms`;
+    $('draw').textContent=`绘制 ${(drawMs/Math.max(1,draws)).toFixed(2)} ms`;
+    $('memory').textContent=`${(core.memory.buffer.byteLength/1048576).toFixed(1)} MiB`;
+    $('hash').textContent=(core.th_checksum()>>>0).toString(16).padStart(8,'0');
+    updatePhase();steps=logicMs=drawMs=draws=0;statsAt=now;
+  }
+  requestAnimationFrame(loop);
+}
+async function startMusic(){
+  if(!musicWanted)return;
+  const track=musicCue();
   try{
-    status('正在加载游戏…');
-    const response=await fetch(baseline?'baseline.json':'th01-multiorb.json');
-    if(!response.ok)throw Error('游戏镜像尚未构建。请先运行构建脚本。');
-    manifest=await response.json();
-    const diskResponse=await fetch(manifest.url);if(!diskResponse.ok)throw Error('无法读取游戏镜像');
-    const disk=new Uint8Array(await new Response(diskResponse.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
-    const hash=await sha256(disk);
-    if(hash!==manifest.sha256||disk.length!==manifest.size)throw Error('游戏镜像校验失败');
-    disk[manifest.configuration['REIIDEN/REIIDEN.CFG'].offset+7]=sessionSettings.rank;
-    disk[manifest.configuration['REIIDEN/ORBS.CFG'].offset]='0'.charCodeAt(0)+sessionSettings.count;
-    if(manifest.configuration['REIIDEN/COOP.CFG'])disk[manifest.configuration['REIIDEN/COOP.CFG'].offset]=48+sessionSettings.players;
-    if(!baseline){
-      const startConfig=manifest.configuration['REIIDEN/START.CFG'];
-      if(!startConfig)throw Error('游戏镜像需要更新，缺少直接开局配置');
-      disk[startConfig.offset]=solo?50:49;
-      const lifeConfig=manifest.configuration['REIIDEN/LIVES.CFG'];
-      if(!lifeConfig)throw Error('游戏镜像需要更新，缺少生命补偿配置');
-      disk[lifeConfig.offset]=sessionSettings.lifeCompensation?49:48;
-    }
-    emulator=await DOSBoxPC98.create({canvas:$('canvas'),onExit:()=>status('模拟器已关闭'),onError:error=>status(error.message)});
-    emulator.module.observeLocalFrame=ms=>{perfSamples.push(ms);if(perfSamples.length>240)perfSamples.shift();};
-    // DOSBox submits completed raster frames. The guest can already be drawing
-    // the next frame at that instant; its old NP21 busy flag can suppress every
-    // submission on a slow device. Limit presentation by completed submissions.
-    emulator.module.shouldPresentFrame=()=>presentation.allow(performance.now(),emulator.module.frameUploads);
-    emulator.addDiskImage('th01.hdi',disk);await emulator.setHdd(0,'th01.hdi');emulator.run();
-    $('cover').hidden=true;$('setup').hidden=true;$('rank').disabled=true;$('count').disabled=true;
-    $('pause').disabled=false;$('restart').disabled=false;$('canvas').focus();
-    status(baseline?'源码基线运行中':'DOSBox-X 游戏运行中');
-    updateSessionSettings();
-    $('diagnostics').textContent=`模式：${baseline?'源码基线':'多玉'}\n源码：ReC98 debloated ${manifest.upstream.commit}\n编译器：${manifest.compiler}\n程序 SHA-256：${manifest.exe_sha256}\n本次难度：${$('rank').selectedOptions[0].textContent}\n本次玉数：${baseline?1:$('count').value}`;
-    window.th01Lab={emulator,manifest};
-    requestAnimationFrame(poll);
-  }catch(error){emulator?.dispose();emulator=null;status(error.message);$('start').disabled=false;busy=false;
-    $('rank').disabled=false;$('players').disabled=baseline||solo;$('count').disabled=baseline;$('life-compensation').disabled=baseline;$('debug-enabled').disabled=baseline;updateSetup();console.error(error);}
+    musicContext??=new AudioContext();await musicContext.resume();
+    if(musicCue()!==track)return;
+    if(musicTrack===track&&musicSource)return;
+    if(musicTrack!==track)stopMusicSource();musicTrack=track;
+    if(track==='silent')return;
+    if(!musicTracks.has(track))musicTracks.set(track,Promise.all([fetch(`bgm/${track}.opus`).then(async response=>{if(!response.ok)throw Error('音乐资源读取失败');return musicContext.decodeAudioData(await response.arrayBuffer());}),fetch(`bgm/${track}.json`).then(async response=>{if(!response.ok)throw Error('音乐循环点读取失败');return response.json();})]));
+    const [buffer,loop]=await musicTracks.get(track);
+    if(!musicWanted||musicSource||musicCue()!==track)return;
+    musicBuffer=buffer;musicLoop=loop;
+    musicSource=musicContext.createBufferSource();musicSource.buffer=musicBuffer;musicSource.loop=true;
+    musicSource.loopStart=musicLoop.loopStart;musicSource.loopEnd=musicLoop.loopEnd;
+    if(!musicGain){musicGain=musicContext.createGain();musicGain.gain.value=.35;musicGain.connect(musicContext.destination);}
+    musicSource.connect(musicGain);musicSource.start();musicEnabled=true;$('music').textContent='音乐：开';
+  }catch(error){musicTracks.delete(track);musicLoading=null;if(musicWanted)$('music').textContent='音乐读取失败';console.error(error);}
+}
+function toggleMusic(){
+  musicWanted=!musicWanted;
+  if(musicWanted){$('music').textContent='音乐：开（加载中）';void startMusic();}
+  else{stopMusicSource();$('music').textContent='音乐：关';}
+}
+document.addEventListener('keydown',event=>{
+  if(!started||configuring)return;
+  if(!event.repeat){void unlockEffects();void startMusic();}
+  if(!event.repeat&&event.code==='F10'&&core){event.preventDefault();previewBoss();return;}
+  if(core?.th_get(50,0)&&!event.target.matches('select,input')){
+    const key={ArrowUp:0,ArrowDown:1,ArrowLeft:2,ArrowRight:3,KeyZ:4,Enter:core.th_get(50,0)===12?6:4,Space:4,KeyX:5,Escape:5}[event.code];
+    if(key!==undefined){event.preventDefault();if(!event.repeat)menuInput(key);return;}
+    if(['F1','F4','F8'].includes(event.code)){event.preventDefault();return;}
+  }
+  if(!event.repeat&&event.code==='F1'){event.preventDefault();core.th_menu_open(1,$('compensation').checked?1:0);setPaused(true);return;}
+  if(!event.repeat&&event.code==='F8'){event.preventDefault();$('god').checked=!$('god').checked;$('god').dispatchEvent(new Event('change'));return;}
+  if(!event.repeat&&event.code==='F4'){event.preventDefault();$('difficulty').value=String((Number($('difficulty').value)+1)%4);reset();return;}
+  if(event.target.matches('select,input'))return;
+  if(!event.repeat&&(event.code==='KeyZ'||event.code==='Enter')&&(paused||core?.th_get(0,0)===2)){
+    event.preventDefault();if(paused)setPaused(false);else{core.th_continue();core.th_debug_invincible($('god').checked?1:0);release();updatePhase();}return;
+  }
+  if(keys.some(row=>row.includes(event.code))){event.preventDefault();held.add(event.code);if(!event.repeat)pressed.add(event.code);}
+  if(!event.repeat&&(event.code==='Escape'||event.code==='Space')){event.preventDefault();setPaused(!paused);}
+  if(!event.repeat&&event.code==='Enter'&&core?.th_get(0,0)>=2){core.th_continue();core.th_debug_invincible($('god').checked?1:0);updatePhase();}
 });
-$('pause').addEventListener('click',()=>{releaseInputs();if(emulator?.state==='running'){emulator.pause();$('pause').textContent='继续模拟器';status('模拟器已暂停');}else if(emulator){emulator.run();$('pause').textContent='暂停模拟器';status('DOSBox-X 游戏运行中');$('canvas').focus();}});
-$('restart').addEventListener('click',()=>{releaseInputs();location.reload();});
-$('runtime-invincible').addEventListener('change',()=>setInvincible($('runtime-invincible').checked));
-for(let slot=0;slot<3;slot++)$(`test-p${slot+1}-ghost`).addEventListener('click',()=>{
-  const state=nativeState();
-  if(!sessionSettings?.debug||sessionSettings.players<2||state?.phase!==2||!state.players?.[slot]||state.players[slot].ghost)return;
-  const view=new DataView(emulator.module.HEAPU8.buffer);
-  view.setUint16(bridge+140,view.getUint16(bridge+140,true)|(2<<slot),true);
-  $('canvas').focus();
-});
-if(baseline){$('players').value='1';$('players').disabled=true;$('count').value='1';$('count').disabled=true;$('life-compensation').checked=false;$('life-compensation').disabled=true;$('debug-enabled').disabled=true;$('launch-note').textContent='验证 ReC98 源码重建的一玉基线。';}
-updateSetup();
-
-function nativeState(){
-  if(!emulator||bridge<0)return null;
-  const heap=emulator.module.HEAPU8,v=new DataView(heap.buffer),at=bridge;
-  if(!signature.every((byte,i)=>heap[at+i]===byte))return null;
-  const phase=v.getUint16(at+18,true),stage=v.getUint16(at+24,true),count=v.getUint16(at+26,true);
-  if(v.getUint16(at+16,true)!==3||phase>3||stage<1||stage>20||![1,2,3,4,6,8].includes(count))return null;
-  const balls=[];
-  for(let i=0;i<Math.min(count,8);i++){
-    const pos=at+44+i*12;
-    balls.push({x:v.getInt16(pos,true),y:v.getInt16(pos+2,true),vx:v.getInt16(pos+4,true)/256,vy:v.getInt16(pos+6,true)/256,portal:!!v.getUint16(pos+8,true)});
-  }
-  return {phase,stage,count,recovering:!baseline&&readHitRecovery(v,at,manifest?.touch_state),ticks:v.getUint32(at+20,true),ack:v.getUint16(at+32,true),launchAge:v.getUint16(at+34,true),collisions:v.getUint32(at+36,true),armedPairs:v.getUint32(at+40,true),invincible:!!v.getUint16(at+142,true),balls,players:baseline?null:readCoopState(v,at),playerLeft:baseline?undefined:v.getInt16(at+186,true),playerBombs:baseline?undefined:v.getInt16(at+190,true),coopMenu:baseline?0:v.getUint16(at+210,true),continueRequested:baseline?false:!!v.getUint16(at+212,true),
-    samples:baseline?0:v.getUint32(at+214,true),profile:Array.from({length:7},(_,i)=>v.getUint32(at+146+i*4,true)),cardHits:v.getUint32(at+174,true),activeItems:v.getUint16(at+178,true)};
+document.addEventListener('keyup',event=>held.delete(event.code));
+window.addEventListener('blur',()=>{if(core&&started&&!configuring)setPaused(true);});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&core&&started&&!configuring)setPaused(true);});
+for(const button of document.querySelectorAll('[data-bit]')){
+  button.addEventListener('pointerdown',event=>{event.preventDefault();if(core?.th_get(50,0)){const key={1:2,2:3,4:4,8:5}[button.dataset.bit];if(key!==undefined)menuInput(key);return;}if(Number(button.dataset.bit)===4&&(paused||core?.th_get(0,0)===2)){if(paused)setPaused(false);else{core.th_continue();updatePhase();}return;}button.setPointerCapture(event.pointerId);touchOwners.set(event.pointerId,{slot:Number($('touchSlot').value),bit:Number(button.dataset.bit)});button.classList.add('active');});
+  for(const type of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(type,event=>{touchOwners.delete(event.pointerId);if(![...touchOwners.values()].some(v=>v.bit===Number(button.dataset.bit)))button.classList.remove('active');});
 }
-
-function scanBridge(now){
-  const heap=emulator.module.HEAPU8,v=new DataView(heap.buffer);
-  candidates=candidates.filter(at=>signature.every((byte,i)=>heap[at+i]===byte));
-  const valid=at=>candidates.includes(at)&&v.getUint16(at+16,true)===3&&v.getUint16(at+18,true)<=3&&v.getUint16(at+24,true)>=1&&v.getUint16(at+24,true)<=20&&[1,2,3,4,6,8].includes(v.getUint16(at+26,true));
-  const advancing=candidates.filter(at=>{
-    const ticks=v.getUint32(at+20,true),previous=bridgeHistory.get(at);
-    bridgeHistory.set(at,ticks);
-    return valid(at)&&v.getUint16(at+18,true)>0&&previous!==undefined&&ticks>previous;
-  });
-  // DOS may leave old data copies behind when switching game programs.
-  // Prove activity by counter progress, and keep the current bridge through
-  // phase 0 rather than replacing it with an old phase-2 memory image.
-  if(advancing.includes(bridge))lastBridgeProgress=now;
-  else if(advancing.length===1){bridge=advancing[0];lastBridgeProgress=now;}
-  else if(!valid(bridge))bridge=-1;
-  if(bridge<0||now-lastBridgeProgress>500){
-    if(scanCursor>=heap.length)scanCursor=0;
-    const end=Math.min(scanCursor+2*1024*1024,heap.length),slice=heap.subarray(scanCursor,Math.min(end+signature.length-1,heap.length));
-    for(let offset=slice.indexOf(signature[0]);offset>=0&&scanCursor+offset<end;offset=slice.indexOf(signature[0],offset+1)){
-      const at=scanCursor+offset;
-      if(at+180<=heap.length&&signature.every((byte,i)=>heap[at+i]===byte)&&!candidates.includes(at))candidates.push(at);
-    }
-    scanCursor=end;
-  }
+document.addEventListener('pointerdown',()=>{if(started&&!configuring){void unlockEffects();void startMusic();}},{passive:true});
+$('sfx').onclick=()=>{sfxEnabled=!sfxEnabled;$('sfx').textContent=`音效：${sfxEnabled?'开':'关'}`;if(sfxEnabled)void unlockEffects();else stopEffects();};
+$('restart').onclick=reset;$('pause').onclick=()=>setPaused(!paused);$('music').onclick=toggleMusic;
+$('title').onclick=()=>{core.th_menu_open(1,$('compensation').checked?1:0);setPaused(true);};
+$('scores').onclick=()=>{core.th_menu_open(13,$('compensation').checked?1:0);paused=false;release();updatePhase();present();};
+$('saveName').onclick=()=>menuInput(6);
+for(const button of document.querySelectorAll('[data-ending]'))button.onclick=()=>{
+  const variant=Number(button.dataset.ending);core.th_stage_command(29,0,variant>>1,variant&1,0,0);
+  paused=false;release();updatePhase();present();$('game').focus({preventScroll:true});
+};
+for(const button of document.querySelectorAll('[data-menu]'))button.onclick=()=>menuInput(Number(button.dataset.menu));
+for(const id of ['players','orbs','compensation','difficulty'])$(id).onchange=setupSummary;
+$('god').onchange=()=>core?.th_debug_invincible($('god').checked?1:0);
+$('reducedFlash').onchange=()=>{if(core&&!configuring){core.th_set_bomb_reduced_flash($('reducedFlash').checked?1:0);present();}};
+$('touchSlot').onchange=release;
+$('touchToggle').onclick=()=>$('touch').classList.toggle('visible');
+$('hit').onclick=()=>core?.th_debug_hit(0,0);
+$('ghost').onclick=()=>{if(players()>1)core?.th_debug_hit(1,1);};
+$('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('stage').requestFullscreen();}catch(error){console.error(error);}};
+$('launch').onclick=()=>{if(!core)return;if(core.th_get(50,0))menuInput(4);else if(paused)setPaused(false);else if(core.th_get(0,0)>=2){core.th_continue();core.th_debug_invincible($('god').checked?1:0);}else core.th_step(4,0,0);updatePhase();$('game').focus({preventScroll:true});};
+$('bossPreview').onclick=()=>{previewBoss();$('game').focus({preventScroll:true});};
+$('mimaPreview').onclick=()=>{previewBoss(10,1);$('game').focus({preventScroll:true});};
+$('sarielPreview').onclick=()=>{previewBoss(20,0);$('game').focus({preventScroll:true});};
+$('konngaraPreview').onclick=()=>{previewBoss(20,1);$('game').focus({preventScroll:true});};
+$('elisPreview').onclick=()=>{previewBoss(15,0);$('game').focus({preventScroll:true});};
+$('kikuriPreview').onclick=()=>{previewBoss(15,1);$('game').focus({preventScroll:true});};
+$('yuugenPreview').onclick=()=>{previewBoss(10,0);$('game').focus({preventScroll:true});};
+if(matchMedia('(pointer:coarse)').matches)$('touch').classList.add('visible');
+function begin(){
+  if(!core)return;
+  const saved={};for(const id of ['players','orbs','difficulty'])saved[id]=$(id).value;
+  for(const id of ['compensation','reducedFlash'])saved[id]=$(id).checked;
+  sessionConfig=saved;
+  try{localStorage.setItem(preferenceKey,JSON.stringify(saved));}catch{}
+  started=true;configuring=false;$('setup').hidden=true;$('player').hidden=false;
+  document.querySelector('.diagnostics').hidden=false;
+  reset();core.th_set_bomb_reduced_flash($('reducedFlash').checked?1:0);
+  if(solo){core.th_menu_open(1,$('compensation').checked?1:0);setPaused(true);}
+  $('sessionSettings').textContent=$('setupSummary').textContent;
+  updatePhase();present();$('game').focus({preventScroll:true});void unlockEffects();void startMusic();
 }
-
-function poll(now){
-  if(!emulator)return;
-  if(!pollDue(now)){requestAnimationFrame(poll);return;}
-  if(now-lastScan>=100){scanBridge(now);lastScan=now;}
-  const state=nativeState();
-  const sampleKey=state?`${bridge}:${state.stage}:${state.samples}`:'';
-  if(sampleKey!==coopSampleKey){coopSampleKey=sampleKey;coopControls.consumed();}
-  syncTouchInputs();
-  if(now-hudAt>=150){hudAt=now;updateCoopHud(state);}
-  syncTestFlags(state);
-  if(now-perfAt>=2000){
-    const frames=emulator.module.localFrameCount||0,elapsed=(now-perfAt)/1000;
-    const sorted=perfSamples.slice().sort((a,b)=>a-b);
-    const gameHz=state?.phase===2&&perfGame?.phase===2&&perfGame.stage===state.stage&&state.ticks>=perfGame.ticks?(state.ticks-perfGame.ticks)/elapsed:0;
-    const presented=emulator.module.presentedFrameCount||0;
-    perfReport={loopHz:(frames-perfFrame)/elapsed,gameHz,presentationHz:(presented-perfPresented)/elapsed,averageMs:perfSamples.length?perfSamples.reduce((a,b)=>a+b,0)/perfSamples.length:0,p95Ms:sorted[Math.floor(sorted.length*.95)]||0,cycles:emulator.module.mobileRuntime.cycles,runtime:emulator.module.mobileRuntime||'dosbox-x'};
-    $('runtime').dataset.performance=JSON.stringify(perfReport);
-    perfAt=now;perfFrame=frames;perfPresented=presented;perfGame=state?{stage:state.stage,phase:state.phase,ticks:state.ticks}:null;perfSamples=[];
-  }
-  if(state&&pendingSkip){
-    if(state.stage!==pendingSkip.stage){pendingSkip=null;status(`已进入第 ${state.stage} 关`);}
-    else if(state.ack===pendingSkip.sequence)status('本关已通过，正在结算…');
-  }
-  $('skip').disabled=baseline||!state||![1,2].includes(state.phase)||emulator.state!=='running'||!!pendingSkip;
-  if(now-lastPoll>200){
-    lastPoll=now;
-    $('runtime').dataset.state=JSON.stringify(state);
-    $('runtime').textContent=state?`第 ${state.stage} 关 · ${state.count} 玉 · ${state.phase===1?'等待发射':state.phase===2?'进行中':'原作暂停'}\n玉间碰撞：${state.collisions} 次 · 已启用玉对：${state.armedPairs.toString(2)}\n${state.balls.map((ball,i)=>`玉 ${i+1}：(${ball.x}, ${ball.y}) · 速度 (${ball.vx.toFixed(2)}, ${ball.vy.toFixed(2)})${ball.portal?' · 传送中':''}`).join('\n')}`:'尚未进入关卡，或正在切换画面。';
-    if(perfReport)$('runtime').textContent+=`\n模拟循环 ${perfReport.loopHz.toFixed(1)} Hz · 游戏 ${perfReport.gameHz.toFixed(1)} 帧/秒 · 完整画面 ${perfReport.presentationHz.toFixed(1)} 帧/秒 · 单次模拟平均 ${perfReport.averageMs.toFixed(1)} ms / P95 ${perfReport.p95Ms.toFixed(1)} ms`;
-  }
-  requestAnimationFrame(poll);
-}
-
-$('skip').addEventListener('click',()=>{
-  const state=nativeState();
-  if(!state||![1,2].includes(state.phase)||emulator.state!=='running'||pendingSkip)return;
-  releaseInputs();
-  const v=new DataView(emulator.module.HEAPU8.buffer),sequence=(state.ack+1)&0xffff;
-  v.setUint16(bridge+30,state.stage,true);
-  v.setUint16(bridge+28,sequence,true);
-  pendingSkip={stage:state.stage,sequence};$('skip').disabled=true;
-  status(`正在判定第 ${state.stage} 关通过…`);$('canvas').focus();
-});
-function syncTestFlags(state){
-  if(!baseline&&state&&[1,2,3].includes(state.phase)){
-    const view=new DataView(emulator.module.HEAPU8.buffer),at=bridge+140;
-    view.setUint16(at,(view.getUint16(at,true)&14)|(testInvincible?1:0),true);
-  }
-}
-function updateSessionSettings(){
-  if(!sessionSettings)return;
-  $('session-settings').hidden=false;
-  $('session-settings').textContent=`本次设置：${sessionSettings.players===3?'本地三人合作':sessionSettings.players===2?'本地双人合作':'单人多玉'} · ${$('rank').selectedOptions[0].textContent} · ${sessionSettings.count} 玉 · ${bossBalanceText(sessionSettings.players,sessionSettings.count)} · ${lifeCompensationText(sessionSettings.count,sessionSettings.lifeCompensation)} · 允许续关 · ${sessionSettings.debug?'调试开启':'调试关闭'}${testInvincible?' · 玩家无敌':''}`;
-  $('debug-runtime').hidden=baseline||!sessionSettings.debug;
-  $('runtime-invincible').checked=testInvincible;
-  for(const id of ['test-p1-ghost','test-p2-ghost','rescue-test-note'])$(id).hidden=sessionSettings.players<2;
-  $('test-p3-ghost').hidden=sessionSettings.players!==3;
-}
-function updateCoopHud(state){
-  const feedback=coopFeedback(state,performance.now());
-  const menu=state?.phase===0?state.coopMenu:0;
-  $('continue-game').hidden=baseline||menu!==3;
-  $('continue-game').disabled=!!state?.continueRequested;
-  $('coop-menu-note').hidden=baseline||!menu;
-  $('coop-menu-note').textContent=menu===1?'残机耗尽，正在进入续关流程…':menu===2?'成绩登记：按确认完成，随后选择续关。':menu===3?'可不限次数续关：点击“续关”或按确认，恢复初始残机（含补偿）和 Bomb；↑ / ↓ 可选择是否继续。':'';
-  const shown=sessionSettings?.players>1&&!!state?.players;
-  for(let i=0;i<3;i++){
-    $(`test-p${i+1}-ghost`).disabled=!shown||state.phase!==2||!state.players[i]||state.players[i].ghost;
-    $(`p${i+1}-hud`).hidden=$(`p${i+1}-marker`).hidden=!shown||!state.players[i];
-  }
-  $('coop-hud').hidden=!shown;
-  $('coop-markers').hidden=!shown||![1,2].includes(state?.phase);
-  if(!shown)return;
-  const rect=$('canvas').getBoundingClientRect(),screen=$('screen').getBoundingClientRect();
-  const width=Math.min(rect.width,rect.height*1.6),height=width/1.6;
-  Object.assign($('coop-markers').style,{left:`${rect.left-screen.left+(rect.width-width)/2}px`,top:`${rect.top-screen.top+(rect.height-height)/2}px`,width:`${width}px`,height:`${height}px`});
-  for(let i=0;i<state.players.length;i++){
-    const player=state.players[i],name=`P${i+1}`;
-    const protection=testInvincible?' · 测试无敌':player.invincibility>0?` · 受击/救援保护 ${(player.invincibility/56.4).toFixed(1)}s`:'';
-    const event=feedback[i],notice=event?` · ${event.text}`:'';
-    const text=`${name} · ${player.ghost?'幽灵：碰活着的队友即可复活':`残机 ${player.lives} · Bomb ${player.bombs}${protection}`}${notice} · 已获救 ${player.rescues}`;
-    const hud=$(`p${i+1}-hud`);if(hud.textContent!==text)hud.textContent=text;hud.classList.toggle('hit-feedback',!!event?.hit);
-    const marker=$(`p${i+1}-marker`);marker.textContent=name+(event?` ${event.text}`:player.ghost?' 👻':'');marker.classList.toggle('hit-feedback',!!event?.hit);
-    marker.style.left=`${(player.left+16)/640*100}%`;marker.style.top='92%';
-  }
-}
-$('continue-game').addEventListener('click',()=>{
-  if(nativeState()?.coopMenu!==3||bridge<0)return;
-  releaseInputs();new DataView(emulator.module.HEAPU8.buffer).setUint16(bridge+212,1,true);
-  $('continue-game').disabled=true;$('canvas').focus();
-});
-function setInvincible(value){
-  testInvincible=!baseline&&!!value;
-  if(testInvincible&&sessionSettings)sessionSettings.debug=true;
-  syncTestFlags(nativeState());updateSessionSettings();
-}
-if(new URLSearchParams(location.search).get('qa')==='1')installQA({emulator:()=>emulator,state:nativeState,bridge:()=>bridge,key,setInvincible,isInvincible:()=>testInvincible,baseline});
+$('start').onclick=begin;
+$('settings').onclick=()=>{setPaused(true);configuring=true;$('player').hidden=true;document.querySelector('.diagnostics').hidden=true;$('setup').hidden=false;$('cancelSetup').hidden=false;setupSummary();$('start').focus();};
+$('cancelSetup').onclick=()=>{
+  for(const id of ['players','orbs','difficulty'])$(id).value=sessionConfig[id];
+  for(const id of ['compensation','reducedFlash'])$(id).checked=sessionConfig[id];
+  setupSummary();configuring=false;$('setup').hidden=true;$('player').hidden=false;document.querySelector('.diagnostics').hidden=false;setPaused(false);$('game').focus({preventScroll:true});
+};
+try{
+  const response=await fetch('game.wasm',{cache:'no-store'});if(!response.ok)throw Error('缺少 game.wasm，请先运行构建脚本');
+  const binary=await response.arrayBuffer();const module=await WebAssembly.compile(binary);
+  if(WebAssembly.Module.imports(module).length)throw Error('核心不应依赖外部导入');
+  const instance=await WebAssembly.instantiate(module,{});core=instance.exports;loadScores();
+  // Read-only diagnostics and deterministic commands for local QA.
+  window.th01Native={core,buttons,reset,pause:setPaused,audio:()=>({ready:sfxReady,enabled:sfxEnabled,buffers:sfxBuffers.size,cursor:soundCursor,musicWanted,musicTrack,musicPlaying:musicEnabled&&musicContext?.state==='running',musicLoop:musicSource?[musicSource.loopStart,musicSource.loopEnd]:null})};
+  $('start').disabled=false;$('start').textContent=solo?'开始单人游戏 →':'开始本地合作 →';requestAnimationFrame(loop);
+}catch(error){$('setupSummary').textContent=`加载失败：${error.message}`;$('start').textContent='游戏资源加载失败';console.error(error);}

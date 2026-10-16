@@ -1,10 +1,10 @@
-# Upload only the ready-to-run distribution. Development files remain local.
+# Ready-to-run release, following the other TH projects' root allowlist.
+# Development sources, raw assets, tools and reports remain local.
 /*
 !/.gitignore
 !/.gitattributes
 !/README.md
-!/README-PUBLIC.md
-!/三星平板性能优化记录.md
+!/README-NETPLAY.md
 !/web/
 !/server.py
 !/lan_server.py
@@ -13,39 +13,54 @@
 !/public_tunnel.py
 !/configure_turn.py
 !/requirements-relay.txt
+!/start-web.bat
 !/start.bat
+!/README-PUBLIC.md
+!/start-native.bat
 !/start-lan.bat
 !/start-public-tunnel.bat
 !/configure-turn.bat
+!/start-stage5.bat
+!/start-stage10-makai.bat
+!/start-stage10-jigoku.bat
+!/start-stage15-makai.bat
+!/start-stage15-jigoku.bat
+!/start-stage20-makai.bat
+!/start-stage20-jigoku.bat
+!/start-ending-makai.bat
 
-# All modes share the patched runtime disk. The development baseline stays local.
-/web/disks/*
-!/web/disks/th01-multiorb.hdi.gz
-/web/baseline.json
+# Ship the standalone Windows executable, without toolchains or build caches.
+!/build/
+/build/*
+!/build/th01-native.exe
 
-# Keep runtime scripts (including imported qa.js), fonts, music, JS/WASM,
-# licenses and manifests. Exclude development output copied into web/.
+# web/ is the complete runtime: keep game.wasm, JS, audio and JSON manifests.
+# Never ignore *.wasm or audio globally: checkout must run without a rebuild.
 /web/baseline/
 /web/build/
 /web/extracted/
 /web/reports/
 /web/screenshots/
+/web/backups/
 /web/tools/
 /web/vendor-source/
 /web/**/test-results/
 /web/**/playwright-report/
-/web/**/guest-*.wasm
-/web/**/extra-probe.wasm
-/web/**/extra-raw.wasm
+/web/**/*-candidate.wasm
+/web/**/*-probe.wasm
 /web/**/*.wat
 /web/**/*.lst
+/web/**/*.cpuprofile
+/web/**/*.heapsnapshot
 
-# Never upload local credentials, generated URLs or caches inside allowed folders.
+# Credentials, generated tunnel URLs, caches and temporary files stay local.
 turn-config.local.json
 public-test-url.txt
 __pycache__/
 *.py[cod]
 node_modules/
+.venv/
+venv/
 .pytest_cache/
 .ruff_cache/
 .DS_Store
@@ -55,9 +70,13 @@ Desktop.ini
 *.tmp
 *.swp
 *.bak
+*.backup
+*.bak.*
 *.orig
 *~
 .idea/
 .vscode/
 .env
 .env.*
+th01-*-fault.json
+th01-*-diagnostics.json
