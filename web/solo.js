@@ -6,7 +6,7 @@ import {prepareSoloDisk} from './solo-save.js';
 import {Fat12} from './disk.js';
 import {unlockDiskScores} from './scores.js';
 import {NP21} from './dosbox-adapter.js';
-import {loadVerifiedBytes} from './startup-assets.js';
+import {loadVerifiedBytes,loadLocalCore} from './startup-assets.js';
 import {mountPlayer} from './player-ui.js';
 import {unpackTouch} from './touch-input.js';
 import {createSoloAssist} from './solo-assist.js';
@@ -100,12 +100,16 @@ $('start').onclick=async()=>{
   for(const id of ['language','clock','import'])$(id).disabled=true;
   try{
     if(audioMode.value==='independent')soloMusic=new SoloMusic(status);
-    lang=$('language').value;status('正在加载原版镜像');const disk=prepareSoloDisk(await loadDisk());
+    lang=$('language').value;status('正在加载原版镜像');
+    const [source,preparedAssist,wasmBinary]=await Promise.all([
+      loadDisk(),createSoloAssist(()=>emulator),loadLocalCore(),soloMusic?.prepare('YUMEZIKU'),
+    ]);
+    const disk=prepareSoloDisk(source);
     try{await storage(lang,'readwrite',disk);$('save-status').textContent='全解锁存档已保存';}
     catch(error){$('save-status').textContent=`全解锁已生效，存档写入失败：${error.message}`;}
-    assist=await createSoloAssist(()=>emulator);await assist.install(disk);
+    assist=preparedAssist;await assist.install(disk);
     if(soloMusic)await soloMusic.install(disk,'YUMEZIKU');
-    const config={canvas,
+    const config={canvas,wasmBinary,
       // Independent BGM uses its own audio clock; native PCM retains sound effects.
       DIPswtch:[0x3e,0xf3,0x7b],ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,nativeSoloAudio:audioMode.value!=='original',
       no_mouse:true,use_menu:false,fontfile:lang==='cn'?'font_cn.bmp':'font.bmp',

@@ -5,7 +5,7 @@ import {createDosboxSnapshots} from './dosbox-snapshots.js';
 import {makeMemoryDiff} from './dosbox-memory-diff.js';
 import {installFramePresenter} from './frame-presenter.js';
 import {dosboxKeyCode} from './dosbox-keys.js';
-import {loadVerifiedBytes,usesWriteJournal} from './startup-assets.js';
+import {loadLocalCore,usesWriteJournal} from './startup-assets.js';
 import {hashNativeMemory} from './netplay/native-hash.js';
 export class DOSBoxPC98 {
   static async create(config){const emulator=new DOSBoxPC98(config);await emulator.initialize();return emulator;}
@@ -18,14 +18,10 @@ export class DOSBoxPC98 {
     const context=(this.config.audioContext?.state!=='closed'&&this.config.audioContext)||new AudioContext({sampleRate:44100,latencyHint:'interactive'});
     context.resume().catch(()=>{});this.audio=new LocalAudioOutput(context,1);
     const vendor=new URL('./vendor/dosbox-x/',import.meta.url),emulator=this;
-    let wasmBinary=this.config.wasmBinary;
-    if(!net&&!wasmBinary){
-      const response=await fetch(new URL('runtime.json',vendor));
-      if(!response.ok)throw Error('DOSBox-X 资源清单加载失败');
-      const runtime=await response.json(),hash=runtime.files?.['wdosbox-x-fast.wasm'];
-      if(!hash)throw Error('DOSBox-X 资源清单缺少单机内核');
-      wasmBinary=await loadVerifiedBytes(new URL('wdosbox-x-fast.wasm',vendor).href,hash);
-    }
+    const [{default:factory},wasmBinary]=await Promise.all([
+      import(net?(tracked?'./vendor/dosbox-x/dosbox-rollback-tracked.mjs':'./vendor/dosbox-x/dosbox-rollback.mjs'):'./vendor/dosbox-x/dosbox-jspi.mjs'),
+      this.config.wasmBinary||(!net?loadLocalCore():undefined),
+    ]);
     const epoch=this.config.lockstepEpoch??946684800000;
     const NativeDate=globalThis.Date;
     class VirtualDate extends NativeDate {constructor(...args){super(...(args.length?args:[epoch+(emulator.module?.virtualNow||0)]));}static now(){return epoch+(emulator.module?.virtualNow||0);}getTimezoneOffset(){return 0;}getFullYear(){return this.getUTCFullYear();}getMonth(){return this.getUTCMonth();}getDate(){return this.getUTCDate();}getDay(){return this.getUTCDay();}getHours(){return this.getUTCHours();}getMinutes(){return this.getUTCMinutes();}getSeconds(){return this.getUTCSeconds();}}
@@ -42,7 +38,6 @@ export class DOSBoxPC98 {
     this.transport={sessionId:'th03-dosbox',module:this.module,net:null,
       sendMessageToServer:(name,props)=>this.module.messageHandler({data:{name,props}}),
       initMessageHandler:handler=>{receiver=handler;for(const [name,props]of queue)handler(name,props);queue.length=0;},exit:()=>{}};
-    const factory=(await import(net?(tracked?'./vendor/dosbox-x/dosbox-rollback-tracked.mjs':'./vendor/dosbox-x/dosbox-rollback.mjs'):'./vendor/dosbox-x/dosbox-jspi.mjs')).default;
     await factory(this.module);this.module.callMain([this.transport.sessionId]);
     this.installDiskNotifications();
     if(net&&this.config.rollbackEnabled!==false)this.module.memoryDiff=await makeMemoryDiff(this.module);

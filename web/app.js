@@ -2,7 +2,7 @@ import {DOSBoxPC98} from './dosbox-adapter.js';
 import {WorkerNP21, supportsSoloWorker} from './solo-worker-client.js';
 import {workerLocalPause} from './local-worker-client.js';
 import {bootToSelection} from './dosbox-boot.js';
-import {loadVerifiedBytes, loadNetworkAssets} from './startup-assets.js';
+import {loadVerifiedBytes, loadNetworkAssets, loadLocalCore} from './startup-assets.js';
 import {mountControls} from './controls.js';
 import {Fat12, installNativePause, nativeAssets, sha256} from './disk.js';
 import {unlockDiskScores} from './scores.js';
@@ -510,7 +510,7 @@ $('start').addEventListener('click', async () => {
       if(!response.ok)throw Error('同步引擎清单缺失');
       const runtime=await response.json();
       return {runtime,wasmBinary:await loadNetworkAssets(runtime,message=>status(message),{rollbackEnabled})};
-    })():null;
+    })():loadLocalCore().then(wasmBinary=>({wasmBinary}));
     const [disk,networkAssets]=await Promise.all([loadDisk(activeLang),networkTask]);
     const wasmBinary=networkAssets?.wasmBinary;
     if(online){

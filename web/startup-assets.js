@@ -42,6 +42,24 @@ export function usesWriteJournal(rollbackEnabled = true) {
   return rollbackEnabled !== false && WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,5,2,0,1,0,1]));
 }
 
+let localCore;
+// Start this alongside disk/patch preparation, including for worker launches.
+// Share one verified download and retry if the network request fails.
+export function loadLocalCore() {
+  if (!localCore) {
+    localCore = (async () => {
+      const vendor = new URL('./vendor/dosbox-x/', import.meta.url);
+      const response = await fetch(new URL('runtime.json', vendor));
+      if (!response.ok) throw Error('DOSBox-X 资源清单加载失败');
+      const runtime = await response.json(), hash = runtime.files?.['wdosbox-x-fast.wasm'];
+      if (!hash) throw Error('DOSBox-X 资源清单缺少单机内核');
+      return loadVerifiedBytes(new URL('wdosbox-x-fast.wasm', vendor).href, hash);
+    })();
+    localCore.catch(() => { localCore = null; });
+  }
+  return localCore;
+}
+
 export async function loadNetworkAssets(runtime, progress = () => {}, {rollbackEnabled = true} = {}) {
   const core = usesWriteJournal(rollbackEnabled) ? 'wdosbox-x-rollback-tracked.wasm' : 'wdosbox-x-rollback.wasm';
   // The identity retains hashes for both variants. Download only the variant

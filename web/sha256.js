@@ -24,15 +24,23 @@ export async function sha256(bytes) {
   const hash = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
     0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]);
   const words = new Uint32Array(64);
+  let yieldedAt = performance.now();
   for (let offset = 0; offset < padded.length; offset += 64) {
-    if (offset && offset % 65536 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+    // Plain-HTTP LAN pages use this path even on modern browsers. Yield by
+    // elapsed work, not every 64 KiB: nested timers otherwise add seconds to
+    // a disk/core checksum. Keep input and room heartbeats responsive.
+    if (offset && offset % 65536 === 0 && performance.now() - yieldedAt >= 8) {
+      if (globalThis.scheduler?.yield) await globalThis.scheduler.yield();
+      else await new Promise(resolve => setTimeout(resolve, 0));
+      yieldedAt = performance.now();
+    }
     for (let index = 0; index < 16; index++) words[index] = view.getUint32(offset + index * 4);
     for (let index = 16; index < 64; index++) {
       const a = words[index - 15], b = words[index - 2];
       words[index] = (rotr(a, 7) ^ rotr(a, 18) ^ (a >>> 3)) + words[index - 16]
         + (rotr(b, 17) ^ rotr(b, 19) ^ (b >>> 10)) + words[index - 7];
     }
-    let [a, b, c, d, e, f, g, h] = hash;
+    let a=hash[0], b=hash[1], c=hash[2], d=hash[3], e=hash[4], f=hash[5], g=hash[6], h=hash[7];
     for (let index = 0; index < 64; index++) {
       const t1 = (h + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25))
         + ((e & f) ^ (~e & g)) + K[index] + words[index]) >>> 0;
@@ -41,7 +49,10 @@ export async function sha256(bytes) {
       h = g; g = f; f = e; e = (d + t1) >>> 0;
       d = c; c = b; b = a; a = (t1 + t2) >>> 0;
     }
-    for (const [index, value] of [a, b, c, d, e, f, g, h].entries()) hash[index] = (hash[index] + value) >>> 0;
+    hash[0]=(hash[0]+a)>>>0; hash[1]=(hash[1]+b)>>>0;
+    hash[2]=(hash[2]+c)>>>0; hash[3]=(hash[3]+d)>>>0;
+    hash[4]=(hash[4]+e)>>>0; hash[5]=(hash[5]+f)>>>0;
+    hash[6]=(hash[6]+g)>>>0; hash[7]=(hash[7]+h)>>>0;
   }
   return Array.from(hash, value => value.toString(16).padStart(8, '0')).join('');
 }

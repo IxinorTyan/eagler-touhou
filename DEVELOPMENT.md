@@ -1,5 +1,7 @@
 # TH03 DOSBox-X 开发交接
 
+2026-10-16 启动准备优化：sha256.js 的 HTTP fallback 按 8 ms 工作预算让出（每 64 KiB 检查一次），优先 scheduler.yield，不支持时保留 setTimeout；去除压缩循环中逐块迭代器和临时数组，摘要算法、原生 crypto.subtle 路径保持。startup-assets.js 的 loadLocalCore 共用已验证内核 Promise，失败清除以便重试。solo.js 并行加载磁盘／辅助／内核／音乐，音乐拆分只读 prepare 和 install；app.js 本地入口同步启动内核读取，adapter 的包装器 import 与二进制读取并行。未修改游戏／模拟时钟、CPU 预算、bootToSelection、磁盘／原生二进制或网络协议。node tools/test_startup_assets.mjs 检查 51 个含边界／偏移的 SHA 向量、存储禁用／下载失败／损坏资源拒绝、内核并发复用与失败重试、中日文完整音乐补丁磁盘与 HEAD 旧实现逐字节对照；可用 build/startup-optimization/sha256-before.js 做旧校验对照，报告 reports/startup-assets-20261016.json。该基准显式模拟嵌套定时器 4 ms 下限，不是浏览器或游戏启动测量。已更新联机资源清单，46 模块静态审计及原 write-journal 合成回归通过；未运行游戏、浏览器、服务器或音频设备。
+
 2026-10-15 第三轮：针对 TH03 选人/切换的 NativePause 双签名搜索，新增只读 WASM SIMD helper web/pause-search.js（tools/build_pause_search.cjs 生成，524 bytes），保持扫描时机、范围、游标、候选验证与快照字段不变。按 16 字节筛首字节并在 WASM 内核对完整签名，避免逐个候选跨 JS/TypedArray 验证；未知签名或无 SIMD/原生 memory 时回退旧 JS 路径。20,960 项搜索对照、280 次原 NativePause 状态机/恢复对照、堆末端/增长/只读/JS 回退通过。桌面 640 KiB 全零/随机合成扫描约 0.326/0.721 ms 降至 0.068/0.104 ms；前缀密集人工压力例约 56.36 降至 1.41 ms，不能当成真实 TH03 内存或手机收益。报告 reports/th03-pause-search-20261015.json。
 
 同时发现 app.js 只创建日志历史，没有调用 mountNetworkPerformance，导致 README 所称下载入口不存在；已在普通/播放器工具栏挂回“日志”，只在联机模式显示。日志增加资源身份、只读 CPU 开关/同步指令/单指令回退原始计数和搜索实现。原生计数 uint32 可溢出且会随回滚倒退，整体模式/映射回退不计入该 fallback 字段，不能用它计算精确快路径百分比。下载内容无房间令牌或 URL，保留 600 条采样及 100 条错误。清单更新至 54 联机资源，46 模块静态审计、原有 write-journal 检查通过。尚未启动游戏/浏览器/服务，未证明 TH03 忙等热点，也未启用显存查表。本轮工作区改动未自动提交或推送。

@@ -10,7 +10,10 @@ export class SoloMusic {
     this.player=new LocalBgm(this.context,report);this.report=report;
     this.lastPoll=-Infinity;this.closed=false;
   }
-  async install(data,folder) {
+  prepare(folder) {
+    return this.prepared ||= this.prepareAssets(folder);
+  }
+  async prepareAssets(folder) {
     const response=await fetch('solo-music.json');
     if(!response.ok)throw Error('独立音乐配置加载失败');
     const meta=await response.json(),asset=await fetch(meta.url);
@@ -21,6 +24,10 @@ export class SoloMusic {
     // Decode the opening before muting native music, surfacing codec/download errors.
     const opening=folder==='YUMEZIKU'?'op-m26':'op-m86';
     await this.player.decode(opening);
+    return {meta,bytes};
+  }
+  async install(data,folder) {
+    const {meta,bytes}=await this.prepare(folder);
     this.reader=new NativeMusic(meta);
     this.batchPath=folder+'/GAME.BAT';this.driverPath=folder+'/WEBMUSIC.COM';
     const fat=new Fat12(data),entry=fat.find(this.batchPath);
