@@ -4,6 +4,7 @@ Client -> server: E7,target,payload (eagler BrowserPeerTransport convention).
 Server -> client: E8,authenticated-source,payload (TH02 adapter extension).
 """
 import json
+import re
 import select
 import socket
 import threading
@@ -84,6 +85,9 @@ def handle(handler,rooms,room_lock,roles,ttl,expired=None):
     data={k:v[0] for k,v in parse_qs(urlparse(handler.path).query).items()}
     code=data.get('room','').upper()
     token=data.get('token')
+    client=data.get('client','')
+    if not re.fullmatch(r'[A-Za-z0-9_-]{16,80}',client):
+        handler.reply({'error':'请刷新新版网页以启用断线恢复'},400);return
     with room_lock:
         room=rooms.get(code)
         if not room or expired(room,time.monotonic()):
@@ -112,7 +116,7 @@ def handle(handler,rooms,room_lock,roles,ttl,expired=None):
             else:protocol.send_text(json.dumps(value).encode())
             flush()
 
-    entry={'send':send,'ready':False}
+    entry={'send':send,'ready':False,'writer':writer}
     try:
         # Browser waits for HTTP 101 before sending WebSocket frames. The HTTP
         # parser has consumed the request; upgraded reads now use the socket.
@@ -123,15 +127,30 @@ def handle(handler,rooms,room_lock,roles,ttl,expired=None):
         response=protocol.accept(events[0]);protocol.send_response(response);flush()
         if response.status_code!=101:return
         with HUB_LOCK:
-            hub=HUBS.setdefault(key,{})
-            if source in hub or any(item['ready'] for item in hub.values()):
-                send({'type':'error','message':'不支持重复加入或中途重连'});return
-            hub[source]=entry
-            if len(hub)==count:
+            now=time.monotonic()
+            for old_key,old in list(HUBS.items()):
+                if not old['peers'] and now-old['empty_at']>ttl:HUBS.pop(old_key,None)
+            hub=HUBS.setdefault(key,{'peers':{},'sessions':{},'released':False,'empty_at':now})
+            peers=hub['peers'];previous=peers.get(source)
+            if source in hub['sessions'] and hub['sessions'][source]!=client:
+                send({'type':'error','message':'该座位已由另一游戏页面使用，不支持刷新页面后接管本局'});return
+            if hub['released'] and source not in hub['sessions']:
+                send({'type':'error','message':'本局已经开始，不能加入新玩家'});return
+            hub['sessions'][source]=client;peers[source]=entry
+            if previous:previous['writer'].abort()
+            if hub['released']:
+                entry['ready']=True
+                send({'type':'route','mode':'relay','generation':generation,'recovery':1,'peers':list(peers)})
+                for peer,item in peers.items():
+                    if peer!=source:
+                        try:item['send']({'type':'peer-back','peer':source})
+                        except OSError:pass
+            elif len(peers)==count:
                 # Enqueue every route before any payload. These calls only
                 # append to bounded FIFOs; a slow socket cannot hold HUB_LOCK.
-                for item in hub.values():item['send']({'type':'route','mode':'relay','generation':generation})
-                for item in hub.values():item['ready']=True
+                for item in peers.values():item['send']({'type':'route','mode':'relay','generation':generation,'recovery':1,'peers':list(peers)})
+                for item in peers.values():item['ready']=True
+                hub['released']=True
         fragments=bytearray();started=time.monotonic();last_data=started
         while True:
             with room_lock:
@@ -148,7 +167,9 @@ def handle(handler,rooms,room_lock,roles,ttl,expired=None):
             if not opened:break
             for event in events:
                 if event.opcode==OP_CLOSE:return
-                if event.opcode==OP_TEXT:raise ValueError('binary expected')
+                if event.opcode==OP_TEXT:
+                    if not event.fin or event.data!=b'{"type":"ping"}':raise ValueError('invalid keepalive')
+                    last_data=time.monotonic();send({'type':'pong'});continue
                 if event.opcode not in (OP_BINARY,OP_CONT):continue
                 fragments.extend(event.data)
                 if len(fragments)>262146:raise ValueError('too large')
@@ -159,8 +180,10 @@ def handle(handler,rooms,room_lock,roles,ttl,expired=None):
                     current=rooms.get(code)
                     if current and current['generation']==generation and current[role]==token:current['seen'][role]=time.monotonic()
                 with HUB_LOCK:
+                    peers=HUBS.get(key,{}).get('peers',{})
+                    if peers.get(source) is not entry:return
                     if not entry['ready']:raise ValueError('route not released')
-                    target=HUBS.get(key,{}).get(packet[1])
+                    target=peers.get(packet[1])
                     # Membership removal may be in flight; never reroute data.
                     if target:
                         try:target['send'](bytes((0xe8,source))+packet[2:])
@@ -169,13 +192,15 @@ def handle(handler,rooms,room_lock,roles,ttl,expired=None):
         pass
     finally:
         with HUB_LOCK:
-            hub=HUBS.get(key,{})
-            if hub.get(source) is entry:
-                del hub[source]
-                for item in hub.values():
+            hub=HUBS.get(key)
+            peers=hub['peers'] if hub else {}
+            if peers.get(source) is entry:
+                del peers[source]
+                if not hub['released']:hub['sessions'].pop(source,None)
+                for item in peers.values():
                     try:item['send']({'type':'peer-left','peer':source})
                     except OSError:pass
-                if not hub:HUBS.pop(key,None)
+                if not peers:hub['empty_at']=time.monotonic()
         with send_lock:
             try:
                 if protocol.state is OPEN:protocol.send_close(1000,'relay ended');flush()

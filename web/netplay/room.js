@@ -8,6 +8,7 @@ import {mountControlSettings,controlSnapshot,isFormTarget} from '../control-sett
 import {InputLatch} from './input-latch.js';
 const downloadFaultReport=(value,name)=>{const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 import {createRelay} from './relay.js';
+import {mergeDeparture} from './membership.js';
 import {loadRtcConfiguration,refreshRtcPath,describeRtcConfiguration,countIceCandidate,describeIceCandidates,recordIceServerError} from './connection.js';
 const $=id=>document.getElementById(id),roles=['host','guest','guest2'];
 const label=role=>({host:'房主',guest:'客机 1',guest2:'客机 2'})[role];
@@ -46,6 +47,7 @@ let costs=newCosts(),measuredCosts=newCosts(),waitDetail='',earlyInputs=0;
 const activeRoles=()=>roles.slice(0,state.settings.players);
 const onlinePeers=()=>[...peers.values()].filter(peer=>!peer.offline);
 const GRACE_MS=5000;
+let membership=null,membershipId=0;
 let pollFailedAt=0,roomServiceError='';
 let bootStage='等待加载游戏页面';
 let bootStep=0,bootStartedAt=0;
@@ -146,16 +148,55 @@ function suspect(peer){
     return;
   }
   peer.suspectAt??=performance.now();
-  status(`${label(peer.role)}连接中断，等待恢复（5 秒）…`);
+  peer.recovering=true;
+  status(`${label(peer.role)}连接中断，正在恢复（最多 ${GRACE_MS/1000} 秒），保留本局进度…`);
 }
-function reportDeparture(role){fail(Error(`${label(role)}连接已断开，请所有玩家重新建房`));}
-function beginDeparture(){fail(Error('有玩家连接断开，本局停止，请重新建房'));}
+function reportDeparture(role){
+  if(session.role==='host')beginDeparture([role]);
+  else send(peers.get('host'),{type:'suspect',role});
+}
+function beginDeparture(dropped){
+  if(stopped||!running||session.role!=='host')return;
+  const targets=[...new Set([...(membership?.roles||[]),...dropped])].filter(r=>!peers.get(r)?.offline);
+  if(!targets.length||targets.some(r=>r==='host'||!peers.has(r)))throw Error('无效离线目标');
+  membership={id:++membershipId,roles:targets,reports:new Map(),started:performance.now()};
+  // Freeze before collecting reports. The original guest input lane may have
+  // arrived at different frontiers; surviving peers contribute their history.
+  membership.reports.set(session.role,queue.membershipReport());
+  broadcast({type:'departure-prepare',id:membership.id,roles:targets});
+  finishDeparture();
+}
+function finishDeparture(){
+  if(session.role!=='host'||!membership)return;
+  const remaining=onlinePeers().filter(p=>!membership.roles.includes(p.role));
+  if(!remaining.every(p=>membership.reports.has(p.role)))return;
+  const closed=remaining.filter(p=>p.channel?.readyState!=='open');
+  if(closed.length){beginDeparture(closed.map(p=>p.role));return;}
+  const change=mergeDeparture([...membership.reports.values()],membership.roles.map(r=>state.slots[r]),state.settings.players);
+  const message={type:'departure-commit',id:membership.id,roles:membership.roles,...change};
+  for(const peer of remaining)send(peer,message);
+  const dropped=membership.roles.slice();applyDeparture(message);
+  request('drop',{roles:dropped}).then(r=>update(r.state)).catch(()=>{});
+}
+function applyDeparture(message){
+  if(!membership||message.id!==membership.id||JSON.stringify(message.roles)!==JSON.stringify(membership.roles)||
+     JSON.stringify(message.slots)!==JSON.stringify(message.roles.map(r=>state.slots[r])))throw Error('离线确认不匹配');
+  queue.applyDeparture(message);
+  for(const role of message.roles){
+    const peer=peers.get(role);peer.offline=true;peer.ended=true;
+    clearTimeout(peer.connectTimer);peer.channel?.close();peer.pc.close();
+  }
+  membership=null;lastNow=performance.now();accumulator=0;
+  render();
+  status(`${message.roles.map(label).join('、')}已离线，角色转为离线幽灵，其余玩家继续。`);
+  wake();
+}
 async function request(action,data={}){
   const response=await fetch(`/api/${action}`,{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({protocol:PROTOCOL,transport:useRelay?'ws':'rtc',room:session?.room,token:session?.token,...data}),signal:AbortSignal.timeout(10000)});
   const result=await response.json();if(!response.ok)throw Error(result.error||`HTTP ${response.status}`);return result;
 }
-function signal(peer,message){return request('signal',{to:peer.role,message});}
+function signal(peer,message){return request('signal',{to:peer.role,message:{...message,attempt:peer.attempt||0}});}
 function send(peer,message){
   if(!peer||peer.offline)return;
   if(peer.channel?.readyState!=='open'){suspect(peer);return;}
@@ -318,7 +359,7 @@ async function poll(){
 }
 function trim(map){while(map.size>60)map.delete(map.keys().next().value);}
 function compare(peer,tick){
-  if(peer.offline)return;
+  if(peer.offline||membership)return;
   const a=hashes.get(tick),b=peer.hashes.get(tick);if(!a||!b)return;
   if(a.hash!==b.hash||a.gameFrame!==b.gameFrame)throw Error(`${label(peer.role)}在同步步 ${tick} 不一致：本机 ${a.hash}/${a.gameFrame}，对方 ${b.hash}/${b.gameFrame}`);
   peer.confirmed=tick;peer.hashes.delete(tick);
@@ -329,7 +370,11 @@ function attachChannel(peer,channel){
   channel.onopen=()=>{
     if(stopped||peers.get(peer.role)!==peer){channel.close();return;}
     clearTimeout(peer.connectTimer);peer.lastPacket=performance.now();
-    try{send(peer,{type:'hello',settings:state.settings,slots:state.slots,inputPolicy});pingPeer(peer);if(localReady)send(peer,{type:'ready',build:localReady});}
+    try{
+      send(peer,{type:'hello',settings:state.settings,slots:state.slots,inputPolicy});pingPeer(peer);
+      if(localReady)send(peer,{type:'ready',build:localReady});
+      if(running)send(peer,{type:'input-tail',slot:queue.slot,inputs:[...queue.inputs[queue.slot]].filter(([at])=>at>=queue.frame-32)});
+    }
     catch(error){fail(error);}
   };
   channel.onmessage=event=>{
@@ -338,7 +383,11 @@ function attachChannel(peer,channel){
       if(typeof event.data!=='string'||event.data.length>65536)throw Error('无效同步消息');
       const m=JSON.parse(event.data);
       if(m.protocol!==PROTOCOL||m.generation!==state.generation)throw Error('同步消息不属于本局');
-      peer.lastPacket=performance.now();peer.suspectAt=null;
+      const recovering=peer.recovering;
+      peer.lastPacket=performance.now();peer.suspectAt=null;peer.recovering=false;
+      if(recovering&&running&&onlinePeers().every(p=>!p.recovering)){
+        lastNow=performance.now();accumulator=0;status(`连接已恢复，继续本局，你操作 P${queue.slot+1}。`);
+      }
       if(stopped&&m.type!=='end'&&m.type!=='end-ack')return;
       switch(m.type){
         case 'hello':
@@ -356,9 +405,11 @@ function attachChannel(peer,channel){
           runDelay=m.delay;
           runRequested=true;maybeRun();break;
         case 'input':
+          if(membership?.roles.includes(peer.role))break;
           if(m.slot!==state.slots[peer.role])throw Error('玩家输入身份不匹配');
           queue.receive(m.frame,m.buttons,m.slot);receivedInputs++;wake();break;
         case 'input-tail':
+          if(membership?.roles.includes(peer.role))break;
           if(m.slot!==state.slots[peer.role]||!Array.isArray(m.inputs)||m.inputs.length>160)throw Error('无效输入补包');
           for(const [frame,buttons]of m.inputs)queue.receive(frame,buttons,m.slot);
           wake();break;
@@ -377,7 +428,19 @@ function attachChannel(peer,channel){
         case 'pong':recordPong(peer,m.id);break;
         case 'suspect':
           if(session.role!=='host'||!peers.has(m.role)||m.role==='host'||m.role===peer.role)throw Error('无效断链报告');
-          if(!peers.get(m.role).offline)beginDeparture();break;
+          if(!peers.get(m.role).offline&&!membership?.roles.includes(m.role))beginDeparture([m.role]);break;
+        case 'departure-prepare':
+          if(peer.role!=='host'||!Number.isSafeInteger(m.id)||m.id<=membershipId||!Array.isArray(m.roles)||
+             !m.roles.length||new Set(m.roles).size!==m.roles.length||m.roles.some(r=>r==='host'||!activeRoles().includes(r)))throw Error('无效离线协商');
+          membershipId=m.id;
+          if(m.roles.includes(session.role)){closeDisconnected('你已与本局断开连接');return;}
+          membership={id:m.id,roles:m.roles,started:performance.now()};
+          send(peer,{type:'departure-report',id:m.id,report:queue.membershipReport()});break;
+        case 'departure-report':
+          if(session.role!=='host'||!membership||m.id!==membership.id)break;
+          if(!membership.roles.includes(peer.role)){membership.reports.set(peer.role,m.report);finishDeparture();}break;
+        case 'departure-commit':
+          if(peer.role!=='host')throw Error('只有房主能确认离线');applyDeparture(m);break;
         case 'end':
           if(peer.role!=='host'||session.role==='host')throw Error('只有房主能退出本局');
           if(stopped)send(peer,{type:'end-ack'});else finishGame();break;
@@ -392,10 +455,15 @@ function attachChannel(peer,channel){
   };
   channel.onclose=()=>{if(stopped||peer.offline)peer.pc.close();else suspect(peer);};
   channel.onerror=()=>suspect(peer);
+  channel.onreconnecting=()=>suspect(peer);
 }
-function makePeer(role,rtcConfiguration){
+function makePeer(role,rtcConfiguration,previous=null,attempt=0){
   const pc=new RTCPeerConnection(rtcConfiguration);
-  const peer={role,pc,candidates:[],localCandidateTypes:{},remoteCandidateTypes:{},iceServerErrors:[],hashes:new Map(),pings:new Map(),confirmed:0,lastPacket:performance.now(),pingId:0};peers.set(role,peer);
+  const peer={...previous,role,pc,channel:null,attempt,rtcConfiguration,retryAt:performance.now()+8000,
+    candidates:previous?.futureCandidates?.get(attempt)||[],futureCandidates:new Map(),localCandidateTypes:{},remoteCandidateTypes:{},iceServerErrors:[],
+    hashes:previous?.hashes||new Map(),pings:new Map(),confirmed:previous?.confirmed||0,lastPacket:previous?.lastPacket??performance.now(),pingId:0};
+  peers.set(role,peer);
+  if(previous){clearTimeout(previous.connectTimer);previous.channel?.close();previous.pc.close();}
   peer.signalChain=Promise.resolve();
   pc.onicecandidate=event=>{if(event.candidate&&currentRtcPeer(peer)){peer.localCandidates=(peer.localCandidates||0)+1;countIceCandidate(peer.localCandidateTypes,event.candidate);signal(peer,{type:'ice',candidate:event.candidate.toJSON()}).catch(error=>rtcFailure(peer,error));showStartup();}};
   pc.onicecandidateerror=event=>{if(stopped)return;recordIceServerError(peer.iceServerErrors,event);showStartup();};
@@ -421,7 +489,25 @@ function makeRelayPeer(role){
   peer.connectTimer=setTimeout(()=>fail(Error('等待全员服务器转发连接超过 30 秒，请确认所有玩家的页面仍打开，且房间服务／公网隧道窗口仍在运行')),30000);
 }
 function currentRtcPeer(peer){return !stopped&&!useRelay&&peers.get(peer.role)===peer;}
-function rtcFailure(peer,error){if(currentRtcPeer(peer))requestRelayFallback(String(error.message||error));}
+function rtcFailure(peer,error){
+  if(!currentRtcPeer(peer))return;
+  if(running){suspect(peer);peer.retryAt=performance.now()+1000;return;}
+  requestRelayFallback(String(error.message||error));
+}
+function reconnectRtc(peer){
+  if(!currentRtcPeer(peer)||!running||performance.now()<peer.retryAt)return;
+  peer.retryAt=performance.now()+8000;
+  // The lower role always offers. Both endpoints can request recovery without
+  // colliding offers, resetting the game queue, or accepting stale ICE.
+  if(roles.indexOf(session.role)>roles.indexOf(peer.role)){
+    signal(peer,{type:'reconnect'}).catch(()=>{});return;
+  }
+  const replacement=makePeer(peer.role,peer.rtcConfiguration,peer,peer.attempt+1);
+  attachChannel(replacement,replacement.pc.createDataChannel('th02-inputs',{ordered:true}));
+  replacement.signalChain=signalingStep(replacement,'恢复设备直连',async()=>replacement.pc.setLocalDescription(await replacement.pc.createOffer()))
+    .then(()=>{if(currentRtcPeer(replacement))return signal(replacement,{type:'offer',description:replacement.pc.localDescription.toJSON()});})
+    .catch(error=>rtcFailure(replacement,error));
+}
 async function requestRelayFallback(reason){
   if(stopped||useRelay||fallbackPending)return;
   if(running){fail(Error(reason));return;}
@@ -502,16 +588,33 @@ function dispatchSignal(event){
   const peer=peers.get(event?.from);
   if(!peer||!event.message)throw Error('未知信令来源');
   if(peer.offline)return;
+  const attempt=event.message.attempt??0;
+  if(!Number.isSafeInteger(attempt)||attempt<0||attempt>1000000)throw Error('无效连接恢复编号');
+  if(event.message.type==='reconnect'){
+    if(!running||roles.indexOf(session.role)>roles.indexOf(peer.role)||attempt<peer.attempt)return;
+    peer.retryAt=Math.min(peer.retryAt,performance.now());suspect(peer);reconnectRtc(peer);return;
+  }
+  if(attempt<peer.attempt)return;
   if(event.message.type==='ice'){
+    if(attempt>peer.attempt){
+      if(!running||attempt>peer.attempt+1)throw Error('无效恢复候选编号');
+      const candidates=peer.futureCandidates.get(attempt)||[];
+      if(candidates.length>=256)throw Error('恢复候选过多');
+      candidates.push(event.message.candidate);peer.futureCandidates.set(attempt,candidates);return;
+    }
     peer.remoteCandidates=(peer.remoteCandidates||0)+1;
     countIceCandidate(peer.remoteCandidateTypes,event.message.candidate);
     if(peer.pc.remoteDescription)submitCandidate(peer,event.message.candidate);
     else peer.candidates.push(event.message.candidate);
     showStartup();return;
   }
-  peer.signalChain=peer.signalChain.then(()=>{
-    if(currentRtcPeer(peer)&&!peer.offline)return receivedSignal(event);
-  }).catch(error=>rtcFailure(peer,error));
+  if(event.message.type==='offer'&&attempt>peer.attempt){
+    if(!running||roles.indexOf(event.from)>=roles.indexOf(session.role))throw Error('无效连接恢复邀请');
+    const replacement=makePeer(peer.role,peer.rtcConfiguration,peer,attempt);
+    replacement.signalChain=receivedSignal(event).catch(error=>rtcFailure(replacement,error));return;
+  }
+  if(attempt!==peer.attempt)return;
+  peer.signalChain=peer.signalChain.then(()=>{if(currentRtcPeer(peer)&&!peer.offline)return receivedSignal(event);}).catch(error=>rtcFailure(peer,error));
 }
 async function remoteDescription(peer,description){
   await signalingStep(peer,'应用远端连接描述',()=>peer.pc.setRemoteDescription(description));
@@ -547,14 +650,19 @@ async function beginGame(){
         // Connecting/loading have their own 30 s / 10 min deadlines. A mobile
         // browser compiling WASM must not be evicted by the in-game watchdog.
         if(running&&now-peer.lastPacket>3000)suspect(peer);
+        if(running&&!useRelay&&peer.recovering)reconnectRtc(peer);
         if(running&&peer.suspectAt!=null&&now-peer.suspectAt>=GRACE_MS){
           if(peer.role==='host'){closeDisconnected('主机连接已断开');return;}
-          reportDeparture(peer.role);
+          if(!membership?.roles.includes(peer.role))reportDeparture(peer.role);
         }
         if(peer.channel?.readyState==='open'){
           pingPeer(peer);send(peer,{type:'heartbeat',hidden:document.hidden,bootStage:running?undefined:bootStage});
           send(peer,{type:'input-tail',slot:queue.slot,inputs:[...queue.inputs[queue.slot]].filter(([at])=>at>=queue.frame-32)});
         }
+      }
+      if(running&&membership&&now-membership.started>=GRACE_MS){
+        if(session.role==='host')beginDeparture(onlinePeers().filter(p=>!membership.roles.includes(p.role)&&!membership.reports.has(p.role)).map(p=>p.role));
+        else if(now-membership.started>=15000)closeDisconnected('房主未完成离线同步');
       }
     }catch(error){fail(error);}
   },1000);
@@ -637,7 +745,7 @@ function wake(delay=0){
 }
 function tick(now){if(running&&!stopped){observeInput();pump(now);}}
 function armRollback(){
-  if(!inputPolicy.rollbackEnabled||session.role!=='host'||!running||queue.activation!==null||!runtime.readyForRollback()||
+  if(!inputPolicy.rollbackEnabled||session.role!=='host'||!running||membership||queue.activation!==null||!runtime.readyForRollback()||
      !onlinePeers().every(peer=>peer.rollbackReady))return;
   // DOS boot remains confirmed-only. All devices/audio are initialized before
   // taking snapshots; every peer switches at the same future simulation tick.
@@ -737,6 +845,11 @@ function updateMetrics(now,waiting){
 }
 function pump(now){
   if(!running||stopped||pumping)return;
+  if(membership){
+    lastNow=now;accumulator=0;waitDetail='正在同步玩家离线边界';
+    if(!waitingSince)waitingSince=now;
+    updateMetrics(now,true);return;
+  }
   if(document.hidden){lastNow=now;accumulator=0;return;}pumping=true;
   try{
     accumulator=Math.min(accumulator+Math.max(0,now-lastNow),TICK_MS*4);lastNow=now;

@@ -262,7 +262,7 @@ class Handler(SimpleHTTPRequestHandler):
                 other=data.get('to')
                 if other not in active or other==role or not room[other]:
                     return self.reply({'error':'信令目标无效'},400)
-                if not isinstance(message,dict) or message.get('type') not in ('offer','answer','ice','ended'):
+                if not isinstance(message,dict) or message.get('type') not in ('offer','answer','ice','ended','reconnect'):
                     return self.reply({'error':'信令格式不合法'},400)
                 if room['phase']!='loading':
                     return self.reply({'error':'本局尚未开始或已经结束'},409)

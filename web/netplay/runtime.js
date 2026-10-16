@@ -127,7 +127,8 @@ function confirmedMusic(event){
 }
 function step(inputs,{frame=ticks,replay=false,offlineMask=0}={}){
  if(!enabled)throw Error('TH02 尚未同步启动');
- if(offlineMask)throw Error('有玩家断开，请重新建房');
+ if(!Number.isInteger(offlineMask)||offlineMask<0||offlineMask>=(1<<players))throw Error('无效离线席位');
+ inputs=inputs.map((bits,i)=>offlineMask&(1<<i)?0:bits);
  const saved=states.get(frame);if(saved)saved.execution={inputs:inputs.slice(),offlineMask};
  const m=emulator.module;
  m.netBeginFrame(frame,replay);
@@ -136,6 +137,8 @@ function step(inputs,{frame=ticks,replay=false,offlineMask=0}={}){
   // every step spent most startup work searching memory that cannot match.
   if(emulatedTicks%15===0)mailbox=locateMailbox(m.HEAPU8,patch,mailbox);
   if(mailbox>=0){
+   const offlineAt=mailbox-patch.entries.mailbox+patch.entries.offline_mask;
+   m.thDirtyMark?.(offlineAt,1);m.HEAPU8[offlineAt]=offlineMask;
    m.thDirtyMark?.(mailbox,patch.players.mailboxSize);
    m.thDirtyMark?.(mailbox-patch.entries.mailbox+patch.entries.touch_state,2*patch.touch.stride+6);
   }

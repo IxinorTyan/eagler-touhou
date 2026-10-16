@@ -37,14 +37,14 @@
     "netplay/local-bgm.js": "3765cf22782dd3b50da82679b03c64ec4fda71d9411b60b781ba8f56fd658daf",
     "netplay/membership.js": "a84a5b38066e29a876db2c900e2411f3d4168f329bcb83fb44a81226a88e6fca",
     "netplay/network-mode.js": "dda8c24274cb84bf50aa50ca9405ffa8d707f9567137cb80cb2133ea45fb019b",
-    "netplay/relay.js": "353ad772d5a77d70150498434398d43568c388d27b850c2401919e7034423d54",
+    "netplay/relay.js": "8189520a9dd4b8900bfb76065787056234ad1a4331b021d99cafe2652251aacf",
     "netplay/rollback-queue.js": "b43c8f69d5e4e00acb4e9c4c0836cc887e3004e4b6566572cc895cf29ec06de6",
-    "netplay/room.js": "f8d30bdaa39fd6ef2231e7925e4f8945d519090e44b2115a72a6ad80483f7fed",
+    "netplay/room.js": "f7cc102db12628be819cd9eb15aab358305c72e96d7de6e20af8e40bac847efe",
     "netplay/runtime.html": "2e1a5f3006b7b9ab9c0632596e56dcd8d869fdbb9f5a8e45d5afcc5cd627ad2b",
-    "netplay/runtime.js": "ccaa2b2626af86bac7ebbb1a54cfebfb1d462d7cb38e4dac2a0e85e840061be0",
+    "netplay/runtime.js": "b483e23820f5e0b8ebf8dfce9f469d0853a4b595d542a0df050b8423e94cca04",
     "netplay/sha256.js": "9cb7be2bc039bcea2a4d727ef98bcd9047a78dfd4c11950355723147423e1f43",
     "netplay/th02-launch.com": "956a4d9d9ea3ff08f0d98c793a35d03cfaf3aeb129cdbdf5b3dbcf70be9b6dd0",
-    "netplay/th02-state.js": "5d9668c72049aaa581e54d09d811dc11b1bb0ae5d552e1d4d1c1bcf0c1bb1461",
+    "netplay/th02-state.js": "7529c6a586d1e29a07a210463d0ea5ab7e50579ded2740f874b70ba045e3ba09",
     "netplay/udp-config.js": "244c1972f3d412455e007c01a7548375d43d38debe71cc077668ed2c977bdfa3",
     "player-art.js": "74d7282128cd7bf8bd40ac1d0218b0c77e0a68469dbed00f06362ee43eb10873",
     "player-ui.css": "336426049fe26ab7dc605359bf230b081a2625a9905fc6bff7a4fcc671cc9a80",
@@ -65,7 +65,7 @@
     "vendor/dosbox-x/dosbox-rollback-tracked.mjs": "f7224bcb7e5ea881525760f3b71b194d01e127acf31103a5400a06d9d004d048",
     "vendor/dosbox-x/dosbox-rollback.mjs": "b86ffabafe90b43c0e12745ebd2d03e0da3353a53f765ad50a2008d12e291e8e",
     "vendor/dosbox-x/emulators.js": "066176a9e9e6babfb5388552a5154f3c1f81ed778af3bf4a1f9f904161e3c4bb",
-    "local-patch.json": "47e707706dc07817936cc1079df15d4bcfd127705d0b7a2e227bfbc7519ae9fe",
+    "local-patch.json": "a60d3d7d42cd4e8a73d220fe38343670aec66dd2f47753f28816bcf6668b1b22",
     "assets/ghost-32.png": "b65bde17c040b32d2c3ca90436a8905006c4c4fc4dabb899876fecf2374674d2",
     "assets/hud-ofuda-p1-original.png": "b37e36b50161916c1888eda080dcda79132286b06758b9ae2ed0431e7ceab7fa",
     "assets/hud-ofuda-p2-blue.png": "581192e5ee4e668c2daa9c4e3069f526061f8865ea37dbee3c2182a640f3f05f",
@@ -93,5 +93,5 @@
       "sha256": "5fb459e5df9232cab4d55f3c36c0bb6b4d00a983fc023661245373ee59ca06d8"
     }
   },
-  "build": "e6d4e703f0c8c7c254de078e0fc1062432d1b9c1619dba1b5ebff3303434e616"
+  "build": "d45a4ea0b9c4131154589fdcf5159930aef0e1fd6c2cc1a36de61c26929cb404"
 }
