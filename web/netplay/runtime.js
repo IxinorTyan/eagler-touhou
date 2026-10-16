@@ -62,7 +62,7 @@ document.getElementById('sound').onclick=async()=>{
   }catch(error){details.textContent=error.message;}
 };
 async function get(path,type='json'){
-  const response=await fetch(path,{cache:'no-store'});if(!response.ok)throw Error(`资源读取失败：${path}`);
+  const response=await fetch(path,{cache:'no-cache'});if(!response.ok)throw Error(`资源读取失败：${path}`);
   if(type==='arrayBuffer'&&response.body){
     const total=Number(response.headers.get('content-length'))||0,reader=response.body.getReader(),chunks=[];
     let received=0,last=0;

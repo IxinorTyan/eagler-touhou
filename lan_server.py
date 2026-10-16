@@ -6,7 +6,8 @@ import socket
 import threading
 import time
 from functools import partial
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
+from web_server import AssetHandler
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from turn_service import credentials as turn_credentials, TurnError
@@ -30,14 +31,13 @@ def snapshot(room):
             'ready':room['ready'],'settings':room['settings'],'generation':room['generation']}
 
 
-class Handler(SimpleHTTPRequestHandler):
-    extensions_map={**SimpleHTTPRequestHandler.extensions_map,'.js':'text/javascript','.mjs':'text/javascript','.wasm':'application/wasm','.opus':'audio/ogg'}
+class Handler(AssetHandler):
+    extensions_map={**AssetHandler.extensions_map,'.js':'text/javascript','.mjs':'text/javascript','.wasm':'application/wasm','.opus':'audio/ogg'}
 
     def log_message(self,*args):
         pass
 
     def end_headers(self):
-        self.send_header('Cache-Control','no-store')
         self.send_header('X-Content-Type-Options','nosniff')
         super().end_headers()
 

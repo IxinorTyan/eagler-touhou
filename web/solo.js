@@ -145,15 +145,19 @@ $('start').onclick=async()=>{
   try{
     if(audioMode.value==='independent')soloMusic=new SoloMusic(status);
     status(`正在加载${version.label}单机磁盘…`);
-    const meta=await fetch(version.soloPatch,{cache:'no-store'});if(!meta.ok)throw Error(`配置 HTTP ${meta.status}`);patch=await meta.json();
-    const response=await fetch(version.soloDisk,{cache:'no-store'});if(!response.ok)throw Error(`磁盘 HTTP ${response.status}`);
-    const data=new Uint8Array(await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+    const [manifest,data]=await Promise.all([
+      fetch(version.soloPatch,{cache:'no-cache'}).then(response=>{if(!response.ok)throw Error(`配置 HTTP ${response.status}`);return response.json();}),
+      fetch(version.soloDisk,{cache:'no-cache'}).then(async response=>{
+        if(!response.ok)throw Error(`磁盘 HTTP ${response.status}`);
+        return new Uint8Array(await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+      })]);
+    patch=manifest;
     if(data.length!==patch.disk.size||await sha256(data)!==patch.disk.sha256)throw Error('单机磁盘校验失败');
     if(soloMusic)await soloMusic.install(data,'GENSO');
     const config={canvas,ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,nativeSoloAudio:audioMode.value!=='original',no_mouse:true,use_menu:false,fontfile:'font.bmp'};
     emulator=runtimeMode.value==='worker'?await WorkerNP21.create(config,{game:'04',patch,music:soloMusic?.reader.patch,onError:e=>{soloMusic?.suspend();player.exit();status('模拟线程停止：'+e.message);}}):await NP21.create(config);
     if(emulator.isWorker)emulator.onMusic=(ax,hash)=>soloMusic?.player.command(ax,hash);
-    await emulator.addDiskImage('th04-solo.hdi',data);await emulator.setHdd(0,'th04-solo.hdi');emulator.run();player.setActive(true);canvas.focus();
+    await emulator.addDiskImage('th04-solo.hdi',data);await emulator.setHdd(0,'th04-solo.hdi');emulator.run();soloMusic?.start();player.setActive(true);canvas.focus();
     status(`${version.label}单机已启动，请等待开头，在游戏内选择模式与角色。`);$('restart').disabled=false;
   }catch(e){emulator?.dispose?.();soloMusic?.dispose();player.setActive(false);player.exit();status(`启动失败：${e.message}`);$('restart').disabled=false;console.error(e);}
 };

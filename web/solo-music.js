@@ -17,10 +17,6 @@ export class SoloMusic {
     if(!asset.ok)throw Error('独立音乐驱动加载失败');
     const bytes=new Uint8Array(await asset.arrayBuffer());
     if(bytes.length!==meta.bytes||await sha256(bytes)!==meta.sha256)throw Error('独立音乐驱动校验失败');
-    await this.player.load({warmOpening:false});
-    // Decode the opening before muting native music, surfacing codec/download errors.
-    const opening=folder==='YUMEZIKU'?'op-m26':'op-m86';
-    await this.player.decode(opening);
     this.reader=new NativeMusic(meta);
     this.batchPath=folder+'/GAME.BAT';this.driverPath=folder+'/WEBMUSIC.COM';
     const fat=new Fat12(data),entry=fat.find(this.batchPath);
@@ -36,6 +32,16 @@ export class SoloMusic {
     if(!installs||installs!==removes)throw Error('无法识别单机音乐启动流程');
     fat.put(this.driverPath,bytes);
     fat.replace(entry,Uint8Array.from(batch,c=>c.charCodeAt(0)));
+  }
+  start() {
+    if(this.closed||this.loading)return;
+    // The driver can queue commands while the small manifest loads. Tracks
+    // download/decode on demand, after the emulator has started.
+    this.loading=this.player.load({warmOpening:false}).catch(error=>{
+      if(this.closed)return;
+      this.player.status='本地音乐错误：'+error.message;
+      this.report(this.player.status+'；游戏继续，可重启选择原声模式');
+    });
   }
   exportDisk(data) {
     const copy=new Uint8Array(data),fat=new Fat12(copy);

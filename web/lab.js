@@ -192,13 +192,17 @@ $('start').onclick=async()=>{
     const config=encodeConfig(launchSettings);
     const version=gameVersion($('language').value);
     status('正在校验并加载实验磁盘…');
-    const response=await fetch(version.coopDisk,{cache:'no-store'});
-    if(!response.ok)throw Error(`磁盘 HTTP ${response.status}`);
-    let data=new Uint8Array(await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
-    const meta=await (await fetch(version.coopMeta,{cache:'no-store'})).json();
+    const [disk,meta,patch]=await Promise.all([
+      fetch(version.coopDisk,{cache:'no-cache'}).then(async response=>{
+        if(!response.ok)throw Error(`磁盘 HTTP ${response.status}`);
+        return new Uint8Array(await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+      }),
+      ...[version.coopMeta,version.coopPatch].map(path=>fetch(path,{cache:'no-cache'}).then(response=>{
+        if(!response.ok)throw Error(`配置 HTTP ${response.status}`);return response.json();
+      }))]);
+    let data=disk;
     const hash=await sha256(data);
     if(hash!==meta.sha256||data.length!==meta.size)throw Error('实验磁盘校验失败');
-    const patch=await (await fetch(gameVersion($('language').value).coopPatch,{cache:'no-store'})).json();
     nativePatch=patch;
     installConfig(data,patch,config);
     if($('audio-mode').value==='independent'){
@@ -210,7 +214,7 @@ $('start').onclick=async()=>{
     const background=supportsSoloWorker()&&new URLSearchParams(location.search).get('runtime')!=='main';
     emulator=background?await WorkerNP21.create(runtimeConfig,{game:'04coop',patch,music:localMusic?.reader.patch,onError:error=>{localMusic?.suspend();status('模拟线程错误：'+error.message);}}):await NP21.create(runtimeConfig);
     if(emulator.isWorker)emulator.onMusic=(ax,hash)=>localMusic?.player.command(ax,hash);
-    await emulator.addDiskImage('th04-lab.hdi',data);await emulator.setHdd(0,'th04-lab.hdi');emulator.run();player.setActive(true);
+    await emulator.addDiskImage('th04-lab.hdi',data);await emulator.setHdd(0,'th04-lab.hdi');emulator.run();localMusic?.start();player.setActive(true);
     $('canvas').focus();$('pause').disabled=false;$('restart').disabled=false;$('capture').disabled=false;
     launchStarted=performance.now();
     status('正在启动游戏并载入双方机体，请稍候…');

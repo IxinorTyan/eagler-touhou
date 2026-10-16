@@ -8,6 +8,7 @@
 !/LAN-试玩说明.md
 !/web/
 !/server.py
+!/web_server.py
 !/lan_server.py
 !/relay_server.py
 !/turn_service.py
