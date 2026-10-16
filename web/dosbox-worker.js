@@ -1,5 +1,5 @@
 /* Real DOSBox-X / PC-98 core, kept off the page's input/render scheduling. */
-let nativeTouch=null,nativeLayout=null,musicReader=null;
+let nativeTouch=null,nativeLayout=null,musicReader=null,gameLocator=null;
 let ci,mod,patch,mailbox=-1,guestBase=-1,paused=false,input={p2:0,slow:0,invincible:false},statePending=false,scanDue=0,qaEnabled=false;
 let frames=0,audioPackets=0,audioEnergy=0,fatal=false,exited=false,logs=[];
 let presentationActive=true,frameProof=null,frameProofHolding=false;
@@ -24,13 +24,12 @@ function scan(){
   if(soloMode){soloInput?.read(mod.HEAPU8);releaseConsumedKeys();return;}
   if(!mod)return;const h=mod.HEAPU8,v=new DataView(h.buffer);
   if(mailbox>=0&&signature.every((b,i)=>h[mailbox+i]===b)&&h[mailbox+25]===1)return;
-  mailbox=-1;guestBase=-1;if(performance.now()<scanDue)return;scanDue=performance.now()+500;
-  const found=[];
-  for(let at=h.indexOf(signature[0]);at>=0;at=h.indexOf(signature[0],at+1))if(signature.every((b,i)=>h[at+i]===b)&&h[at+25]===1&&v.getUint32(at+16,true)>0){
-    const origin=at-patch.mailbox_cs_offset-(v.getUint16(at+20,true)-patch.data_segment+patch.code_segment)*16;
-    if(origin>=0&&origin+0x100000<=h.length)found.push([at,origin]);
-  }
-  if(found.length===1)[mailbox,guestBase]=found[0];
+  mailbox=-1;guestBase=-1;
+  if(mod.UTF8ToString(mod._emGetRunningProgram()).toUpperCase()!=='MAIN')return;
+  if(performance.now()<scanDue)return;scanDue=performance.now()+64;
+  const found=gameLocator.find(h,patch);
+  if(found)[mailbox,guestBase]=found;
+  mod.afterimageArt?.bind(mailbox);
 }
 function inputs(){if(mailbox<0)return;const h=mod.HEAPU8,v=new DataView(h.buffer);releaseConsumedKeys();if(nativeInputTick()!==p2PulseTick)p2Pulse=0;v.setUint16(mailbox+22,(input.p2|p2Pulse)&63,true);h[mailbox+24]=input.slow?1:0;
     if(nativeInputTick()!==p3PulseTick)p3Pulse=0;
@@ -64,16 +63,24 @@ function publish(){if(fatal||exited||!ci)return;scan();if(nativeStatus().exit){e
 const config=(cycles,core)=>`[dosbox]\nmachine=pc98\nmemsize=16\n[cpu]\ncore=${core}\ncputype=386\ncycles=${cycles}\n[render]\nframeskip=0\nscaler=none\naspect=false\n[sblaster]\nsbtype=none\n[pc98]\npc-98 fm board=board86\n[mixer]\nrate=44100\nblocksize=512\nprebuffer=20\n[autoexec]\n@echo off\nmount a /home/web_user/game\na:\ncd KAIKI\nFAST.BAT\n`;
 async function boot(data){
   soloMode=!!data.solo;
-  if(soloMode){const {SoloInput}=await import(new URL('solo-input.js',data.base).href);soloInput=new SoloInput(data.patch);}
-  const {writeNativeTouch,nativeHitPoints}=await import(new URL('native-touch.js',data.base).href),{NativeMusic}=await import(new URL('solo-native-music.js',data.base).href);nativeTouch=soloMode?null:writeNativeTouch;musicReader=data.musicPatch?new NativeMusic(data.musicPatch):null;
-  nativeLayout=(await import(new URL('native-players.js',data.base).href)).nativePlayers;patch=data.patch;qaEnabled=!!data.qa;const dispatch=onmessage,vendor=new URL('vendor/dosbox-x/',data.base);
-  const {createPersonalHud,compositePersonalHudRgb}=await import(new URL('personal-hud.js',data.base).href);
+  const dependency=name=>import(new URL(name,data.base).href);
+  const [locator,{writeNativeTouch,nativeHitPoints},{NativeMusic},players,{createPersonalHud,compositePersonalHudRgb},solo,art]=await Promise.all([
+    dependency('game-locator.js'),dependency('native-touch.js'),dependency('solo-native-music.js'),dependency('native-players.js'),dependency('personal-hud.js'),
+    soloMode?dependency('solo-input.js'):null,soloMode?null:dependency('afterimage-art.js'),
+  ]);
+  gameLocator=locator.createGameLocator();if(solo)soloInput=new solo.SoloInput(data.patch);
+  nativeTouch=soloMode?null:writeNativeTouch;musicReader=data.musicPatch?new NativeMusic(data.musicPatch):null;
+  nativeLayout=players.nativePlayers;patch=data.patch;qaEnabled=!!data.qa;const dispatch=onmessage,vendor=new URL('vendor/dosbox-x/',data.base);
   viewSlot=data.viewSlot||0;
-  const [{loadCompiledCore},coreManifestResponse]=await Promise.all([
-    import(new URL('startup-assets.js',data.base).href),fetch(new URL('runtime.json',vendor),{cache:'no-store'})]);
-  if(!coreManifestResponse.ok)throw Error('模拟器核心清单读取失败');
-  const coreManifest=await coreManifestResponse.json();
-  const compiledTask=loadCompiledCore(new URL('wdosbox-x-fast.wasm',vendor),coreManifest.files['wdosbox-x-fast.wasm']);
+  const compiledTask=data.compiledCore?Promise.resolve(data.compiledCore):(async()=>{
+    const [{loadCompiledCore},response]=await Promise.all([
+      import(new URL('startup-assets.js',data.base).href),fetch(new URL('runtime.json',vendor),{cache:'no-store'})]);
+    if(!response.ok)throw Error('模拟器核心清单读取失败');
+    const manifest=await response.json();
+    return loadCompiledCore(new URL('wdosbox-x-fast.wasm',vendor),manifest.files['wdosbox-x-fast.wasm']);
+  })();
+  const afterimageTask=art?art.loadAfterimageArt(patch):Promise.resolve(null);
+  compiledTask.catch(()=>{});afterimageTask.catch(()=>{});
   importScripts(new URL('sidebar-background.js',data.base).href,new URL('frame-presenter.js',data.base).href,new URL('emulators.js',vendor).href,new URL('wdosbox-x-jspi.js',vendor).href);onmessage=dispatch;
   const compiledCore=await compiledTask;
   const init=[...data.files,{dosboxConf:config(data.cycles||'max 100%',data.core||'simple'),jsdosConf:{version:'8'}}];
@@ -85,6 +92,9 @@ async function boot(data){
     initMessageHandler:handler=>{receiver=handler;for(const [name,props]of queue)handler(name,props);queue.length=0;},exit:()=>{}};
   await WDOSBOXXJSPI(mod);mod.callMain([sessionId]);
   ci=await emulators.backend(init,transport,{});
+  if(!soloMode){
+    mod.afterimageArt=await art.installAfterimageArt(mod,patch,await afterimageTask);
+  }
   presentationActive=data.presentationActive!==false;
   mod.getSidebarBackground=()=>{
     if(mailbox<0)return null;

@@ -1,4 +1,6 @@
 import {nativePlayers} from './native-players.js';
+import {createGameLocator} from './game-locator.js';
+import {installAfterimageArt,loadAfterimageArt} from './afterimage-art.js';
 import {createPersonalHud} from './personal-hud.js';
 import './frame-presenter.js';
 import './sidebar-background.js';
@@ -28,23 +30,24 @@ const send=(type,props={},transfer=[])=>postMessage({type,...props},transfer);
 function fail(error){if(fatal)return;fatal=true;send('error',{message:error?.message||String(error)});}
 addEventListener('error',e=>fail(e.error||e.message));
 addEventListener('unhandledrejection',e=>fail(e.reason));
+const gameLocator=createGameLocator();
 function scan(){
   const h=mod.HEAPU8,v=new DataView(h.buffer);
   if(mailbox>=0&&signature.every((n,i)=>h[mailbox+i]===n)&&h[mailbox+25]===1)return;
-  mailbox=-1;const found=[];
+  mailbox=-1;
   mod.nativeExports().th05_set_idle_pc?.(-1);
-  for(let at=h.indexOf(signature[0]);at>=0;at=h.indexOf(signature[0],at+1))if(signature.every((n,i)=>h[at+i]===n)&&h[at+25]===1&&v.getUint32(at+16,true)>0){
-    const origin=at-patch.mailbox_cs_offset-(v.getUint16(at+20,true)-patch.data_segment+patch.code_segment)*16;
-    if(origin>=0&&origin+0x100000<=h.length)found.push([at,origin]);
-  }
-  if(found.length===1){
-    [mailbox,guestBase]=found[0];
+  // Gameplay/rollback must not depend on a host-side discovery counter.
+  // Runtime invalidation is rare: use the original fresh-scan behavior there.
+  const found=gameLocator.find(h,patch,!warming);
+  if(found){
+    [mailbox,guestBase]=found;
     // The verified MAIN image uses CS = image + 0xAE10. Its VSync loop
     // starts at CS:0011, before the inserted payload in both CN and JP.
     const at=mailbox-patch.mailbox_cs_offset+0x11;
     const code=[0xa1,0x7a,0x26,0x3b,0x06,0x6a,0x57,0x72,0xf7];
     if(patch.code_segment===0xae1&&code.every((byte,i)=>h[at+i]===byte))mod.nativeExports().th05_set_idle_pc?.(at-guestBase);
   }
+  mod.afterimageArt?.bind(mailbox);
 }
 function nativePause(){return mailbox<0?0:mod.HEAPU8[mailbox-patch.mailbox_cs_offset+patch.native_pause_cs_offset];}
 function controlState(){
@@ -121,12 +124,13 @@ async function boot(data){
   const core=tracked?'wdosbox-x-rollback-tracked.wasm':'wdosbox-x-rollback.wasm';
   const glue=tracked?'dosbox-rollback-tracked.mjs':'dosbox-rollback.mjs';
   const dispatch=onmessage;
-  const [disk,compiledCore,musicAssets,factory]=await Promise.all([
+  const [disk,compiledCore,musicAssets,factory,afterimageBytes]=await Promise.all([
     loadVerifiedBytes(new URL(`th05-local-${data.settings.language}.hdi.gz`,import.meta.url),patch.sha256,{gzip:true,size:patch.size,
       report:phase=>progress('disk',phase==='cache'?'已读取已校验磁盘缓存':phase==='verify'?'正在校验游戏磁盘…':'正在下载并解压游戏磁盘…')}),
     loadCompiledCore(new URL(core,vendor),manifest.files[core],phase=>progress('core',phase==='compiled-cache'?'已读取编译核心缓存':phase==='compile'?'正在编译联机核心…':phase==='verify'?'正在校验联机核心…':phase==='cache'?'已读取核心资源缓存':'正在下载联机核心…')),
     loadMusicAssets(),
     (async()=>{try{await import('./vendor/dosbox-net/emulators.js');return (await import(new URL(glue,vendor).href)).default;}finally{onmessage=dispatch;}})(),
+    loadAfterimageArt(patch),
   ]);
   timings.resourcesMs=performance.now()-bootStarted;
   progress('native','正在初始化 PC-98 与本局配置…');
@@ -170,6 +174,7 @@ async function boot(data){
   await factory(mod);mod.callMain([transport.sessionId]);
   const config='[dosbox]\nmachine=pc98\nmemsize=16\n[cpu]\ncore=simple\ncputype=386\ncycles=1000\n[render]\nframeskip=0\nscaler=none\naspect=false\n[sblaster]\nsbtype=none\n[pc98]\npc-98 fm board=board86\n[mixer]\nrate=44100\nblocksize=512\nprebuffer=20\n[autoexec]\n@echo off\nmount a /home/web_user/game\na:\ncd KAIKI\nFASTBOOT.BAT\n';
   ci=await emulators.backend([...files,{dosboxConf:config,jsdosConf:{version:'8'}}],transport,{});
+  mod.afterimageArt=await installAfterimageArt(mod,patch,afterimageBytes);
   ci.events().onSoundPush(samples=>{if(warming||!effect)return;audioPackets++;for(let i=0;i<samples.length;i+=32)audioEnergy+=Math.abs(samples[i]);effect.audio.push(samples.slice());});
   shim={module:mod,ci,keys:new Set(),get tick(){return tick;},set tick(value){tick=value;}};
   ci.events().onMessage((type,...args)=>{if(type==='error'&&args.some(s=>String(s).includes('[panic]')))fail(Error(args.join(' ')));});
@@ -177,8 +182,10 @@ async function boot(data){
   const started=performance.now();
   timings.initializationMs=started-bootStarted-timings.resourcesMs;
   let yieldedAt=started,reportedAt=0;
+  timings.scanMs=0;timings.stepMs=0;timings.bootSteps=0;
   for(let n=0;n<18000&&mailbox<0;n++){
-    step();if(n%15===0&&mod.UTF8ToString(mod._emGetRunningProgram()).toUpperCase()==='MAIN')scan();
+    const stepAt=performance.now();step();timings.stepMs+=performance.now()-stepAt;timings.bootSteps++;
+    if(n%15===0&&mod.UTF8ToString(mod._emGetRunningProgram()).toUpperCase()==='MAIN'){const scanAt=performance.now();scan();timings.scanMs+=performance.now()-scanAt;}
     const now=performance.now();
     if(now-reportedAt>=500){progress('native',`正在执行 DOS／游戏启动：${(tick/60).toFixed(1)} 模拟秒`);reportedAt=now;}
     if(now-yieldedAt>=16){await yieldHost();yieldedAt=performance.now();}
@@ -196,10 +203,11 @@ async function boot(data){
   // Both variants execute the same pinned machine. The build fingerprint
   // covers both resources; allow capable and fallback clients in one room.
   timings.nativeBootMs=performance.now()-started;
+  timings.locator={...gameLocator.metrics};
   send('ready',{state:state(),bootMs:performance.now()-bootStarted,bootTimings:timings,checksum:checksum(),guestSha:await sha256(mod.HEAPU8.slice(guestBase,guestBase+0xa0000)),diskSha:patch.sha256,
     coreSha:manifest.files['wdosbox-x-rollback.wasm'],executionCoreSha:manifest.files[core]});
 }
-function advance(pair,predicted=true){
+function advance(pair,predicted=true,offlineMask=0){
   const started=performance.now();
   if(snapshots&&predicted){
     const captureAt=performance.now();
@@ -208,7 +216,7 @@ function advance(pair,predicted=true){
     const previous=saved.get(frame-1),nativeFrame=previous?.nativeFrame===frame-1?frame-1:frame;
     if(nativeFrame===frame){snapshots.capture(frame,restoredBoundary===frame);rollbackMetrics.captures++;}
     else rollbackMetrics.sharedCaptures++;
-    saved.set(frame,{nativeFrame,oldP1,paused,escapeTicks,lastPauseRequests,frame,mailbox,guestBase,music:music.capture(),execution:pair.slice()});
+    saved.set(frame,{nativeFrame,oldP1,paused,escapeTicks,lastPauseRequests,frame,mailbox,guestBase,music:music.capture(),execution:pair.slice(),offlineMask});
     rollbackMetrics.captureMs+=performance.now()-captureAt;
   }
   restoredBoundary=null;
@@ -218,6 +226,13 @@ function advance(pair,predicted=true){
   scan();
   // Cover direct DataView, touch and mailbox writes in the guest window.
   if(guestBase>=0)mod.thDirtyMark?.(guestBase,1048576);
+  if(!Number.isInteger(offlineMask)||offlineMask<0||offlineMask>7)throw Error('离线席位掩码无效');
+  if(mailbox>=0){
+    const c=mailbox-patch.mailbox_cs_offset,h=mod.HEAPU8;
+    h[c+patch.entry_map.offline_mask]=offlineMask;
+    // Also apply at the suspended menu boundary, before the next native tick.
+    for(let slot=0;slot<3;slot++)if(offlineMask&(1<<slot))h[c+patch.entry_map.out_flags+slot]=2;
+  }
   input(pair);step();
   paused=nativePause()!==0;
   if(before!==paused)escapeTicks=0;
@@ -268,7 +283,7 @@ onmessage=async({data})=>{try{
       // The queue selected the earliest changed tick, so the preceding tick's
       // original input is immutable. Rebuild it without output or sampling.
       replaying=true;mod.suppressPresentation=true;
-      try{advance(s.execution,true);}finally{mod.suppressPresentation=false;replaying=false;}
+      try{advance(s.execution,true,s.offlineMask);}finally{mod.suppressPresentation=false;replaying=false;}
       rollbackMetrics.checkpointReplays++;
       if(from<confirmed)effects.delete(from); // Already committed exactly once.
     }
@@ -284,7 +299,7 @@ onmessage=async({data})=>{try{
         if(applied&&performance.now()-started>=REPLAY_BUDGET_MS)break;
         if(plan.frame!==frame)throw Error('回滚补算帧顺序异常');
         if(!plan.authoritative&&!syncPolicy().canPredict)break;
-        advance(plan.pair,plan.predicted);applied++;finished=plan.end;
+        advance(plan.pair,plan.predicted,plan.offlineMask);applied++;finished=plan.end;
       }
     }finally{mod.suppressPresentation=false;replaying=false;}
     const sliceMs=performance.now()-started;
@@ -295,7 +310,7 @@ onmessage=async({data})=>{try{
   }
   if(data.type==='step'){
     if(data.frame!==frame)throw Error('同步帧顺序异常');
-    advance(data.pair,data.predicted);
+    advance(data.pair,data.predicted,data.offlineMask);
     // Keep the final image of this step; intermediate native updates still run.
     mod.framePresenter.flush();
     const now=performance.now(),publish=frame%30===0||now-lastStateSent>=1000;

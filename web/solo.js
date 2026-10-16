@@ -1,4 +1,4 @@
-import {createFastCore} from './dosbox-runtime.js';
+import {createFastCore,prepareFastCore} from './dosbox-runtime.js';
 import {loadVerifiedBytes} from './startup-assets.js';
 import {mountPlayer} from './player-ui.js';
 import {unpackTouch} from './touch-input.js';
@@ -120,9 +120,10 @@ async function start(){
   const language=$('language').value,independentMusic=$('audio-mode').value==='independent';
   $('bgm-control').hidden=!independentMusic;
   try{
+    const coreTask=prepareFastCore();coreTask.catch(()=>{});
     const {disk,patch}=await readDisk(language);if(disposed)return;
     status('正在启动 PC-98 原版游戏…');
-    const core=await createFastCore({canvas,disk,patch,solo:true,independentMusic});
+    const core=await createFastCore({canvas,disk,patch,solo:true,independentMusic,coreTask});
     if(disposed){core.stop();return;}emulator=core;emulator.onError=failure;emulator.onExit=endSession;
     emulator.bgm?.setVolume(Number($('bgm-volume').value)/100);
     $('pause').disabled=false;$('capture').disabled=false;$('sound').disabled=false;

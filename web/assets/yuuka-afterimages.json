@@ -1,0 +1,26 @@
+{
+  "file": "assets/yuuka-afterimages.bin",
+  "sha256": "c447381d1cff99365b2ffd1bf265224686d85ffaf7dbdc6ef9f3ef87e1a8ab9a",
+  "bytes": 262144,
+  "sources": {
+    "yuuka/p1-original/player-00.png": "cf7d63cfa1b8ce0b71f778419222003c4df9e2e4d25906ef01dfcdfaf0f0f1a0",
+    "yuuka/p1-original/player-01.png": "d0d6109e88a6c4c1f9c59fc29425caec29c839dde582a6b2c8b2238a5fc72299",
+    "yuuka/p1-original/player-02.png": "7a1afa85ed1fae690e240baa55c806908c9755cf10c1235e6d2b1d83d3e9c339",
+    "yuuka/p2-orange/player-00.png": "f75cffdfa9f1c1fe28446918aa0f018a4b46724b5029c702edc9e2370e606c79",
+    "yuuka/p2-orange/player-01.png": "e38d7f9dd475c7335ed33a13ac1361e669fa4524d5870090bde5ca8cee4f91eb",
+    "yuuka/p2-orange/player-02.png": "70eca4171b23a154371c78a83d34631fc7c00a54940d768d56dda6832cc7aaab",
+    "yuuka/p3-magenta/player-00.png": "7e4b96310127c7709bda4204d0221d2318eb90bb656ebf2b2d468a6cc93d4a14",
+    "yuuka/p3-magenta/player-01.png": "d6bf8dea043aa092eb9ad3311c9d7100b68aa8384e05bfcb665dca859a3f8b76",
+    "yuuka/p3-magenta/player-02.png": "ac876664a3e37027faa234e2cf3986491bc125cba3ec0facded7067eb42ad6a5"
+  },
+  "sourceIndices": [
+    8,
+    9
+  ],
+  "scope": "Reviewed Yuuka afterimages and per-character/per-frame projectile RGB; native stage palette unchanged",
+  "variants": [
+    "p1-original",
+    "p2-orange",
+    "p3-magenta"
+  ]
+}

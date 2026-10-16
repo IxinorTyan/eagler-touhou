@@ -1,5 +1,5 @@
 import {installConfig} from './launch-config.js';
-import {createFastCore} from './dosbox-runtime.js';
+import {createFastCore,prepareFastCore} from './dosbox-runtime.js';
 import {loadVerifiedBytes} from './startup-assets.js';
 import {mountPlayer} from './player-ui.js';
 import {packTouch,unpackTouch,ALWAYS_POINT} from './touch-input.js';
@@ -99,13 +99,14 @@ $('start').onclick=async()=>{
   $('start').disabled=true;$('language').disabled=true;
   document.querySelectorAll('[data-config]').forEach(el=>el.disabled=true);
   try{
+    const coreTask=prepareFastCore();coreTask.catch(()=>{});
     const lang=$('language').value;status('正在校验并加载实验磁盘…');
     const response=await fetch(`patch-${lang}.json`,{cache:'no-store'});if(!response.ok)throw Error('磁盘清单读取失败');
     patch=await response.json();
     const data=await loadVerifiedBytes(new URL(`th05-local-${lang}.hdi.gz`,import.meta.url),patch.sha256,{gzip:true,size:patch.size});
     installConfig(data,patch,runConfig);
     const params=new URLSearchParams(location.search);
-    emulator=await createFastCore({canvas:$('canvas'),disk:data,patch,qa:qaEnabled,
+    emulator=await createFastCore({canvas:$('canvas'),disk:data,patch,qa:qaEnabled,coreTask,
       core:qaEnabled?(params.get('core')||'simple'):'simple',cycles:qaEnabled?(params.get('cycles')||'max 100%'):'max 100%',
       presentation:qaEnabled?(params.get('presentation')||'bitmap'):'bitmap',viewSlot:Number($('score-seat').value)});
     emulator.onError=e=>{status('游戏运行失败：'+e.message);$('pause').disabled=true;};

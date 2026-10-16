@@ -35,7 +35,7 @@ export function planReplay(queue,target,allowPrediction){
   for(;cursor.frame<target&&plans.length<REPLAY_MAX_STEPS;cursor.frame++){
     const pair=nextInputs(cursor,allowPrediction);if(!pair)break;
     plans.push({frame:cursor.frame,pair,predicted:cursor.active&&cursor.frame>=cursor.confirmed,
-      authoritative:cursor.inputs.every(lane=>lane.has(cursor.frame)),end:cursor.frame+1===target});
+      authoritative:cursor.inputs.every((lane,slot)=>cursor.isOffline(slot,cursor.frame)||lane.has(cursor.frame)),offlineMask:cursor.offlineMask(),end:cursor.frame+1===target});
   }
   return plans;
 }

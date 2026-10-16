@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from lan_relay import available as relay_available, handle as relay_handle
 
-PROTOCOL = 'th05-netplay/6'
+PROTOCOL = 'th05-netplay/7'
 ROOT = Path(__file__).resolve().parent / 'web'
 ROOMS = {}
 LOCK = threading.Lock()
@@ -23,8 +23,9 @@ def active_roles(room):
 
 
 def build_id():
-    files = ['lan.js', 'lan-worker.js', 'lan.html', 'frame-presenter.js', 'host-yield.js', 'startup-assets.js',
-             'personal-hud.js', 'hud-digits.js',
+    files = ['lan.js', 'lan-worker.js', 'lan.html', 'frame-presenter.js', 'host-yield.js', 'startup-assets.js', 'game-locator.js',
+               'personal-hud.js', 'hud-digits.js', 'afterimage-art.js',
+               'assets/yuuka-afterimages.bin', 'assets/yuuka-afterimages.json',
              'player-ui.js', 'player-ui.css', 'touch-overlay.css', 'touch-layout.js', 'touch-input.js',
              'native-touch.js', 'native-players.js', 'dosbox-memory-diff.js', 'dosbox-snapshots.js', 'solo-native-music.js',
              'music-files.js', 'music-patch.json', 'bgm/manifest.json',
@@ -46,7 +47,7 @@ def build_id():
 def snapshot(room):
     return {key: room[key] for key in ('generation', 'revision', 'phase', 'slots', 'characters', 'ready', 'settings', 'transport')} | {
         'protocol': PROTOCOL, 'network': room.get('network', 'lan'),
-        'present': {r: bool(room['tokens'][r]) for r in ROLES}}
+        'present': {r: bool(room['tokens'][r]) and not room.get('offline', {}).get(r, False) for r in ROLES}}
 
 
 def integer(data, name, low, high):
@@ -133,8 +134,12 @@ class Handler(SimpleHTTPRequestHandler):
                 lease = 600 if room['phase'] == 'loading' else 120
                 if now - room['seen']['host'] > lease:
                     del ROOMS[code]
-                elif any(room['tokens'][r] and now-room['seen'][r]>lease for r in active_roles(room)[1:]):
-                    room['phase'] = 'ended'
+                elif room['phase'] == 'lobby' and any(room['tokens'][r] and now-room['seen'][r]>lease for r in active_roles(room)[1:]):
+                    for r in active_roles(room)[1:]:
+                        if room['tokens'][r] and now-room['seen'][r]>lease:
+                            room['tokens'][r] = None
+                            room['ready'][r] = False
+                            room['revision'] += 1
             if action == 'create':
                 if data.get('protocol') != PROTOCOL:
                     return self.reply({'error': '请刷新联机页面'}, 409)
@@ -153,7 +158,7 @@ class Handler(SimpleHTTPRequestHandler):
                         'generation': secrets.token_hex(16), 'revision': 1, 'phase': 'lobby',
                         'network': network, 'transport': 'relay' if network == 'public-ws' else 'rtc',
                         'slots': {'host': 0, 'guest': 1, 'guest2': 2}, 'characters': {'host': 0, 'guest': 1, 'guest2': 2},
-                        'ready': dict.fromkeys(ROLES, False), 'queues': {r: [] for r in ROLES},
+                        'ready': dict.fromkeys(ROLES, False), 'offline': dict.fromkeys(ROLES, False), 'queues': {r: [] for r in ROLES},
                         'settings': {'rank': 1, 'spares': 2, 'bombs': 3, 'language': 'cn', 'rollback': False, 'players': 2}}
                 ROOMS[code] = room
                 return self.reply({'room': code, 'token': token, 'role': 'host', 'state': snapshot(room)})
@@ -183,12 +188,28 @@ class Handler(SimpleHTTPRequestHandler):
                 messages, room['queues'][role] = room['queues'][role], []
                 return self.reply({'state': snapshot(room), 'messages': messages})
             if action == 'leave':
-                if role == 'host' or room['phase'] != 'lobby':
+                if role == 'host':
                     room['phase'] = 'ended'
+                elif room['phase'] == 'loading':
+                    room['offline'][role] = True
+                    room['tokens'][role] = None
+                    room['queues'][role].clear()
                 else:
                     room['tokens'][role] = None
                     room['queues'][role].clear()
                     room['ready'] = dict.fromkeys(ROLES, False)
+                room['revision'] += 1
+                return self.reply({'state': snapshot(room)})
+            if action == 'drop':
+                dropped = data.get('roles')
+                if role != 'host' or room['phase'] != 'loading':
+                    return self.reply({'error': '只有房主可确认运行中的离线席位'}, 403)
+                if not isinstance(dropped, list) or not dropped or any(r not in active_roles(room)[1:] for r in dropped) or len(set(dropped)) != len(dropped):
+                    return self.reply({'error': '离线席位无效'}, 400)
+                for r in dropped:
+                    room['offline'][r] = True
+                    room['tokens'][r] = None
+                    room['queues'][r].clear()
                 room['revision'] += 1
                 return self.reply({'state': snapshot(room)})
             if action == 'fallback':
@@ -208,9 +229,15 @@ class Handler(SimpleHTTPRequestHandler):
                 signal = data.get('signal')
                 if room['phase'] != 'loading' or not room['tokens'][other] or room['transport'] != 'rtc':
                     return self.reply({'error': '房间连接状态无效'}, 409)
-                if not isinstance(signal, dict) or signal.get('type') not in ('offer', 'answer') or not isinstance(signal.get('sdp'), str):
+                if not isinstance(signal, dict) or signal.get('type') not in ('offer', 'answer', 'repair'):
                     return self.reply({'error': '连接消息无效'}, 400)
-                if signal['type'] != ('offer' if ROLES.index(role)<ROLES.index(other) else 'answer') or len(signal['sdp']) > 60000 or len(room['queues'][other]) >= 8:
+                attempt = signal.get('attempt', 0)
+                if type(attempt) is not int or not 0 <= attempt <= 1000000000 or len(room['queues'][other]) >= 8:
+                    return self.reply({'error': '连接消息越界'}, 400)
+                if signal['type'] == 'repair':
+                    if ROLES.index(role) < ROLES.index(other) or set(signal) != {'type'}:
+                        return self.reply({'error': '重连请求身份无效'}, 400)
+                elif signal['type'] != ('offer' if ROLES.index(role)<ROLES.index(other) else 'answer') or not isinstance(signal.get('sdp'), str) or len(signal['sdp']) > 60000:
                     return self.reply({'error': '连接消息越界'}, 400)
                 room['queues'][other].append({'from': role, 'signal': signal})
                 return self.reply({'ok': True})

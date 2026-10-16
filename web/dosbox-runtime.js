@@ -1,12 +1,22 @@
 import {gameFiles} from './disk-files.js';
 import {createFrameDisplay} from './frame-display.js';
 import {LocalAudioOutput} from './netplay/audio-output.js';
-import {installMusicFiles} from './music-files.js';
+import {installMusicFiles,loadMusicAssets} from './music-files.js';
+import {loadCompiledCore} from './startup-assets.js';
 import {LocalBgm} from './netplay/local-bgm.js';
-export async function createFastCore({canvas,disk,patch,qa=false,core='simple',cycles='max 100%',presentation='bitmap',viewSlot=0,solo=false,independentMusic=true}){
+export async function prepareFastCore(){
+  if(typeof WebAssembly.Suspending!=='function'||typeof WebAssembly.promising!=='function')throw Error('此性能版需要支持 JSPI 的新版 Chrome / Edge 浏览器。');
+  const vendor=new URL('vendor/dosbox-x/',import.meta.url),response=await fetch(new URL('runtime.json',vendor),{cache:'no-store'});
+  if(!response.ok)throw Error('模拟器核心清单读取失败');
+  const manifest=await response.json();
+  return loadCompiledCore(new URL('wdosbox-x-fast.wasm',vendor),manifest.files['wdosbox-x-fast.wasm']);
+}
+export async function createFastCore({canvas,disk,patch,qa=false,core='simple',cycles='max 100%',presentation='bitmap',viewSlot=0,solo=false,independentMusic=true,coreTask}){
   if(typeof WebAssembly.Suspending!=='function'||typeof WebAssembly.promising!=='function')throw Error('此性能版需要支持 JSPI 的新版 Chrome / Edge 浏览器。');
   if(typeof OffscreenCanvas!=='function')throw Error('此性能版需要支持后台画布的浏览器。');
   const mode=qa&&['direct','upstream'].includes(presentation)?presentation:'bitmap';
+  const compiledTask=coreTask||prepareFastCore(),musicTask=independentMusic?loadMusicAssets():Promise.resolve(null);
+  compiledTask.catch(()=>{});musicTask.catch(()=>{});
   let latest=null,resolveReady,rejectReady,stopped=false;
   const worker=new Worker(new URL('./dosbox-worker.js',import.meta.url));
   const ready=new Promise((a,b)=>{resolveReady=a;rejectReady=b;});
@@ -59,9 +69,14 @@ export async function createFastCore({canvas,disk,patch,qa=false,core='simple',c
     if(independentMusic){api.bgm=new LocalBgm(api.audio,()=>{});api.bgm.load({warmOpening:false}).catch(e=>{api.musicError=e.message;});}
   }catch(e){api.stop();throw Error('声音初始化失败：'+e.message);}
   let files,musicPatch;
-  try{files=gameFiles(disk,{solo});if(independentMusic)musicPatch=await installMusicFiles(files,{solo});}catch(e){api.stop();throw e;}
+  let compiledCore;
+  try{
+    files=gameFiles(disk,{solo});const assets=await musicTask;
+    if(independentMusic)musicPatch=await installMusicFiles(files,{solo,assets});
+    compiledCore=await compiledTask;
+  }catch(e){api.stop();throw e;}
   const offscreen=mode==='bitmap'?new OffscreenCanvas(canvas.width,canvas.height):canvas.transferControlToOffscreen(),transfer=[offscreen,audioPort,...files.map(f=>f.contents.buffer)];
-  worker.postMessage({type:'boot',base:new URL('.',import.meta.url).href,canvas:offscreen,audioPort,files,patch,musicPatch,core,cycles,qa,presentation:mode,presentationActive:!document.hidden,viewSlot,solo},transfer);
+  worker.postMessage({type:'boot',base:new URL('.',import.meta.url).href,canvas:offscreen,audioPort,files,patch,musicPatch,compiledCore,core,cycles,qa,presentation:mode,presentationActive:!document.hidden,viewSlot,solo},transfer);
   const timeout=setTimeout(()=>rejectReady(Error('PC-98 核心初始化超时')),30000);
   try{await ready;return api;}catch(e){api.stop();throw e;}finally{clearTimeout(timeout);}
 }

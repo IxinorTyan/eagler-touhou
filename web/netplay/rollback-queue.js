@@ -1,5 +1,5 @@
 import {MAX_INPUT} from '../touch-input.js';
-export const PROTOCOL='th05-netplay/6';
+export const PROTOCOL='th05-netplay/7';
 export const TICK_MS=1000/60;
 export const BOOT_DELAY=2;
 export const MAX_ROLLBACK=12;
@@ -78,7 +78,7 @@ export class RollbackQueue {
     for(let slot=0;slot<this.players;slot++)for(const [at,value]of inputs[slot]){
       if(slot===this.slot){
         if(this.inputs[slot].get(at)!==value)throw Error('离线同步试图修改本机输入');
-      }else this.receive(at,value,slot);
+      }else RollbackQueue.prototype.receive.call(this,at,value,slot);
     }
     // Dropped lanes become authoritative neutral input, forever. Their last
     // uncertain pre-boundary steps are supplied by the host's merged report.

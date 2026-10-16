@@ -5,7 +5,7 @@ export function createRelayChannel(identity){
   for(const key of ['room','token','generation'])url.searchParams.set(key,identity[key]);
   const socket=new WebSocket(url);
   const channel={kind:'relay',ordered:true,maxRetransmits:null,maxPacketLifeTime:null,readyState:'connecting',
-    onopen:null,onmessage:null,onclose:null,onerror:null,
+    onopen:null,onmessage:null,onclose:null,onerror:null,onpeerchange:null,
     get bufferedAmount(){return socket.bufferedAmount;},
     send(data){if(channel.readyState!=='open')throw Error('局域网中继尚未连接');socket.send(data);},
     close(){channel.readyState='closed';socket.close();}};
@@ -17,7 +17,9 @@ export function createRelayChannel(identity){
         if(packet.generation!==identity.generation||channel.readyState!=='connecting')throw Error('中继房间版本失效');
         channel.readyState='open';channel.onopen?.();
       }else if(packet.type==='relay-left'){
-        channel.readyState='closed';channel.onclose?.();socket.close();
+        channel.onpeerchange?.({role:packet.role,connected:false});
+      }else if(packet.type==='relay-peer'){
+        channel.onpeerchange?.({role:packet.role,connected:!!packet.connected});
       }else if(packet.type==='relay-error')throw Error(packet.message);
       else if(channel.readyState==='open')channel.onmessage?.(event);
       else throw Error('中继开局顺序异常');

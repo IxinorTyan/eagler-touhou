@@ -6,6 +6,8 @@ import {mountPlayer} from './player-ui.js';
 import {LocalBgm} from './netplay/local-bgm.js';
 import {loadRtcConfiguration} from './netplay/connection.js';
 import {deploymentIceConfiguration} from './netplay/udp-config.js';
+import {mergeDeparture} from './netplay/membership.js';
+const GRACE_MS=5000;
 const requestedNetwork=new URLSearchParams(location.search).get('network');
 let network=['public-ws','direct-ws'].includes(requestedNetwork)?'public-ws':['public','public-rtc'].includes(requestedNetwork)?'public-rtc':requestedNetwork==='lan'?'lan':null;
 let rtcPreparing=false,pendingSignals=[];
@@ -26,8 +28,10 @@ function touchContext(){
 
 
 const roles=['host','guest','guest2'],peers=new Map();
+const offlineRoles=new Set(),hashHistory=new Map(),comparedFrames=new Map();
+let membership=null,membershipId=0,lastDeparture=null,rtcConfiguration=null,relayRetry=0;
 const activeRoles=()=>roles.slice(0,room?.settings.players||2);
-const remoteRoles=()=>activeRoles().filter(role=>role!==auth?.role);
+const remoteRoles=()=>activeRoles().filter(role=>role!==auth?.role&&!offlineRoles.has(role));
 let relay=null;
 let pendingGo=false;
 let earlyPackets=[];
@@ -92,7 +96,7 @@ function diagnostics(){
     rollbackEnabled:room?.settings.rollback,rollbackActive:queue?.active,activation:queue?.activation,inputPolicy:sessionPolicy,
     prediction:runtimePolicy,lead:queue?Math.max(0,queue.frame-queue.confirmed):0,predictionLeadLimit:PREDICTION_LEAD_LIMIT,maxRollback:MAX_ROLLBACK,
     waitReason:queue?.waitReason,rollbackCount,resimulated,maxRewind,earlyInputs,inputAgeMs:inputAge,
-    startup:bootProgress,bootTimings:boot?.bootTimings,performance:perf,music:bgm?.status,connection:pc?.connectionState,channel:channel?.readyState,transport,networkEvents,audio:audio?.info(),display:display?.metrics,state:lastState,endedReason},null,2);
+    startup:bootProgress,bootTimings:boot?.bootTimings,performance:perf,music:bgm?.status,connection:pc?.connectionState,channel:channel?.readyState,transport,networkEvents,recovery:recoveryInfo(),audio:audio?.info(),display:display?.metrics,state:lastState,endedReason},null,2);
   player.diagnostics($('diagnostics').textContent);
 }
 async function api(action,extra={},identity=auth){
@@ -123,7 +127,7 @@ function render(){
   $('my-seat').textContent=`我的角色：P${room.slots[auth.role]+1}`;
   for(const role of activeRoles()){
     const seat=$(role+'-seat');
-    seat.textContent=`P${room.slots[role]+1} · ${role==='host'?'房主':'队友'} · ${room.present[role]?names[room.characters[role]]+' · '+(room.ready[role]?'已准备':'未准备'):'等待加入'}`;
+    seat.textContent=`P${room.slots[role]+1} · ${role==='host'?'房主':'队友'} · ${offlineRoles.has(role)?'已离线（幽灵）':room.present[role]?names[room.characters[role]]+' · '+(room.ready[role]?'已准备':'未准备'):running?'连接中断':'等待加入'}`;
     seat.dataset.local=String(role===auth.role);seat.dataset.ready=String(!!room.ready[role]);seat.dataset.present=String(!!room.present[role]);
   }
   $('character').value=room.characters[auth.role];$('character').disabled=!lobby;
@@ -140,6 +144,7 @@ async function setRoom(data){
   if(room&&data.state.revision<room.revision)return;
   room=data.state;render();
   if(room.phase==='ended'){await finish('房间已结束，请重新建房。',false);return;}
+  if(running)for(const role of remoteRoles())if(!room.present[role])suspect(role,'队友已离开');
   if(room.phase==='loading'&&!connecting){const identity=auth;connecting=true;connect().catch(error=>{if(auth===identity)finish(error.message);});}
   else if(room.phase==='loading'&&room.transport==='relay'&&transport!=='relay')switchRelay();
 }
@@ -157,7 +162,7 @@ async function poll(){
     if(auth===identity){
       const now=performance.now();pollFailedAt||=now;pollFailures++;
       pollRetryAt=now+Math.min(8000,500*2**Math.min(4,pollFailures));
-      if(error.fatal||(now-pollFailedAt>(connecting?600000:120000)&&channel?.readyState!=='open'))await finish(error.message,false);
+      if(!running&&(error.fatal||(now-pollFailedAt>(connecting?600000:120000)&&channel?.readyState!=='open')))await finish(error.message,false);
       else status(channel?.readyState==='open'?'房间服务暂时不可用；游戏连接继续运行，正在重试。':'房间请求暂时失败，正在重试…');
     }
   }finally{pollBusy=false;}
@@ -167,7 +172,7 @@ async function enter(action){
   try{
   const data=await api(action,action==='join'?{room:$('room-code').value.trim()}:{network});
   auth={room:data.room,token:data.token,role:data.role,generation:data.state.generation};
-  room=data.state;endedReason=null;networkEvents=[];transport='rtc';fallbackPending=false;render();status(`已${action==='create'?'创建':'加入'}房间 ${auth.room}。请选择角色并准备。`);
+  room=data.state;endedReason=null;networkEvents=[];transport='rtc';fallbackPending=false;offlineRoles.clear();membership=null;membershipId=0;lastDeparture=null;render();status(`已${action==='create'?'创建':'加入'}房间 ${auth.room}。请选择角色并准备。`);
   pollFailures=0;pollFailedAt=pollRetryAt=0;
   pollTimer=setInterval(poll,500);
   }finally{entering=false;render();}
@@ -177,7 +182,15 @@ async function ensureAudio(){
   await context.resume();if(!audio)audio=new LocalAudioOutput(context,1);if(!bgm){bgm=new LocalBgm(context,()=>{});bgm.setVolume(Number($('bgm-volume').value)/100);const currentBgm=bgm;bgm.load({warmOpening:false}).catch(e=>{if(bgm===currentBgm)status('音乐加载失败：'+e.message);});}
   $('sound').textContent=context.state==='running'?'声音已开启':'开启声音';
 }
-function send(message){if(channel?.readyState!=='open')throw Error('游戏连接已断开');channel.send(JSON.stringify(message));}
+function sendTo(role,message){
+  if(!remoteRoles().includes(role))return false;
+  const target=transport==='relay'?relay:peers.get(role)?.channel;
+  if(target?.readyState!=='open'||target.bufferedAmount>65536){if(running)suspect(role,'等待连接恢复');return false;}
+  try{target.send(JSON.stringify(transport==='relay'?{...message,to:role}:message));return true;}
+  catch(error){networkFailure(error.message,{role});return false;}
+}
+function send(message){let sent=true;for(const role of remoteRoles())sent=sendTo(role,message)&&sent;return sent;}
+function sendHandshake(role){if(!boot)return;sendTo(role,hello());if(loadedSent)sendTo(role,{type:'loaded'});}
 function hello(){return {type:'hello',protocol:PROTOCOL,build:version.build,generation:auth.generation,slot:room.slots[auth.role],
   settings:room.settings,characters:room.characters,slots:room.slots,inputPolicy:makeInputPolicy(transport,room.settings.rollback),
   coreSha:boot.coreSha,diskSha:boot.diskSha,guestSha:boot.guestSha,checksum:boot.checksum};}
@@ -204,6 +217,7 @@ function activate(){
   queue=new GameQueue(room.slots[auth.role],room.settings.rollback,room.settings.players,sessionPolicy);
   committedPrefix=0;inflight=null;rollbackCount=resimulated=maxRewind=earlyInputs=0;replayUntil=0;pendingKind='';inflightPlans=[];
   steps=waits=hashMatches=0;hashes.clear();peerHashes.clear();rollbackPeers.clear();captureTimes.clear();
+  hashHistory.clear();comparedFrames.clear();for(const peer of peers.values()){peer.lastMessage=performance.now();peer.suspectAt=null;}
   activity={phase:'clock',since:performance.now(),totals:{}};nativeFps=null;
   for(const packet of earlyPackets)queue.receive(packet);earlyPackets=[];
   sessionStarted=lastNow=performance.now();accumulator=TICK_MS;capture();render();status('已连接。点击画面即可操作自己的角色。');
@@ -220,19 +234,36 @@ function capture(){
 function compare(frame){
   if(!hashes.has(frame)||!remoteRoles().every(role=>peerHashes.get(role)?.has(frame)))return;
   for(const role of remoteRoles())if(hashes.get(frame)!==peerHashes.get(role).get(frame))throw Error(`游戏状态在第 ${frame} 帧不同步，本局已停止。`);
-  hashMatches++;hashes.delete(frame);for(const lane of peerHashes.values())lane.delete(frame);
+  hashMatches++;hashes.delete(frame);for(const role of remoteRoles()){peerHashes.get(role)?.delete(frame);comparedFrames.set(role,Math.max(comparedFrames.get(role)||0,frame));}
 }
 function onPacket(event,source){try{
   if(typeof event.data!=='string'||event.data.length>4096)throw Error('连接消息超出限制');
   const message=JSON.parse(event.data);
-  const role=source||message.from;if(!remoteRoles().includes(role))throw Error('未知消息来源');
-  lastMessage=performance.now();if(peers.has(role))peers.get(role).lastMessage=lastMessage;
+  const role=source||message.from;if(offlineRoles.has(role))return;if(!remoteRoles().includes(role))throw Error('未知消息来源');
+  if(transport==='relay'&&message.to&&message.to!==auth.role)return;
+  lastMessage=performance.now();const peer=peers.get(role);
+  if(peer){const recovering=peer.suspectAt!=null;peer.lastMessage=lastMessage;peer.suspectAt=null;if(recovering){status('连接已恢复，正在补齐输入并继续本局。');schedule(0);}}
   if(message.type==='hello'){
-    if(peerHello.has(role))throw Error('重复开局消息');peerHello.set(role,message);tryLoaded();
+    if(peerHello.has(role))for(const key of Object.keys(peerHello.get(role)).filter(k=>!['from','to'].includes(k)))if(JSON.stringify(peerHello.get(role)[key])!==JSON.stringify(message[key]))throw Error('重连开局身份不一致');peerHello.set(role,message);tryLoaded();if(running)sendResume(role);
   }else if(message.type==='loaded'){
-    if(!peerHello.has(role)||peerLoaded.has(role))throw Error('准备消息顺序异常');peerLoaded.add(role);tryGo();
+    if(!peerHello.has(role))throw Error('准备消息顺序异常');peerLoaded.add(role);tryGo();
   }else if(message.type==='go'){
-    if(role!=='host'||auth.role==='host'||pendingGo)throw Error('非法开局消息');pendingGo=true;tryGo();
+    if(role!=='host'||auth.role==='host')throw Error('非法开局消息');pendingGo=true;tryGo();
+  }else if(message.type==='resume'){
+    acceptResume(role,message);
+  }else if(message.type==='suspect'){
+    if(auth.role!=='host'||!remoteRoles().includes(message.role)||message.role===role)throw Error('无效断线报告');if(!membership?.roles.includes(message.role))beginDeparture([message.role]);
+  }else if(message.type==='departure-prepare'){
+    if(role==='host'&&message.id===membership?.id&&JSON.stringify(message.roles)===JSON.stringify(membership.roles)){reportMembership();return;}
+    if(role==='host'&&message.id<=membershipId&&Array.isArray(message.roles)&&message.roles.length&&message.roles.every(r=>offlineRoles.has(r)))return;
+    if(role!=='host'||!running||!Number.isSafeInteger(message.id)||message.id<=membershipId||!Array.isArray(message.roles)||!message.roles.length||new Set(message.roles).size!==message.roles.length||message.roles.some(r=>r==='host'||!activeRoles().includes(r)))throw Error('无效离线协商');
+    if(message.roles.includes(auth.role)){finish('连接恢复超时，你已与本局断开。',false);return;}
+    membershipId=message.id;membership={id:message.id,roles:message.roles,started:performance.now(),reported:false};reportMembership();
+  }else if(message.type==='departure-report'){
+    if(auth.role!=='host')throw Error('离线报告只能发送给房主');
+    if(membership&&message.id===membership.id&&!membership.roles.includes(role)){membership.reports.set(role,message.report);finishDeparture();}
+  }else if(message.type==='departure-commit'){
+    if(role!=='host')throw Error('只有房主能确认离线');applyDeparture(message);
   }else if(message.type==='input'){
     if(message.slot!==room.slots[role])throw Error('输入来源与座位不一致');
     if(!running){
@@ -252,11 +283,12 @@ function onPacket(event,source){try{
   }else if(message.type==='hash'){
     if(!running||!Number.isSafeInteger(message.frame)||message.frame<0||message.frame>queue.frame+120||typeof message.hash!=='string'||!/^[0-9a-f]{8}$/.test(message.hash))throw Error('同步检查消息无效');
     if(typeof message.boot!=='boolean')throw Error('同步就绪信息无效');
+    if(message.frame<=(comparedFrames.get(role)||0))return;
     if(!peerHashes.has(role))peerHashes.set(role,new Map());const lane=peerHashes.get(role);lane.set(message.frame,message.hash);if(lane.size>8)throw Error('同步检查积压');compare(message.frame);
     if(message.boot)rollbackPeers.add(role);armRollback();
   }else if(message.type==='ping'){
     if(!Number.isSafeInteger(message.id)||message.id<0)throw Error('无效延迟探测');
-    send({type:'pong',id:message.id,to:role});
+    sendTo(role,{type:'pong',id:message.id,to:role});
   }else if(message.type==='pong'){
     if(!Number.isSafeInteger(message.id)||!activeRoles().includes(message.to))throw Error('无效延迟应答');
     if(message.to===auth.role){
@@ -265,24 +297,89 @@ function onPacket(event,source){try{
       if(pending&&!pending.roles.size)pings.delete(message.id);
     }
   }else if(message.type==='stop'){
-    finish(typeof message.reason==='string'?`队友结束本局：${message.reason.slice(0,250)}`:'队友已离开，本局结束。',false);
+    if(role==='host'||!running)finish(typeof message.reason==='string'?`房主结束本局：${message.reason.slice(0,250)}`:'房主已离开，本局结束。',false);
+    else{suspect(role,'队友已离开');if(auth.role==='host')beginDeparture([role]);}
   }else throw Error('未知连接消息');
 }catch(error){finish(error.message);}}
+function recoveryInfo(){return {graceMs:GRACE_MS,offline:[...offlineRoles],membership:membership?{id:membership.id,roles:membership.roles}:null,
+  peers:Object.fromEntries([...peers].map(([role,p])=>[role,{suspect:p.suspectAt!=null,attempt:p.attempt||0,channel:p.channel?.readyState,lastMessageAgoMs:Math.round(performance.now()-p.lastMessage)}]))};}
+function suspect(role,reason){
+  if(!running||offlineRoles.has(role))return;
+  const peer=peers.get(role);if(!peer)return;
+  if(peer.suspectAt==null){peer.suspectAt=performance.now();status(`P${room.slots[role]+1} 连接中断，等待恢复（5 秒）…`);networkEvents.push({message:reason,role,transport,atMs:Math.round(performance.now())});if(networkEvents.length>10)networkEvents.shift();}
+}
+function resumePacket(){return {type:'resume',hello:hello(),frame:queue.frame,activation:queue.activation,
+  inputs:[...queue.inputs[queue.slot]].filter(([at])=>at>=queue.frame-32),hashes:[...hashHistory.values()]};}
+function sendResume(role){if(!running)return;sendTo(role,resumePacket());const change=membership||lastDeparture;if(change){sendTo(role,{type:'departure-prepare',id:change.id,roles:change.roles});if(!membership)sendTo(role,lastDeparture);}}
+function acceptResume(role,message){
+  const remote=message.hello,own=hello();
+  if(!remote||remote.slot!==room.slots[role])throw Error('重连身份无效');
+  for(const key of ['protocol','build','generation','settings','characters','slots','inputPolicy','coreSha','diskSha','guestSha','checksum'])if(JSON.stringify(remote[key])!==JSON.stringify(own[key]))throw Error('重连游戏版本或开局身份不一致');
+  if(!running){peerHello.set(role,{...remote,...(transport==='relay'?{to:auth.role}:{} )});peerLoaded.add(role);if(role==='host')pendingGo=true;tryLoaded();tryGo();}
+  if(!running)return;
+  if(!Number.isSafeInteger(message.frame)||Math.abs(message.frame-queue.frame)>120||!Array.isArray(message.inputs)||message.inputs.length>160||!Array.isArray(message.hashes)||message.hashes.length>8)throw Error('重连状态越界');
+  for(const entry of message.inputs){if(!Array.isArray(entry)||entry.length!==2)throw Error('重连输入无效');queue.receive({slot:remote.slot,frame:entry[0],buttons:entry[1]});}
+  if(role==='host'&&message.activation!==null){if(queue.activation===null)queue.arm(message.activation);else if(queue.activation!==message.activation)throw Error('重连回滚边界不一致');}
+  for(const hash of message.hashes)onPacket({data:JSON.stringify(hash)},role);
+  schedule(0);
+}
+function reportMembership(){
+  if(!membership||busy||(membership.reported&&auth.role==='host'))return;
+  membership.reported=true;const report=queue.membershipReport();
+  if(auth.role==='host'){membership.reports.set('host',report);finishDeparture();}
+  else sendTo('host',{type:'departure-report',id:membership.id,report});
+}
+function beginDeparture(dropped){
+  if(!running||auth?.role!=='host')return;
+  const targets=[...new Set([...(membership?.roles||[]),...dropped])].filter(r=>!offlineRoles.has(r));
+  if(!targets.length)return;
+  if(targets.some(r=>r==='host'||!remoteRoles().includes(r)))throw Error('无效离线目标');
+  membership={id:++membershipId,roles:targets,reports:new Map(),started:performance.now(),reported:false};
+  send({type:'departure-prepare',id:membership.id,roles:targets});reportMembership();
+}
+function finishDeparture(){
+  if(auth?.role!=='host'||!membership||busy||!membership.reports.has('host'))return;
+  const remaining=remoteRoles().filter(r=>!membership.roles.includes(r));
+  if(!remaining.every(r=>membership.reports.has(r)))return;
+  const change=mergeDeparture([...membership.reports.values()],membership.roles.map(r=>room.slots[r]),room.settings.players);
+  const message={type:'departure-commit',id:membership.id,roles:membership.roles,...change};
+  for(const role of remaining)if(!sendTo(role,message))return;
+  const dropped=membership.roles.slice(),identity=auth;applyDeparture(message);
+  api('drop',{roles:dropped},identity).then(data=>{if(auth===identity)setRoom(data);}).catch(()=>{});
+}
+function applyDeparture(message){
+  if(message.id<=membershipId&&message.roles?.every(r=>offlineRoles.has(r)))return;
+  if(!membership||message.id!==membership.id||JSON.stringify(message.roles)!==JSON.stringify(membership.roles)||JSON.stringify(message.slots)!==JSON.stringify(message.roles.map(r=>room.slots[r])))throw Error('离线确认不匹配');
+  queue.applyDeparture(message);
+  for(const role of message.roles){offlineRoles.add(role);const peer=peers.get(role);if(peer){peer.suspectAt=null;clearTimeout(peer.repairTimer);if(peer.channel){peer.channel.onopen=peer.channel.onclose=peer.channel.onerror=peer.channel.onmessage=null;peer.channel.close();}peer.pc?.close();}peerHashes.delete(role);rollbackPeers.delete(role);}
+  lastDeparture=message;membership=null;lastNow=performance.now();accumulator=0;clearInputs();
+  for(const at of [...hashes.keys()])compare(at);
+  render();status('离线队友已转为幽灵，其余玩家继续本局。');schedule(0);
+}
 function startHeartbeat(){
   clearInterval(heartbeat);heartbeat=setInterval(()=>{try{
     const now=performance.now();
-    if(transport==='relay'?now-lastMessage>(paused?120000:15000):[...peers.values()].some(p=>now-p.lastMessage>(paused?120000:15000)))throw Error('队友长时间无响应，本局结束。');
+    for(const role of remoteRoles()){
+      const peer=peers.get(role);if(!peer)continue;
+      if(running&&now-peer.lastMessage>3000)suspect(role,'队友暂时无响应');
+      if(running&&transport==='rtc'&&peer.suspectAt!=null)repairPeer(role);
+      if(running&&peer.suspectAt!=null&&now-peer.suspectAt>=GRACE_MS){
+        if(role==='host'){finish('房主连接恢复超时，本局结束。',false);return;}
+        if(!membership?.roles.includes(role)){if(auth.role==='host')beginDeparture([role]);else sendTo('host',{type:'suspect',role});}
+      }
+    }
     const id=++pingSeq;pings.set(id,{at:now,roles:new Set(remoteRoles())});
     for(const [key,value]of pings)if(now-value.at>15000)pings.delete(key);
     send({type:'ping',id});
     if(running)send({type:'input-tail',slot:queue.slot,inputs:[...queue.inputs[queue.slot]].filter(([at])=>at>=queue.frame-32)});
+    if(running&&membership){reportMembership();if(auth.role==='host'&&now-membership.started>=GRACE_MS){const missing=remoteRoles().filter(r=>!membership.roles.includes(r)&&!membership.reports.has(r));if(missing.length)beginDeparture(missing);else finishDeparture();}else if(auth.role!=='host'&&now-membership.started>=15000)finish('房主未完成离线同步。',false);}
     if(running)diagnostics();
   }catch(error){finish(error.message);}},1000);
 }
 function meshChannel(){
   return {ordered:true,maxRetransmits:null,maxPacketLifeTime:null,
     get readyState(){return remoteRoles().every(role=>peers.get(role)?.channel?.readyState==='open')?'open':'connecting';},
-    get bufferedAmount(){return Math.max(0,...[...peers.values()].map(peer=>peer.channel?.bufferedAmount||0));},
+    get bufferedAmount(){return Math.max(0,...remoteRoles().map(role=>peers.get(role)?.channel?.bufferedAmount||0));},
     send(data){for(const role of remoteRoles()){const c=peers.get(role)?.channel;if(c?.readyState!=='open')throw Error('游戏连接已断开');c.send(data);}},
     close(){for(const peer of peers.values())peer.channel?.close();}};
 }
@@ -291,27 +388,28 @@ function attachChannel(value,role){
   if(!peer||peer.channel)throw Error('重复游戏连接');peer.channel=value;
   if(!value.ordered||value.maxRetransmits!==null||value.maxPacketLifeTime!==null)throw Error('游戏需要可靠有序连接');
   value.onmessage=event=>{if(peers.get(role)===peer)onPacket(event,role);};
-  value.onclose=()=>{if(peers.get(role)===peer&&auth)networkFailure('连接已关闭');};
-  value.onerror=event=>{if(peers.get(role)===peer)networkFailure(event.error?.message||'游戏数据通道发生错误');};
+  value.onclose=()=>{if(peers.get(role)===peer&&auth&&!offlineRoles.has(role))networkFailure('连接已关闭',{role});};
+  value.onerror=event=>{if(peers.get(role)===peer)networkFailure(event.error?.message||'游戏数据通道发生错误',{role});};
   value.onopen=()=>{
     if(peers.get(role)!==peer||!auth)return;
-    peer.lastMessage=performance.now();
     if(room?.transport==='relay'){switchRelay();return;}
-    try{if(boot)value.send(JSON.stringify(hello()));if(channel.readyState==='open'){clearTimeout(rtcTimeout);startHeartbeat();tryLoaded();}}catch(error){networkFailure(error.message);}
+    try{peer.repairing=false;if(running)sendResume(role);else sendHandshake(role);if(channel.readyState==='open'){clearTimeout(rtcTimeout);startHeartbeat();tryLoaded();}}catch(error){networkFailure(error.message,{role});}
   };
 }
 function closeTransport(){
-  clearInterval(heartbeat);clearTimeout(rtcTimeout);
+  clearInterval(heartbeat);clearTimeout(rtcTimeout);clearTimeout(relayRetry);relayRetry=0;
   if(relay){relay.onopen=relay.onclose=relay.onerror=relay.onmessage=null;relay.close();relay=null;}
   const previous=[...peers.values()];peers.clear();
-  for(const peer of previous){const c=peer.channel;if(c){c.onopen=c.onclose=c.onerror=c.onmessage=null;c.close();}peer.pc.onconnectionstatechange=peer.pc.ondatachannel=null;peer.pc.close();}
+  for(const peer of previous){clearTimeout(peer.repairTimer);const c=peer.channel;if(c){c.onopen=c.onclose=c.onerror=c.onmessage=null;c.close();}if(peer.pc){peer.pc.onconnectionstatechange=peer.pc.ondatachannel=null;peer.pc.close();}}
   channel=null;pc=null;
 }
 function networkFailure(message,detail={}){
   networkEvents.push({message,...detail,transport,rollbackEnabled:room?.settings.rollback,rollbackCount,music:bgm?.status,connection:pc?.connectionState,ice:pc?.iceConnectionState,channel:channel?.readyState,atMs:Math.round(performance.now())});
   if(networkEvents.length>10)networkEvents.shift();diagnostics();
   if(!running&&transport==='rtc'){requestRelay(message);return;}
-  finish(`${transport==='relay'?'联机中继':'游戏数据通道'}连接失败：${message}。本局结束。`,false);
+  if(!running){status('中继连接暂时中断，正在重试…');retryRelay();return;}
+  for(const role of detail.role?[detail.role]:remoteRoles()){suspect(role,message);if(transport==='rtc')repairPeer(role);}
+  if(transport==='relay'&&relay?.readyState!=='open')retryRelay();
 }
 async function requestRelay(reason){
   if(!auth||fallbackPending||transport==='relay')return;
@@ -327,14 +425,25 @@ function switchRelay(){
   if(transport==='relay'||!auth)return;
   if(running){finish('队友连接中断，本局结束，请重新建房。');return;}
   closeTransport();transport='relay';peerHello.clear();peerLoaded.clear();loadedSent=false;pendingGo=false;earlyPackets=[];
+  for(const role of remoteRoles())peers.set(role,{role,pc:null,channel:null,lastMessage:performance.now(),suspectAt:null});
+  openRelay();
+}
+function retryRelay(){
+  if(!auth||transport!=='relay'||relayRetry)return;
+  const identity=auth;relayRetry=setTimeout(()=>{relayRetry=0;if(auth===identity&&transport==='relay')openRelay();},300);
+}
+function openRelay(){
+  if(!auth||transport!=='relay')return;
+  if(relay){relay.onopen=relay.onclose=relay.onerror=relay.onmessage=relay.onpeerchange=null;relay.close();}
   relay=createRelayChannel(auth);channel=relay;
   const currentRelay=relay,identity=auth;
   relay.onmessage=event=>{if(relay===currentRelay)onPacket(event);};
+  relay.onpeerchange=({role,connected})=>{if(relay!==currentRelay||!remoteRoles().includes(role))return;if(connected){if(running)sendResume(role);else sendHandshake(role);}else suspect(role,'中继队友连接中断');};
   relay.onclose=()=>{if(relay===currentRelay&&auth)networkFailure('中继连接已关闭');};
   relay.onerror=event=>{if(relay===currentRelay)networkFailure(event.error?.message||'中继连接错误');};
-  relay.onopen=()=>{if(auth!==identity||relay!==currentRelay)return;try{clearTimeout(rtcTimeout);lastMessage=performance.now();if(boot)send(hello());startHeartbeat();}catch(error){networkFailure(error.message);}};
-  status('正在通过服务建立联机连接…');
-  rtcTimeout=setTimeout(()=>{if(auth===identity)networkFailure('联机中继连接超时');},15000);diagnostics();
+  relay.onopen=()=>{if(auth!==identity||relay!==currentRelay)return;try{clearTimeout(rtcTimeout);for(const role of remoteRoles()){if(running)sendResume(role);else sendHandshake(role);}startHeartbeat();}catch(error){networkFailure(error.message);}};
+  if(!running)status('正在通过服务建立联机连接…');
+  clearTimeout(rtcTimeout);rtcTimeout=setTimeout(()=>{if(auth===identity)networkFailure('联机中继连接超时');},15000);diagnostics();
 }
 async function completeIce(connection){
   if(connection.iceGatheringState==='complete')return;
@@ -347,7 +456,7 @@ async function completeIce(connection){
 async function connect(){
   const current=++epoch,identity=auth;status('正在连接队友并启动游戏…');
   bootProgress={};
-  let directRelay=room.transport==='relay',rtcConfiguration=null;
+  let directRelay=room.transport==='relay';rtcConfiguration=null;
   rtcPreparing=!directRelay;
   if(!directRelay){
     const source=globalThis.th05NetplayUdp??globalThis.th05NetplayConnection??(room.network==='public-rtc'?deploymentIceConfiguration:undefined);
@@ -357,15 +466,7 @@ async function connect(){
   }
   if((directRelay?!globalThis.WebSocket:!globalThis.RTCPeerConnection)||!globalThis.Worker||!globalThis.OffscreenCanvas||!globalThis.DecompressionStream)throw Error('此浏览器缺少联机运行能力，请使用新版 Edge / Chrome。');
   if(transport!=='relay')channel=meshChannel();
-  for(const role of directRelay?[]:remoteRoles()){
-    const connection=new RTCPeerConnection(rtcConfiguration);
-    const peer={role,pc:connection,channel:null,lastMessage:performance.now(),signalChain:Promise.resolve()};peers.set(role,peer);
-    if(!pc)pc=connection;
-    connection.ondatachannel=event=>{if(auth!==identity||peers.get(role)!==peer)return;try{
-      if(roles.indexOf(identity.role)<roles.indexOf(role))throw Error('意外的数据通道');attachChannel(event.channel,role);
-    }catch(error){finish(error.message);}};
-    connection.onconnectionstatechange=()=>{if(auth===identity&&peers.get(role)===peer&&connection.connectionState==='failed')networkFailure('WebRTC 连接失败');};
-  }
+  for(const role of directRelay?[]:remoteRoles())makePeer(role);
   rtcPreparing=false;
   for(const signal of pendingSignals.splice(0))void receiveSignal(signal).catch(error=>{if(auth===identity)finish(error.message);});
   if(!directRelay)rtcTimeout=setTimeout(()=>{if(auth===identity&&transport==='rtc')requestRelay('WebRTC 连接超时');},room.network==='public-rtc'?20000:8000);
@@ -384,7 +485,7 @@ async function connect(){
       else if(data.type==='frame')display.receive(data);
       else if(data.type==='audio')audio?.push([data.samples]);
       else if(data.type==='music'){for(const [ax,hash]of data.events)bgm?.command(ax,hash);}
-      else if(data.type==='hash'){hashes.set(data.frame,data.hash);if(hashes.size>8)throw Error('同步检查积压');send({type:'hash',frame:data.frame,hash:data.hash,boot:data.boot});compare(data.frame);armRollback();}
+      else if(data.type==='hash'){hashes.set(data.frame,data.hash);if(hashes.size>8)throw Error('同步检查积压');const packet={type:'hash',frame:data.frame,hash:data.hash,boot:data.boot};hashHistory.set(data.frame,packet);while(hashHistory.size>8)hashHistory.delete(hashHistory.keys().next().value);send(packet);compare(data.frame);armRollback();}
       else if(data.type==='pause-state'){
         paused=data.paused;clearInputs();audio?.flush();
         overlay('');$('pause').textContent=paused?'继续游戏':'暂停游戏';
@@ -408,38 +509,71 @@ async function connect(){
         pendingKind='';runtimePolicy=data.policy;if(data.state)acceptState(data.state);
         confirmFrames();schedule();if(steps%30===0)diagnostics();
       }else if(data.type==='error')throw Error(data.message);
+      if(membership)reportMembership();
     }catch(error){finish(error.message);}
   };
   const config={rank:room.settings.rank,players:[]};
   for(const role of activeRoles())config.players[room.slots[role]]={character:room.characters[role],spares:room.settings.spares,bombs:room.settings.bombs};
   worker.postMessage({type:'boot',settings:room.settings,config,viewSlot:room.slots[auth.role]});
 if(room?.transport==='relay'){switchRelay();return;}
-  await Promise.all(remoteRoles().filter(role=>roles.indexOf(identity.role)<roles.indexOf(role)).map(async role=>{
-    const peer=peers.get(role);if(!peer||transport!=='rtc'||auth!==identity)return;
-    const connection=peer.pc;
-    try{
-      attachChannel(connection.createDataChannel('th05-input',{ordered:true}),role);
-      await connection.setLocalDescription(await connection.createOffer());await completeIce(connection);
-      if(current!==epoch||peers.get(role)!==peer||transport!=='rtc')return;
-      await api('signal',{to:role,signal:connection.localDescription.toJSON()},identity);
-    }catch(error){if(auth===identity&&transport==='rtc')requestRelay(error.message);}
-  }));
+  await Promise.all(remoteRoles().filter(role=>roles.indexOf(identity.role)<roles.indexOf(role)).map(role=>offerPeer(peers.get(role))));
+}
+function makePeer(role,attempt=0){
+  const old=peers.get(role),identity=auth,connection=new RTCPeerConnection(rtcConfiguration);
+  if(old){clearTimeout(old.repairTimer);if(old.channel){old.channel.onopen=old.channel.onclose=old.channel.onerror=old.channel.onmessage=null;old.channel.close();}if(old.pc){old.pc.onconnectionstatechange=old.pc.ondatachannel=null;old.pc.close();}}
+  const peer={role,pc:connection,channel:null,lastMessage:old?.lastMessage||performance.now(),suspectAt:old?.suspectAt??null,signalChain:Promise.resolve(),attempt,repairing:attempt>0,attemptAt:performance.now(),repairTimer:0};peers.set(role,peer);
+  if(!pc||pc===old?.pc)pc=connection;
+  connection.ondatachannel=event=>{if(auth!==identity||peers.get(role)!==peer){event.channel.close();return;}try{
+    if(roles.indexOf(identity.role)<roles.indexOf(role))throw Error('意外的数据通道');attachChannel(event.channel,role);
+  }catch(error){finish(error.message);}};
+  connection.onconnectionstatechange=()=>{if(auth!==identity||peers.get(role)!==peer||offlineRoles.has(role))return;
+    if(connection.connectionState==='failed'||running&&['disconnected','closed'].includes(connection.connectionState))networkFailure('WebRTC 连接中断',{role});};
+  return peer;
+}
+async function offerPeer(peer){
+  if(!peer||transport!=='rtc'||!auth)return;
+  const identity=auth,{role,pc:connection}=peer;
+  try{
+    attachChannel(connection.createDataChannel('th05-input',{ordered:true}),role);
+    await connection.setLocalDescription(await connection.createOffer());await completeIce(connection);
+    if(auth!==identity||peers.get(role)!==peer||transport!=='rtc'||offlineRoles.has(role))return;
+    await api('signal',{to:role,signal:{...connection.localDescription.toJSON(),attempt:peer.attempt}},identity);
+  }catch(error){if(auth===identity&&peers.get(role)===peer&&transport==='rtc')networkFailure(error.message,{role});}
+}
+function startPeerRepair(role){
+  const peer=peers.get(role);if(!peer||!running||transport!=='rtc'||offlineRoles.has(role)||membership?.roles.includes(role))return;
+  if(peer.repairing&&performance.now()-peer.attemptAt<2500)return;
+  void offerPeer(makePeer(role,peer.attempt+1));
+}
+function repairPeer(role){
+  const peer=peers.get(role);if(!peer||!running||transport!=='rtc'||offlineRoles.has(role)||peer.repairTimer||membership?.roles.includes(role))return;
+  if(peer.channel?.readyState==='open'&&peer.pc.connectionState==='connected')return;
+  const identity=auth;peer.repairTimer=setTimeout(()=>{peer.repairTimer=0;if(auth!==identity||peers.get(role)!==peer||offlineRoles.has(role))return;
+    if(roles.indexOf(identity.role)<roles.indexOf(role))startPeerRepair(role);
+    else api('signal',{to:role,signal:{type:'repair'}},identity).catch(()=>{});
+  },200);
 }
 async function receiveSignal(envelope){
   if(!auth||room?.transport==='relay'||transport==='relay')return;
   if(rtcPreparing){if(pendingSignals.length>=16)throw Error('等待连接配置时收到过多信令');pendingSignals.push(envelope);return;}
-  const role=envelope.from,signal=envelope.signal,peer=peers.get(role),identity=auth;
+  const role=envelope.from,signal=envelope.signal,identity=auth;let peer=peers.get(role);
+  if(offlineRoles.has(role))return;
   if(!peer||!signal)throw Error('未知信令来源');
+  if(signal.type==='repair'){if(roles.indexOf(identity.role)>=roles.indexOf(role))throw Error('重连请求身份无效');startPeerRepair(role);return;}
+  const attempt=signal.attempt||0;
+  if(!Number.isSafeInteger(attempt)||attempt<0)throw Error('重连序号无效');
+  if(attempt<peer.attempt)return;
+  if(attempt>peer.attempt){if(signal.type!=='offer'||roles.indexOf(identity.role)<roles.indexOf(role))throw Error('重连协商身份无效');peer=makePeer(role,attempt);}
   peer.signalChain=peer.signalChain.then(async()=>{
     if(auth!==identity||peers.get(role)!==peer||transport!=='rtc')return;
     const connection=peer.pc,offerer=roles.indexOf(identity.role)<roles.indexOf(role);
-    if(connection.remoteDescription)throw Error('重复连接描述');
+    if(connection.remoteDescription){if(connection.remoteDescription.sdp===signal.sdp)return;throw Error('重复连接描述');}
     if(signal.type==='offer'&&!offerer){
       await connection.setRemoteDescription(signal);await connection.setLocalDescription(await connection.createAnswer());await completeIce(connection);
-      if(auth===identity&&peers.get(role)===peer&&transport==='rtc')await api('signal',{to:role,signal:connection.localDescription.toJSON()},identity);
+      if(auth===identity&&peers.get(role)===peer&&transport==='rtc')await api('signal',{to:role,signal:{...connection.localDescription.toJSON(),attempt:peer.attempt}},identity);
     }else if(signal.type==='answer'&&offerer)await connection.setRemoteDescription(signal);
     else throw Error('连接消息与身份不一致');
-  }).catch(error=>{if(auth===identity&&transport==='rtc')requestRelay(error.message);});
+  }).catch(error=>{if(auth===identity&&peers.get(role)===peer&&transport==='rtc')networkFailure(error.message,{role});});
   // The chain preserves each peer's SDP order. ICE gathering must not hold up
   // room polling or another peer's negotiation (especially in a three-seat room).
 }
@@ -454,18 +588,19 @@ function schedule(delay){
   else timer=setTimeout(()=>{if(token!==wakeToken||!wakePending)return;wakePending=false;pump();},delay);
 }
 function armRollback(){
-  if(!running||auth.role!=='host'||!sessionPolicy.rollbackEnabled||queue.activation!==null||!runtimePolicy.ready||!remoteRoles().every(role=>rollbackPeers.has(role)))return;
+  if(!running||membership||auth.role!=='host'||!sessionPolicy.rollbackEnabled||queue.activation!==null||!runtimePolicy.ready||!remoteRoles().every(role=>rollbackPeers.has(role)))return;
   const frame=queue.frame+ROLLBACK_ARM_AHEAD;queue.arm(frame);send({type:'rollback',frame});
 }
 function confirmFrames(){
-  if(queue.dirty!==null)return;
+  if(membership||queue.dirty!==null)return;
   const prefix=Math.min(queue.confirmed,queue.frame);
   if(prefix>committedPrefix){worker.postMessage({type:'confirm',prefix});committedPrefix=prefix;queue.prune();}
   armRollback();
 }
 function pump(){try{
   if(!running||busy)return;
-  if(channel.bufferedAmount>65536)throw Error('网络发送积压，本局停止。');
+  if(membership){reportMembership();return;}
+  if(channel.bufferedAmount>65536){for(const role of remoteRoles())suspect(role,'网络发送暂时积压');setActivity('network-wait');schedule(16);return;}
   const now=performance.now();accumulator=Math.min(accumulator+Math.max(0,now-lastNow),TICK_MS*4);lastNow=now;
   if(queue.dirty!==null){
     // Publish due live input before costly restore, never from a history frame.
@@ -486,7 +621,7 @@ function pump(){try{
   capture();const pair=nextInputs(queue,runtimePolicy.canPredict);
   if(!pair){waits++;setActivity('network-wait');schedule(16);return;}
   accumulator-=TICK_MS;busy=true;setActivity('worker');pendingKind='step';inflight=pair;
-  worker.postMessage({type:'step',frame:queue.frame,pair,predicted:queue.active&&queue.frame>=queue.confirmed});
+  worker.postMessage({type:'step',frame:queue.frame,pair,predicted:queue.active&&queue.frame>=queue.confirmed,offlineMask:queue.offlineMask()});
 }catch(error){finish(error.message);}}
 function pauseControl(){if(!running)return;clearInputs();controls|=paused?RESUME:PAUSE;$('canvas').focus();schedule(0);}
 async function finish(reason,notify=true){
@@ -499,6 +634,7 @@ async function finish(reason,notify=true){
   worker?.terminate();worker=null;display?.stop();display=null;audio?.disconnect();audio=null;
   bgm?.dispose();bgm=null;context?.close().catch(()=>{});context=null;player.setActive(false);player.exit();
   closeTransport();fallbackPending=false;
+  offlineRoles.clear();membership=null;membershipId=0;lastDeparture=null;hashHistory.clear();comparedFrames.clear();
   boot=null;peerHello.clear();peerLoaded.clear();loadedSent=pendingGo=false;earlyPackets=[];queue=null;room=null;
   endedReason=reason;status(reason);overlay(reason);render();diagnostics();
   if(identity)try{await api('leave',{},identity);}catch{}
@@ -544,7 +680,7 @@ document.addEventListener('visibilitychange',()=>{clearInputs();if(document.hidd
 addEventListener('pagehide',()=>{if(!auth)return;const data=JSON.stringify({...auth,protocol:PROTOCOL});navigator.sendBeacon('/api/leave',new Blob([data],{type:'application/json'}));});
 // Read-only diagnostics for repeatable two-browser validation.
 globalThis.th05Lan={get info(){return {running,paused,rollbackEnabled:room?.settings.rollback,rollbackActive:queue?.active,activation:queue?.activation,inputPolicy:sessionPolicy,prediction:runtimePolicy,
-  performance:performanceInfo(),
+  performance:performanceInfo(),recovery:recoveryInfo(),
   replayUntil,resimulated,maxRewind,earlyInputs,inputAgeMs:inputAge,lead:queue?Math.max(0,queue.frame-queue.confirmed):0,predictionLeadLimit:PREDICTION_LEAD_LIMIT,waitReason:queue?.waitReason,
   rollbackCount,music:bgm?{status:bgm.status,id:bgm.active?.id,generation:bgm.generation,audioTime:context?.currentTime,sourceStart:bgm.sourceStart,paused:bgm.paused}:null,frame:queue?.frame,confirmed:queue?.confirmed,state:lastState,boot,hashMatches,steps,waits,endedReason,transport,network:room?.network||network,networkEvents:networkEvents.slice(),display:display?.metrics,audio:audio?.info(),role:auth?.role,slot:auth&&room?room.slots[auth.role]:null,room:auth?.room,
   capabilities:{secure:isSecureContext,subtle:!!globalThis.crypto?.subtle,audioWorklet:!!context?.audioWorklet,offscreen:!!globalThis.OffscreenCanvas}};}};

@@ -116,7 +116,7 @@ def handle(handler, rooms, room_lock):
             protocol.send_text(text.encode())
             flush()
 
-    entry = {'send': send, 'ready': False}
+    entry = {'send': send, 'ready': False, 'close': writer.abort}
     try:
         request = (handler.requestline + '\r\n' + ''.join(f'{k}: {v}\r\n' for k, v in handler.headers.items()) + '\r\n').encode('iso-8859-1')
         protocol.receive_data(request)
@@ -130,21 +130,33 @@ def handle(handler, rooms, room_lock):
             return
         with HUB_LOCK:
             hub = HUBS.setdefault(key, {})
-            if role in hub or any(item['ready'] for item in hub.values()):
-                send(json.dumps({'type': 'relay-error', 'message': '不支持重复加入或中途重连'}))
-                return
+            previous = hub.get(role)
+            if previous:
+                previous['close']()
             hub[role] = entry
-            if len(hub) == len(roles):
+            if room.get('relay_started'):
+                entry['ready'] = True
+                send(json.dumps({'type': 'relay-ready', 'generation': generation}))
+                for peer_role, item in hub.items():
+                    if peer_role != role:
+                        try:
+                            item['send'](json.dumps({'type': 'relay-peer', 'role': role, 'connected': True}))
+                        except OSError:
+                            item['close']()
+            elif len(hub) == len(roles):
                 for item in hub.values():
                     item['send'](json.dumps({'type': 'relay-ready', 'generation': generation}))
                 for item in hub.values():
                     item['ready'] = True
+                room['relay_started'] = True
         fragments = bytearray()
         started = last_data = time.monotonic()
         while True:
             with room_lock:
                 current = rooms.get(code)
                 valid = current and current['generation'] == generation and current['phase'] == 'loading' and current['tokens'][role] == token
+            with HUB_LOCK:
+                valid = valid and HUBS.get(key, {}).get(role) is entry
             if not valid or time.monotonic() - last_data > (130 if entry['ready'] else 30):
                 break
             if not select.select([sock], [], [], 1)[0]:
@@ -172,22 +184,32 @@ def handle(handler, rooms, room_lock):
                 text = fragments.decode('utf-8')
                 fragments.clear()
                 message = json.loads(text)
-                if not isinstance(message, dict) or message.get('type') not in ('hello', 'loaded', 'go', 'input', 'input-tail', 'rollback', 'hash', 'stop', 'ping', 'pong'):
+                if not isinstance(message, dict) or message.get('type') not in ('hello', 'loaded', 'go', 'input', 'input-tail', 'rollback', 'hash', 'stop', 'ping', 'pong', 'resume', 'suspect', 'departure-prepare', 'departure-report', 'departure-commit'):
                     raise ValueError('invalid packet')
-                if (message['type'] in ('input', 'input-tail') and message.get('slot') != slot) or (message['type'] in ('go', 'rollback') and role != 'host'):
+                if (message['type'] in ('input', 'input-tail') and message.get('slot') != slot) or (message['type'] in ('go', 'rollback', 'departure-prepare', 'departure-commit') and role != 'host') or (message['type'] == 'resume' and (not isinstance(message.get('hello'), dict) or message['hello'].get('slot') != slot)):
                     raise ValueError('wrong source')
+                destination = message.get('to')
+                if destination is not None and (destination not in roles or destination == role):
+                    raise ValueError('wrong destination')
                 last_data = time.monotonic()
                 with room_lock:
                     if current:
                         current['seen'][role] = last_data
                 with HUB_LOCK:
                     hub=HUBS.get(key,{})
-                    targets=[hub.get(r) for r in roles if r!=role]
-                    if not entry['ready'] or any(not target for target in targets):
+                    if hub.get(role) is not entry:
+                        raise ValueError('replaced connection')
+                    targets=[hub.get(r) for r in roles if r!=role and (destination is None or destination == r)]
+                    if not entry['ready']:
                         raise ValueError('peer not ready')
                     # The authenticated server supplies source identity.
                     routed=json.dumps({**message,'from':role},separators=(',',':'))
-                    for target in targets:target['send'](routed)
+                    for target in targets:
+                        if target:
+                            try:
+                                target['send'](routed)
+                            except OSError:
+                                target['close']()
     except (OSError, ValueError, UnicodeError):
         pass
     finally:
@@ -197,7 +219,7 @@ def handle(handler, rooms, room_lock):
                 del hub[role]
                 for item in hub.values():
                     try:
-                        item['send'](json.dumps({'type': 'relay-left'}))
+                        item['send'](json.dumps({'type': 'relay-left', 'role': role}))
                     except OSError:
                         pass
                 if not hub:
