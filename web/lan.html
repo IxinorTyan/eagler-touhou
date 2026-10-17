@@ -8,10 +8,11 @@
 <label>人数<select id="players"><option value="2">双人</option><option value="3">三人</option></select></label>
 <label>难度<select id="rank"><option value="0">Easy</option><option value="1" selected>Normal</option><option value="2">Hard</option><option value="3">Lunatic</option></select></label>
 <label>阴阳玉<select id="count"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>6</option><option>8</option></select></label>
+<label>起始关卡<select id="startStage"><option value="normal">正常流程 · 从第 1 关开始</option></select></label>
 <label>网络<select id="network"><option value="lan">局域网</option><option value="public">公网</option></select></label>
 <label>连接<select id="transport"><option value="rtc">UDP 直连／打洞</option><option value="ws">TCP 服务器转发</option></select></label>
 <label>打洞策略<select id="ice"><option value="all">自动（TURN 可用时兜底）</option><option value="relay">强制 TURN</option></select></label>
-<label>输入缓冲<select id="delay"><option value="0">自动（推荐）</option><option value="2">2 步</option><option value="3">3 步</option><option value="4">4 步</option><option value="6">6 步</option><option value="9">9 步</option><option value="12">12 步</option></select></label>
+<label>输入缓冲<select id="delay"><option value="0">自动（推荐）</option><option value="1">1 步（低延迟稳定网络）</option><option value="2">2 步</option><option value="3">3 步</option><option value="4">4 步</option><option value="6">6 步</option><option value="9">9 步</option><option value="12">12 步</option></select></label>
 <label class="check"><input id="life-compensation" type="checkbox" checked>多玉生命补偿</label>
 </div><p id="network-help" class="small"></p><p id="balance" class="small"></p>
 <div id="entry-actions" class="room-actions"><button id="create">创建房间</button><input id="code" inputmode="numeric" maxlength="4" placeholder="四位房间号" aria-label="房间号"><button id="join">加入房间</button></div>

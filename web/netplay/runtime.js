@@ -1,3 +1,4 @@
+import {applyStage,stageSelection} from '../stage-select.js';
 import {sha256} from './sha256.js';
 import {PROTOCOL} from './queue.js';
 import {LocalAudio} from './audio.js';
@@ -36,7 +37,7 @@ export class GameRuntime{
   reset(){
     const s=this.settings,e=this.core;
     e.th_init(s.players,s.count,0x12345678,s.lifeCompensation?1:0);
-    e.th_set_difficulty(s.rank);e.th_start_stage_entrance();
+    e.th_set_difficulty(s.rank);applyStage(e,s.startStage);
   }
   start(){this.stopped=false;}
   state(){
@@ -77,7 +78,7 @@ export class GameRuntime{
     const revision=g(110);
     if(revision!==this.scoreRevision){
       this.scoreRevision=revision;
-      try{const data=new Uint8Array(e.memory.buffer,e.th_score_data(),e.th_score_size());
+      if(!stageSelection(this.settings.startStage).practice)try{const data=new Uint8Array(e.memory.buffer,e.th_score_data(),e.th_score_size());
         localStorage.setItem('th01-native-net-scores-v1',btoa(String.fromCharCode(...data)));}
       catch{this.scoreSaveError=true;}
     }

@@ -1,35 +1,41 @@
+import {populateStages,stageLabel,stageSelection,applyStage} from './stage-select.js';
 import {musicRoomTracks} from './music-room.js';
 const $=id=>document.getElementById(id);
 const solo=document.body.dataset.page==='solo';
+populateStages($('startStage'));
 let started=false,configuring=true,sessionConfig;
 const preferenceKey=`th01-native-${solo?'solo':'local'}-setup`;
 try{
   const saved=JSON.parse(localStorage.getItem(preferenceKey)||'null');
   if(saved){
-    for(const id of ['players','orbs','difficulty'])if([...$(id).options].some(o=>o.value===saved[id]))$(id).value=saved[id];
+    for(const id of ['players','orbs','difficulty','startStage'])if([...$(id).options].some(o=>o.value===saved[id]))$(id).value=saved[id];
     for(const id of ['compensation','reducedFlash'])if(typeof saved[id]==='boolean')$(id).checked=saved[id];
   }
 }catch{}
 function setupSummary(){
-  $('setupSummary').textContent=`${solo?1:$('players').value} 人 · ${$('orbs').value} 玉 · ${$('difficulty').selectedOptions[0].textContent} · ${$('compensation').checked?'多玉生命补偿开启':'生命补偿关闭'}。${solo?'先进入标题菜单，再选择 START。':'跳过标题菜单，直接进入第一关过场。'}`;
+  $('setupSummary').textContent=`${solo?1:$('players').value} 人 · ${$('orbs').value} 玉 · ${$('difficulty').selectedOptions[0].textContent} · ${$('compensation').checked?'多玉生命补偿开启':'生命补偿关闭'}。${stageLabel($('startStage').value)}。${stageSelection($('startStage').value).practice?'选关练习，直接入场；成绩不保存到正式排行榜。':solo?'先进入标题菜单，再选择 START。':'直接进入第一关过场。'}`;
 }
 setupSummary();
 const tick=440/24830*1000;
 const keys=[['ArrowLeft','ArrowRight','KeyZ','KeyX','KeyC'],['KeyA','KeyD','KeyJ','KeyK','KeyL'],['KeyF','KeyH','KeyT','KeyY','KeyU']];
 const held=new Set(),pressed=new Set(),touchOwners=new Map();
 let core,paused=false,last=0,accumulator=0,steps=0,logicMs=0,drawMs=0,draws=0,statsAt=performance.now(),lastDraw=-Infinity;
-let musicContext,musicBuffer,musicSource,musicGain,musicEnabled=false,musicWanted=true,musicLoading,musicLoop;
+let musicContext,musicBuffer,musicSource,musicGain,musicEnabled=false,musicWanted=true,musicRequest,musicLoop;
 let musicTrack=null;
-let scoreRevision=0,scoreSaveFailed=false;
+let scoreRevision=0,scoreSaveFailed=false,formalScores;
+function restoreFormalScores(){if(formalScores){new Uint8Array(core.memory.buffer,core.th_score_data(),formalScores.length).set(formalScores);core.th_score_load(formalScores.length);}}
 function loadScores(){
   try{const saved=localStorage.getItem('th01-native-scores-v1');if(saved){const data=Uint8Array.from(atob(saved),c=>c.charCodeAt(0));
     if(data.length===core.th_score_size()){new Uint8Array(core.memory.buffer,core.th_score_data(),data.length).set(data);core.th_score_load(data.length);}}}
   catch(error){console.warn('成绩记录读取失败',error);}
   scoreRevision=core.th_get(110,0);
+  formalScores=new Uint8Array(core.memory.buffer,core.th_score_data(),core.th_score_size()).slice();
 }
 function saveScores(){
   const revision=core.th_get(110,0);if(revision===scoreRevision)return;
-  try{const data=new Uint8Array(core.memory.buffer,core.th_score_data(),core.th_score_size());localStorage.setItem('th01-native-scores-v1',btoa(String.fromCharCode(...data)));scoreSaveFailed=false;}
+  if(stageSelection(sessionConfig?.startStage).practice){scoreRevision=revision;return;}
+  formalScores=new Uint8Array(core.memory.buffer,core.th_score_data(),core.th_score_size()).slice();
+  try{const data=formalScores;localStorage.setItem('th01-native-scores-v1',btoa(String.fromCharCode(...data)));scoreSaveFailed=false;}
   catch(error){scoreSaveFailed=true;console.warn('成绩记录未能保存到本机',error);}
   scoreRevision=revision;
 }
@@ -38,7 +44,7 @@ function musicCue(){
   const cue=core?.th_get(79,0)??0;
   return cue===2?'silent':cue<2?musicRoomTracks[cue].key:musicRoomTracks[cue-3].key;
 }
-function stopMusicSource(){musicSource?.stop();musicSource?.disconnect();musicSource=null;musicEnabled=false;}
+function stopMusicSource(){musicRequest=null;musicSource?.stop();musicSource?.disconnect();musicSource=null;musicEnabled=false;}
 let sfxEnabled=true,sfxReady=false,soundCursor=0,sfxLoading;
 const sfxBuffers=new Map(),sfxSources=new Set();
 function stopEffects(){for(const source of sfxSources)source.stop();sfxSources.clear();}
@@ -129,7 +135,8 @@ function reset(){
   release();accumulator=0;last=0;
   core.th_init(players(),Number($('orbs').value),0x12345678,$('compensation').checked?1:0);
   core.th_set_difficulty(Number($('difficulty').value));
-  core.th_start_stage_entrance();
+  restoreFormalScores();
+  applyStage(core,sessionConfig?.startStage);
   soundCursor=0;stopEffects();
   $('touchSlot').value=String(Math.min(Number($('touchSlot').value),players()-1));
   for(const option of $('touchSlot').options)option.disabled=Number(option.value)>=players();
@@ -166,21 +173,27 @@ function loop(now){
 async function startMusic(){
   if(!musicWanted)return;
   const track=musicCue();
+  if(musicTrack===track&&(musicSource||musicRequest||track==='silent'))return;
+  stopMusicSource();musicTrack=track;
+  const request={};musicRequest=request;
+  if(track==='silent'){musicRequest=null;return;}
   try{
     musicContext??=new AudioContext();await musicContext.resume();
-    if(musicCue()!==track)return;
-    if(musicTrack===track&&musicSource)return;
-    if(musicTrack!==track)stopMusicSource();musicTrack=track;
-    if(track==='silent')return;
-    if(!musicTracks.has(track))musicTracks.set(track,Promise.all([fetch(`bgm/${track}.opus`).then(async response=>{if(!response.ok)throw Error('音乐资源读取失败');return musicContext.decodeAudioData(await response.arrayBuffer());}),fetch(`bgm/${track}.json`).then(async response=>{if(!response.ok)throw Error('音乐循环点读取失败');return response.json();})]));
+    if(musicRequest!==request||!musicWanted||musicCue()!==track)return;
+    if(!musicTracks.has(track)){
+      const pending=Promise.all([fetch(`bgm/${track}.opus`).then(async response=>{if(!response.ok)throw Error('音乐资源读取失败');return musicContext.decodeAudioData(await response.arrayBuffer());}),fetch(`bgm/${track}.json`).then(async response=>{if(!response.ok)throw Error('音乐循环点读取失败');return response.json();})]);
+      musicTracks.set(track,pending);
+      void pending.catch(()=>{if(musicTracks.get(track)===pending)musicTracks.delete(track);});
+    }
     const [buffer,loop]=await musicTracks.get(track);
-    if(!musicWanted||musicSource||musicCue()!==track)return;
+    if(musicRequest!==request||!musicWanted||musicCue()!==track)return;
     musicBuffer=buffer;musicLoop=loop;
     musicSource=musicContext.createBufferSource();musicSource.buffer=musicBuffer;musicSource.loop=true;
     musicSource.loopStart=musicLoop.loopStart;musicSource.loopEnd=musicLoop.loopEnd;
     if(!musicGain){musicGain=musicContext.createGain();musicGain.gain.value=.35;musicGain.connect(musicContext.destination);}
     musicSource.connect(musicGain);musicSource.start();musicEnabled=true;$('music').textContent='音乐：开';
-  }catch(error){musicTracks.delete(track);musicLoading=null;if(musicWanted)$('music').textContent='音乐读取失败';console.error(error);}
+  }catch(error){if(musicRequest===request){if(musicWanted)$('music').textContent='音乐读取失败';console.error(error);}}
+  finally{if(musicRequest===request)musicRequest=null;}
 }
 function toggleMusic(){
   musicWanted=!musicWanted;
@@ -225,7 +238,7 @@ for(const button of document.querySelectorAll('[data-ending]'))button.onclick=()
   paused=false;release();updatePhase();present();$('game').focus({preventScroll:true});
 };
 for(const button of document.querySelectorAll('[data-menu]'))button.onclick=()=>menuInput(Number(button.dataset.menu));
-for(const id of ['players','orbs','compensation','difficulty'])$(id).onchange=setupSummary;
+for(const id of ['players','orbs','compensation','difficulty','startStage'])$(id).onchange=setupSummary;
 $('god').onchange=()=>core?.th_debug_invincible($('god').checked?1:0);
 $('reducedFlash').onchange=()=>{if(core&&!configuring){core.th_set_bomb_reduced_flash($('reducedFlash').checked?1:0);present();}};
 $('touchSlot').onchange=release;
@@ -244,21 +257,21 @@ $('yuugenPreview').onclick=()=>{previewBoss(10,0);$('game').focus({preventScroll
 if(matchMedia('(pointer:coarse)').matches)$('touch').classList.add('visible');
 function begin(){
   if(!core)return;
-  const saved={};for(const id of ['players','orbs','difficulty'])saved[id]=$(id).value;
+  const saved={};for(const id of ['players','orbs','difficulty','startStage'])saved[id]=$(id).value;
   for(const id of ['compensation','reducedFlash'])saved[id]=$(id).checked;
   sessionConfig=saved;
   try{localStorage.setItem(preferenceKey,JSON.stringify(saved));}catch{}
   started=true;configuring=false;$('setup').hidden=true;$('player').hidden=false;
   document.querySelector('.diagnostics').hidden=false;
   reset();core.th_set_bomb_reduced_flash($('reducedFlash').checked?1:0);
-  if(solo){core.th_menu_open(1,$('compensation').checked?1:0);setPaused(true);}
+  if(solo&&!stageSelection(saved.startStage).practice){core.th_menu_open(1,$('compensation').checked?1:0);setPaused(true);}
   $('sessionSettings').textContent=$('setupSummary').textContent;
   updatePhase();present();$('game').focus({preventScroll:true});void unlockEffects();void startMusic();
 }
 $('start').onclick=begin;
 $('settings').onclick=()=>{setPaused(true);configuring=true;$('player').hidden=true;document.querySelector('.diagnostics').hidden=true;$('setup').hidden=false;$('cancelSetup').hidden=false;setupSummary();$('start').focus();};
 $('cancelSetup').onclick=()=>{
-  for(const id of ['players','orbs','difficulty'])$(id).value=sessionConfig[id];
+  for(const id of ['players','orbs','difficulty','startStage'])$(id).value=sessionConfig[id];
   for(const id of ['compensation','reducedFlash'])$(id).checked=sessionConfig[id];
   setupSummary();configuring=false;$('setup').hidden=true;$('player').hidden=false;document.querySelector('.diagnostics').hidden=false;setPaused(false);$('game').focus({preventScroll:true});
 };

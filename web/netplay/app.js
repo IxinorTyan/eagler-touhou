@@ -1,6 +1,8 @@
+import {populateStages,stageLabel} from '../stage-select.js';
 import {NetSession} from './session.js';
 import {readNetworkMode,describeNetwork,networkParams} from './network-mode.js';
 const $=id=>document.getElementById(id),roles=['host','guest','guest2'];
+populateStages($('startStage'));
 let identity,room,session,polling=false,busy=false,editing=false,leaving=false;
 const keys=new Set(),touches=new Map();let taps=0,commands=0;
 const keyBits={ArrowLeft:1,ArrowRight:2,KeyZ:4,KeyX:8,KeyC:4096,ArrowUp:16,ArrowDown:32,Enter:64,Escape:128};
@@ -8,7 +10,7 @@ const status=text=>{$('status').textContent=text;};
 const initial=readNetworkMode();for(const id of ['network','transport','ice'])$(id).value=initial[id];
 function config(){
   const network=$('network').value,transport=$('transport').value;
-  return {players:Number($('players').value),rank:Number($('rank').value),count:Number($('count').value),
+  return {startStage:$('startStage').value,players:Number($('players').value),rank:Number($('rank').value),count:Number($('count').value),
     lifeCompensation:$('life-compensation').checked,network,transport,ice:network==='public'&&transport==='rtc'?$('ice').value:'all',delay:Number($('delay').value)};
 }
 function help(){
@@ -21,7 +23,7 @@ function help(){
   $('network-help').textContent=c.network==='public'?'全员使用同一 HTTPS 地址。自动模式使用 STUN 打洞；强制 TURN 需先配置服务。':'全员使用同一个局域网网址。UDP 默认直连，无需 STUN；公网请选择公网模式。';
   $('balance').textContent=`${c.players} 人 · ${c.count} 玉 · ${c.lifeCompensation?'生命补偿 +'+Math.floor(c.count/2):'生命补偿关闭'}；Boss 耐久沿用当前移植版的人数／玉数配置。每步约 17.7 ms，自动缓冲按连接实测选择。`;
 }
-for(const id of ['players','rank','count','life-compensation','network','transport','ice','delay'])$(id).onchange=help;help();
+for(const id of ['startStage','players','rank','count','life-compensation','network','transport','ice','delay'])$(id).onchange=help;help();
 const wake=()=>session?.pump();
 function sample(){let v=taps|commands;for(const key of keys)v|=keyBits[key];for(const bit of touches.values())v|=bit;taps=commands=0;return v;}
 function clear(){keys.clear();touches.clear();taps=commands=0;for(const b of document.querySelectorAll('[data-bit]'))b.classList.remove('active');wake();}
@@ -46,7 +48,7 @@ function showRoom(value){
   room=value;const host=identity.role==='host',lobby=room.phase==='lobby';
   editing=editing&&lobby;$('entry').hidden=!editing;$('lobby').hidden=false;
   $('room-title').textContent=`合作房间 · P${room.seats[identity.role]+1}${host?'（房主）':''}`;$('room-code').textContent=room.room;
-  $('room-settings').textContent=`${room.settings.players} 人 · ${room.settings.count} 玉 · ${['Easy','Normal','Hard','Lunatic'][room.settings.rank]} · ${describeNetwork(room.settings)} · ${room.settings.delay?room.settings.delay+' 步缓冲':'自动缓冲'}`;
+  $('room-settings').textContent=`${stageLabel(room.settings.startStage)}${room.settings.startStage!=='normal'?'（练习，不保存正式成绩）':''} · ${room.settings.players} 人 · ${room.settings.count} 玉 · ${['Easy','Normal','Hard','Lunatic'][room.settings.rank]} · ${describeNetwork(room.settings)} · ${room.settings.delay?room.settings.delay+' 步缓冲':'自动缓冲'}`;
   $('members').replaceChildren(...roles.slice(0,room.settings.players).map(role=>{
     const el=document.createElement('span');el.textContent=`P${room.seats[role]+1}${role===identity.role?' · 你':''}：${!room.present[role]?'等待加入':room.ready[role]?'已准备':'未准备'}`;return el;
   }));
@@ -92,7 +94,7 @@ $('ready').onclick=()=>action(async()=>accept(await post('ready',{ready:!room.re
 $('start').onclick=()=>action(async()=>accept(await post('start')));
 $('swap').onclick=()=>action(async()=>accept(await post('seat')));
 $('settings').onclick=()=>{editing=!editing;$('entry').hidden=!editing;$('entry-actions').hidden=true;$('save-settings').hidden=false;
-  for(const id of ['players','rank','count','network','transport','ice','delay'])$(id).value=String(room.settings[id]);$('life-compensation').checked=room.settings.lifeCompensation;help();};
+  for(const id of ['startStage','players','rank','count','network','transport','ice','delay'])$(id).value=String(room.settings[id]);$('life-compensation').checked=room.settings.lifeCompensation;help();};
 $('save-settings').onclick=()=>action(async()=>{const value=await post('settings',{settings:config()});editing=false;await accept(value);});
 async function leave(mode=room?.settings||config()){
   leaving=true;session?.close();try{if(identity)await post('leave');}finally{identity=null;location.href='lan.html?'+networkParams(mode);}

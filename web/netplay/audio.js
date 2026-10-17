@@ -2,7 +2,7 @@ import {musicRoomTracks} from '../music-room.js';
 
 // Sound is local presentation; downloads and audio clocks never gate a game step.
 export class LocalAudio{
-  constructor(){this.volume=.35;this.buffers=new Map();this.effects=new Map();this.cursor=0;this.stopped=false;}
+  constructor(){this.volume=.35;this.buffers=new Map();this.effects=new Map();this.cursor=0;this.stopped=false;this.trackRequest=0;}
   async unlock(){
     if(this.stopped)return;
     this.context??=new AudioContext();this.gain??=this.context.createGain();this.gain.gain.value=this.volume;
@@ -13,18 +13,23 @@ export class LocalAudio{
   setVolume(value){this.volume=Math.max(0,Math.min(1,value));if(this.gain)this.gain.gain.value=this.volume;}
   async track(key){
     if(this.trackKey===key||this.stopped)return;
-    this.trackKey=key;this.source?.stop();this.source=null;
+    const request=++this.trackRequest;
+    this.trackKey=key;this.source?.stop();this.source?.disconnect();this.source=null;
     if(key==='silent')return;
     try{
-      if(!this.buffers.has(key))this.buffers.set(key,Promise.all([
+      if(!this.buffers.has(key)){
+        const pending=Promise.all([
         fetch(`bgm/${key}.opus`).then(async r=>{if(!r.ok)throw Error('音乐读取失败');return this.context.decodeAudioData(await r.arrayBuffer());}),
-        fetch(`bgm/${key}.json`).then(async r=>{if(!r.ok)throw Error('循环点读取失败');return r.json();})]));
+        fetch(`bgm/${key}.json`).then(async r=>{if(!r.ok)throw Error('循环点读取失败');return r.json();})]);
+        this.buffers.set(key,pending);
+        void pending.catch(()=>{if(this.buffers.get(key)===pending)this.buffers.delete(key);});
+      }
       const [buffer,loop]=await this.buffers.get(key);
-      if(this.stopped||this.trackKey!==key)return;
+      if(this.stopped||this.trackRequest!==request)return;
       const source=this.context.createBufferSource();source.buffer=buffer;source.loop=true;
       source.loopStart=loop.loopStart;source.loopEnd=loop.loopEnd;source.connect(this.gain);source.start();this.source=source;
       this.onStatus?.(`本机音乐：${key}`);
-    }catch{this.buffers.delete(key);if(this.trackKey===key){this.trackKey=null;this.onStatus?.('本机音乐读取失败，可重新启用声音');}}
+    }catch{if(this.trackRequest===request){this.trackKey=null;this.onStatus?.('本机音乐读取失败，可重新启用声音');}}
   }
   update(core){
     this.core=core;const end=core.th_get(11,0)>>>0;
@@ -43,5 +48,5 @@ export class LocalAudio{
       this.effect?.stop();const source=this.context.createBufferSource();source.buffer=buffer;source.connect(this.gain);source.start();this.effect=source;
     }
   }
-  stop(){this.stopped=true;this.source?.stop();this.effect?.stop();void this.context?.close();}
+  stop(){this.stopped=true;++this.trackRequest;this.source?.stop();this.source?.disconnect();this.source=null;this.effect?.stop();void this.context?.close();}
 }

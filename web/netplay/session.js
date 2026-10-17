@@ -205,7 +205,7 @@ export class NetSession{
         this.acks.add(source);this.maybeHello();break;
       case 'go':
         if(this.identity.role==='host'||source!=='host'||!this.sentAck.has('host')||!this.acks.has('host')||this.running)throw Error('未完成校验就尝试开局');
-        if(!Number.isInteger(message.delay)||message.delay<2||message.delay>12||
+        if(!Number.isInteger(message.delay)||message.delay<1||message.delay>12||
           (!this.autoBuffer&&message.delay!==this.room.settings.delay)||typeof message.fallback!=='boolean'||
           !Number.isFinite(message.startAfter)||message.startAfter<0||message.startAfter>10000)throw Error('开局输入缓冲无效');
         this.queue=new FrameQueue(this.slot,message.delay,this.roles.length);this.bufferFallback=message.fallback;
@@ -320,6 +320,10 @@ export class NetSession{
       (startup?p.probePeak??p.rtt:p.rtt)/2+(p.jitter||0)).sort((a,b)=>b-a);
     // A guest sees only its host link: double it for conservative 3P advice.
     const travel=this.roles.length===3?(paths.length===1?2*paths[0]:paths.slice(0,2).reduce((a,b)=>a+b,0)):(paths[0]||0);
+    // One-step buffering is enough only when the complete input path plus
+    // jitter fits one tick, including the 4 ms pump scheduling allowance.
+    // Keep the existing safety margin on longer or unstable paths.
+    if(paths.length&&travel+4<=TICK)return 1;
     return Math.max(2,Math.min(12,Math.ceil(travel/TICK)+1));
   }
   networkQualityText(){

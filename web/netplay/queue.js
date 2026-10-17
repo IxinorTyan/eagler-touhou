@@ -3,7 +3,7 @@ export const VALID_INPUT=32767;
 // Every input is immutable once sampled. No prediction or wall-clock game state.
 export class FrameQueue{
   constructor(slot,delay,count=2){
-    if(![2,3].includes(count)||!Number.isInteger(slot)||slot<0||slot>=count||!Number.isInteger(delay)||delay<2||delay>12)throw Error('输入缓冲无效');
+    if(![2,3].includes(count)||!Number.isInteger(slot)||slot<0||slot>=count||!Number.isInteger(delay)||delay<1||delay>12)throw Error('输入缓冲无效');
     this.slot=slot;this.delay=delay;this.frame=0;this.lanes=Array.from({length:count},()=>new Map());
     for(let i=0;i<delay;i++)for(const lane of this.lanes)lane.set(i,0);
   }
