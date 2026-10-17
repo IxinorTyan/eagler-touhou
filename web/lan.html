@@ -30,7 +30,7 @@
 <div id="screen"><canvas id="canvas" width="640" height="400" tabindex="0" aria-label="联机游戏画面"></canvas><p id="cover">等待全员准备后由房主开始</p>
 <div class="net-touch" aria-label="触屏操作"><button data-bit="1">←</button><button data-bit="2">→</button><button data-bit="4">射击 Z</button><button data-bit="8">御币 X</button><button data-bit="4096">Bomb C</button></div>
 <div id="menu-touch" class="net-touch" hidden><button data-bit="16">↑</button><button data-bit="32">↓</button><button data-bit="64">确认／保存 Enter</button><button data-bit="128">返回 Esc</button></div></div>
-<p class="small">联机特有规则：幽灵移速减半；X 御币反弹的白弹可以伤害玩家，也能再次反弹。</p>
+<p class="small">联机特有规则：幽灵移速减半；X 御币反弹的白弹可以伤害玩家，最多再弹回一次，之后被 X 挡住就消除。</p>
 <p id="menu-note" class="small"></p><div id="coop-hud"></div>
 <div id="fallback" hidden><p>本局已停止。请全员重新建房；打洞失败时可尝试已配置的 TURN 或 TCP 转发。</p><button id="retry">重新建房</button><button id="retry-ws">改用 TCP 转发</button></div>
 </section>
