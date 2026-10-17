@@ -11,15 +11,28 @@ export function createPersonalHud(read,select){
     const at=(y*160+n*16+x)*4;pixels.data.fill(255,at,at+4);
   }
   ink.putImageData(pixels,0,0);
-  let tram=-1,buffer=null,lastSearch=-Infinity,lastKey='',revision=0;
+  let tram=-1,buffer=null,lastSearch=-Infinity,layout=-1,revision=0;
+  let changed=false,dream=-1;
+  const numbers=new Map();
   function number(n,x,y,count,zero=false){
     x=x>=448?x-448:x-272+128;
-    ctx.fillStyle='#000';ctx.fillRect(x,y,count*16,16);
+    const key=y*256+x;
+    let row=numbers.get(key);
+    if(!row){
+      row={value:null,text:null};numbers.set(key,row);
+    }
+    if(row.value===n)return;
+    row.value=n;
     const text=String(n).padStart(count,zero?'0':' ').slice(-count);
+    if(row.text===text)return;
+    // The packed canvas is retained between frames, so an unchanged field
+    // needs neither digit drawing nor another intermediate canvas copy.
+    row.text=text;ctx.fillStyle='#000';ctx.fillRect(x,y,count*16,16);
     for(let i=0;i<count;i++)if(text[i]!==' ')ctx.drawImage(atlas,Number(text[i])*16,0,16,16,x+i*16,y,16,16);
+    changed=true;
   }
   return ()=>{
-    const source=read();let key='',values=null;
+    const source=read();let values=null;
     if(source){
       const {heap,mailbox,patch}=source,view=new DataView(heap.buffer),schema=patch.personal_stats;
       if(buffer!==heap.buffer){buffer=heap.buffer;tram=-1;lastSearch=-Infinity;}
@@ -38,35 +51,38 @@ export function createPersonalHud(read,select){
           lives:heap[mailbox+patch.mailbox_offsets.stats+slot*4],
           misses:view.getUint16(at+24,true),bombs:view.getUint16(at+26,true),
           stageMiss:view.getUint16(at+28,true),stageBomb:view.getUint16(at+30,true)};
-        key=JSON.stringify([slot,values]);
       }
     }
-    if(key!==lastKey){
-      lastKey=key;ctx.clearRect(0,0,256,400);
-      if(values){
-        number(values.high,448,64,8,true);number(values.score,448,96,8,true);
-        number(values.total,496,240,5);number(values.point,496,256,5);number(values.graze,496,288,5);
-        // TH05's dream meter lives on row 20. Its native P1 value is replaced
-        // only in this final image; each seat retains the native 1..128 range.
+    const nextLayout=values?values.settlement:-1,reset=nextLayout!==layout;
+    changed=reset;
+    if(reset){layout=nextLayout;ctx.clearRect(0,0,256,400);numbers.clear();dream=-1;}
+    if(values){
+      number(values.high,448,64,8,true);number(values.score,448,96,8,true);
+      number(values.total,496,240,5);number(values.point,496,256,5);number(values.graze,496,288,5);
+      // TH05's dream meter lives on row 20. Its native P1 value is replaced
+      // only in this final image; each seat retains the native 1..128 range.
+      if(dream!==values.dream){
+        dream=values.dream;
         ctx.fillStyle='#000';ctx.fillRect(0,320,128,16);
-        ctx.fillStyle='#f5cf75';ctx.fillRect(0,326,Math.min(128,values.dream),4);
-        if(values.settlement){
-          const all=values.settlement===2;
-          number(all?10000:(values.stage+1)*1000,272,all?96:128,8);
-          number(values.dream*100,272,all?128:160,8);
-          number(values.graze*50,272,all?160:192,8);
-          if(all)number(Math.max(0,values.lives-1)*10000,272,192,8);
-          number(values.point,320,224,5);
-          if(all)number(values.total*2500,272,288,8);
-          const noMiss=all?values.misses===0:values.misses===values.stageMiss;
-          const noBomb=noMiss&&(all?values.bombs===0:values.bombs===values.stageBomb);
-          const reward=all?500000:values.stage*50000+100000;
-          number(noMiss?reward:0,272,256,8);number(noBomb?reward:0,272,272,8);
-          number(values.bonus,272,336,8);
-        }
+        ctx.fillStyle='#f5cf75';ctx.fillRect(0,326,Math.min(128,dream),4);
+        changed=true;
       }
-      revision++;
+      if(values.settlement){
+        const all=values.settlement===2;
+        number(all?10000:(values.stage+1)*1000,272,all?96:128,8);
+        number(values.dream*100,272,all?128:160,8);
+        number(values.graze*50,272,all?160:192,8);
+        if(all)number(Math.max(0,values.lives-1)*10000,272,192,8);
+        number(values.point,320,224,5);
+        if(all)number(values.total*2500,272,288,8);
+        const noMiss=all?values.misses===0:values.misses===values.stageMiss;
+        const noBomb=noMiss&&(all?values.bombs===0:values.bombs===values.stageBomb);
+        const reward=all?500000:values.stage*50000+100000;
+        number(noMiss?reward:0,272,256,8);number(noBomb?reward:0,272,272,8);
+        number(values.bonus,272,336,8);
+      }
     }
+    if(changed)revision++;
     return {canvas,revision,visible:!!values,slot:select()};
   };
 }

@@ -24,6 +24,7 @@ const rollbackMetrics={captures:0,captureMs:0,sharedCaptures:0,checkpointReplays
 let mod,ci,patch,mailbox=-1,guestBase=-1,tick=0,frame=0,oldP1=0,paused=false,warming=true,fatal=false;
 let escapeTicks=0,lastPauseRequests=0;
 let frames=0,audioPackets=0,audioEnergy=0,lastStateSent=0;
+let sfxEvents=0;
 const transfers=new Set(),costs=[],signature=new TextEncoder().encode('TH05LOCALv002!!\0');
 const keys={ArrowUp:[1,265],ArrowDown:[2,264],ArrowLeft:[4,263],ArrowRight:[8,262],KeyX:[16,88],KeyZ:[32,90],ShiftLeft:[64,340],Escape:[128,256],Enter:[256,257]};
 const send=(type,props={},transfer=[])=>postMessage({type,...props},transfer);
@@ -65,7 +66,7 @@ function state(){
 players:layout.players,playerCount:layout.count,characters:layout.characters,
     ...Object.fromEntries(layout.positions.map((xy,i)=>['p'+(i+1),xy])),
     rank:h[d+0x576f],stage:h[d+0x576e],generation:v.getUint16(mailbox+26,true),nativeTick:tick,frame,paused,frames,audioPackets,audioEnergy,rollbackCount,confirmed,rollback:snapshots?{...snapshots.info(),checkpointFrames:2}: {snapshots:0,snapshotBytes:0},
-    heapBytes:h.length,writeJournal:!!mod.thDirty,render:mod.framePresenter,sidebarBlack:mod.sidebarBlack,costs:costs.slice(),
+    heapBytes:h.length,writeJournal:!!mod.thDirty,render:mod.framePresenter,sidebarBlack:mod.sidebarBlack,costs:costs.slice(),sfxEvents,audioMode:'local-effects',
     syncPolicy:syncPolicy(),rollbackMetrics:{...rollbackMetrics}};
 }
 function syncPolicy(){
@@ -128,7 +129,7 @@ async function boot(data){
     loadVerifiedBytes(new URL(`th05-local-${data.settings.language}.hdi.gz`,import.meta.url),patch.sha256,{gzip:true,size:patch.size,
       report:phase=>progress('disk',phase==='cache'?'已读取已校验磁盘缓存':phase==='verify'?'正在校验游戏磁盘…':'正在下载并解压游戏磁盘…')}),
     loadCompiledCore(new URL(core,vendor),manifest.files[core],phase=>progress('core',phase==='compiled-cache'?'已读取编译核心缓存':phase==='compile'?'正在编译联机核心…':phase==='verify'?'正在校验联机核心…':phase==='cache'?'已读取核心资源缓存':'正在下载联机核心…')),
-    loadMusicAssets(),
+    loadMusicAssets({effects:true}),
     (async()=>{try{await import('./vendor/dosbox-net/emulators.js');return (await import(new URL(glue,vendor).href)).default;}finally{onmessage=dispatch;}})(),
     loadAfterimageArt(patch),
   ]);
@@ -175,7 +176,9 @@ async function boot(data){
   const config='[dosbox]\nmachine=pc98\nmemsize=16\n[cpu]\ncore=simple\ncputype=386\ncycles=1000\n[render]\nframeskip=0\nscaler=none\naspect=false\n[sblaster]\nsbtype=none\n[pc98]\npc-98 fm board=board86\n[mixer]\nrate=44100\nblocksize=512\nprebuffer=20\n[autoexec]\n@echo off\nmount a /home/web_user/game\na:\ncd KAIKI\nFASTBOOT.BAT\n';
   ci=await emulators.backend([...files,{dosboxConf:config,jsdosConf:{version:'8'}}],transport,{});
   mod.afterimageArt=await installAfterimageArt(mod,patch,afterimageBytes);
-  ci.events().onSoundPush(samples=>{if(warming||!effect)return;audioPackets++;for(let i=0;i<samples.length;i+=32)audioEnergy+=Math.abs(samples[i]);effect.audio.push(samples.slice());});
+  // The native mixer still advances deterministically, but its silent PCM is
+  // no longer copied, retained in rollback effects, or transferred per frame.
+  ci.events().onSoundPush(()=>{if(!warming)audioPackets++;});
   shim={module:mod,ci,keys:new Set(),get tick(){return tick;},set tick(value){tick=value;}};
   ci.events().onMessage((type,...args)=>{if(type==='error'&&args.some(s=>String(s).includes('[panic]')))fail(Error(args.join(' ')));});
   ci.events().onExit(()=>fail(Error('游戏核心已退出')));
@@ -221,7 +224,7 @@ function advance(pair,predicted=true,offlineMask=0){
   }
   restoredBoundary=null;
   const simulateAt=performance.now();
-  effect={audio:[],music:[],paused,transition:false,exit:false,hash:null};
+  effect={sfx:[],music:[],paused,transition:false,exit:false,hash:null};
   const before=paused;
   scan();
   // Cover direct DataView, touch and mailbox writes in the guest window.
@@ -237,7 +240,11 @@ function advance(pair,predicted=true,offlineMask=0){
   paused=nativePause()!==0;
   if(before!==paused)escapeTicks=0;
   effect.exit=nativePause()===2;
-  effect.music=music.read(mod.HEAPU8);effect.paused=paused;effect.transition=before!==paused;
+  for(const event of music.read(mod.HEAPU8)){
+    if((event[0]>>>8)===0x0c)effect.sfx.push({frame,id:event[0]&255});
+    else effect.music.push(event);
+  }
+  effect.paused=paused;effect.transition=before!==paused;
   effects.set(frame,effect);frame++;effect.hash=frame%120===0?checksum():null;
   if(predicted)snapshots?.seal();effect=null;
   rollbackMetrics.simulateMs+=performance.now()-simulateAt;
@@ -245,17 +252,18 @@ function advance(pair,predicted=true,offlineMask=0){
 }
 function confirm(prefix){
   const started=performance.now();
-  let exit=false;
+  let exit=false,sfx=[];
   if(!Number.isSafeInteger(prefix)||prefix<confirmed||prefix>frame)throw Error('确认边界无效');
   for(let n=confirmed;n<prefix;n++){
     const e=effects.get(n);if(!e)throw Error('确认帧缺少音效状态');
-    if(e.transition)send('pause-state',{paused:e.paused});
+    if(e.transition){if(sfx.length){send('sfx',{events:sfx});sfx=[];}send('pause-state',{paused:e.paused});}
     exit||=e.exit;
-    for(const samples of e.audio)send('audio',{samples},[samples.buffer]);
+    sfx.push(...e.sfx);sfxEvents+=e.sfx.length;
     if(e.music.length)send('music',{events:e.music});
     if(e.hash)send('hash',{frame:n+1,hash:e.hash,boot:syncPolicy().ready});
     effects.delete(n);
   }
+  if(sfx.length)send('sfx',{events:sfx});
   // Keep the first boundary until its second tick is confirmed, even if the
   // first tick's effects have already been delivered.
   const pending=saved.get(prefix),previous=saved.get(prefix-1);

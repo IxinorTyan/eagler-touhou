@@ -1,6 +1,6 @@
 import {PROTOCOL,TICK_MS,PAUSE,RESUME,GameQueue,inputPolicy as makeInputPolicy,planReplay,nextInputs,PREDICTION_LEAD_LIMIT,ROLLBACK_ARM_AHEAD,MAX_ROLLBACK} from './netplay/protocol.js';
 import {createFrameDisplay} from './frame-display.js';
-import {LocalAudioOutput} from './netplay/audio-output.js';
+import {LocalSfx} from './netplay/local-sfx.js';
 import {createRelayChannel} from './netplay/relay-channel.js';
 import {mountPlayer} from './player-ui.js';
 import {LocalBgm} from './netplay/local-bgm.js';
@@ -179,7 +179,12 @@ async function enter(action){
 }
 async function ensureAudio(){
   if(!context||context.state==='closed')context=new AudioContext({sampleRate:44100,latencyHint:'interactive'});
-  await context.resume();if(!audio)audio=new LocalAudioOutput(context,1);if(!bgm){bgm=new LocalBgm(context,()=>{});bgm.setVolume(Number($('bgm-volume').value)/100);const currentBgm=bgm;bgm.load({warmOpening:false}).catch(e=>{if(bgm===currentBgm)status('音乐加载失败：'+e.message);});}
+  await context.resume();
+  if(!audio){audio=new LocalSfx(context);audio.ready=audio.load();}
+  const prepared=audio;
+  try{await prepared.ready;}catch(error){if(audio===prepared){prepared.disconnect();audio=null;}throw error;}
+  if(audio!==prepared||prepared.closed)return;
+  if(!bgm){bgm=new LocalBgm(context,()=>{});bgm.setVolume(Number($('bgm-volume').value)/100);const currentBgm=bgm;bgm.load({warmOpening:false}).catch(e=>{if(bgm===currentBgm)status('音乐加载失败：'+e.message);});}
   $('sound').textContent=context.state==='running'?'声音已开启':'开启声音';
 }
 function sendTo(role,message){
@@ -483,7 +488,7 @@ async function connect(){
         if(!running)status(data.message);diagnostics();
       }else if(data.type==='session-exit'){finish('已从游戏暂停菜单退出，本局结束。');return;}
       else if(data.type==='frame')display.receive(data);
-      else if(data.type==='audio')audio?.push([data.samples]);
+      else if(data.type==='sfx')audio?.push(data.events);
       else if(data.type==='music'){for(const [ax,hash]of data.events)bgm?.command(ax,hash);}
       else if(data.type==='hash'){hashes.set(data.frame,data.hash);if(hashes.size>8)throw Error('同步检查积压');const packet={type:'hash',frame:data.frame,hash:data.hash,boot:data.boot};hashHistory.set(data.frame,packet);while(hashHistory.size>8)hashHistory.delete(hashHistory.keys().next().value);send(packet);compare(data.frame);armRollback();}
       else if(data.type==='pause-state'){

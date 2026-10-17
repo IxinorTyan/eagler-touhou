@@ -1,8 +1,10 @@
 import {loadVerifiedBytes} from './startup-assets.js';
-export async function loadMusicAssets(){
-  const response=await fetch(new URL('music-patch.json',import.meta.url),{cache:'no-store'});
+export async function loadMusicAssets({effects=false}={}){
+  const stem=effects?'lan-music':'music';
+  const response=await fetch(new URL(stem+'-patch.json',import.meta.url),{cache:'no-store'});
   if(!response.ok)throw Error('音乐桥接清单读取失败');
-  const patch=await response.json(),bytes=await loadVerifiedBytes(new URL('music.com',import.meta.url),patch.sha256);
+  const patch=await response.json(),bytes=await loadVerifiedBytes(new URL(stem+'.com',import.meta.url),patch.sha256);
+  if(effects&&!patch.separate_effects)throw Error('请更新联机音效桥并刷新页面');
   return {patch,bytes};
 }
 export async function installMusicFiles(files,{solo=false,assets}={}){

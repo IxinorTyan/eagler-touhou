@@ -29,6 +29,7 @@ def build_id():
              'player-ui.js', 'player-ui.css', 'touch-overlay.css', 'touch-layout.js', 'touch-input.js',
              'native-touch.js', 'native-players.js', 'dosbox-memory-diff.js', 'dosbox-snapshots.js', 'solo-native-music.js',
              'music-files.js', 'music-patch.json', 'bgm/manifest.json',
+             'lan-music.com', 'lan-music-patch.json', 'sfx/manifest.json',
              'frame-display.js', 'sidebar-background.js', 'launch-config.js', 'disk-files.js']
     files += [str(p.relative_to(ROOT)).replace('\\', '/') for p in (ROOT / 'netplay').glob('*.js')]
     files += ['patch-cn.json', 'patch-jp.json', 'vendor/dosbox-net/runtime.json',
