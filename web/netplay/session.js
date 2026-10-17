@@ -280,7 +280,7 @@ export class NetSession{
           this.send(checksum);this.checkHashes();
         }
       }
-      this.game.present?.();
+      this.game.requestPresent?.();
       if(now-(this.renderAt||0)>150){this.renderAt=now;this.render(this);}
     }catch(error){this.fail(error);}finally{this.pumping=false;}
   }

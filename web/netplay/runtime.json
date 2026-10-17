@@ -4,9 +4,9 @@
   "tickDenominator": 24830,
   "files": {
     "stage-select.js": "346e673950c5914f5146617ed7dc17801398b3b5e52cda17ef5443e3d29d59e4",
-    "game.wasm": "88c4dd83999154329e4b8562af81afb1ac5c25e94da2b1677586276cae0d2599",
-    "netplay/runtime.js": "da9ae01215fb9d55c7f97f2bf1754be13e6428178f4645ed66dcc4057294b0d2",
-    "netplay/session.js": "4f8e869e3167b36624fb684c28115625067612e0373d96d2fd3fa11d8cff7e28",
+    "game.wasm": "63955948e4ff51c5fe3a5e3c31931de787ee3305d559f08d1df629ca36afdd4e",
+    "netplay/runtime.js": "766afd9195262c72fa0d18ade6a61c0b7203b4f74125e37a8f7bcfde5185934d",
+    "netplay/session.js": "43d882193e3e2b9004a95a8ecb29a7550545309edb58999be8b7a8fb18b1fb81",
     "netplay/queue.js": "5a488cd5c1b11fb9cd094408465b6a85d0a1091a07d76596f6f3371a8247c26b",
     "netplay/connection.js": "1e5fd3ebc19aee23175cc5531df65f6ac19e2e6ef5455214792f822458965a44",
     "netplay/udp-config.js": "6a04c0244c0912b8c6235dbca15d0943eda0218a5f281be688dec41191af0a5f",

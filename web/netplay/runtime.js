@@ -9,7 +9,7 @@ export class GameRuntime{
   constructor(canvas,hostSlot){
     this.canvas=canvas;this.hostSlot=hostSlot;this.frame=0;this.previous=[];
     this.context=canvas?.getContext('2d',{alpha:false});
-    this.image=canvas?new ImageData(640,400):null;
+    this.image=null;this.presentRequest=null;
     this.audio=new LocalAudio();this.audio.onStatus=text=>this.onMusicStatus?.(text);
   }
   async load(settings,progress=()=>{}){
@@ -27,7 +27,10 @@ export class GameRuntime{
     const module=await WebAssembly.compile(binary);
     if(WebAssembly.Module.imports(module).length)throw Error('游戏核心含外部导入');
     this.core=(await WebAssembly.instantiate(module,{})).exports;
-    if(!this.core.th_net_checksum||this.core.memory.buffer.byteLength!==4194304)throw Error('游戏核心需要更新');
+    if(!this.core.th_net_checksum||!this.core.th_set_netplay_rules||this.core.memory.buffer.byteLength!==4194304)throw Error('游戏核心需要更新');
+    // The core has fixed memory. Share its RGBA view instead of copying 1 MiB
+    // into a second ImageData buffer for every displayed frame.
+    if(this.context)this.image=new ImageData(new Uint8ClampedArray(this.core.memory.buffer,this.core.th_pixels(),640*400*4),640,400);
     // Each room starts with the same records. Device-local scores must never
     // enter synchronized menus or change registration eligibility on one peer.
     this.core.th_score_data();this.scoreRevision=this.core.th_get(110,0);
@@ -37,7 +40,7 @@ export class GameRuntime{
   reset(){
     const s=this.settings,e=this.core;
     e.th_init(s.players,s.count,0x12345678,s.lifeCompensation?1:0);
-    e.th_set_difficulty(s.rank);applyStage(e,s.startStage);
+    e.th_set_netplay_rules(1);e.th_set_difficulty(s.rank);applyStage(e,s.startStage);
   }
   start(){this.stopped=false;}
   state(){
@@ -91,10 +94,20 @@ export class GameRuntime{
   }
   present(){
     if(!this.core||!this.context||this.stopped||this.presentedFrame===this.frame)return;
-    this.core.th_render();this.image.data.set(new Uint8Array(this.core.memory.buffer,this.core.th_pixels(),640*400*4));
+    this.core.th_render();
     this.context.putImageData(this.image,0,0);this.presentedFrame=this.frame;
+  }
+  requestPresent(){
+    if(!this.context||this.stopped||this.presentRequest!==null||this.presentedFrame===this.frame)return;
+    // Network callbacks publish inputs promptly; display only the newest
+    // confirmed frame at the next browser repaint, including after catch-up.
+    this.presentRequest=requestAnimationFrame(()=>{
+      this.presentRequest=null;
+      if(document.hidden||this.stopped)return;
+      try{this.present();}catch(error){if(this.onFailure)this.onFailure(error);else throw error;}
+    });
   }
   unlockAudio(){return this.audio.unlock();}
   setMusicVolume(value){this.audio.setVolume(value);}
-  stop(){this.stopped=true;this.audio.stop();}
+  stop(){this.stopped=true;if(this.presentRequest!==null)cancelAnimationFrame(this.presentRequest);this.presentRequest=null;this.audio.stop();}
 }
