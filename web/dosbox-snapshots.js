@@ -9,6 +9,7 @@ export function createDosboxSnapshots(emulator){
   let active=null,tracking=null,total=0;
   function syncMemory(){if(!diff)return;diff.begin();const pages=diff.changes();
     if(tracking){const block=diff.pack(pages);if(block)tracking.undo.push(block);}
+    else if(diff.syncPages)diff.syncPages(pages);
     else for(const page of pages)diff.sync(page);
     total=Math.max(total,diff.bytes+[...frames.values()].reduce((n,s)=>n+s.undo.reduce((bytes,block)=>bytes+block.buffer.length,0),0));}
   function release(saved){if(saved.memory)pool.push(saved.memory);else for(const block of saved.undo)diff.release(block);}

@@ -34,6 +34,7 @@ export async function makeMemoryDiff(module){
       release(block){if(!pool.length)pool.push(block.buffer);else if(block.buffer.length>pool[0].length)pool[0]=block.buffer;},
       old(page){return new Uint8Array(api.shadow.buffer,directoryBytes+(page<<12),pageBytes).slice();},
       sync(page){api.copyPage(page);},
+      syncPages(pages){if(api.syncPages)api.syncPages(pages.length);else for(const page of pages)api.copyPage(page);},
       restore(page,bytes){module.HEAPU8.set(bytes,page<<12);new Uint8Array(api.shadow.buffer,directoryBytes+(page<<12),pageBytes).set(bytes);},
       pageBytes,get bytes(){return api.shadow.buffer.byteLength+pool.reduce((n,buffer)=>n+buffer.length,0);}};
   }catch{return null;}

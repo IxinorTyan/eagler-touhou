@@ -845,6 +845,9 @@ function updateMetrics(now,waiting){
 }
 function pump(now){
   if(!running||stopped||pumping)return;
+  // Message/timer wakes can run before an rAF carrying an older timestamp.
+  // Never move the elapsed-time baseline backward and count that time twice.
+  now=Math.max(now,lastNow);
   if(membership){
     lastNow=now;accumulator=0;waitDetail='正在同步玩家离线边界';
     if(!waitingSince)waitingSince=now;

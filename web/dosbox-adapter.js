@@ -49,7 +49,7 @@ export class DOSBoxPC98 {
     this.state='ready';
     const m=this.module;
     m.netKey=(type,event)=>this.key(event.code,type==='keydown');
-    m.netBeginFrame=(frame,replay)=>{this.frame=frame;this.replaying=!!replay;this.outputs.set(frame,[]);};
+    m.netBeginFrame=(frame,replay)=>{this.frame=frame;this.replaying=!!replay;if(!this.config.independentEffects)this.outputs.set(frame,[]);};
     m.netEndFrame=()=>{this.snapshots?.seal();this.frame=null;this.replaying=false;};
     m.netConfirm=(prefix,retainFrame=prefix)=>{this.snapshots?.confirm(prefix,retainFrame);for(const [frame,blocks]of this.outputs)if(frame<prefix){for(const samples of blocks)this.audio.push([samples]);this.outputs.delete(frame);}};
     m.netDiscardFrame=frame=>this.outputs.delete(frame);
@@ -67,7 +67,7 @@ export class DOSBoxPC98 {
     const network=!!this.config.lockstep,directLaunch=!!this.config.launchFiles?.some(file=>file.path==='game/HUMAROKU/WEBSTART.COM'),launcher=prepareFastBoot(this.extracted,{network,directLaunch});
     const init=[...this.extracted.files,...(this.config.launchFiles||[]),launcher,{dosboxConf:dosboxConfig({network,fastBoot:true}),jsdosConf:{version:'8'}}];
     this.ci=await globalThis.emulators.backend(init,this.transport,{});
-    this.ci.events().onSoundPush(samples=>{this.module.audioPackets=(this.module.audioPackets||0)+1;if(this.module.warmingBoot)return;if(this.config.workerRuntime){this.audioChunks.push(samples.slice());return;}if(this.frame!==null)this.outputs.get(this.frame)?.push(samples.slice());else this.audio.push([samples]);});
+    this.ci.events().onSoundPush(samples=>{this.module.audioPackets=(this.module.audioPackets||0)+1;if(this.module.warmingBoot||this.config.independentEffects)return;if(this.config.workerRuntime){this.audioChunks.push(samples.slice());return;}if(this.frame!==null)this.outputs.get(this.frame)?.push(samples.slice());else this.audio.push([samples]);});
     this.logs=[];this.ci.events().onMessage((type,...messages)=>{this.logs.push([type,...messages]);this.logs=this.logs.slice(-40);if(type==='error'&&messages.some(s=>String(s).includes('[panic]'))){this.state='failed';this.config.onError?.(Error(messages.join(' ')));}});
     this.ci.events().onExit(()=>{if(this.resetting)return;this.state='exited';this.config.onExit?.();});
     for(const code of this.keys)this.ci.sendKeyEvent(codes[code],true);

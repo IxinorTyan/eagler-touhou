@@ -4,6 +4,7 @@ import {keyboardBits,isBound,useControlSnapshot,isFormTarget,controlsSummary} fr
 import {nativeBits,locateMailbox,guestBase,nativePaused,writeInputs,readState} from './th02-state.js';
 import {configureLauncher,launchConfig,launchDefaults} from './launch-config.js';
 import {runBoot} from './boot-runner.js';
+import {LocalSfx} from './local-sfx.js';
 const PROTOCOL='th02-rollback/6',canvas=document.getElementById('canvas'),details=document.getElementById('details');
 const nativeCanvas=document.createElement('canvas');nativeCanvas.width=640;nativeCanvas.height=400;nativeCanvas.hidden=true;document.body.append(nativeCanvas);
 const ctx=canvas.getContext('2d');
@@ -14,12 +15,13 @@ let previousInputs=[0,0,0],confirmedPrefix=0,checkpointReplays=0,presentationCou
 const states=new Map(),effects=new Map();
 let soundPolicy,bgm,musicTask,musicError='',musicVolume=.7,musicSequence=-1,musicName='',playedName='',pendingMusic=[];
 let pendingNative=[0,0,0],consumedNative=[0,0,0];
+let sfx,sfxSequence=0;
 const state=()=>emulator?readState(emulator.module.HEAPU8,mailbox,patch):null;
 function clearKeys(){keys.clear();inputListener(0);}
 window.addEventListener('keydown',e=>{if(editing||isFormTarget(e.target)||e.metaKey||e.ctrlKey||e.altKey||!isBound(e.code))return;e.preventDefault();e.stopImmediatePropagation();keys.add(e.code);inputListener(keyboardBits(keys));},true);
 window.addEventListener('keyup',e=>{if(keys.delete(e.code)){e.preventDefault();e.stopImmediatePropagation();inputListener(keyboardBits(keys));}},true);
 window.addEventListener('blur',clearKeys);
-document.addEventListener('visibilitychange',()=>{if(document.hidden){clearKeys();emulator?.module.netFlushAudio();}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){clearKeys();sfx?.stop();emulator?.module.netFlushAudio();}});
 canvas.addEventListener('pointerdown',()=>canvas.focus());
 async function progress(message,step){details.textContent=message;window.parent.postMessage({protocol:PROTOCOL,event:'boot-progress',message,step},location.origin);await new Promise(r=>setTimeout(r,0));}
 async function get(url,type='json'){
@@ -61,12 +63,14 @@ async function boot(settings){
  const launcher=new Uint8Array(await get('./th02-launch.com','arrayBuffer'));
  if(await sha256(launcher)!==version.assets['netplay/th02-launch.com'])throw Error('TH02 网页启动器校验失败');
  await progress('初始化确定性 DOSBox-X 核心与音频',5);
- emulator=await DOSBoxPC98.create({canvas:nativeCanvas,artPatch:patch,lockstep:true,rollbackEnabled:config.rollback,lockstepEpoch:version.epoch,wasmBinary,
+ emulator=await DOSBoxPC98.create({canvas:nativeCanvas,artPatch:patch,lockstep:true,independentEffects:true,rollbackEnabled:config.rollback,lockstepEpoch:version.epoch,wasmBinary,
   launchFiles:[{path:'game/HUMAROKU/WEBSTART.COM',contents:configureLauncher(launcher,config)}],
   onError:error=>window.parent.postMessage({protocol:PROTOCOL,event:'boot-error',message:error.message},location.origin),
   onExit:()=>window.parent.postMessage({protocol:PROTOCOL,event:'runtime-exit'},location.origin)});
  if(closed){emulator.dispose();return;}
  if(emulator.audio.context.sampleRate!==44100)throw Error('浏览器未提供统一的 44100 Hz 音频，请使用新版 Chrome / Edge');
+ sfx=new LocalSfx(emulator.audio.context);await sfx.load();
+ if(closed){sfx.dispose();return;}
  await progress('挂载本局私有磁盘',6);
  emulator.addDiskImage('th02-sync.hdi',disk);await emulator.setHdd(0,'th02-sync.hdi');
  emulator.module.warmingBoot=true;emulator.run();const started=performance.now();
@@ -81,6 +85,7 @@ async function boot(settings){
  emulator.module.bootCPUMetrics=emulator.module.UTF8ToString(emulator.module._getCPUMetrics());
  if(emulator.module.bootCPUMetrics.split('|')[0]!=='30000')throw Error('TH02 联机周期未恢复为 30000');
  const initial=state();if(initial.stage!==config.stage||initial.players.length!==players||initial.players.some((p,i)=>p.lives!==config.lives||p.bombs!==config.bombs||p.shot!==config[`p${i+1}`]))throw Error('TH02 原生开局配置未生效');
+ sfxSequence=readSfxSequence();
  writeInputs(emulator.module.HEAPU8,mailbox,patch,Array(players).fill(0),players,config);
  const view=new DataView(emulator.module.HEAPU8.buffer);consumedNative=consumedNative.map((_,i)=>view.getUint16(mailbox+138+i*2,true));
  config.boot={steps:emulator.tick,wallMs:Math.round(performance.now()-started)};
@@ -109,6 +114,20 @@ function readMusic(){
  if(sequence===musicSequence&&name===musicName)return null;
  musicSequence=sequence;musicName=name;
  return {sequence,name,ax:v.getUint16(d+soundPolicy.command,true)};
+}
+function readSfxSequence(){
+ const m=emulator.module,d=mailbox-patch.entries.mailbox+(patch.dataSegment-patch.codeSegment)*16;
+ return new DataView(m.HEAPU8.buffer).getUint16(d+soundPolicy.effects.sequence,true);
+}
+function readSfx(){
+ const sequence=readSfxSequence(),count=(sequence-sfxSequence)&65535,p=soundPolicy.effects;
+ if(count>p.capacity)throw Error('TH02 单步音效事件越界');
+ const h=emulator.module.HEAPU8,d=mailbox-patch.entries.mailbox+(patch.dataSegment-patch.codeSegment)*16,events=[];
+ for(let i=0;i<count;i++){
+  const id=h[d+p.ring+((sfxSequence+i)%p.capacity)];
+  if(id>=p.count)throw Error(`TH02 原生音效编号无效：${id}`);events.push(id);
+ }
+ sfxSequence=sequence;return events;
 }
 function confirmedMusic(event){
  if(event.name){
@@ -153,14 +172,14 @@ function step(inputs,{frame=ticks,replay=false,offlineMask=0}={}){
    m.bootCPUMetrics=m.UTF8ToString(m._getCPUMetrics());
    if(m.bootCPUMetrics.split('|')[0]!=='30000')throw Error('TH02 联机周期未恢复为 30000');
   }
-  effects.set(frame,{music:readMusic()});if(!replay)pending=true;
+  effects.set(frame,{music:readMusic(),sounds:readSfx()});if(!replay)pending=true;
  }finally{m.netEndFrame();}
 }
 function capture(frame,restored=false){
  if(states.has(frame))throw Error('TH02 重复检查点');
  const previous=states.get(frame-1),nativeFrame=previous?.nativeFrame===frame-1?frame-1:frame;
  if(nativeFrame===frame)emulator.module.netCapture(frame,restored);
- states.set(frame,{nativeFrame,ticks,emulatedTicks,oldP1,mailbox,previousInputs:previousInputs.slice(),pendingNative:pendingNative.slice(),consumedNative:consumedNative.slice(),musicSequence,musicName});
+ states.set(frame,{nativeFrame,ticks,emulatedTicks,oldP1,mailbox,previousInputs:previousInputs.slice(),pendingNative:pendingNative.slice(),consumedNative:consumedNative.slice(),musicSequence,musicName,sfxSequence});
 }
 function restore(frame){
  pending=false;const saved=states.get(frame);
@@ -169,7 +188,7 @@ function restore(frame){
  if(!checkpoint||(from!==frame&&!checkpoint.execution))throw Error('TH02 检查点历史缺失');
  emulator.module.netRestore(from);
  ({ticks,emulatedTicks,oldP1,mailbox}=checkpoint);previousInputs=checkpoint.previousInputs.slice();
- pendingNative=checkpoint.pendingNative.slice();consumedNative=checkpoint.consumedNative.slice();({musicSequence,musicName}=checkpoint);
+ pendingNative=checkpoint.pendingNative.slice();consumedNative=checkpoint.consumedNative.slice();({musicSequence,musicName,sfxSequence}=checkpoint);
  for(const at of states.keys())if(at>=from)states.delete(at);
  for(const at of effects.keys())if(at>=from)effects.delete(at);
  if(from!==frame){
@@ -179,16 +198,22 @@ function restore(frame){
 }
 function retained(prefix){const next=states.get(prefix);if(next)return next.nativeFrame;const previous=states.get(prefix-1);return previous?.nativeFrame===prefix-1?prefix-1:prefix;}
 function confirm(prefix){
+ let sound=null;
  for(let frame=confirmedPrefix;frame<prefix;frame++){
   if(!effects.has(frame))throw Error('TH02 确认步缺少模拟结果');
-  emulator.module.netConfirm(frame+1,retained(frame+1));if(effects.get(frame).music)confirmedMusic(effects.get(frame).music);effects.delete(frame);
+  const effect=effects.get(frame);
+  emulator.module.netConfirm(frame+1,retained(frame+1));if(effect.music)confirmedMusic(effect.music);
+  if(effect.sounds.length)sound=effect.sounds.at(-1);effects.delete(frame);
  }
  confirmedPrefix=prefix;const keep=retained(prefix);for(const frame of states.keys())if(frame<keep)states.delete(frame);
+ // PMD has one SE voice. A confirmation burst starts only its newest event,
+ // never a queue of obsolete sounds. Playback thereafter uses device time.
+ if(sound!==null&&!document.hidden)sfx.play(sound);
 }
 function checksum(){
  let h=0x811c9dc5;const hash=n=>{h=Math.imul(h^n,0x01000193);};
  hash(ticks);hash(emulatedTicks);hash(oldP1);previousInputs.forEach(n=>{hash(n%4294967296);hash(Math.floor(n/4294967296));});
- pendingNative.forEach(hash);consumedNative.forEach(hash);hash(musicSequence);for(const c of musicName)hash(c.charCodeAt(0));
+ pendingNative.forEach(hash);consumedNative.forEach(hash);hash(musicSequence);hash(sfxSequence);for(const c of musicName)hash(c.charCodeAt(0));
  if(mailbox>=0){const heap=emulator.module.HEAPU8,base=guestBase(heap,mailbox,patch);for(let at=base;at<base+0xa0000;at++)hash(heap[at]);}
  return {tick:ticks,hash:(h>>>0).toString(16).padStart(8,'0'),gameFrame:state()?.gameFrame||0};
 }
@@ -204,12 +229,12 @@ function present(){
  pending=false;presentationCount++;return true;
 }
 function predictionBlockReason(){return !state()?'原版菜单或关卡加载':nativePaused(emulator.module.HEAPU8,mailbox,patch)?'原生暂停菜单':'';}
-function diagnosticText(){const s=state(),info=emulator?.module.netInfo();return `TH02 · 同步步 ${ticks} · 游戏帧 ${s?.gameFrame??'菜单'} · 画面提交 ${presentationCount}\n个人分数 ${s?.players.map(p=>`P${p.id} ${p.score}`).join(' / ')||'等待入关'}\n音频欠载 ${info?.audioUnderruns??0} · 核心固定 30000 cycles · ${version?.th02IdleOptimization?'TH02 等价忙等优化':'通用核心'}\n浏览器 BGM：${musicError||bgm?.status||'等待确认关卡'} · 原生 FM 音效保留`;}
+function diagnosticText(){const s=state(),info=sfx?.info();return `TH02 · 同步步 ${ticks} · 游戏帧 ${s?.gameFrame??'菜单'} · 画面提交 ${presentationCount}\n个人分数 ${s?.players.map(p=>`P${p.id} ${p.score}`).join(' / ')||'等待入关'}\n本地完整音效 ${info?.played??0} 次 · 核心固定 30000 cycles · ${version?.th02IdleOptimization?'TH02 等价忙等优化':'通用核心'}\n浏览器 BGM：${musicError||bgm?.status||'等待确认关卡'} · 浏览器独立音效：${info?.ready?'就绪':'加载中'}`;}
 window.th02Sync={
  configure(host,local,count=2){if(![2,3].includes(count)||![host,local].every(n=>Number.isInteger(n)&&n>=0&&n<count))throw Error('无效联机座位');localSlot=local;players=count;},
  load(settings){return bootPromise??=boot(settings);},
  start(){if(closed)return;emulator.run();enabled=true;canvas.focus();},
- stop(){enabled=false;closed=true;clearKeys();bgm?.dispose();emulator?.module.netFlushAudio();emulator?.pause();},
+ stop(){enabled=false;closed=true;clearKeys();bgm?.dispose();sfx?.dispose();emulator?.module.netFlushAudio();emulator?.pause();},
  onInput(callback){inputListener=callback;},onMenuAction(){},setMusicVolume(value){musicVolume=Math.max(0,Math.min(1,Number(value)||0));bgm?.setVolume(musicVolume);},
  updateControls(value,blocked=false){clearKeys();useControlSnapshot(value);editing=blocked;document.getElementById('controls-summary').textContent=controlsSummary('online');},
  setPointPreferences(value){points={...value};},setRawPresentation(value){raw=!!value;pending=true;},
@@ -220,7 +245,7 @@ window.th02Sync={
  canPredict:()=>!predictionBlockReason(),predictionBlockReason,
  rollbackInfo:()=>({...emulator?.module.netSnapshotInfo(),checkpointFrames:2,checkpointReplays}),
  diagnosticText,renderInfo:()=>emulator?.module.framePresenter.info(),
- faultReport:()=>({settings:config,game:state(),diagnostics:diagnosticText(),music:{error:musicError,status:bgm?.status,track:bgm?.active?.id,sequence:musicSequence,nativeBgm:false,nativeEffects:true},input:{pendingNative,consumedNative},logs:emulator?.logs,build:version?.build})
+ faultReport:()=>({settings:config,game:state(),diagnostics:diagnosticText(),music:{error:musicError,status:bgm?.status,track:bgm?.active?.id,sequence:musicSequence,nativeBgm:false,nativeEffects:false},sound:{...sfx?.info(),sequence:sfxSequence},input:{pendingNative,consumedNative},logs:emulator?.logs,build:version?.build})
 };
 document.getElementById('sound').onclick=()=>window.th02Sync.unlockAudio();
 window.addEventListener('pagehide',()=>window.th02Sync.stop());
