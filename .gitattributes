@@ -8,6 +8,8 @@ web/*.html text eol=lf
 web/*.css text eol=lf
 web/netplay/*.js text eol=lf
 web/bgm/manifest.json text eol=lf
+web/sfx/manifest.json text eol=lf
+web/sfx/*.wav -text
 web/disks/manifest.json text eol=lf
 web/vendor/dosbox-x/* text=auto eol=lf
 web/vendor/dosbox-x/*.wasm -text

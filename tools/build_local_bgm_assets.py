@@ -14,7 +14,7 @@ def archive_bytes():
     entry = next(e for e in files(disk) if e[0] == 'YUMEZIKU/夢時空1.DAT')
     return b''.join(disk[at:at + 8192] for at in entry[1])[:entry[2]]
 
-def assets(data):
+def assets(data, suffix='.m'):
     size = struct.unpack_from('<H', data)[0]
     key = data[6]
     table = bytearray(data[16:16 + size])
@@ -39,7 +39,7 @@ def assets(data):
                     count = source[j]; j += 1; decoded.extend(bytes([value]) * count)
                 previous = value
             source = bytes(decoded)
-        if name.endswith('.m'):
+        if name.endswith(suffix):
             if len(source) < original:
                 raise ValueError(f'Truncated song: {name}')
             result[name] = source[:original]

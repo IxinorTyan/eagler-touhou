@@ -12,6 +12,8 @@ import {mountPlayer} from './player-ui.js';
 import {Lockstep} from './lockstep.js';
 import {createFrameGate} from './frame-limit.js';
 import {LocalBgm} from './local-bgm.js';
+import {LocalSfx} from './local-sfx.js';
+import {installNetworkAudio} from './network-audio.js';
 import {NativeMusic, ConfirmedMusic} from './native-music.js';
 import {createNetworkHistory,mountNetworkPerformance,readNativeCoreDiagnostics} from './network-performance.js';
 
@@ -33,6 +35,7 @@ if (embedded) {
 let emulator, manifest, database, activeLang, starting = false, dirty = 0, saved = 0, saveTask, saveTimer, netplay;
 let visibilityPaused = false, storageWarning = '';
 let nativePause, nativeState, pauseSeat = null, pauseSelection = 0, localBgm, nativeMusic, confirmedMusic;
+let localSfx, networkAudio;
 let closed = false, closing = false, escapeAt = -Infinity, escapeTimer;
 let sync, syncIdentity, syncFrame=0, syncReplaying=false;
 const nativeCanvas = document.createElement('canvas');
@@ -95,7 +98,7 @@ setInterval(()=>{
     nativeMaxMs:emulator.module.stepMetrics?.maxMs??0,program:emulator.module.programReads?.at(-1)?.name??null,
     snapshotStorage:emulator.module.netSnapshotInfo?.().storage??'disabled',writeJournal:emulator.module.mobileRuntime.writeJournal,heapBytes:emulator.module.HEAPU8.length,
     nativeCore:readNativeCoreDiagnostics(emulator.module),pauseSearch:nativePause?.search?'wasm-simd':'javascript',
-    audioState:emulator.audio.context.state,status:$('status').textContent,connection:$('connection-path').textContent});
+    audioState:emulator.audio.context.state,soundEffects:localSfx?.info()??null,status:$('status').textContent,connection:$('connection-path').textContent});
   $('performance-stats').textContent=`模拟 ${stats.stepsHz.toFixed(1)}/60 步/秒 · 画面上传 ${stats.uploadsHz.toFixed(1)} 次/秒 · 显示提交 ${stats.presentationsHz.toFixed(1)} 次/秒\n模拟 ${stats.simulateMs.toFixed(2)} ms/步 · 快照 ${stats.snapshotMs.toFixed(2)} ms/次 · 校验 ${stats.hashMs.toFixed(2)} ms\n补算 ${stats.replaySteps} 步 · 恢复 ${stats.restoreMs.toFixed(2)} ms · 快照 ${(stats.snapshotBytes/1048576).toFixed(1)} MiB\n${localBgm?.status||'音乐准备中'}`;
 },1000);
 const enqueue=value=>{if(netplay?.isLockstep&&!sync?.applying){netplay.command(value);return true;}return false;};
@@ -213,6 +216,7 @@ async function prepareDisk(data, meta, lang = activeLang || $('language').value)
   validate(data, meta);
   unlockDiskScores(new Fat12(data));
   await installNativePause(data, lang);
+  if(online)networkAudio=await installNetworkAudio(data);
   const script = new TextEncoder().encode('@ECHO OFF\r\nPATH A:\\DOS;A:\\\r\nSET TEMP=A:\\DOS\r\nSET DOSDIR=A:\\DOS\r\nA:\r\nCD \\YUMEZIKU\r\nCALL GAME.BAT\r\n');
   if (script.length > meta.autoexecCapacity) throw Error('启动脚本空间不足');
   data.fill(0, meta.autoexecOffset, meta.autoexecOffset + meta.autoexecCapacity);
@@ -374,6 +378,7 @@ async function closeGame() {
   closing = true; controls.release(); visibilityPaused = false;
   emulator.pause(); clearTimeout(saveTimer); saveTimer = null;
   localBgm?.dispose(); localBgm = null;
+  localSfx?.dispose(); localSfx = null;
   try { await emulator.module.SDL2?.audioContext?.suspend(); } catch {}
   await save();
   closed = true; closing = false; nativePause.reset(); nativeState = null; pauseSeat = null;
@@ -509,7 +514,10 @@ $('start').addEventListener('click', async () => {
       const response=await fetch('lockstep-runtime.json',{cache:'no-store'});
       if(!response.ok)throw Error('同步引擎清单缺失');
       const runtime=await response.json();
-      return {runtime,wasmBinary:await loadNetworkAssets(runtime,message=>status(message),{rollbackEnabled})};
+      const soundAssets=new Map();
+      const wasmBinary=await loadNetworkAssets(runtime,message=>status(message),{rollbackEnabled,
+        onAsset:(path,bytes,sha256)=>{if(path.startsWith('sfx/'))soundAssets.set(path,{bytes,sha256});}});
+      return {runtime,wasmBinary,soundAssets};
     })():loadLocalCore().then(wasmBinary=>({wasmBinary}));
     const [disk,networkAssets]=await Promise.all([loadDisk(activeLang),networkTask]);
     const wasmBinary=networkAssets?.wasmBinary;
@@ -521,11 +529,12 @@ $('start').addEventListener('click', async () => {
     nativePause = new NativePause(() => emulator, (await nativeAssets()).meta);
     nativeState = null; clearEscape();
     status('正在启动 DOSBox-X');
-    const config={canvas:online?nativeCanvas:visibleCanvas,lockstep:online,rollbackEnabled,wasmBinary,lockstepEpoch:946684800000,onError:report,
+    const config={canvas:online?nativeCanvas:visibleCanvas,lockstep:online,independentSfx:online,rollbackEnabled,wasmBinary,lockstepEpoch:946684800000,onError:report,
       DIPswtch: [0x3e, 0xf3, 0x7b], ExMemory: 7, Latencys: online?40:100, SampleHz: 44100, SNDboard: 4,
       no_mouse: true, use_menu: false, fontfile: activeLang === 'cn' ? 'font_cn.bmp' : 'font.bmp',
       onDiskChange: diskChanged, onExit: () => {
         localBgm?.stop();
+        localSfx?.stop();
         controls.release(); pauseSeat = null; nativeState = null;
         $('pause-menu').hidden = $('pause-shade').hidden = true;
         nativePause.reset(); reflectState(); save();
@@ -534,8 +543,17 @@ $('start').addEventListener('click', async () => {
     emulator=useWorker?await WorkerNP21.create(config,{game:'03local',patch:nativePause.meta,music:(await nativeAssets()).meta.startup.music,onError:report}):await DOSBoxPC98.create(config);
     if(emulator.isWorker)nativePause=workerLocalPause(emulator);
     localBgm = new LocalBgm(emulator.module.SDL2.audioContext, () => {});
-    nativeMusic = new NativeMusic((await nativeAssets()).meta.startup.music);
-    confirmedMusic = new ConfirmedMusic(localBgm);
+    nativeMusic = new NativeMusic(online?networkAudio:(await nativeAssets()).meta.startup.music);
+    if(online){
+      localSfx=new LocalSfx(emulator.module.SDL2.audioContext);
+      // Load every small effect before simulation: no downloads/decoding on a
+      // shot, and no muted-PCM game if any local effect failed to load.
+      await localSfx.load(networkAssets.soundAssets);
+      networkAssets.soundAssets.clear();
+    }
+    confirmedMusic = new ConfirmedMusic({command:(ax,hash)=>{
+      if((ax>>>8)===0x0c)localSfx?.command(ax);else localBgm.command(ax,hash);
+    }});
     if(emulator.isWorker)emulator.onMusic=(ax,hash)=>localBgm?.command(ax,hash);
     // The device decodes music asynchronously; downloads cannot stall game start.
     const loadingBgm=localBgm;
@@ -565,7 +583,9 @@ $('start').addEventListener('click', async () => {
         onState:message=>status(message)});
       await netplay.synchronize(syncIdentity);
     }
-    for(const [ax,hash]of bootMusic)localBgm.command(ax,hash);
+    // Boot can contain menu SE while the other device is still loading.
+    // Keep its BGM commands; do not play those old effects at room start.
+    for(const [ax,hash]of bootMusic)if((ax>>>8)!==0x0c)localBgm.command(ax,hash);
     closed = false; dirty = saved = 0;
     $('cover').hidden = true; emulator.run(); $('canvas').focus(); resumeAudio();
     if(online)sync.start();
@@ -574,6 +594,7 @@ $('start').addEventListener('click', async () => {
     if (!storageWarning) $('save-status').textContent = online ? '联机镜像' : '存档已就绪';
     if (online) notifyRoom('游戏已启动', true);
   } catch (error) {
+    localSfx?.dispose();localSfx=null;
     netplay?.close(); netplay = null; report(error); $('start').textContent = '刷新重试'; $('start').disabled = false;
     $('start').onclick = () => location.reload();
   } finally { starting = false; }

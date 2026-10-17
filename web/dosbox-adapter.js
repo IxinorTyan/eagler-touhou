@@ -86,7 +86,7 @@ export class DOSBoxPC98 {
     const init=[...this.extracted.files,launcher,{dosboxConf:dosboxConfig({network,fastBoot:true}),jsdosConf:{version:'8'}}];
     this.installingDisk=true;
     try{this.ci=await globalThis.emulators.backend(init,this.transport,{});}finally{this.installingDisk=false;}
-    this.ci.events().onSoundPush(samples=>{this.module.audioPackets=(this.module.audioPackets||0)+1;if(this.module.warmingBoot)return;if(this.config.workerRuntime){this.audioChunks.push(samples.slice());return;}if(this.frame!==null){if(this.frame>=this.confirmedAudio)this.outputs.get(this.frame)?.push(samples.slice());}else this.audio.push([samples]);});
+    this.ci.events().onSoundPush(samples=>{this.module.audioPackets=(this.module.audioPackets||0)+1;if(this.module.warmingBoot||(this.config.lockstep&&this.config.independentSfx))return;if(this.config.workerRuntime){this.audioChunks.push(samples.slice());return;}if(this.frame!==null){if(this.frame>=this.confirmedAudio)this.outputs.get(this.frame)?.push(samples.slice());}else this.audio.push([samples]);});
     this.logs=[];this.ci.events().onMessage((type,...messages)=>{this.logs.push([type,...messages]);this.logs=this.logs.slice(-40);if(type==='error'&&messages.some(s=>/\[panic\]|Backend crashed|Aborted\(/i.test(String(s)))){this.failure=Error(messages.join(' '));this.state='failed';this.config.onError?.(this.failure);}});
     this.ci.events().onExit(()=>{if(this.resetting||this.failure||this.state==='failed')return;this.state='exited';this.config.onExit?.();});
     for(const code of this.keys)this.key(code,true);

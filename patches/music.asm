@@ -62,6 +62,12 @@ local_pmd:
     db 'PMD'
 pmd_version: dw 0
 pmd_dispatch:
+%ifdef LOCAL_SFX
+    ; Network variant also copies the game's already-prioritized FM effect
+    ; command. Forward it unchanged so PMD queries/state remain original.
+    cmp ah,0x0c
+    je .event
+%endif
     cmp ah,2
     jbe .event
     cmp ah,0x19

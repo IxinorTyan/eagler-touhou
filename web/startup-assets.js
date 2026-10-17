@@ -60,7 +60,7 @@ export function loadLocalCore() {
   return localCore;
 }
 
-export async function loadNetworkAssets(runtime, progress = () => {}, {rollbackEnabled = true} = {}) {
+export async function loadNetworkAssets(runtime, progress = () => {}, {rollbackEnabled = true, onAsset} = {}) {
   const core = usesWriteJournal(rollbackEnabled) ? 'wdosbox-x-rollback-tracked.wasm' : 'wdosbox-x-rollback.wasm';
   // The identity retains hashes for both variants. Download only the variant
   // this device executes, along with all shared assets.
@@ -74,6 +74,7 @@ export async function loadNetworkAssets(runtime, progress = () => {}, {rollbackE
     while (next < files.length) {
       const [path, hash] = files[next++];
       const bytes = await loadVerifiedBytes(path, hash);
+      onAsset?.(path,bytes,hash);
       if (path === 'vendor/dosbox-x/' + core) wasmBinary = bytes;
       progress(`正在校验联机资源：${++completed}/${files.length}`);
     }

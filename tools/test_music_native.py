@@ -1,12 +1,13 @@
 """Run the actual TSR's INT 60h wrapper with a stub PMD driver in Unicorn."""
-import json, struct
+import json, struct, sys
 from pathlib import Path
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_16, UC_HOOK_CODE
 from unicorn.x86_const import *
 
 ROOT=Path(__file__).resolve().parents[1]
-meta=json.loads((ROOT/'web/native-patch.json').read_text())['startup']['music']
-code=(ROOT/'web/native/music.com').read_bytes()
+network='--network-audio' in sys.argv
+meta=json.loads((ROOT/'web/network-audio.json').read_text()) if network else json.loads((ROOT/'web/native-patch.json').read_text())['startup']['music']
+code=(ROOT/('web/native/network-audio.com' if network else 'web/native/music.com')).read_bytes()
 CS,SS=0x2000,0x7000
 mail=CS*16+meta['mailbox_com_offset']
 entry=0x100+code.index(b'PMD')-2
@@ -44,7 +45,20 @@ for i,ax in enumerate([0x202,0x19ff,0x100],2):
     assert command(ax)==[ax]
     assert struct.unpack('<HHI',uc.mem_read(mail+20+(i-1)*8,8))==(i,ax,signature)
 before=uc.mem_read(mail+18,2)
-assert command(0x1003)==[0x1003]  # PMD_SE_PLAY, unaffected by music masking
+assert command(0x1003)==[0x1003]  # work-area query, forwarded without an event
 assert command(0x500)==[0x500]    # query forwarded without music event
 assert uc.mem_read(mail+18,2)==before
-print('PASS: real TSR hashes loaded song, records play/stop/fade/volume, masks only music parts 0..14, forwards SE/queries and preserves registers')
+for effect in range(1,23):
+    previous=struct.unpack('<H',uc.mem_read(mail+18,2))[0]
+    ax=0x0c00|effect
+    assert command(ax)==[ax]  # actual PMD_SE_PLAY, forwarded unchanged
+    latest=struct.unpack('<H',uc.mem_read(mail+18,2))[0]
+    assert latest==(previous+int(network))&65535
+    if network:
+        assert struct.unpack('<HHI',uc.mem_read(mail+20+(previous&63)*8,8))==(latest,ax,signature)
+if network:
+    uc.mem_write(mail+18,struct.pack('<H',65535))
+    assert command(0x0c16)==[0x0c16]
+    assert struct.unpack('<HHI',uc.mem_read(mail+20+63*8,8))==(0,0x0c16,signature)
+    assert uc.mem_read(mail+18,2)==b'\0\0'
+print('PASS:', 'network BGM+22 SE events and sequence wrap;' if network else 'original music-only bridge;', 'original PMD forwarding/masking, queries and register preservation')

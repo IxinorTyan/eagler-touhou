@@ -29,6 +29,8 @@ function write() {
   const paths = [
     'app.js','network-performance.js','netplay.js','netplay/udp-config.js','lockstep.js','frame-queue.js','controls.js',
     'native-pause.js','pause-search.js','native-patch.json','native/main.exe','native/start.com','native/music.com',
+    'local-sfx.js','network-audio.js','network-audio.json','native/network-audio.com','sfx/manifest.json',
+    ...fs.readdirSync(path.join(web,'sfx')).filter(name=>name.endsWith('.wav')).map(name=>'sfx/'+name),
     'native/game-jp.bat','native/game-cn.bat','native-music.js','local-bgm.js','bgm/manifest.json',
     'fire-control.js','player-ui.js','player-ui.css','touch-input.js','touch-layout.js','disk.js','scores.js','sha256.js',
     'netplay/native-hash.js','frame-limit.js','frame-presenter.js','startup-assets.js','dosbox-adapter.js','dosbox-disk.js',
@@ -41,7 +43,8 @@ function write() {
   const network = {
     protocol:'th03-rollback/5', tickHz:60, epoch:946684800000,
     adapter:'dosbox-x-full-asyncify-v1', dispatch:'dosbox-x-simple', cpu_cycles:16000,snapshotStride:2,
-    native_sound:{bgm:0,se:1,schema:2,config_bgm_mode:1,mute:'pmd-parts-0-14',se_part:15}, files:{},
+    native_sound:{bgm:0,se:0,schema:3,config_bgm_mode:1,mute:'network PCM output',se_part:15,
+      effects:'confirmed-local-waveforms',bridge:'network-audio.json'}, files:{},
   };
   if(build)Object.assign(network,{adapter:'dosbox-x-th03-native-v1',snapshotScan:build.snapshotScan,
     nativeScheduling:build.releaseProfile.nativeScheduling,nativeCpu:build.releaseProfile.nativeCpu,
