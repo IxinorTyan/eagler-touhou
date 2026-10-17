@@ -8,6 +8,7 @@ import {useControlSnapshot,isFormTarget,controlsSummary} from '../control-settin
 import {PauseMenu} from './pause.js';
 import {createPersonalHud} from './personal-hud.js';
 import {readSoloFault} from '../solo-fault.js';
+import {LocalSe,readNativeSe} from './local-se.js';
 const canvas=document.getElementById('canvas'),details=document.getElementById('details');
 const nativeCanvas=document.createElement('canvas');
 nativeCanvas.width=640;nativeCanvas.height=400;nativeCanvas.hidden=true;
@@ -25,6 +26,15 @@ let pauseMenu,localSlot,menuAction=()=>{},blocked=[0,0],emulatedTicks=0,playerCo
 const rollbackStates=new Map(),effects=new Map();
 let confirmedPrefix=0,replaying=false,currentEffect;
 let checkpointReplays=0;
+let runtimeFailure=null;
+let localSe,seError='';
+function reportRuntimeFailure(kind,error){
+  if(runtimeFailure||closed)return;
+  const message=String(error?.message||error);
+  runtimeFailure={kind,message,tick:ticks,emulatedTicks};
+  enabled=false;closed=true;bgm?.dispose();localSe?.dispose();details.textContent=message;
+  window.parent.postMessage({protocol:'th04-rollback/3',event:'runtime-error',message,kind},location.origin);
+}
 let controlsBlocked=false;
 function localButtons(){
   return keyboardBits(keys);
@@ -37,7 +47,7 @@ window.addEventListener('keydown',event=>{
 window.addEventListener('keyup',event=>{keys.delete(event.code);inputListener(localButtons());},true);
 window.addEventListener('blur',clearKeys);
 document.addEventListener('focusin',event=>{if(isFormTarget(event.target))clearKeys();});
-document.addEventListener('visibilitychange',()=>{if(document.hidden){clearKeys();emulator?.module.netFlushAudio?.();}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){clearKeys();emulator?.module.netFlushAudio?.();localSe?.stop();}});
 canvas.addEventListener('pointerdown',()=>canvas.focus());
 function nativePauseAddress(){
   return mailbox<0?-1:mailbox-patch.mailbox_cs_offset+patch.native_pause_cs_offset;
@@ -53,7 +63,7 @@ function predictionBlockReason(){
   return '';
 }
 document.getElementById('bgm-volume').addEventListener('input',event=>bgm?.setVolume(Number(event.target.value)/100));
-window.addEventListener('pagehide',()=>{closed=true;bgm?.dispose();});
+window.addEventListener('pagehide',()=>{closed=true;bgm?.dispose();localSe?.dispose();});
 document.getElementById('sound').onclick=async()=>{
   try{
     const context=emulator?.module.SDL2?.audioContext;
@@ -100,10 +110,10 @@ async function boot(config){
   if(disk.length!==meta.size||await sha256(disk)!==meta.sha256)throw Error('游戏磁盘校验失败，请刷新页面');
   installConfig(disk,patch,encodeConfig(config));
   await bootProgress('安装本局配置和声音补丁',4);
-  // Apply the game's own BGM OFF / FM SE ON settings to this private copy.
+  // BGM OFF / FM SE arbitration ON; driver play calls use browser samples.
   // Keep the original launcher, PMD driver, shared disk and single-player intact.
-  const sound=soundPolicy=version.native_sound_by_language?.[selected.language];
-  if(sound?.disk_sha256!==meta.sha256||sound.bgm!==0||sound.se!==1||sound.schema!==2||!sound.edits?.length)
+  const sound=soundPolicy=version.external_sound_by_language?.[selected.language];
+  if(sound?.disk_sha256!==meta.sha256||sound.bgm!==0||sound.se!==1||sound.schema!==3||sound.observer?.se_capacity!==8||!version.local_se_sha256||!sound.edits?.length)
     throw Error('联机声音配置版本不匹配，请重启服务并刷新所有玩家页面');
   for(const edit of sound.edits){
     if(edit.targets.length!==edit.expected.length||edit.targets.length!==edit.values.length)throw Error('声音配置长度不匹配');
@@ -113,11 +123,14 @@ async function boot(config){
   }
   for(const edit of sound.edits)edit.targets.forEach((at,i)=>{disk[at]=edit.values[i];});
   await bootProgress('下载、编译并初始化 DOSBox-X WASM 与音频设备',5);
-  emulator=await NP21.create({canvas:nativeCanvas,artPatch:patch,lockstep:true,rollbackEnabled:config.rollback!==false,lockstepEpoch:version.epoch,
+  emulator=await NP21.create({canvas:nativeCanvas,artPatch:patch,lockstep:true,externalEffects:true,rollbackEnabled:config.rollback!==false,lockstepEpoch:version.epoch,
     ExMemory:7,Latencys:40,SampleHz:44100,SNDboard:4,
     no_mouse:true,use_menu:false,fontfile:'font.bmp',
-    onExit:()=>{enabled=false;closed=true;bgm?.dispose();window.parent.postMessage({protocol:'th04-rollback/3',event:'runtime-exit'},location.origin);}});
+    onError:error=>reportRuntimeFailure('emulator-error',Error('模拟器异常：'+String(error?.message||error))),
+    onExit:()=>reportRuntimeFailure('emulator-exit',Error('游戏模拟器已经退出'))});
   if(closed){emulator.pause();return;}
+  localSe=new LocalSe(emulator.module.SDL2.audioContext);
+  const seLoading=localSe.load().catch(error=>{if(!closed)seError='浏览器音效加载失败：'+error.message;});
   await bootProgress('挂载游戏磁盘',6);
   emulator.addDiskImage('th04-sync.hdi',disk);await emulator.setHdd(0,'th04-sync.hdi');
   // The private DOS launcher restores 30000 cycles before MAIN. The initial
@@ -136,6 +149,8 @@ async function boot(config){
       progress:message=>bootProgress(message,6)});
     if(!ready)return;
   }finally{emulator.module.warmingBoot=false;emulator.pause();}
+  await seLoading;
+  if(closed){localSe.dispose();return;}
   emulator.module.bootCPUMetrics=emulator.module.UTF8ToString(emulator.module._getCPUMetrics());
   if(emulator.module.bootCPUMetrics.split('|')[0]!=='30000')
     throw Error('启动后联机算力未恢复，请刷新页面并检查引擎版本');
@@ -143,7 +158,7 @@ async function boot(config){
   // No music imports/downloads/decoding until an actual game frame is observed.
   musicSettings=config;
   await bootProgress('原游戏磁盘和引擎已就绪，等待全员同步开局',7);
-  return {projectileArt:version.projectile_art_sha256,presentation:version.presentation_sha256,disk:meta.sha256,runtime:version.generated_js_sha256,wasm:version.wasm_sha256,mobileWasm:version.mobile_wasm_sha256,clock:version.clock_sha256,cpuCycles:version.cpu_cycles,audio:version.audio_output_sha256,nativeSound:sound,queue:version.rollback_queue_sha256,snapshots:version.native_snapshots_sha256,controls:version.controls_sha256,pause:version.pause_sha256,game:version.game_adapter_sha256,room:version.room_sha256,membership:version.membership_sha256,startup:version.startup_sha256,hostSlot:pauseMenu.hostSlot,adapter:version.adapter,dosboxDisk:version.dosbox_disk_sha256,memoryDiff:version.dosbox_memory_diff_sha256,snapshotDiff:version.snapshot_diff_wasm_sha256,fault:version.fault_sha256,trackedWasm:version.write_journal?.wasm_sha256,trackedGlue:version.write_journal?.glue_sha256,trackedDiff:version.write_journal?.diff_sha256};
+  return {localSe:version.local_se_sha256,projectileArt:version.projectile_art_sha256,presentation:version.presentation_sha256,disk:meta.sha256,runtime:version.generated_js_sha256,wasm:version.wasm_sha256,mobileWasm:version.mobile_wasm_sha256,clock:version.clock_sha256,cpuCycles:version.cpu_cycles,audio:version.audio_output_sha256,nativeSound:sound,queue:version.rollback_queue_sha256,snapshots:version.native_snapshots_sha256,controls:version.controls_sha256,pause:version.pause_sha256,game:version.game_adapter_sha256,room:version.room_sha256,membership:version.membership_sha256,startup:version.startup_sha256,hostSlot:pauseMenu.hostSlot,adapter:version.adapter,dosboxDisk:version.dosbox_disk_sha256,memoryDiff:version.dosbox_memory_diff_sha256,snapshotDiff:version.snapshot_diff_wasm_sha256,fault:version.fault_sha256,trackedWasm:version.write_journal?.wasm_sha256,trackedGlue:version.write_journal?.glue_sha256,trackedDiff:version.write_journal?.diff_sha256};
 }
 function findMailbox(){
   const heap=emulator.module.HEAPU8,view=new DataView(heap.buffer);
@@ -169,7 +184,7 @@ function stepInner(inputs){
   // Native writes and host glue writes are journaled by the tracked core.
   if(mailbox>=0)emulator.module.thDirtyMark?.(guestBase(),1048576);
   const touchInputs=inputs;
-  if(!enabled)throw Error('本机游戏没有运行');
+  if(!enabled)throw Error(runtimeFailure?.message||'本机游戏没有运行');
   // There is no native stage pause before the first gameplay mailbox exists.
   if(mailbox<0&&emulatedTicks%15===0)findMailbox();
   if(mailbox>=0){
@@ -204,6 +219,10 @@ function stepInner(inputs){
   }
   writeNativeTouch(emulator.module.HEAPU8,mailbox,patch,touchInputs,pauseMenu.paused||active||result==='resume');
   emulator.step();emulatedTicks++;
+  if(mailbox>=0&&!seError){
+    try{currentEffect.se=readNativeSe(emulator.module.HEAPU8,gameDataBase(),soundPolicy.observer);}
+    catch(error){currentEffect.seError=error.message;}
+  }
   if(mailbox>=0&&!musicError){
     try{currentEffect.music=readMusic();}
     catch(error){currentEffect.musicError=error.message;}
@@ -213,6 +232,7 @@ function stepInner(inputs){
     const s=snapshot();
     const info=emulator.module.netInfo();
     details.textContent=`本机同步步 ${ticks} · 游戏帧 ${s?.gameFrame??'启动中'} · 音频断供 ${info.audioUnderruns??0}\n声音待播 ${(info.audioQueuedMs??0).toFixed(1)} ms · 设备延迟 ${info.audioDeviceMs==null?'浏览器未提供':info.audioDeviceMs.toFixed(1)+' ms'} · 清理积压 ${info.audioResets??0} 次`;
+    details.textContent+='\n'+(seError||localSe?.status||'浏览器音效：等待');
     if(s)details.textContent+='\n'+s.players.map((xy,i)=>`P${i+1} (${xy.join(', ')})`).join(' · ');
     else details.textContent+=`\n启动进度：正在执行 DOS / 游戏启动，尚未检测到游戏首帧（模拟时间 ${(emulatedTicks/60).toFixed(1)} 秒）。`;
     details.textContent+=`\n${musicError?musicStatus:(bgm?.status??musicStatus)}`;
@@ -284,8 +304,10 @@ function confirm(prefix){
   let exit=false;
   for(let frame=confirmedPrefix;frame<prefix;frame++){
     const effect=effects.get(frame);if(!effect)throw Error('确认帧缺少模拟结果');
-    if(effect.flushAudio)emulator.module.netFlushAudio();
+    if(effect.flushAudio){emulator.module.netFlushAudio();localSe?.stop();}
     emulator.module.netConfirm(frame+1,retainedCheckpoint(frame+1));
+    if(effect.seError)seError='浏览器音效错误：'+effect.seError;
+    if(effect.se&&!seError){try{localSe.confirm(effect.se);}catch(error){seError='浏览器音效错误：'+error.message;localSe.stop();}}
     if(effect.musicError){musicError=true;musicStatus=`浏览器音乐错误（游戏继续）：${effect.musicError}`;}
     if(effect.music&&!musicError){try{observeMusic(effect.music);}catch(error){musicError=true;musicStatus=`浏览器音乐错误（游戏继续）：${error.message}`;}}
     if(effect.result==='exit')exit=true;
@@ -358,13 +380,18 @@ function checksum(){
   return {tick:ticks,hash:(h>>>0).toString(16).padStart(8,'0'),gameFrame:v.getUint32(mailbox+16,true)};
 }
 window.th04Sync={
-  faultReport(){return {settings:musicSettings,game:snapshot(),cpu:emulator?readSoloFault(emulator.module.HEAPU8,emulator.module):null,diagnostics:details.textContent};},
+  faultReport(){return {settings:musicSettings,game:snapshot(),runtimeFailure,
+    sound:{...localSe?.info(),error:seError},
+    emulator:emulator?{state:emulator.state,error:emulator.failedError?.message??null,logs:emulator.logs??[]}:null,
+    pause:pauseMenu?{paused:pauseMenu.paused,selection:pauseMenu.selection,exited:pauseMenu.exited,hostSlot:pauseMenu.hostSlot}:null,
+    cpu:emulator?readSoloFault(emulator.module.HEAPU8,emulator.module):null,diagnostics:details.textContent};},
   setPointPreferences({focus,always}){pointPreferences={focus:!!focus,always:!!always};},
   diagnosticText:()=>{
     const r=emulator?.module.framePresenter?.info(),ms=value=>value==null?'—':value.toFixed(1);
     return `${details.textContent}\n画面提交 ${presentationCount} · ${rawPresentation?"原始画面":"个人 HUD"}`
       +(r?`\n核心画面更新 ${r.submitted} · WebGL 绘制 ${r.drawn} · 重算画面更新 ${r.replaySubmitted}\n最近绘制间隔 P95 ${ms(r.intervals.p95Ms)} / P99 ${ms(r.intervals.p99Ms)} ms`:'');
   },
+  soundInfo:()=>({...localSe?.info(),error:seError}),
   renderInfo:()=>({canvasSubmitted:presentationCount,...emulator?.module.framePresenter?.info()}),
   setRawPresentation(value){rawPresentation=!!value;presentationPending=true;},
   setMusicVolume(value){document.getElementById('bgm-volume').value=value;bgm?.setVolume(Number(value)/100);},
@@ -388,7 +415,7 @@ window.th04Sync={
   load(config){if(!bootPromise)bootPromise=boot(config);return bootPromise;},
   onInput(callback){inputListener=callback;},
   start(){emulator.run();enabled=true;details.textContent='启动进度：全员已同步开局，正在启动 DOS 和游戏。';canvas.focus();},
-  stop(){enabled=false;closed=true;clearKeys();bgm?.dispose();if(emulator){emulator.module.netFlushAudio();emulator.pause();}},
+  stop(){enabled=false;closed=true;clearKeys();bgm?.dispose();localSe?.dispose();if(emulator){emulator.module.netFlushAudio();emulator.pause();}},
   step,present,checksum,snapshot,capture,restore,confirm,
   readyForRollback:()=>mailbox>=0&&!!emulator?.module.netCapture,
   canPredict:()=>!predictionBlockReason(),predictionBlockReason,

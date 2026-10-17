@@ -130,8 +130,8 @@ function showStartup(){
 function closeDisconnected(reason){
   if(stopped)return;
   stopReason=String(reason);startupFailure(stopReason);
-  stopped=true;running=false;clearInput();runtime?.stop();iframe?.remove();runtime=null;
-  clearTimers();disconnect();render();status(`${reason}。本局游戏已关闭。`);
+  stopped=true;running=false;clearInput();runtime?.stop();
+  clearTimers();disconnect();render();status(`${reason}。本局已停止，保留最后画面，可下载故障信息。`);
 }
 function suspect(peer){
   if(stopped||peer.offline)return;
@@ -231,10 +231,11 @@ function closeFinishedRoom(){
 }
 function finishGame(){
   if(stopped)return;stopped=true;running=false;clearInput();
-  runtime?.stop();iframe?.remove();runtime=null;clearTimers();
+  stopReason='房主通过暂停菜单结束本局';
+  runtime?.stop();clearTimers();
   if(session.role==='host'){broadcast({type:'end'});closeFinishedRoom();}
   else send(peers.get('host'),{type:'end-ack'});
-  status('房主已退出，本局游戏已关闭。');render();
+  status('房主通过暂停菜单结束本局，已保留结束画面。');render();
 }
 function render(){
   if(!session||!state)return;
@@ -412,7 +413,8 @@ function attachChannel(peer,channel){
         case 'end-ack':if(session.role!=='host')throw Error('无效退出确认');peer.ended=true;closeFinishedRoom();break;
         case 'fatal':
           if(!running){fail(Error(`${label(peer.role)}启动失败：${String(m.reason).slice(0,600)}`));return;}
-          if(peer.role==='host'){closeDisconnected('房主已停止游戏');return;}
+          peer.failureReason=String(m.reason).slice(0,600);
+          if(peer.role==='host'){closeDisconnected(`房主已停止游戏：${peer.failureReason}`);return;}
           suspect(peer);break;
         default:throw Error('未知同步消息');
       }
@@ -692,6 +694,9 @@ function updateMetrics(now,waiting){
 }
 function pump(now){
   if(!running||stopped||pumping)return;
+  // rAF's frame timestamp can precede a timer/message wake already handled.
+  // Keep the accounting baseline monotonic so that interval is counted once.
+  now=Math.max(now,lastNow);
   if(membership){
     lastNow=now;accumulator=0;waitDetail='正在同步玩家离线边界';
     if(!waitingSince)waitingSince=now;
@@ -752,7 +757,11 @@ window.addEventListener('keydown',event=>{if(!running||controlEditor.isEditing()
 document.addEventListener('focusin',event=>{if(isFormTarget(event.target))clearInput();});
 window.addEventListener('keyup',event=>keys.delete(event.code));window.addEventListener('blur',clearInput);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)clearInput();else wake();});
-window.addEventListener('message',event=>{if(event.origin===location.origin&&event.source===iframe?.contentWindow&&event.data?.protocol===PROTOCOL&&event.data?.event==='runtime-exit')fail(Error('游戏模拟器已经退出'));});
+window.addEventListener('message',event=>{
+  if(event.origin!==location.origin||event.source!==iframe?.contentWindow||event.data?.protocol!==PROTOCOL)return;
+  if(event.data.event==='runtime-exit')fail(Error('游戏模拟器已经退出'));
+  else if(event.data.event==='runtime-error')fail(Error(String(event.data.message).slice(0,600)));
+});
 window.addEventListener('message',event=>{
   if(event.origin!==location.origin||event.source!==iframe?.contentWindow||event.data?.protocol!==PROTOCOL||stopped)return;
   if(event.data.event==='boot-progress'){

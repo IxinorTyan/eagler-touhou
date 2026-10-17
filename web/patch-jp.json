@@ -1,13 +1,13 @@
 {
   "original_md5": "06d74719b6f72b11014a392fd34d5f57",
   "original_size": 156258,
-  "patched_size": 169106,
+  "patched_size": 169378,
   "insert_image_offset": 78048,
-  "insert_size": 12848,
-  "payload_size": 12847,
-  "heap_bytes": 380880,
-  "payload_and_heap_bytes": 393728,
-  "payload_padding_bytes": 1,
+  "insert_size": 13120,
+  "payload_size": 13118,
+  "heap_bytes": 379648,
+  "payload_and_heap_bytes": 392768,
+  "payload_padding_bytes": 2,
   "player_art": {
     "assignment": "occurrence of the same character in seat order",
     "variants": [
@@ -41,118 +41,148 @@
       "ghost-preview\\th05-four-player-colors\\marisa\\p2-blue\\ghost-32.png": "01320a87ff717696d0dea392f7824c3b85b4686bf5e852573970f3b5beacfb95",
       "ghost-preview\\th05-four-player-colors\\marisa\\p3-green\\ghost-32.png": "c830cca4eb9f53e56ee29e47378b6b4e7c431ad367a894670862c9a261ab0ced"
     },
-    "select_cs_offset": 39437,
-    "render_cs_offset": 39942,
+    "select_cs_offset": 38925,
+    "render_cs_offset": 39567,
     "minimum_heap_bytes": 379584
   },
   "projectileArt": {
     "file": "assets/projectiles-rgb.bin",
     "sha256": "d477bef6b82fae1f04e0b6fdbc4e458ce526b8437d8f78e75f57ec28720916f3",
     "bytes": 262144,
-    "context_cs_offset": 39735
+    "context_cs_offset": 39360
   },
   "shot_art": {
-    "render_cs_offset": 39554,
-    "laser_color_cs_offset": 39669,
-    "owners_cs_offset": 39486,
+    "render_cs_offset": 39178,
+    "laser_color_cs_offset": 39294,
+    "owners_cs_offset": 38974,
     "assignment": "occurrence of the same character in seat order",
     "shared_palette_restored_after_each_blit": true
   },
+  "shot_pool": {
+    "count": 204,
+    "stride": 18,
+    "base": 46430,
+    "ranges": [
+      {
+        "base": 46430,
+        "count": 73,
+        "end": 47744
+      },
+      {
+        "base": 48576,
+        "count": 131,
+        "end": 50934
+      }
+    ],
+    "end": 50934,
+    "collision_base": 17574,
+    "collision_stride": 2,
+    "extra_bss_bytes": 2368,
+    "stack_bytes_preserved": 4096,
+    "allocate_cs_offset": 40165,
+    "begin_cs_offset": 39835,
+    "flush_cs_offset": 40054,
+    "batch_cs_offset": 39793,
+    "queue_cs_offset": 39799,
+    "queue_stride": 12,
+    "priority": "rotate per firing wave; no seat quota",
+    "scan": "one shared cursor per wave"
+  },
   "entries": [
     34446,
-    34837,
-    35134,
+    34839,
+    35017,
+    34994,
+    34991,
+    37592,
+    35446,
+    35539,
+    35687,
+    35962,
+    35988,
+    36078,
+    36285,
+    36495,
+    36538,
+    36584,
+    35705,
+    35765,
+    34735,
+    35874,
+    36411,
+    38331,
+    38437,
+    38502,
+    38546,
+    38575,
+    38603,
+    38281,
+    38711,
+    38775,
+    38819,
+    38708,
+    38441,
+    40479,
+    41209,
+    40985,
+    40416,
+    41025,
+    41486,
     35111,
-    35020,
-    38036,
-    35574,
-    35667,
-    35815,
-    36090,
-    36116,
-    36206,
-    36413,
-    36623,
-    36666,
-    36712,
-    35833,
-    35893,
-    34733,
-    36002,
-    36539,
-    38843,
-    38949,
-    39014,
-    39058,
-    39087,
-    39115,
-    38725,
-    39223,
-    39287,
-    39331,
-    39220,
-    38953,
-    40201,
-    40931,
-    40707,
-    40138,
-    40747,
-    41208,
-    35239,
-    42637,
-    42640,
-    43803,
-    43838,
-    43851,
-    43657,
-    43883,
-    44009,
-    44030,
-    44051,
-    43993,
-    43997,
-    44001,
-    44005,
-    44131,
-    44118,
-    44119,
-    44304,
-    44592,
-    45477,
-    45046,
-    45100,
-    45250,
-    45220,
-    45235,
-    45058,
-    45070,
-    45085,
-    45660,
-    45666,
-    45271,
-    45295,
-    45333,
-    45358,
-    45372,
-    44652,
-    46175,
-    45964,
-    45988
+    42915,
+    42918,
+    44081,
+    44116,
+    44129,
+    43935,
+    44161,
+    44287,
+    44308,
+    44329,
+    44271,
+    44275,
+    44279,
+    44283,
+    44409,
+    44396,
+    44397,
+    44582,
+    44870,
+    45748,
+    45324,
+    45378,
+    45528,
+    45498,
+    45513,
+    45336,
+    45348,
+    45363,
+    45931,
+    45937,
+    45549,
+    45573,
+    45604,
+    45629,
+    45643,
+    44930,
+    46446,
+    46235,
+    46259
   ],
   "near_code_guard": {
     "image_offset": 78048,
     "original": "8346fe1a83fe107cdb5f5ec9c3"
   },
-  "mailbox_cs_offset": 38036,
+  "mailbox_cs_offset": 37592,
   "relocations_rebased": 1136,
-  "native_pause_cs_offset": 43993,
-  "offline_mask_cs_offset": 44118,
-  "focus_visible_mask_cs_offset": 44304,
+  "native_pause_cs_offset": 44271,
+  "offline_mask_cs_offset": 44396,
+  "focus_visible_mask_cs_offset": 44582,
   "personal_stats": {
-    "cs_offset": 44592,
+    "cs_offset": 44870,
     "stride": 20,
     "players": 3,
-    "bonus_cs_offset": 44652,
+    "bonus_cs_offset": 44930,
     "score": 0,
     "high_score": 4,
     "point": 8,
@@ -188,16 +218,16 @@
     "3_players": 2,
     "fraction_resource_offset": 12
   },
-  "loadout_cs_offset": 38725,
-  "loadout_file_offset": 88629,
-  "bomb_owner_cs_offset": 39220,
+  "loadout_cs_offset": 38281,
+  "loadout_file_offset": 88185,
+  "bomb_owner_cs_offset": 38708,
   "entry_count": 79,
-  "touch_cs_offset": 45964,
+  "touch_cs_offset": 46235,
   "touch_stride": 8,
-  "touch_status_cs_offset": 45988,
-  "rescue_cs_offset": 40138,
-  "p3_input_cs_offset": 42637,
-  "p3_motion_cs_offset": 42640,
+  "touch_status_cs_offset": 46259,
+  "rescue_cs_offset": 40416,
+  "p3_input_cs_offset": 42915,
+  "p3_motion_cs_offset": 42918,
   "boss_damage_call_sites": [
     124409,
     111620,
@@ -250,37 +280,37 @@
     {
       "image_offset": 68469,
       "original": "e8d8fd",
-      "target_cs_offset": 46175,
+      "target_cs_offset": 46446,
       "name": "synchronized direct touch velocity"
     },
     {
       "image_offset": 43934,
       "original": "9ac4060e13",
-      "target_cs_offset": 44131,
+      "target_cs_offset": 44409,
       "name": "offline seats before world update"
     },
     {
       "image_offset": 43950,
       "original": "e81e07",
-      "target_cs_offset": 44009,
+      "target_cs_offset": 44287,
       "name": "native pause entry"
     },
     {
       "image_offset": 45783,
       "original": "9abc060e13",
-      "target_cs_offset": 44030,
+      "target_cs_offset": 44308,
       "name": "pause release at entry"
     },
     {
       "image_offset": 45851,
       "original": "9a33010e13",
-      "target_cs_offset": 44051,
+      "target_cs_offset": 44329,
       "name": "pause synchronized menu input"
     },
     {
       "image_offset": 45991,
       "original": "9abc060e13",
-      "target_cs_offset": 44030,
+      "target_cs_offset": 44308,
       "name": "pause release at resume"
     },
     {
@@ -292,173 +322,179 @@
     {
       "image_offset": 44001,
       "original": "e8db5e",
-      "target_cs_offset": 34837,
+      "target_cs_offset": 34839,
       "name": "player update"
     },
     {
       "image_offset": 44056,
       "original": "e8e25f",
-      "target_cs_offset": 35134,
+      "target_cs_offset": 35017,
       "name": "player render"
     },
     {
       "image_offset": 52062,
       "original": "e8813c",
-      "target_cs_offset": 35111,
+      "target_cs_offset": 34994,
       "name": "background invalidation"
     },
     {
       "image_offset": 68528,
       "original": "ff169a44",
-      "target_cs_offset": 35020,
+      "target_cs_offset": 34991,
       "name": "shot dispatch"
     },
     {
       "image_offset": 68279,
       "original": "e887da",
-      "target_cs_offset": 36413,
+      "target_cs_offset": 36285,
       "name": "last life / retirement"
     },
     {
       "image_offset": 61041,
       "original": "c41e86ba26807f0b63772726fe470b",
-      "target_cs_offset": 36623,
+      "target_cs_offset": 36495,
       "name": "score extend for survivors"
     },
     {
       "image_offset": 44004,
       "original": "e8cf58",
-      "target_cs_offset": 39014,
+      "target_cs_offset": 38502,
       "name": "shared shots and independent lasers update"
     },
     {
       "image_offset": 44053,
       "original": "e83a59",
-      "target_cs_offset": 39058,
+      "target_cs_offset": 38546,
       "name": "shared shots and independent lasers render"
     },
     {
       "image_offset": 66979,
       "original": "e8a0bf",
-      "target_cs_offset": 39554,
+      "target_cs_offset": 39178,
       "name": "per-owner projectile palette during native tiny blit"
     },
     {
       "image_offset": 57981,
       "original": "e8e2de",
-      "target_cs_offset": 39669,
+      "target_cs_offset": 39294,
       "name": "bound player laser palette"
     },
     {
       "image_offset": 58033,
       "original": "e8b4db",
-      "target_cs_offset": 39716,
+      "target_cs_offset": 39341,
       "name": "clear native laser RGB context"
     },
     {
       "image_offset": 52065,
       "original": "e8e038",
-      "target_cs_offset": 39087,
+      "target_cs_offset": 38575,
       "name": "shared shots and independent lasers invalidate"
     },
     {
       "image_offset": 67332,
       "original": "660fb7c7",
-      "target_cs_offset": 39115,
+      "target_cs_offset": 38603,
       "name": "guest laser damage"
     },
     {
       "image_offset": 44944,
       "original": "e8a14f",
-      "target_cs_offset": 39223,
+      "target_cs_offset": 38711,
       "name": "preload both Bomb characters"
     },
     {
       "image_offset": 65530,
       "original": "c606684301",
-      "target_cs_offset": 39287,
+      "target_cs_offset": 38775,
       "name": "latch Bomb owner"
     },
     {
       "image_offset": 67043,
       "original": "33ffc646f100",
-      "target_cs_offset": 45271,
+      "target_cs_offset": 45549,
       "name": "reset hit ownership"
     },
     {
       "image_offset": 67135,
       "original": "03f8fe064046",
-      "target_cs_offset": 45295,
+      "target_cs_offset": 45573,
       "name": "record shot damage owner"
     },
     {
       "image_offset": 67195,
       "original": "83c705803e5c1b00",
-      "target_cs_offset": 45333,
+      "target_cs_offset": 45604,
       "name": "record Bomb damage owner"
     },
     {
       "image_offset": 67252,
       "original": "83c703fe064046",
-      "target_cs_offset": 45358,
+      "target_cs_offset": 45629,
       "name": "record first P1 laser"
     },
     {
       "image_offset": 67300,
       "original": "83c703fe064046",
-      "target_cs_offset": 45358,
+      "target_cs_offset": 45629,
       "name": "record second P1 laser"
     },
     {
       "image_offset": 44039,
       "original": "e80056",
-      "target_cs_offset": 39331,
+      "target_cs_offset": 38819,
       "name": "render owner Bomb resources"
+    },
+    {
+      "image_offset": 73110,
+      "original": "33c0803e664344",
+      "target_cs_offset": 40165,
+      "name": "bounded shared shot allocation and direct owner tagging"
     },
     {
       "image_offset": 48081,
       "original": "b90800268b0426890583c65083c750e2f281ef8002",
-      "target_cs_offset": 46492,
+      "target_cs_offset": 46763,
       "name": "fixed eight-row EGC tile copy; original read/write order"
     },
     {
       "image_offset": 50622,
       "original": "add3c88af022c226890532c674042688450283c750fecd75e7",
-      "target_cs_offset": 46598,
+      "target_cs_offset": 46869,
       "name": "16x16 even four-row blit; equivalent SHRD rotation"
     },
     {
       "image_offset": 50726,
       "original": "add3c88af022c226880532c686e02689450183c750fecd75e7",
-      "target_cs_offset": 46728,
+      "target_cs_offset": 46999,
       "name": "16x16 odd four-row blit; equivalent SHRD rotation"
     },
     {
       "image_offset": 50306,
       "original": "e8550075fb",
-      "target_cs_offset": 46858,
+      "target_cs_offset": 47129,
       "name": "32x32 even inline cloud rows"
     },
     {
       "image_offset": 50352,
       "original": "e8590075fb",
-      "target_cs_offset": 46911,
+      "target_cs_offset": 47182,
       "name": "32x32 odd inline cloud rows"
     },
     {
       "image_offset": 49728,
       "original": "ad0ae47405268905eb070ac0740326880583c750e2ea",
-      "target_cs_offset": 46973,
+      "target_cs_offset": 47244,
       "name": "spark four-row blit"
     },
     {
       "image_offset": 51691,
       "original": "a583c74ee2fa",
-      "target_cs_offset": 47091,
+      "target_cs_offset": 47362,
       "name": "point-bullet full six-row blit"
     }
   ],
-  "sha256": "199b875af7c7f47ac7bfc58906244908b34c691b628796f368009db88d637948",
+  "sha256": "af7bacce81c50d750a00e4fe73c0635a294864fe9b1eac302aa5e1295ba6581c",
   "source": {
     "language": "ja",
     "file": "4-jp.hdi.gz",
@@ -466,7 +502,7 @@
     "main_md5": "06d74719b6f72b11014a392fd34d5f57"
   },
   "code_segment": 2735,
-  "data_segment": 9303,
+  "data_segment": 9320,
   "launch_config": {
     "schema": 2,
     "defaults": [
@@ -484,17 +520,17 @@
     ],
     "targets": [
       [
-        8279605,
-        8279606,
-        8279607,
-        8279608,
-        8279609,
-        8279610,
-        8279611,
-        8279612,
-        8279613,
-        8279614,
-        8279615
+        8279161,
+        8279162,
+        8279163,
+        8279164,
+        8279165,
+        8279166,
+        8279167,
+        8279168,
+        8279169,
+        8279170,
+        8279171
       ],
       [
         326673,

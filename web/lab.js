@@ -208,7 +208,7 @@ $('start').onclick=async()=>{
     installConfig(data,patch,config);
     if($('audio-mode').value==='independent'){
       localMusic=new SoloMusic(status);const musicDisk=data.slice();
-      try{await localMusic.install(musicDisk,'GENSO');data=musicDisk;}
+      try{await localMusic.installCoop(musicDisk,patch,version.language,meta.sha256);data=musicDisk;}
       catch(error){localMusic.dispose();localMusic=null;status('独立音乐加载失败，将使用原声：'+error.message);}
     }
     const runtimeConfig={canvas:$('canvas'),artPatch:patch,ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,no_mouse:true,use_menu:false,fontfile:'font.bmp'};

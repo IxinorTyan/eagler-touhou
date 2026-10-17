@@ -1,13 +1,23 @@
 const {chromium}=require('C:/Users/14915/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-(async()=>{const reports=[],rtc=process.env.TRANSPORT==='rtc'||process.env.RTC_OFF==='1',rollback=process.env.RTC_OFF!=='1',browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});try{
+(async()=>{const reports=[],rtc=process.env.TRANSPORT==='rtc'||process.env.RTC_OFF==='1',rollback=process.env.RTC_OFF!=='1'&&process.env.ROLLBACK!=='0',browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});try{
  const base=process.env.ROOM_URL||'http://127.0.0.1:9868';
- for(const players of (rollback?[2,3]:[2])){
+ for(const players of (process.env.ROOM_PLAYERS?JSON.parse(process.env.ROOM_PLAYERS):rollback?[2,3]:[2])){
   const pages=[],errors=[];
   for(let slot=0;slot<players;slot++){
    const page=await browser.newPage();pages.push(page);page.on('pageerror',e=>{errors.push(e.stack||e.message);console.log('PAGEERROR',slot,e.message);});page.on('requestfailed',r=>console.log('REQUEST FAILED',slot,r.url(),r.failure()));
    await page.route('**/netplay/room.js',async route=>{const r=await route.fetch();await route.fulfill({response:r,body:await r.text()+`\nglobalThis.roomQA={read:()=>({running,stopped,stopReason,frame:queue?.frame,confirmed:queue?.confirmed,active:queue?.active,slot:queue?.slot,reason:runtime?.predictionBlockReason(),offlineMask:queue?.offlineMask(queue.frame),hashes:[...hashes].slice(-6).map(([tick,s])=>({tick,hash:s.hash})),s:runtime?.snapshot(),check:runtime?.checksum(),rollbacks:rollbackCount,replayed:resimulated,info:runtime?.rollbackInfo(),hz,averageCost,details:$('diagnostics').textContent}),stop:()=>{stopped=true;running=false;runtime?.stop();},keys};const qaSend=broadcast;broadcast=packet=>{if(window.qaDelay&&packet.type==='input')setTimeout(()=>qaSend(packet),window.qaDelay);else qaSend(packet);};`});});
    await require('./native_scheduler_qa.cjs').install(page);
+   if(process.env.FULL_FIRE==='1')await page.route('**/netplay/runtime.js',async route=>{
+    const response=await route.fetch();await route.fulfill({response,body:await response.text()+`
+     const fullPowerStep=th04Sync.step;th04Sync.step=(inputs,options)=>{
+      if(mailbox>=0){const d=gameDataBase(),m=emulator.module,h=m.HEAPU8;
+       m.thDirtyMark?.(d+0x4664,2);m.thDirtyMark?.(mailbox+609,48);
+       h[d+0x4664]=128;h[d+0x4665]=9;
+       for(let s=0;s<3;s++){h[mailbox+609+s*16]=128;h[mailbox+610+s*16]=9;}
+      }return fullPowerStep(inputs,options);
+     };`});
+   });
    await page.goto(base+'/lan.html?network=lan&transport='+(rtc?'rtc':'ws'));await page.waitForFunction(()=>window.roomQA);
   }
   const host=pages[0];await host.click('#create');await host.locator('#lobby').waitFor({state:'visible'});await host.selectOption('#players',String(players));if(rollback)await host.locator('#rollback').check();else await host.locator('#rollback').uncheck();if(rtc)await host.selectOption('#language','jp');
@@ -23,6 +33,11 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
   try{for(const page of pages)await page.waitForFunction(rollback=>{const s=window.roomQA.read();return s.stopped||(s.s?.gameFrame>100&&(!rollback||s.active));},rollback,{timeout:60000});}catch(error){for(let i=0;i<pages.length;i++){console.log('ROOM FAILURE',i,await pages[i].evaluate(()=>({qa:window.roomQA.read(),status:document.querySelector('#status').textContent,startup:document.querySelector('#startup-progress').textContent})));await pages[i].screenshot({path:path.resolve(__dirname,`../reports/dosbox-room-failure-${i}.png`)});}throw error;}
   const boot=await Promise.all(pages.map(p=>p.evaluate(()=>window.roomQA.read())));for(let i=0;i<boot.length;i++){const s=boot[i];if(!s.running||s.stopped){for(const f of pages[i].frames())console.log('BOOT FRAME',i,f.url(),await f.evaluate(()=>({details:document.querySelector('#details')?.textContent,warning:document.querySelector('#page-warning')?.textContent})).catch(()=>null));}assert(s.running&&!s.stopped,s.stopReason);}console.log('rooms boot',players,boot.map(s=>({frame:s.frame,active:s.active})));
   const before=await host.evaluate(()=>window.roomQA.read());
+  if(process.env.FULL_FIRE==='1'){
+   for(const page of pages)await page.keyboard.down('KeyZ');
+   await host.waitForTimeout(2500);
+   for(const page of pages)await page.keyboard.up('KeyZ');
+  }
   let outage=null;
   if(process.env.ROOM_OUTAGE==='1'){
    const route='**/api/events?*',block=r=>r.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'QA temporary room service outage'})});

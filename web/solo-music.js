@@ -33,6 +33,33 @@ export class SoloMusic {
     fat.put(this.driverPath,bytes);
     fat.replace(entry,Uint8Array.from(batch,c=>c.charCodeAt(0)));
   }
+  async installCoop(data,patch,language,diskSha256) {
+    // Cooperative MAIN already has the verified native BGM-OFF observer used
+    // online. Reuse it without retaining another DOS interrupt driver.
+    const response=await fetch('netplay/runtime.json',{cache:'no-cache'});
+    if(!response.ok)throw Error('合作音乐配置加载失败');
+    const version=await response.json(),sound=version.native_sound_by_language?.[language];
+    if(sound?.disk_sha256!==diskSha256||sound.schema!==2||sound.bgm!==0||sound.se!==1||!sound.edits?.length)
+      throw Error('合作音乐配置版本不匹配');
+    const manifestResponse=await fetch('bgm/manifest.json');
+    if(!manifestResponse.ok)throw Error('合作音乐曲目清单加载失败');
+    const manifest=await manifestResponse.json(),trackHashes={};
+    for(const [hash,id]of Object.entries(manifest.headers)){
+      const match=/^(.+)-(m26|m86)$/.exec(id);
+      if(match&&(match[2]==='m86'||trackHashes[match[1]]===undefined))trackHashes[match[1]]=Number(hash);
+    }
+    const seen=new Set();
+    for(const edit of sound.edits)for(let i=0;i<edit.targets.length;i++){
+      const at=edit.targets[i];
+      if(!Number.isInteger(at)||at<0||at>=data.length||seen.has(at)||data[at]!==edit.expected[i])throw Error('合作音乐补丁校验失败');
+      seen.add(at);
+    }
+    this.coopEdits=sound.edits;
+    this.reader=new NativeMusic({kind:'th04-native',signature:'TH04COOPLABv001!',
+      mailbox_cs_offset:patch.mailbox_cs_offset,data_segment:patch.data_segment,code_segment:patch.code_segment,
+      observer:sound.observer,trackHashes});
+    for(const edit of sound.edits)for(let i=0;i<edit.targets.length;i++)data[edit.targets[i]]=edit.values[i];
+  }
   start() {
     if(this.closed||this.loading)return;
     // The driver can queue commands while the small manifest loads. Tracks
@@ -44,6 +71,7 @@ export class SoloMusic {
     });
   }
   exportDisk(data) {
+    if(this.coopEdits){const copy=new Uint8Array(data);for(const edit of this.coopEdits)for(let i=0;i<edit.targets.length;i++)copy[edit.targets[i]]=edit.expected[i];return copy;}
     const copy=new Uint8Array(data),fat=new Fat12(copy);
     fat.replace(fat.find(this.batchPath),this.originalBatch);
     const entry=fat.find(this.driverPath);

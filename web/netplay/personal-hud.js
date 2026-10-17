@@ -13,11 +13,22 @@ export function createPersonalHud(canvas,nativeCanvas){
     const at=(y*160+digit*16+x)*4;pixels.data.fill(255,at,at+4);
   }
   ink.putImageData(pixels,0,0);
+  const numbers=new Map();
   function number(value,x,y,count,zeros=false){
-    context.fillStyle='#000';context.fillRect(x,y,count*16,16);
     const text=String(value).padStart(count,zeros?'0':' ').slice(-count);
-    for(let i=0;i<count;i++)if(text[i]!==' ')
-      context.drawImage(atlas,Number(text[i])*16,0,16,16,x+i*16,y,16,16);
+    const key=x+','+y+','+count;
+    let row=numbers.get(key);
+    if(!row){
+      const image=document.createElement('canvas');image.width=count*16;image.height=16;
+      row={image,ink:image.getContext('2d',{alpha:false}),text:null};numbers.set(key,row);
+    }
+    if(row.text!==text){
+      row.ink.fillStyle='#000';row.ink.fillRect(0,0,count*16,16);
+      for(let i=0;i<count;i++)if(text[i]!==' ')
+        row.ink.drawImage(atlas,Number(text[i])*16,0,16,16,i*16,0,16,16);
+      row.text=text;
+    }
+    context.drawImage(row.image,x,y);
   }
   return ({heap,mailbox,patch,slot,guestBase,raw=false,points={}})=>{
     if(canvas.width!==640||canvas.height!==400){

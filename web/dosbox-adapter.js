@@ -24,7 +24,7 @@ export class DOSBoxPC98 {
       mobileRuntime:{core:'dosbox-x',cpuCore:'simple',continuation:net?'Asyncify':'JSPI',writeJournal:tracked},
       locateFile:f=>new URL(f==='wdosbox-x-jspi.wasm'?(net?(tracked?'wdosbox-x-rollback-tracked.wasm':'wdosbox-x-rollback.wasm'):'wdosbox-x-fast.wasm'):f==='wdosbox-x.wasm'?(tracked?'wdosbox-x-rollback-tracked.wasm':'wdosbox-x-rollback.wasm'):f,vendor).href,
       postMessage:(name,props)=>{if(receiver)receiver(name,props);else queue.push([name,props]);},
-      onAbort:error=>{this.state='failed';this.config.onError?.(Error(String(error)));}};
+      onAbort:error=>this.fail(Error(String(error)))};
     this.module.installFramePresenter=()=>{
       this.module.framePresenter?.dispose();
       this.module.framePresenter=installFramePresenter(this.module,{deferred:net,isReplaying:()=>this.replaying});
@@ -62,22 +62,23 @@ export class DOSBoxPC98 {
     const network=!!this.config.lockstep,launcher=prepareFastBoot(this.extracted,{network});
     const init=[...this.extracted.files,launcher,{dosboxConf:dosboxConfig({network,fastBoot:true}),jsdosConf:{version:'8'}}];
     this.ci=await globalThis.emulators.backend(init,this.transport,{});
-    this.ci.events().onSoundPush(samples=>{this.module.audioPackets=(this.module.audioPackets||0)+1;if(this.module.warmingBoot)return;if(this.config.workerRuntime){this.audioChunks.push(samples.slice());return;}if(this.frame!==null)this.outputs.get(this.frame)?.push(samples.slice());else this.audio.push([samples]);});
-    this.logs=[];this.ci.events().onMessage((type,...messages)=>{this.logs.push([type,...messages]);this.logs=this.logs.slice(-40);if(type==='error'&&messages.some(s=>String(s).includes('[panic]'))){this.state='failed';this.config.onError?.(Error(messages.join(' ')));}});
-    this.ci.events().onExit(()=>{if(this.resetting)return;this.state='exited';this.config.onExit?.();});
+    this.ci.events().onSoundPush(samples=>{this.module.audioPackets=(this.module.audioPackets||0)+1;if(this.module.warmingBoot||this.config.externalEffects)return;if(this.config.workerRuntime){this.audioChunks.push(samples.slice());return;}if(this.frame!==null)this.outputs.get(this.frame)?.push(samples.slice());else this.audio.push([samples]);});
+    this.logs=[];this.ci.events().onMessage((type,...messages)=>{this.logs.push([type,...messages]);this.logs=this.logs.slice(-40);if(type==='error'&&messages.some(s=>String(s).includes('[panic]')))this.fail(Error(messages.join(' ')));});
+    this.ci.events().onExit(()=>{if(this.resetting)return;if(this.state!=='failed')this.state='exited';this.config.onExit?.();});
     for(const code of this.keys)this.ci.sendKeyEvent(codes[code],true);
     if(this.state!=='running'&&!this.config.lockstep)this.ci.pause();
     this.module.SDL2={audioContext:this.audio.context};
     if(!this.module.framePresenter)throw Error('DOSBox-X 直接呈现器未初始化，请刷新页面并检查运行资源版本');
   }
   getDiskImage(name){if(name===this.diskName&&this.extracted)return this.extracted.export(this.module.FS);const disk=this.disks.get(name);if(!disk)throw Error('未知磁盘');return disk.slice();}
-  run(){this.state='running';if(!this.config.lockstep)this.ci?.resume();this.audio.context.resume().catch(()=>{});}
-  pause(){this.state='paused';if(!this.config.lockstep)this.ci?.pause();this.module?.framePresenter?.resetTiming();this.audio.flush();}
+  fail(error){if(this.state==='failed')return;this.failedError=error;this.state='failed';this.config.onError?.(error);}
+  run(){if(this.state==='failed'||this.state==='exited')throw this.failedError||Error('DOSBox-X 已退出');this.state='running';if(!this.config.lockstep)this.ci?.resume();this.audio.context.resume().catch(()=>{});}
+  pause(){if(this.state!=='failed'&&this.state!=='exited')this.state='paused';if(!this.config.lockstep)this.ci?.pause();this.module?.framePresenter?.resetTiming();this.audio.flush();}
   async reset(){
     const running=this.state==='running',diskName=this.diskName,disks=this.disks;
     this.resetting=true;this.pause();
     if(this.ci){const exiting=this.ci.exit();if(this.config.lockstep){for(let i=0;!this.ci.exited&&i<1000;i++){this.module.virtualNow=Math.max(this.module.virtualNow,this.module.wakeAt);this.module.advanceNative();}}await exiting;}
-    this.dispose();this.state='loading';this.keys=new Set();this.outputs=new Map();this.frame=null;this.replaying=false;this.tick=0;this.audioChunks=[];this.snapshots=null;
+    this.dispose();this.state='loading';this.failedError=null;this.keys=new Set();this.outputs=new Map();this.frame=null;this.replaying=false;this.tick=0;this.audioChunks=[];this.snapshots=null;
     await this.initialize();this.disks=disks;
     if(diskName)await this.setHdd(0,diskName);
     this.resetting=false;if(running)this.run();
@@ -86,7 +87,7 @@ export class DOSBoxPC98 {
     if(!this.config.lockstep||this.state!=='running')throw Error('DOSBox-X 没有进入同步运行状态');
     const m=this.module;this.tick++;m.targetNow=Math.max(m.virtualNow,Math.floor(this.tick*1000/60));
     let safety=0;
-    while(m.wakeAt<=m.targetNow){if(++safety>1000)throw Error('DOSBox-X 同步步骤未让出执行');if(m.wakeAt>m.virtualNow)m.virtualNow=m.wakeAt;m.advanceNative();}
+    while(m.wakeAt<=m.targetNow){if(++safety>1000)throw Error('DOSBox-X 同步步骤未让出执行');if(m.wakeAt>m.virtualNow)m.virtualNow=m.wakeAt;m.advanceNative();if(this.state==='failed'||this.state==='exited')throw this.failedError||Error('DOSBox-X 模拟器已经退出');}
     m.virtualNow=m.targetNow;
     if(!m.pendingWake)throw Error('DOSBox-X 未在同步边界挂起');
   }

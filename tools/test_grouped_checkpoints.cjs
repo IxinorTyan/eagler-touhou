@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 (async()=>{
  const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true}),reports=[];
  try{
-  for(const [language,players,fallback,pauseCase=false]of [['cn',2,false],['cn',3,false],['jp',2,false],['jp',3,false],['cn',3,true],['jp',3,false,true]]){
+  for(const [language,players,fallback,pauseCase=false]of [['cn',2,false],['cn',3,false],['jp',2,false],['jp',3,false],['cn',3,true],['jp',3,false,true]].filter((_,i)=>!process.env.CHECKPOINT_CASES||JSON.parse(process.env.CHECKPOINT_CASES).includes(i))){
    const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.stack||e.message));
    if(process.env.QA_RUNTIME_DIR)for(const name of ['dosbox-snapshots.js','dosbox-memory-diff.js','snapshot-diff.wasm','dosbox-rollback.mjs'])await page.route('**/'+name,route=>route.fulfill({contentType:name.endsWith('.wasm')?'application/wasm':'text/javascript',body:fs.readFileSync(path.resolve(__dirname,'..',process.env.QA_RUNTIME_DIR,name))}));
    if(process.env.CANDIDATE)await page.route('**/wdosbox-x-rollback.wasm',route=>route.fulfill({contentType:'application/wasm',body:fs.readFileSync(path.resolve(__dirname,'..',process.env.CANDIDATE))}));
@@ -13,7 +13,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    await page.route('**/netplay/runtime.js',async route=>{const response=await route.fetch();const source=process.env.QA_RUNTIME_DIR?fs.readFileSync(path.resolve(__dirname,'..',process.env.QA_RUNTIME_DIR,'runtime.js'),'utf8'):await response.text();await route.fulfill({response,body:source+'\nglobalThis.checkpointQA={emulator:()=>emulator};'});});
    if(fallback)await page.route('**/dosbox-memory-diff.js',route=>route.fulfill({contentType:'text/javascript',body:'export async function makeMemoryDiff(){return null;}'}));
    await require('./native_scheduler_qa.cjs').install(page);
-   await page.goto((process.env.BASE||'http://127.0.0.1:9867')+'/netplay/runtime.html');await page.waitForFunction(()=>window.th04Sync);
+   await page.goto((process.env.BASE||'http://127.0.0.1:9867')+'/netplay/runtime.html');try{await page.waitForFunction(()=>window.th04Sync);}catch(error){console.error('CHECKPOINT IMPORT',language,players,fallback,pauseCase,errors,await page.locator('body').innerText());throw error;}
    await page.evaluate(async({language,players})=>{const r=th04Sync;r.configure(1,0,players);await r.load({language,players,p1:0,p2:2,p3:1,difficulty:1,lives:6,bombs:2});r.start();for(let i=0;i<60;i++){r.step(Array(players).fill(0),{frame:i});r.confirm(i+1);}}, {language,players});
    const result=await page.evaluate(async({players,fallback,pauseCase})=>{
     const r=th04Sync,e=checkpointQA.emulator(),m=e.module,FS=m.FS,filename='/home/web_user/checkpoint-undo.txt';
