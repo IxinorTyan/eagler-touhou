@@ -11,6 +11,11 @@
 </style>
 <style>aside{min-width:0;overflow-wrap:anywhere}select{max-width:100%}.layout>*{min-width:0}@media(max-width:950px){.layout{grid-template-columns:minmax(0,1fr) 230px}}@media(max-width:720px){.layout{display:block}}</style>
 <header class="intro"><span class="eyebrow">LOCAL / TEST</span><h1>本地双人测试</h1></header>
+<section class="panel local-music-settings" aria-label="本机音乐">
+<label class="bgm-version">本机音乐 <select data-bgm-version-control aria-label="本机音乐版本"><option value="old">游戏原版</option><option value="new">幺乐团专辑版</option></select><small data-bgm-restart-note></small></label>
+<p class="muted">仅影响本机播放的音乐，不改变其他玩家的选择；自动保存，游戏中切换会从头播放当前曲目。</p>
+</section>
+
 <p>在这里选择双方机体和本局设置，开始后直接载入第一关；选择 Extra 则直接进入 EX 关。实验版 0.5 · 本地双人</p>
 <fieldset id="setup"><legend>本局设置</legend><label>游戏语言 <select id="language"><option value="cn">汉化版</option><option value="jp">日文版</option></select></label><div class="toolbar">
 <label>P1 机体 <select id="loadout-p1"><option value="0">灵梦 A</option><option value="1">灵梦 B</option><option value="2">魔理沙 A</option><option value="3">魔理沙 B</option></select></label>
@@ -30,5 +35,5 @@
 </main><aside><h2>P1 · 键盘</h2><div>当前键位见画面上方操作说明；点击「自定义操作」可修改。</div><h2>P2 · 手柄</h2><div>左摇杆移动；默认十字键移动，A / × 射击，B / ○ 炸弹，RB / R1 低速，Start 暂停。按钮可在「自定义操作」中修改。</div><p id="pad">未检测到手柄：连接后按一下手柄按钮。</p><label>使用手柄 <select id="pad-select"><option value="auto">自动选择</option></select></label><p>P2 也支持键盘：默认 WASD 移动、J 射击、K 低速、L 炸弹。当前键位见上方操作说明。</p><h2>实验规则</h2><div>独立选择角色与 A/B 机体，独立火力、炸弹与残机；Power 归拾取者；1UP 给所有玩家加一命，已退场者会带短暂无敌复活；Bomb 道具给仍在场的玩家各加一颗。分数共享，分数加命与过关炸弹奖励发给仍在场的玩家。炸弹同时只能生效一个，背景板与演出跟随施放者，另一人不会扣库存。耗尽残机后，变成初始位置附近漂浮的小幽灵；过关时免费复活。借命：有备用残机的玩家低速停火靠近队友（含幽灵），保持 90 帧，读条完成后扣自己一命给对方；松开低速键后才能再次借命。两人均退场才结束；续关时两人一同回归。双方使用各自的原版射击、子机与激光，吃到 Power 后分别升级。右栏沿用拾取道具图标：小 P 旁显示火力 0.00–4.00，1UP 旁显示备用残机，Bomb 旁显示炸弹数。备用残机为 0 时仍可继续当前一命。</div><p class="warning">P2 已接入普通敌弹与杂鱼碰撞；Boss 接触、特殊激光等判定尚未完整适配。当前用于验证双人基础，不作为完整通关版。</p></aside></div>
 <details open><summary>单机验证与状态</summary><div class="toolbar"><button id="selftest" disabled>检查 P2 移动与射击</button><button id="hit-test" disabled>检查 P2 受击与复活</button><button id="capture" disabled>保存当前画面</button></div><div id="tests">进入关卡后可运行检查；运行时请暂时松开所有按键和手柄。</div><pre id="diagnostics">尚未进入 MAIN.EXE。</pre><small>受击检查会在 P2 位置生成一颗真实普通敌弹，消耗 P2 残机；仅用于这个不保存进度的实验版本。</small></details>
 <script type="module" src="lab.js?v=0.5"></script>
-</body></html>
+<script type="module" src="bgm-version.js"></script></body></html>
 
