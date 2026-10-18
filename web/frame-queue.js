@@ -12,20 +12,23 @@ export function validInput(input){
 }
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 export class FrameQueue {
-  constructor(slot,{rollbackEnabled=false,directionPrediction=DIRECTION_PREDICTION}={}){
-    if(![0,1].includes(slot)||typeof rollbackEnabled!=='boolean'||!Number.isInteger(directionPrediction)||directionPrediction<0||directionPrediction>MAX_ROLLBACK)throw Error('无效预测策略');
-    this.slot=slot;this.rollbackEnabled=rollbackEnabled;this.directionPrediction=directionPrediction;this.frame=0;this.confirmed=BOOT_DELAY;
+  constructor(slot,{rollbackEnabled=false,directionPrediction=DIRECTION_PREDICTION,inputDelay=INPUT_DELAY}={}){
+    if(![0,1].includes(slot)||typeof rollbackEnabled!=='boolean'||!Number.isInteger(directionPrediction)||directionPrediction<0||directionPrediction>MAX_ROLLBACK||!Number.isInteger(inputDelay)||inputDelay<0||inputDelay>6||(!rollbackEnabled&&inputDelay!==0))throw Error('无效预测策略');
+    // Choose before sampling. Starting with at least this much neutral input
+    // avoids a hole when the future activation switches to rollback timing.
+    Object.defineProperties(this,{inputDelay:{value:inputDelay,enumerable:true},bootDelay:{value:Math.max(BOOT_DELAY,inputDelay),enumerable:true}});
+    this.slot=slot;this.rollbackEnabled=rollbackEnabled;this.directionPrediction=directionPrediction;this.frame=0;this.confirmed=this.bootDelay;
     this.activation=null;this.dirty=null;this.waitReason='';this.inputs=[new Map(),new Map()];this.used=new Map();
-    for(const lane of this.inputs)for(let n=0;n<BOOT_DELAY;n++)lane.set(n,neutral());
+    for(const lane of this.inputs)for(let n=0;n<this.bootDelay;n++)lane.set(n,neutral());
   }
   get active(){return this.rollbackEnabled&&this.activation!==null&&this.frame>=this.activation;}
   arm(frame){
     if(!this.rollbackEnabled||this.activation!==null||!Number.isSafeInteger(frame)||frame<this.frame||frame>this.frame+240)throw Error('无效回滚启用帧');
     this.activation=frame;
   }
-  needsCapture(){const frame=this.frame+(this.active?INPUT_DELAY:BOOT_DELAY);return !this.inputs[this.slot].has(frame);}
+  needsCapture(){const frame=this.frame+(this.active?this.inputDelay:this.bootDelay);return !this.inputs[this.slot].has(frame);}
   capture(input){
-    const frame=this.frame+(this.active?INPUT_DELAY:BOOT_DELAY),lane=this.inputs[this.slot];
+    const frame=this.frame+(this.active?this.inputDelay:this.bootDelay),lane=this.inputs[this.slot];
     if(lane.has(frame))return null;
     if(!validInput(input))throw Error('本机帧输入无效');
     lane.set(frame,structuredClone(input));this.updateConfirmed();return {type:'frame',frame,input:structuredClone(input)};

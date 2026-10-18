@@ -1,6 +1,7 @@
 import {packTouch, unpackTouch, ALWAYS_POINT, MAX_INPUT} from './touch-input.js';
 import {neutral} from './frame-queue.js';
 import {loadRtcConfiguration,hasTurn,describeRtcPath} from './netplay/udp-config.js';
+import {SYNC_PROTOCOL,RTT_SAMPLES,validInputReport,validInputPolicy,chooseInputPolicy} from './netplay/input-policy.js';
 const ACTIONS=['up','down','left','right','shot','rapid','attack','focus'], protocol='th03-lan/1';
 export class Netplay {
   constructor({room,token,role,mode,sampleLocal,onState=()=>{},onError=()=>{}}){this.room=room;this.token=token;this.role=role;this.mode=mode;this.sampleLocal=sampleLocal;this.localSeat=role==='host'?0:1;this.onState=onState;this.onError=onError;this.remote=new Set();this.seq=0;this.lastRemote=-1;this.socket=null;this.pc=null;this.rtcPoll=null;this.rtcTimer=null;this.rtcResolve=null;this.rtcReject=null;this.pendingIce=[];this.remoteDescriptionReady=false;}
@@ -57,7 +58,7 @@ export class Netplay {
     this.localTaps?.clear();if(touch)touch.x=touch.y=0;return input;}
   sendPacket(packet){if(this.channel?.readyState!=='open')throw Error('同步通道未连接');
     if((this.channel.bufferedAmount||this.socket?.bufferedAmount||0)>524288)throw Error('联机发送队列拥塞，请结束后重新建房');
-    this.channel.send(JSON.stringify({...packet,sync:'th03-rollback/5'}));}
+    this.channel.send(JSON.stringify({...packet,sync:SYNC_PROTOCOL}));}
   async synchronize(identity){
     this.sendPacket({type:'sync-ready',identity});
     const deadline=performance.now()+30000;
@@ -69,11 +70,78 @@ export class Netplay {
     }
     throw Error('同步连接已关闭');
   }
+  async waitForSync(predicate,message){
+    const deadline=performance.now()+30000;
+    while(!this.closed){if(predicate())return;if(performance.now()>deadline)throw Error(message);await new Promise(resolve=>setTimeout(resolve,10));}
+    throw Error('同步连接已关闭');
+  }
+  probeRtt(){
+    this.probes??=new Map();const id=this.probeSerial=(this.probeSerial??0)+1;
+    return new Promise((resolve,reject)=>{
+      const pending={at:performance.now(),resolve,reject,timer:setTimeout(()=>{this.probes.delete(id);reject(Error('连接延迟采样超时，请重新建房'));},5000)};
+      this.probes.set(id,pending);
+      try{this.sendPacket({type:'buffer-ping',id});}catch(error){clearTimeout(pending.timer);this.probes.delete(id);reject(error);}
+    });
+  }
+  async negotiateInputPolicy({rollbackEnabled}){
+    if(typeof rollbackEnabled!=='boolean'||!this.synchronized||this.negotiating)throw Error('输入缓冲协商状态无效');
+    this.negotiating=true;
+    this.onState(rollbackEnabled?'正在测量连接延迟并确认输入缓冲':'正在确认双方关闭回滚');
+    const samples=[];if(rollbackEnabled)for(let n=0;n<RTT_SAMPLES;n++)samples.push(await this.probeRtt());
+    const sorted=[...samples].sort((a,b)=>a-b);
+    const report={rollbackEnabled,rttMs:rollbackEnabled?Math.ceil(sorted[sorted.length>>1]):0,maxRttMs:rollbackEnabled?Math.ceil(Math.max(...samples)):0};
+    this.localInputReport=Object.freeze(report);this.rttSamples=Object.freeze(samples);
+    this.sendPacket({type:'buffer-report',report});
+    await this.waitForSync(()=>this.peerInputReport,'等待对方连接延迟采样超时');
+    const expected=chooseInputPolicy(report,this.peerInputReport);
+    if(this.role==='host'){
+      this.sendPacket({type:'buffer-policy',policy:expected});
+      await this.waitForSync(()=>this.peerPolicyAck,'等待对方确认输入缓冲超时');
+      if(JSON.stringify(this.peerPolicyAck)!==JSON.stringify(expected))throw Error('对方输入缓冲确认不一致');
+    }else{
+      await this.waitForSync(()=>this.hostInputPolicy,'等待房主输入缓冲超时');
+      if(JSON.stringify(this.hostInputPolicy)!==JSON.stringify(expected))throw Error('房主输入缓冲与双方测量不一致');
+      this.sendPacket({type:'buffer-ack',policy:expected});
+    }
+    this.inputPolicy=Object.freeze(expected);
+    this.onState(rollbackEnabled?`双方输入缓冲 ${expected.inputDelay} 帧（约 ${Math.round(expected.inputDelay*1000/60)} ms）· 开局 RTT ${expected.rttMs} ms`:'回滚关闭 · 使用 2 帧确认锁步');
+    return this.inputPolicy;
+  }
+  setPacketHandler(handler){
+    if(typeof handler!=='function'||this.onPacket)throw Error('帧同步接收器重复安装');
+    this.onPacket=handler;for(const packet of this.pendingPackets??[])handler(packet);this.pendingPackets=[];
+  }
+  rememberSync(name,value){
+    if(this[name]&&JSON.stringify(this[name])!==JSON.stringify(value))throw Error('收到冲突的开局协商消息');
+    this[name]=structuredClone(value);
+  }
   send(value,touch=0){const message=JSON.stringify({type:'input',seq:this.seq++,actions:[...value],touch});if(this.channel?.readyState==='open')this.channel.send(message);}
   receive(message){
-    if(message.sync==='th03-rollback/5'){
-      if(message.type==='sync-ready'){this.peerIdentity=message.identity;return;}
-      if(message.type==='frame'||message.type==='check'||message.type==='rollback'){this.onPacket?.(message);return;}
+    if(message.sync&&message.sync!==SYNC_PROTOCOL)throw Error('双方同步协议版本不同，请更新服务、刷新页面后重新建房');
+    if(message.sync===SYNC_PROTOCOL){
+      if(message.type==='sync-ready'){
+        if(!message.identity||typeof message.identity!=='object'||Array.isArray(message.identity))throw Error('同步资源身份无效');
+        this.rememberSync('peerIdentity',message.identity);return;
+      }
+      if(message.type==='buffer-ping'||message.type==='buffer-pong'){
+        if(!Number.isSafeInteger(message.id)||message.id<1)throw Error('延迟采样消息无效');
+        if(message.type==='buffer-ping')this.sendPacket({type:'buffer-pong',id:message.id});
+        else{const pending=this.probes?.get(message.id);if(pending){this.probes.delete(message.id);clearTimeout(pending.timer);pending.resolve(Math.max(0,performance.now()-pending.at));}}
+        return;
+      }
+      if(message.type==='buffer-report'){
+        if(!validInputReport(message.report))throw Error('连接延迟报告无效');
+        this.rememberSync('peerInputReport',message.report);return;
+      }
+      if(message.type==='buffer-policy'||message.type==='buffer-ack'){
+        if(!validInputPolicy(message.policy)||(message.type==='buffer-policy'?this.role!=='guest':this.role!=='host'))throw Error('输入缓冲协商消息无效');
+        this.rememberSync(message.type==='buffer-policy'?'hostInputPolicy':'peerPolicyAck',message.policy);return;
+      }
+      if(message.type==='frame'||message.type==='check'||message.type==='rollback'){
+        if(this.onPacket)this.onPacket(message);
+        else{this.pendingPackets??=[];if(this.pendingPackets.length>=256)throw Error('开局同步消息过多');this.pendingPackets.push(structuredClone(message));}
+        return;
+      }
       throw Error('未知同步消息');
     }
     if(message.type!=='input'||!Number.isSafeInteger(message.seq)||message.seq<=this.lastRemote||!Array.isArray(message.actions))return;
@@ -224,5 +292,5 @@ export class Netplay {
     this.rtcProgress();
   }
   closeRtc(){clearTimeout(this.rtcPoll);clearTimeout(this.rtcTimer);clearTimeout(this.disconnectTimer);clearInterval(this.pathTimer);this.rtcAbort?.abort();this.rtcPoll=null;this.rtcTimer=null;}
-  close(){if(this.closed)return;this.closed=true;this.rtcReject?.(Error('WebRTC 连接已结束'));this.relayReject?.(Error('TCP 连接已结束'));this.rtcResolve=this.rtcReject=this.relayReject=null;this.remote.clear();clearInterval(this.heartbeat);clearTimeout(this.relayTimer);this.closeRtc();this.socket?.close();this.channel?.close?.();this.pc?.close();}
+  close(){if(this.closed)return;this.closed=true;for(const pending of this.probes?.values()??[]){clearTimeout(pending.timer);pending.reject(Error('同步连接已关闭'));}this.probes?.clear();this.pendingPackets=[];this.rtcReject?.(Error('WebRTC 连接已结束'));this.relayReject?.(Error('TCP 连接已结束'));this.rtcResolve=this.rtcReject=this.relayReject=null;this.remote.clear();clearInterval(this.heartbeat);clearTimeout(this.relayTimer);this.closeRtc();this.socket?.close();this.channel?.close?.();this.pc?.close();}
 }

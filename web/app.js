@@ -93,6 +93,8 @@ setInterval(()=>{
   if(online)networkHistory.push({at:next.at,intervalMs:dt,...stats,frame:sync?.queue.frame??null,confirmed:sync?.queue.confirmed??null,
     tick:emulator.tick,virtualNow:emulator.module.virtualNow,waitReason:sync?.queue.waitReason??'',replayUntil:sync?.replayUntil??null,
     predictionLead:Math.max(0,(sync?.queue.frame??0)-(sync?.queue.confirmed??0)),directionPrediction:sync?.queue.directionPrediction??null,
+    inputDelay:sync?.queue.inputDelay??null,bootInputDelay:sync?.queue.bootDelay??null,inputPolicy:netplay?.inputPolicy??null,
+    startupRttSamples:netplay?.rttSamples??null,
     predictionLeadLimit:sync?.queue.active?Math.max(1,sync.queue.directionPrediction):0,
     phase:nativeState?.phase??0,selecting:nativePause?.selecting??false,pauseSeat,hiddenSeats:[...hiddenSeats],documentHidden:document.hidden,
     nativeMaxMs:emulator.module.stepMetrics?.maxMs??0,program:emulator.module.programReads?.at(-1)?.name??null,
@@ -140,6 +142,8 @@ requestAnimationFrame(drawLocalPoints);
 if(online)mountNetworkPerformance({host:$('screen'),toolbar:document.querySelector('nav.toolbar .commands'),
   getReport:()=>({schema:2,game:'TH03',seat:netplay?.localSeat??null,language:activeLang,
     rollbackEnabled,transport:netQuery.get('net'),userAgent:navigator.userAgent,
+    inputPolicy:netplay?.inputPolicy??null,startupRttSamples:netplay?.rttSamples??null,
+    startupInputReports:{local:netplay?.localInputReport??null,remote:netplay?.peerInputReport??null},
     identity:syncIdentity?{protocol:syncIdentity.protocol,files:syncIdentity.files}:null,
     samples:networkHistory.read(),errors:networkEvents.read(),
     programReads:emulator?.module.programReads??[],slowSteps:emulator?.module.stepMetrics?.slowSteps??[]})});
@@ -579,9 +583,11 @@ $('start').addEventListener('click', async () => {
       status('本机资源已就绪，等待另一位玩家完成加载');
       await netplay.start();
       status('双方已连接，正在校验开局状态');
-      sync=new Lockstep({network:netplay,rollbackEnabled,snapshotStride:2,step:stepSynchronized,present:()=>{if(presentationDue(performance.now()))presentFrame();},hash:syncHash,capture:captureSynchronized,restore:restoreSynchronized,confirm:confirmSynchronized,onError:report,
-        onState:message=>status(message)});
       await netplay.synchronize(syncIdentity);
+      status('正在确认双方输入缓冲');
+      const inputPolicy=await netplay.negotiateInputPolicy({rollbackEnabled});
+      sync=new Lockstep({network:netplay,rollbackEnabled,inputDelay:inputPolicy.inputDelay,snapshotStride:2,step:stepSynchronized,present:()=>{if(presentationDue(performance.now()))presentFrame();},hash:syncHash,capture:captureSynchronized,restore:restoreSynchronized,confirm:confirmSynchronized,onError:report,
+        onState:message=>status(message)});
     }
     // Boot can contain menu SE while the other device is still loading.
     // Keep its BGM commands; do not play those old effects at room start.

@@ -10,7 +10,7 @@ export function createDosboxSnapshots(emulator){
   function syncMemory(){if(!diff)return;diff.begin();const pages=diff.changes();
     if(tracking){const block=diff.pack(pages);if(block)tracking.undo.push(block);}
     else for(const page of pages)diff.sync(page);
-    total=Math.max(total,diff.bytes+[...frames.values()].reduce((n,s)=>n+s.undo.reduce((bytes,block)=>bytes+block.buffer.length,0),0));}
+    total=Math.max(total,diff.bytes+[...frames.values()].reduce((n,s)=>n+s.undo.reduce((bytes,block)=>bytes+(block.buffer?.length||0),0),0));}
   function release(saved){if(saved.memory)pool.push(saved.memory);else for(const block of saved.undo)diff.release(block);}
   const write=m.MEMFS.stream_ops.write;
   m.MEMFS.stream_ops.write=function(stream,buffer,offset,length,position,canOwn){
@@ -30,7 +30,11 @@ export function createDosboxSnapshots(emulator){
     // heap scan at every boundary. Filesystem writes remain tracked meanwhile.
     seal(){active=null;},
     restore(frame){active=null;const s=frames.get(frame);if(!s)throw Error('DOSBox-X 快照已过期');
-      syncMemory();for(const key of [...frames.keys()].sort((a,b)=>b-a))if(key>=frame){const saved=frames.get(key);for(const [buffer,pages]of saved.writes)for(const [at,data]of pages)buffer.set(data,at);if(diff)for(let i=saved.undo.length-1;i>=0;i--)diff.restoreBlock(saved.undo[i]);}
+      syncMemory();const restoring=[...frames.keys()].filter(key=>key>=frame).sort((a,b)=>b-a).map(key=>frames.get(key));
+      // Newest-first blocks describe the original undo order. The resident
+      // backend validates the whole chain and restores each page only once.
+      if(diff){const blocks=restoring.flatMap(saved=>saved.undo.slice().reverse());if(diff.restoreBlocks)diff.restoreBlocks(blocks);else for(const block of blocks)diff.restoreBlock(block);}
+      for(const saved of restoring)for(const [buffer,pages]of saved.writes)for(const [at,data]of pages)buffer.set(data,at);
       if(s.memory)m.HEAPU8.set(s.memory);globals.forEach((g,i)=>{g.value=s.globals[i];});m.restoreContinuation(s.continuation);emulator.tick=s.tick;emulator.keys=new Set(s.keys);emulator.ci.keyMatrix={...s.keyMatrix};
       // Restore the framebuffer pointer/size alongside the native allocation.
       // The GPU stays unchanged until the room finishes catching up.
@@ -41,5 +45,5 @@ export function createDosboxSnapshots(emulator){
     // Retain it until its second tick is confirmed, so an odd-tick correction
     // can reconstruct that boundary without committing effects a second time.
     confirm(retainFrom){for(const key of [...frames.keys()])if(key<retainFrom){release(frames.get(key));frames.delete(key);}tracking=[...frames.values()].at(-1)||null;},
-    info(){return {snapshots:frames.size,snapshotBytes:total,core:'DOSBox-X Asyncify',storage:diff?'page undo':'full copy'};}};
+    info(){return {snapshots:frames.size,snapshotBytes:total,core:'DOSBox-X Asyncify',storage:diff?(diff.restoreBlocks?'resident page undo + merged restore':'page undo'):'full copy'};}};
 }

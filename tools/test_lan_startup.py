@@ -80,7 +80,7 @@ def main():
                         assert json.loads(await asyncio.wait_for(duplicate.recv(), 3))['type'] == 'error'
                     async with websockets.connect(url(identities[second_role], second_role), origin=base) as second:
                         peers = {first_role: first, second_role: second}
-                        sync = {'sync': 'th03-rollback/5', 'type': 'sync-ready', 'identity': {'disk': 'same'}}
+                        sync = {'sync': 'th03-rollback/6', 'type': 'sync-ready', 'identity': {'disk': 'same'}}
                         async def synchronize(role):
                             peer = peers[role]
                             assert json.loads(await asyncio.wait_for(peer.recv(), 3)) == {'type': 'ready', 'role': role}
@@ -95,10 +95,10 @@ def main():
                         packet = {'type': 'input', 'seq': 8, 'actions': []}
                         await b.send(json.dumps(packet)); assert json.loads(await asyncio.wait_for(a.recv(), 3)) == packet
                         for packet in [
-                            {'sync': 'th03-rollback/5', 'type': 'rollback', 'frame': 120},
-                            {'sync': 'th03-rollback/5', 'type': 'frame', 'frame': 4,
+                            {'sync': 'th03-rollback/6', 'type': 'rollback', 'frame': 120},
+                            {'sync': 'th03-rollback/6', 'type': 'frame', 'frame': 4,
                              'input': {'actions': ['shot', 'rapid'], 'touch': 0, 'focusEnabled': True, 'points': False, 'commands': ['pause']}},
-                            {'sync': 'th03-rollback/5', 'type': 'check', 'frame': 120, 'hash': 'abc123'},
+                            {'sync': 'th03-rollback/6', 'type': 'check', 'frame': 120, 'hash': 'abc123'},
                         ]:
                             await a.send(json.dumps(packet)); assert json.loads(await asyncio.wait_for(b.recv(), 3)) == packet
                         await second.close()

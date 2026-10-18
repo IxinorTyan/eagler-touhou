@@ -1,10 +1,10 @@
 import {FrameQueue,TICK_MS,DIRECTION_PREDICTION} from './frame-queue.js';
 export class Lockstep {
-  constructor({network,step,present,hash,onError,onState,capture,restore,confirm,rollbackEnabled=false,directionPrediction=DIRECTION_PREDICTION,snapshotStride=1}){
+  constructor({network,step,present,hash,onError,onState,capture,restore,confirm,rollbackEnabled=false,directionPrediction=DIRECTION_PREDICTION,inputDelay=0,snapshotStride=1}){
     if(!Number.isInteger(snapshotStride)||snapshotStride<1||snapshotStride>2)throw Error('无效回滚检查点间隔');
     Object.assign(this,{network,step,present,hash,onError,onState,capture,restore,confirm,rollbackEnabled,snapshotStride});
     this.checkpoints=new Set();
-    this.queue=new FrameQueue(network.localSeat,{rollbackEnabled,directionPrediction});this.hashes=new Map();this.remoteHashes=new Map();this.pendingHashes=new Map();
+    this.queue=new FrameQueue(network.localSeat,{rollbackEnabled,directionPrediction,inputDelay});this.hashes=new Map();this.remoteHashes=new Map();this.pendingHashes=new Map();
     this.costs={simulate:0,steps:0,capture:0,captures:0,restore:0,restores:0,hash:0,confirm:0,replays:0};
     this.running=false;this.applying=false;this.last=0;this.budget=0;this.lastProgress=performance.now();this.replayUntil=null;
     this.timer=null;this.wakeTimer=null;this.wakePending=false;this.wakeToken=0;this.frameHandle=null;this.pumping=false;
@@ -13,7 +13,7 @@ export class Lockstep {
       if(event.data!==this.wakeToken||!this.wakePending||!this.running)return;
       this.wakePending=false;this.wakeTimer=null;this.pump(performance.now());
     };
-    network.onPacket=packet=>{try{
+    const onPacket=packet=>{try{
       if(packet.type==='frame')this.queue.receive(packet.frame,packet.input);
       else if(packet.type==='rollback'){
         if(!this.rollbackEnabled||this.network.localSeat===0)throw Error('无效回滚启用通知');
@@ -23,6 +23,7 @@ export class Lockstep {
         this.remoteHashes.set(packet.frame,packet.hash);this.compare(packet.frame);
       }
     }catch(error){this.fail(error);}finally{this.wake();}};
+    if(network.setPacketHandler)network.setPacketHandler(onPacket);else network.onPacket=onPacket;
   }
   compare(frame){
     if(!this.hashes.has(frame)||!this.remoteHashes.has(frame))return;
@@ -42,6 +43,7 @@ export class Lockstep {
     }
   }
   start(){
+    if(this.failed)throw Error('帧同步已因无效开局消息停止，请重新建房');
     this.running=true;this.last=performance.now();this.lastProgress=this.last;
     if(this.rollbackEnabled&&this.network.localSeat===0){
       const frame=this.queue.frame+120;

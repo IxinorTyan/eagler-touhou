@@ -27,7 +27,7 @@ function write() {
   for (const name of fs.readdirSync(vendor).sort()) if (name !== 'runtime.json') runtime.files[name] = sha(fs.readFileSync(path.join(vendor, name)));
   fs.writeFileSync(path.join(vendor, 'runtime.json'), JSON.stringify(runtime, null, 2) + '\n');
   const paths = [
-    'app.js','network-performance.js','netplay.js','netplay/udp-config.js','lockstep.js','frame-queue.js','controls.js',
+    'app.js','network-performance.js','netplay.js','netplay/udp-config.js','netplay/input-policy.js','lockstep.js','frame-queue.js','controls.js',
     'native-pause.js','pause-search.js','native-patch.json','native/main.exe','native/start.com','native/music.com',
     'local-sfx.js','network-audio.js','network-audio.json','native/network-audio.com','sfx/manifest.json',
     ...fs.readdirSync(path.join(web,'sfx')).filter(name=>name.endsWith('.wav')).map(name=>'sfx/'+name),
@@ -41,7 +41,7 @@ function write() {
       .map(name => 'vendor/dosbox-x/' + name),
   ];
   const network = {
-    protocol:'th03-rollback/5', tickHz:60, epoch:946684800000,
+    protocol:'th03-rollback/6', tickHz:60, epoch:946684800000,
     adapter:'dosbox-x-full-asyncify-v1', dispatch:'dosbox-x-simple', cpu_cycles:16000,snapshotStride:2,
     native_sound:{bgm:0,se:0,schema:3,config_bgm_mode:1,mute:'network PCM output',se_part:15,
       effects:'confirmed-local-waveforms',bridge:'network-audio.json'}, files:{},

@@ -13,10 +13,24 @@ ACTIONS = {'up', 'down', 'left', 'right', 'shot', 'rapid', 'attack', 'focus'}
 def valid_message(message):
     if not isinstance(message, dict):
         return False
-    if message.get('sync') == 'th03-rollback/5':
+    if message.get('sync') == 'th03-rollback/6':
         kind = message.get('type')
         if kind == 'sync-ready':
             return isinstance(message.get('identity'), dict)
+        if kind in ('buffer-ping', 'buffer-pong'):
+            return type(message.get('id')) is int and 1 <= message['id'] < 2**53
+        if kind == 'buffer-report':
+            value = message.get('report')
+            return isinstance(value, dict) and type(value.get('rollbackEnabled')) is bool \
+                and type(value.get('rttMs')) is int and type(value.get('maxRttMs')) is int \
+                and 0 <= value['rttMs'] <= value['maxRttMs'] <= 60000
+        if kind in ('buffer-policy', 'buffer-ack'):
+            value = message.get('policy')
+            return isinstance(value, dict) and type(value.get('schema')) is int and value['schema'] == 1 \
+                and type(value.get('rollbackEnabled')) is bool \
+                and type(value.get('rttMs')) is int and 0 <= value['rttMs'] <= 60000 \
+                and type(value.get('inputDelay')) is int and 0 <= value['inputDelay'] <= 6 \
+                and (value['rollbackEnabled'] or value['inputDelay'] == 0)
         if kind == 'rollback':
             return type(message.get('frame')) is int and 0 <= message['frame'] < 2**53
         if kind == 'check':
@@ -29,6 +43,8 @@ def valid_message(message):
             and type(value.get('focusEnabled')) is bool and type(value.get('points')) is bool \
             and isinstance(value.get('commands'), list) and len(value['commands']) <= 16 \
             and all(isinstance(c, str) and c in ('pause', 'resume', 'round', 'match', 'up', 'down', 'confirm', 'escape', 'hidden', 'visible') for c in value['commands'])
+    if 'sync' in message:
+        return False
     return message.get('type') == 'input' and type(message.get('seq')) is int \
         and isinstance(message.get('actions'), list) and all(isinstance(a, str) and a in ACTIONS for a in message['actions']) \
         and type(message.get('touch', 0)) is int and 0 <= message.get('touch', 0) < 2**43
