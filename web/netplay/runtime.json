@@ -4,9 +4,9 @@
   "tickDenominator": 24830,
   "files": {
     "stage-select.js": "346e673950c5914f5146617ed7dc17801398b3b5e52cda17ef5443e3d29d59e4",
-    "game.wasm": "f769404d6e6db85d10961946b563bf590269257bc805cf75f038c0d4b6932e84",
-    "netplay/runtime.js": "766afd9195262c72fa0d18ade6a61c0b7203b4f74125e37a8f7bcfde5185934d",
-    "netplay/session.js": "43d882193e3e2b9004a95a8ecb29a7550545309edb58999be8b7a8fb18b1fb81",
+    "game.wasm": "1ceae6a045e11796eb533e102fad8ccc44ad145f246f635026bbd32f3a348af8",
+    "netplay/runtime.js": "b9444d4b7713299a1e9c765cfaec01275edab4b0ba458e2d7acb8de73d7357b3",
+    "netplay/session.js": "59427f834f65c36b5ea5e2b6d73f4792117660ad2f595abc20ba7c9d02410477",
     "netplay/queue.js": "5a488cd5c1b11fb9cd094408465b6a85d0a1091a07d76596f6f3371a8247c26b",
     "netplay/connection.js": "1e5fd3ebc19aee23175cc5531df65f6ac19e2e6ef5455214792f822458965a44",
     "netplay/udp-config.js": "6a04c0244c0912b8c6235dbca15d0943eda0218a5f281be688dec41191af0a5f",
@@ -14,6 +14,7 @@
     "netplay/relay.js": "967e09da2690df2a733ce2e7f8393a16620cb263a447fa4df192657927a12d50",
     "netplay/sha256.js": "9cb7be2bc039bcea2a4d727ef98bcd9047a78dfd4c11950355723147423e1f43",
     "netplay/app.js": "20013460d6f21baef03670d3ca1f0134eb4cef5f15e9b074dbdab82269238e71",
-    "netplay/audio.js": "eaf982407c027ac45d29e8bab8b511f0da95fb9d4dfaea44a00b49ca5276b1d3"
+    "netplay/audio.js": "5a7f72c004c9c022b045451f59c94a2e5af304219fe508c837a2a856ec82b1c5",
+    "netplay/renderer.js": "1004a7b2e1f8cab0748ff6f09de75df9f90d71b27e9dbc5123a46a1b4c1c9f50"
   }
 }

@@ -9,7 +9,8 @@ export class GameRuntime{
   constructor(canvas,hostSlot){
     this.canvas=canvas;this.hostSlot=hostSlot;this.frame=0;this.previous=[];
     this.context=canvas?.getContext('2d',{alpha:false});
-    this.image=null;this.presentRequest=null;
+    this.image=null;this.presentRequest=null;this.renderCost=0;this.displayFrames=0;
+    this.renderBackend='main';this.renderBusy=false;this.mainRenderCost=0;
     this.audio=new LocalAudio();this.audio.onStatus=text=>this.onMusicStatus?.(text);
   }
   async load(settings,progress=()=>{}){
@@ -17,13 +18,14 @@ export class GameRuntime{
     const get=async path=>{const r=await fetch(path,{cache:'no-store'});if(!r.ok)throw Error(`资源读取失败：${path}`);return r;};
     const version=await (await get('netplay/runtime.json')).json();
     if(version.protocol!==PROTOCOL||version.tickNumerator!==440000||version.tickDenominator!==24830)throw Error('联机版本不匹配，请刷新页面');
-    let binary;
+    let binary,rendererSource;
     await Promise.all(Object.entries(version.files).map(async([name,hash])=>{
       const bytes=new Uint8Array(await (await get(name)).arrayBuffer());
       if(await sha256(bytes)!==hash)throw Error(`联机资源校验失败：${name}`);
       if(name==='game.wasm')binary=bytes;
+      if(name==='netplay/renderer.js')rendererSource=bytes;
     }));
-    if(!binary)throw Error('联机清单缺少游戏核心');
+    if(!binary||!rendererSource)throw Error('联机清单缺少游戏核心或绘图线程，请刷新页面');
     const module=await WebAssembly.compile(binary);
     if(WebAssembly.Module.imports(module).length)throw Error('游戏核心含外部导入');
     this.core=(await WebAssembly.instantiate(module,{})).exports;
@@ -35,6 +37,7 @@ export class GameRuntime{
     // enter synchronized menus or change registration eligibility on one peer.
     this.core.th_score_data();this.scoreRevision=this.core.th_get(110,0);
     this.reset();this.present();
+    await this.startRenderer(module,rendererSource);
     return sha256(new TextEncoder().encode(JSON.stringify({version,settings,hostSlot:this.hostSlot})));
   }
   reset(){
@@ -92,15 +95,93 @@ export class GameRuntime{
     for(const n of [this.frame,...this.previous])for(let b=0;b<4;b++)h=Math.imul(h^((n>>>(8*b))&255),16777619);
     return {type:'hash',frame:this.frame,hash:(h>>>0).toString(16).padStart(8,'0'),memory:true};
   }
+  async startRenderer(module,verifiedSource){
+    if(!this.context||this.stopped)return false;
+    if(typeof Worker==='undefined'||typeof OffscreenCanvas==='undefined')return false;
+    return new Promise(resolve=>{
+      let workerURL,settled=false,readyCount=0;
+      this.renderWorkers=[];
+      const finish=(ready,reason='')=>{
+        if(settled)return;settled=true;clearTimeout(timer);this.cancelRendererStart=null;
+        if(workerURL)URL.revokeObjectURL(workerURL);
+        if(ready&&!this.stopped){
+          this.renderBackend='worker';this.renderPending=[];
+          this.renderSnapshots=Array.from({length:2},()=>new ArrayBuffer(this.core.memory.buffer.byteLength));
+          resolve(true);
+        }else{
+          for(const worker of this.renderWorkers)worker.terminate();this.renderWorkers=[];this.renderWorker=null;
+          this.rendererFallback=reason;resolve(false);
+        }
+      };
+      const timer=setTimeout(()=>finish(false,'绘图线程启动超时'),5000);
+      this.cancelRendererStart=()=>finish(false);
+      try{
+        // Execute the exact bytes already checked against runtime.json, rather
+        // than letting a second Worker fetch reuse an older cached script.
+        if(verifiedSource)workerURL=URL.createObjectURL(new Blob([verifiedSource],{type:'text/javascript'}));
+        for(let lane=0;lane<2;lane++){
+          const worker=new Worker(workerURL||'netplay/renderer.js');this.renderWorkers.push(worker);this.renderWorker=this.renderWorkers[0];
+          worker.onmessage=({data})=>{
+            if(this.stopped||!this.renderWorkers.includes(worker)){data.bitmap?.close();return;}
+            if(!settled){
+              if(data.type==='ready'&&++readyCount===2)finish(true);
+              else if(data.type==='error')finish(false,data.message);
+              return;
+            }
+            try{
+              if(data.type==='error')throw Error(data.message);
+              const index=this.renderPending.findIndex(job=>job.worker===worker&&job.frame===data.frame);
+              if(data.type!=='frame'||index<0)throw Error('绘图线程返回了无效帧');
+              const [job]=this.renderPending.splice(index,1);this.renderSnapshots.push(data.snapshot);this.renderBusy=this.renderPending.length>0;
+              const started=performance.now();
+              if(!document.hidden&&(this.presentedFrame===undefined||data.frame>this.presentedFrame)){
+                this.context.drawImage(data.bitmap,0,0);this.presentedFrame=data.frame;this.displayFrames++;
+              }else if(data.frame===this.renderSubmittedFrame)this.renderSubmittedFrame=null;
+              this.recordRenderCost(data.cost+job.snapshotCost,performance.now()-started+job.snapshotCost);
+              this.renderLatency=performance.now()-job.started;
+              this.requestPresent();
+            }catch(error){if(this.onFailure)this.onFailure(error);else throw error;}
+            finally{data.bitmap?.close();}
+          };
+          worker.onerror=event=>{
+            event.preventDefault?.();
+            if(this.stopped||!this.renderWorkers.includes(worker))return;
+            if(!settled)finish(false,event.message||'绘图线程不可用');
+            else{const error=Error(event.message||'绘图线程发生错误');if(this.onFailure)this.onFailure(error);else throw error;}
+          };
+          worker.postMessage({type:'init',module});
+        }
+      }catch(error){finish(false,error.message);}
+    });
+  }
+  recordRenderCost(total,main){
+    this.renderCost=this.renderCost?this.renderCost*.75+total*.25:total;
+    this.mainRenderCost=this.mainRenderCost?this.mainRenderCost*.75+main*.25:main;
+  }
   present(){
     if(!this.core||!this.context||this.stopped||this.presentedFrame===this.frame)return;
-    this.core.th_render();
-    this.context.putImageData(this.image,0,0);this.presentedFrame=this.frame;
+    const started=performance.now();
+    if(this.renderBackend==='worker'){
+      if(!this.renderSnapshots.length||this.renderSubmittedFrame===this.frame)return;
+      // Two display-only cores use separate CPU threads when a draw overruns
+      // one tick. One snapshot per worker bounds both memory and render lag.
+      const worker=this.renderWorkers.find(candidate=>!this.renderPending.some(job=>job.worker===candidate));
+      if(!worker)return;
+      const snapshot=this.renderSnapshots.pop();
+      new Uint8Array(snapshot).set(new Uint8Array(this.core.memory.buffer));
+      this.renderPending.push({frame:this.frame,worker,started,snapshotCost:performance.now()-started});
+      this.renderBusy=true;this.renderSubmittedFrame=this.frame;
+      worker.postMessage({type:'render',frame:this.frame,snapshot},[snapshot]);return;
+    }
+    this.core.th_render();this.context.putImageData(this.image,0,0);
+    this.presentedFrame=this.frame;this.displayFrames++;
+    const cost=performance.now()-started;this.recordRenderCost(cost,cost);
   }
   requestPresent(){
-    if(!this.context||this.stopped||this.presentRequest!==null||this.presentedFrame===this.frame)return;
-    // Network callbacks publish inputs promptly; display only the newest
-    // confirmed frame at the next browser repaint, including after catch-up.
+    if(!this.context||this.stopped||document.hidden||this.presentRequest!==null||this.presentedFrame===this.frame)return;
+    // Start off-thread drawing as soon as confirmed state is available, rather
+    // than waiting for rAF and then missing that same repaint while it renders.
+    if(this.renderBackend==='worker'){this.present();return;}
     this.presentRequest=requestAnimationFrame(()=>{
       this.presentRequest=null;
       if(document.hidden||this.stopped)return;
@@ -109,5 +190,5 @@ export class GameRuntime{
   }
   unlockAudio(){return this.audio.unlock();}
   setMusicVolume(value){this.audio.setVolume(value);}
-  stop(){this.stopped=true;if(this.presentRequest!==null)cancelAnimationFrame(this.presentRequest);this.presentRequest=null;this.audio.stop();}
+  stop(){this.stopped=true;if(this.presentRequest!==null)cancelAnimationFrame(this.presentRequest);this.presentRequest=null;this.cancelRendererStart?.();for(const worker of this.renderWorkers||[])worker.terminate();this.renderWorkers=[];this.renderWorker=null;this.renderSnapshots=[];this.renderPending=[];this.audio.stop();}
 }

@@ -250,6 +250,7 @@ export class NetSession{
     this.running=true;clearTimeout(this.loadTimer);this.game.start();
     this.status('联机运行中');this.lastAdvance=performance.now();this.nextTick=this.lastAdvance+startAfter;
     this.waitStats={since:this.lastAdvance,at:this.lastAdvance,elapsed:0,input:0,hash:0};
+    this.performanceSample={at:this.lastAdvance,frame:this.game.frame,draws:this.game.displayFrames||0,visible:!document.hidden};
     this.timer=setInterval(()=>this.pump(),4);
   }
   pump(){
@@ -285,6 +286,20 @@ export class NetSession{
     }catch(error){this.fail(error);}finally{this.pumping=false;}
   }
   recordWait(now){
+    const sample=this.performanceSample;
+    if(sample){
+      if(document.hidden)sample.visible=false;
+      const duration=now-sample.at;
+      if(duration>=5000){
+        // Wall time includes foreground stalls. Suppress windows containing
+        // background throttling, which are not representative of active play.
+        this.performanceRates=sample.visible&&!document.hidden?{
+          logic:1000*(this.game.frame-sample.frame)/duration,
+          display:1000*((this.game.displayFrames||0)-sample.draws)/duration
+        }:null;
+        this.performanceSample={at:now,frame:this.game.frame,draws:this.game.displayFrames||0,visible:!document.hidden};
+      }
+    }
     const stats=this.waitStats,elapsed=now-(stats.at??now);stats.at=now;
     if(!document.hidden&&elapsed>=0&&elapsed<1000){
       stats.elapsed+=elapsed;
@@ -333,7 +348,9 @@ export class NetSession{
     const recommendation=this.recommendedDelay();
     return `${this.autoBuffer?'自动选定 · ':''}缓冲 ${this.queue.delay} 帧（约 ${(this.queue.delay*TICK).toFixed(0)} ms）${this.bufferFallback?' · 测量超时，采用保守缓冲':''}`+
       (measured?` · 最大往返 ${this.rtt.toFixed(0)} ms · 抖动约 ${jitter.toFixed(0)} ms`:' · 正在测量延迟')+
-      (this.waitPercent!=null?` · 近 5 秒网络等待 ${this.waitPercent.toFixed(1)}%`:'')+
+      (this.waitPercent!=null?` · 近 5 秒同步等待 ${this.waitPercent.toFixed(1)}%（输入 ${(this.inputWaitPercent||0).toFixed(1)}% / 校验 ${(this.hashWaitPercent||0).toFixed(1)}%）`:'')+
+      (this.performanceRates?`\n实际逻辑 ${this.performanceRates.logic.toFixed(1)} 步/秒（正常约 56.4） · 本机画面 ${this.performanceRates.display.toFixed(1)} FPS · 绘图均值 ${(this.game.renderCost||0).toFixed(1)} ms`:'')+
+      (this.performanceRates?` · ${this.game.renderBackend==='worker'?'独立绘图线程':'主线程绘图'} · 主线程绘图占用 ${(this.game.mainRenderCost||0).toFixed(1)} ms`:'')+
       (canRecommend&&recommendation>this.queue.delay?`\n下次开房建议缓冲 ${recommendation} 帧${recommendation===12?'；较高延迟仍可能需要等待':''}`:
         canRecommend&&recommendation<this.queue.delay&&this.waitPercent!=null&&this.waitPercent<1?`\n下次开房可选自动或 ${recommendation} 帧，减少操作等待`:'');
   }

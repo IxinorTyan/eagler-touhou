@@ -35,8 +35,9 @@ export class LocalAudio{
     this.core=core;const end=core.th_get(11,0)>>>0;
     if(!this.context||this.context.state!=='running'||this.stopped){this.cursor=end;return;}
     const cue=core.th_get(79,0),key=cue===2?'silent':musicRoomTracks[cue<2?cue:cue-3]?.key||'silent';
-    void this.track(key);
+    if(this.trackKey!==key)void this.track(key);
     if(this.cursor>end)this.cursor=0;this.cursor=Math.max(this.cursor,end-128);
+    let latestBuffer=null;
     for(;this.cursor<end;this.cursor++){
       const id=core.th_sound_event(this.cursor);if(!id)continue;
       if(!this.effects.has(id)){
@@ -45,8 +46,16 @@ export class LocalAudio{
           .then(buffer=>this.effects.set(id,buffer)).catch(()=>this.effects.delete(id));
       }
       const buffer=this.effects.get(id);if(!buffer)continue;
-      this.effect?.stop();const source=this.context.createBufferSource();source.buffer=buffer;source.connect(this.gain);source.start();this.effect=source;
+      latestBuffer=buffer;
+    }
+    // Effects are monophonic. Earlier events in the same tick were immediately
+    // stopped before the audio clock could play them; create only the last one.
+    if(latestBuffer){
+      this.effect?.stop();this.effect?.disconnect();
+      const source=this.context.createBufferSource();source.buffer=latestBuffer;source.connect(this.gain);
+      source.onended=()=>{source.disconnect();if(this.effect===source)this.effect=null;};
+      source.start();this.effect=source;
     }
   }
-  stop(){this.stopped=true;++this.trackRequest;this.source?.stop();this.source?.disconnect();this.source=null;this.effect?.stop();void this.context?.close();}
+  stop(){this.stopped=true;++this.trackRequest;this.source?.stop();this.source?.disconnect();this.source=null;this.effect?.stop();this.effect?.disconnect();this.effect=null;void this.context?.close();}
 }
