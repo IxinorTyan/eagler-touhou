@@ -3,7 +3,31 @@
   "original_md5": "06d74719b6f72b11014a392fd34d5f57",
   "original_size": 156258,
   "patched_size": 157842,
-  "sha256": "93d2ab0d53d80c8275df66fa276d55ee9a958d828df5d8e1f6b367d6ef359212",
+  "native_crash_fixes": [
+    {
+      "name": "stage-4 Marisa zero-divisor flystep stays still",
+      "image_offset": 93061,
+      "bytes": 128,
+      "original_sha256": "e441622bb8806d953e657d208aabaf4a138a6110bcc9d451f13dae17ea918973",
+      "replacement_sha256": "6cd2afd613df1a32fba5711b4b6fc60bde6f6bdd4f83830162f7547eeb09d8b8",
+      "undefined_durations": [
+        12,
+        13
+      ],
+      "payload_bytes_added": 0
+    },
+    {
+      "name": "shared ring bullet zero-count divide guard",
+      "image_offset": 118986,
+      "bytes": 66,
+      "original_sha256": "fe683d83fb49dd5e153085acf7540c8d9564ba7c7f7ac406b1c08918a2e99243",
+      "replacement_sha256": "3e50d3eb3dcd29c69f9f6ca25f2c1bb7456edaf22c8a1d038e8eea4b5a0aff8e",
+      "undefined_count": 0,
+      "fallback_count": 1,
+      "payload_bytes_added": 0
+    }
+  ],
+  "sha256": "6a701f8e5421cd44f09bfdaa79ae4888d6fd391acb68e11390b3824f0645a4e6",
   "insert_image_offset": 78048,
   "insert_size": 1584,
   "code_segment": 2735,
@@ -151,7 +175,7 @@
     "main_md5": "06d74719b6f72b11014a392fd34d5f57"
   },
   "disk": {
-    "sha256": "73e1d378c26813a9e33eaf74e4e40c6c46da7c1aa1e6e8fc800b9ad2a25f9a5a",
+    "sha256": "60e1408d1daccc0ee5a0d7d86259baabc03cec5410cfef2422d23a48a6635a83",
     "size": 21415936
   },
   "unchanged_files": {

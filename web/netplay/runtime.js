@@ -20,6 +20,8 @@ let pointPreferences={focus:true,always:false};
 const signature=new TextEncoder().encode('TH04COOPLABv001!');
 const keyTable=[['ArrowUp','ArrowUp',38,1],['ArrowDown','ArrowDown',40,2],['ArrowLeft','ArrowLeft',37,4],['ArrowRight','ArrowRight',39,8],['KeyX','x',88,16],['KeyZ','z',90,32],['ShiftLeft','Shift',16,64],['Escape','Escape',27,128],['Enter','Enter',13,256]];
 let emulator,patch,soundPolicy,bgm,musicTask,closed=false,bootPromise,oldP1=0,ticks=0,inputListener=()=>{},keys=new Set(),enabled=false,mailbox=-1;
+let guestMemoryBase=-1,residentAddress=-1,gameplaySeen=false;
+const residentSignature=new TextEncoder().encode('HUMAConfig\0');
 let musicStatus='浏览器音乐：等待游戏开始后加载',musicError=false,lastMusicSequence=null;
 let pendingMusic=[],lastMusicName='',musicSettings,musicReady=false;
 let pauseMenu,localSlot,menuAction=()=>{},blocked=[0,0],emulatedTicks=0,playerCount=2;
@@ -162,14 +164,32 @@ async function boot(config){
 }
 function findMailbox(){
   const heap=emulator.module.HEAPU8,view=new DataView(heap.buffer);
-  if(mailbox>=0&&signature.every((v,i)=>heap[mailbox+i]===v))return;
-  mailbox=-1;
+  if(mailbox>=0)return;
+  // MAIN's original exit sets end_sequence before freeing its code/heap.
+  // MAINE reuses that memory; a surviving signature alone is not ownership.
+  if(residentAddress>=0&&heap[residentAddress+48]!==0x37)return;
   const candidates=[];
-  for(let at=heap.indexOf(signature[0]);at>=0;at=heap.indexOf(signature[0],at+1)){
-    if(at+675<heap.length&&signature.every((v,i)=>heap[at+i]===v)&&heap[at+25]===1&&view.getUint32(at+16,true)>0&&view.getUint16(at+20,true)>0)candidates.push(at);
+  const limit=guestMemoryBase<0?heap.length:guestMemoryBase+0xa0000;
+  for(let at=heap.indexOf(signature[0],Math.max(0,guestMemoryBase));at>=0&&at<limit;at=heap.indexOf(signature[0],at+1)){
+    if(at+675>=heap.length||!signature.every((v,i)=>heap[at+i]===v)||heap[at+25]!==1||!view.getUint32(at+16,true)||!view.getUint16(at+20,true))continue;
+    const data=at-patch.mailbox_cs_offset+(patch.data_segment-patch.code_segment)*16;
+    const base=data-view.getUint16(at+20,true)*16;
+    if(base<0||base+0xa0000>heap.length||data<base||data+0xba8a>base+0xa0000)continue;
+    if(guestMemoryBase>=0&&base!==guestMemoryBase)continue;
+    const resident=base+view.getUint16(data+0xba86,true)+view.getUint16(data+0xba88,true)*16;
+    if(resident<base||resident+74>base+0xa0000||!residentSignature.every((v,i)=>heap[resident+i]===v)||heap[resident+48]!==0x37)continue;
+    candidates.push({at,base,resident});
   }
-  if(candidates.length===1)mailbox=candidates[0];
+  if(candidates.length===1){
+    const {at,base,resident}=candidates[0];mailbox=at;guestMemoryBase=base;residentAddress=resident;gameplaySeen=true;
+  }
   emulator.module.projectileArt?.bind(mailbox);
+}
+function refreshMailbox(){
+  if(mailbox<0)return;
+  const heap=emulator.module.HEAPU8;
+  if(heap[residentAddress+48]===0x37&&signature.every((v,i)=>heap[mailbox+i]===v))return;
+  mailbox=-1;emulator.module.projectileArt?.bind(-1);
 }
 function applyP1(bits){
   for(const [code,key,keyCode,bit]of keyTable){
@@ -182,7 +202,7 @@ function applyP1(bits){
 function stepInner(inputs){
   // Browser-written input lives in the guest's conventional-memory window.
   // Native writes and host glue writes are journaled by the tracked core.
-  if(mailbox>=0)emulator.module.thDirtyMark?.(guestBase(),1048576);
+  if(guestMemoryBase>=0)emulator.module.thDirtyMark?.(guestMemoryBase,1048576);
   const touchInputs=inputs;
   if(!enabled)throw Error(runtimeFailure?.message||'本机游戏没有运行');
   // There is no native stage pause before the first gameplay mailbox exists.
@@ -219,6 +239,7 @@ function stepInner(inputs){
   }
   writeNativeTouch(emulator.module.HEAPU8,mailbox,patch,touchInputs,pauseMenu.paused||active||result==='resume');
   emulator.step();emulatedTicks++;
+  refreshMailbox();
   if(mailbox>=0&&!seError){
     try{currentEffect.se=readNativeSe(emulator.module.HEAPU8,gameDataBase(),soundPolicy.observer);}
     catch(error){currentEffect.seError=error.message;}
@@ -227,7 +248,7 @@ function stepInner(inputs){
     try{currentEffect.music=readMusic();}
     catch(error){currentEffect.musicError=error.message;}
   }
-  if(mailbox<0&&emulatedTicks>=10800)throw Error('模拟启动超过 180 秒仍未进入游戏，请记录两边的画面');
+  if(!gameplaySeen&&emulatedTicks>=10800)throw Error('模拟启动超过 180 秒仍未进入游戏，请记录两边的画面');
   if(!replaying&&ticks%30===0){
     const s=snapshot();
     const info=emulator.module.netInfo();
@@ -245,6 +266,7 @@ function step(inputs,{frame=ticks,replay=false,offlineMask=0}={}){
   replaying=replay;currentEffect={};
   emulator.module.netBeginFrame(frame,replay);
   try{
+    refreshMailbox();
     if(mailbox>=0)emulator.module.HEAPU8[mailbox-patch.mailbox_cs_offset+patch.offline_mask_cs_offset]=offlineMask;
     currentEffect.result=stepInner(inputs);effects.set(frame,currentEffect);
     if(!replay)presentationPending=true;
@@ -267,7 +289,7 @@ function capture(frame,restored=false){
   const previous=rollbackStates.get(frame-1);
   const nativeFrame=previous?.nativeFrame===frame-1?frame-1:frame;
   if(nativeFrame===frame)emulator.module.netCapture(frame,restored);
-  rollbackStates.set(frame,{nativeFrame,ticks,emulatedTicks,oldP1,mailbox,blocked:blocked.slice(),
+  rollbackStates.set(frame,{nativeFrame,ticks,emulatedTicks,oldP1,mailbox,guestMemoryBase,residentAddress,gameplaySeen,blocked:blocked.slice(),
     pause:{previous:pauseMenu.previous.slice(),paused:pauseMenu.paused,selection:pauseMenu.selection,exited:pauseMenu.exited}});
 }
 function restore(frame){
@@ -277,7 +299,7 @@ function restore(frame){
   const from=saved.nativeFrame,checkpoint=rollbackStates.get(from);
   if(!checkpoint||(from!==frame&&!checkpoint.execution))throw Error('游戏回滚检查点缺失');
   emulator.module.netRestore(from);
-  ({ticks,emulatedTicks,oldP1,mailbox}=checkpoint);blocked=checkpoint.blocked.slice();
+  ({ticks,emulatedTicks,oldP1,mailbox,guestMemoryBase,residentAddress,gameplaySeen}=checkpoint);blocked=checkpoint.blocked.slice();
   Object.assign(pauseMenu,checkpoint.pause,{previous:checkpoint.pause.previous.slice()});
   for(const key of rollbackStates.keys())if(key>=from)rollbackStates.delete(key);
   for(const key of effects.keys())if(key>=from)effects.delete(key);
@@ -365,19 +387,17 @@ function observeMusic({name,sequence,ax,mode}){
 }
 function gameDataBase(){return mailbox-patch.mailbox_cs_offset+(patch.data_segment-patch.code_segment)*16;}
 function guestBase(){
-  const heap=emulator.module.HEAPU8,v=new DataView(heap.buffer);
-  const dataBase=gameDataBase();
-  const base=dataBase-v.getUint16(mailbox+20,true)*16;
+  const heap=emulator.module.HEAPU8,base=guestMemoryBase;
   if(!Number.isInteger(base)||base<0||base+0xa0000>heap.length)throw Error('游戏内存布局不匹配');
   return base;
 }
 function checksum(){
   let h=0x811c9dc5;
   for(const value of [...pauseMenu.signature(),...blocked,emulatedTicks])h=Math.imul(h^value,0x01000193);
-  if(mailbox<0)return {tick:ticks,hash:(h>>>0).toString(16).padStart(8,'0'),gameFrame:0};
+  if(guestMemoryBase<0)return {tick:ticks,hash:(h>>>0).toString(16).padStart(8,'0'),gameFrame:0};
   const heap=emulator.module.HEAPU8,v=new DataView(heap.buffer),base=guestBase();
   for(let at=base;at<base+0xa0000;at++)h=Math.imul(h^heap[at],0x01000193);
-  return {tick:ticks,hash:(h>>>0).toString(16).padStart(8,'0'),gameFrame:v.getUint32(mailbox+16,true)};
+  return {tick:ticks,hash:(h>>>0).toString(16).padStart(8,'0'),gameFrame:mailbox<0?0:v.getUint32(mailbox+16,true)};
 }
 window.th04Sync={
   faultReport(){return {settings:musicSettings,game:snapshot(),runtimeFailure,
@@ -417,7 +437,7 @@ window.th04Sync={
   start(){emulator.run();enabled=true;details.textContent='启动进度：全员已同步开局，正在启动 DOS 和游戏。';canvas.focus();},
   stop(){enabled=false;closed=true;clearKeys();bgm?.dispose();localSe?.dispose();if(emulator){emulator.module.netFlushAudio();emulator.pause();}},
   step,present,checksum,snapshot,capture,restore,confirm,
-  readyForRollback:()=>mailbox>=0&&!!emulator?.module.netCapture,
+  readyForRollback:()=>gameplaySeen&&!!emulator?.module.netCapture,
   canPredict:()=>!predictionBlockReason(),predictionBlockReason,
   rollbackInfo:()=>({...emulator?.module.netSnapshotInfo(),checkpointFrames:2,checkpointReplays})
 };

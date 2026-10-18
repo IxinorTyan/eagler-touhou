@@ -22,14 +22,14 @@
   "audio_output_sha256": "18760a612db5dfff8a8dd63bef48f12df51c62474a7cd465084ffbe0fc90a214",
   "rollback_queue_sha256": "3e9690c1eecbfd9dd71c1d171608144ca58afbfb473bd53406dc72ee3ec4db04",
   "native_snapshots_sha256": "d6413ec1ef0c6ba4c10421e68cefce031f2fc009320a7993346b93de061a3daa",
-  "game_adapter_sha256": "b02216f81286d3101ac14c00b71a9702bd576b869be74538d1b6b47785c15471",
+  "game_adapter_sha256": "1bf6452044b3d43dbefb2d47cd99dc0ecbdf3488742d6f89ae91f385bdac027e",
   "room_sha256": "d6c267dc4921ba9fd0b6e9544d299d8e5861af31948d9e2124f4f0863a2d153e",
   "membership_sha256": "a84a5b38066e29a876db2c900e2411f3d4168f329bcb83fb44a81226a88e6fca",
   "startup_sha256": "c1cc7aacda262a15556a945f09f22ba018682df70362a5df9def4c7cbc9e5a30",
   "controls_sha256": "3e3b43bb22961e9dbdba88dd00d3869a594dd5645e4160d84b0d190b0fb63955",
   "pause_sha256": "92977ae14ace41e7d47a27a565cd9786fa71b236e97fe510b33bd7ae1a44ccb3",
   "native_sound": {
-    "disk_sha256": "e6e34055f22f4751a554f29490eabe3235e2f600ea726e5ede3050cb374eac69",
+    "disk_sha256": "b6b7a7bd6da23652aa0e283345d071d17530eab66ca9a3914be1c84ec8446d63",
     "bgm": 0,
     "se": 1,
     "schema": 2,
@@ -139,7 +139,7 @@
   },
   "native_sound_by_language": {
     "cn": {
-      "disk_sha256": "e6e34055f22f4751a554f29490eabe3235e2f600ea726e5ede3050cb374eac69",
+      "disk_sha256": "b6b7a7bd6da23652aa0e283345d071d17530eab66ca9a3914be1c84ec8446d63",
       "bgm": 0,
       "se": 1,
       "schema": 2,
@@ -248,7 +248,7 @@
       }
     },
     "jp": {
-      "disk_sha256": "7a9edfb6c352853baa27527dd2bb8e420adbb1d133aee879b717140cb30b1d57",
+      "disk_sha256": "614f1be644b5cc79bba55b68f60f981bc882fb967f02fcd0c3a10967842c2197",
       "bgm": 0,
       "se": 1,
       "schema": 2,
@@ -375,7 +375,7 @@
   "projectile_art_sha256": "b317f80451af37cfa63744520da62a567d5bba8ba16a01db1d1afdc43ea888bb",
   "external_sound_by_language": {
     "cn": {
-      "disk_sha256": "e6e34055f22f4751a554f29490eabe3235e2f600ea726e5ede3050cb374eac69",
+      "disk_sha256": "b6b7a7bd6da23652aa0e283345d071d17530eab66ca9a3914be1c84ec8446d63",
       "bgm": 0,
       "se": 1,
       "schema": 3,
@@ -581,7 +581,7 @@
       }
     },
     "jp": {
-      "disk_sha256": "7a9edfb6c352853baa27527dd2bb8e420adbb1d133aee879b717140cb30b1d57",
+      "disk_sha256": "614f1be644b5cc79bba55b68f60f981bc882fb967f02fcd0c3a10967842c2197",
       "bgm": 0,
       "se": 1,
       "schema": 3,

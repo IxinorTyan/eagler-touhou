@@ -20,6 +20,13 @@ TTL=120
 LOADING_TTL=600
 
 
+class RoomHTTPServer(ThreadingHTTPServer):
+    # A tunnel multiplexes simultaneous imports/assets/polls into a burst of
+    # origin connections. The default backlog of 5 rejects part of a 3P boot
+    # even though handler threads are available to serve those requests.
+    request_queue_size=128
+
+
 def room_expired(room,now):
     lease=LOADING_TTL if room['phase']=='loading' else TTL
     return now-room['seen']['host']>lease
@@ -263,9 +270,9 @@ if __name__=='__main__':
     root=Path(__file__).resolve().parent/'web'
     try:
         bind=args.bind
-        server_type=ThreadingHTTPServer
+        server_type=RoomHTTPServer
         if ':' in bind:
-            class IPv6HTTPServer(ThreadingHTTPServer):
+            class IPv6HTTPServer(RoomHTTPServer):
                 address_family=socket.AF_INET6
             server_type=IPv6HTTPServer
         server=server_type((bind,args.port),partial(Handler,directory=str(root)))

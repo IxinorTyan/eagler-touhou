@@ -2,6 +2,30 @@
   "original_md5": "06d74719b6f72b11014a392fd34d5f57",
   "original_size": 156258,
   "patched_size": 169378,
+  "native_crash_fixes": [
+    {
+      "name": "stage-4 Marisa zero-divisor flystep stays still",
+      "image_offset": 93061,
+      "bytes": 128,
+      "original_sha256": "e441622bb8806d953e657d208aabaf4a138a6110bcc9d451f13dae17ea918973",
+      "replacement_sha256": "6cd2afd613df1a32fba5711b4b6fc60bde6f6bdd4f83830162f7547eeb09d8b8",
+      "undefined_durations": [
+        12,
+        13
+      ],
+      "payload_bytes_added": 0
+    },
+    {
+      "name": "shared ring bullet zero-count divide guard",
+      "image_offset": 118986,
+      "bytes": 66,
+      "original_sha256": "fe683d83fb49dd5e153085acf7540c8d9564ba7c7f7ac406b1c08918a2e99243",
+      "replacement_sha256": "3e50d3eb3dcd29c69f9f6ca25f2c1bb7456edaf22c8a1d038e8eea4b5a0aff8e",
+      "undefined_count": 0,
+      "fallback_count": 1,
+      "payload_bytes_added": 0
+    }
+  ],
   "insert_image_offset": 78048,
   "insert_size": 13120,
   "payload_size": 13118,
@@ -494,7 +518,7 @@
       "name": "point-bullet full six-row blit"
     }
   ],
-  "sha256": "af7bacce81c50d750a00e4fe73c0635a294864fe9b1eac302aa5e1295ba6581c",
+  "sha256": "01dba1a2555ba1f1a684e2b1422dc8b0b3cc031e4af0cae4533a4f8acdfa33a3",
   "source": {
     "language": "ja",
     "file": "4-jp.hdi.gz",
