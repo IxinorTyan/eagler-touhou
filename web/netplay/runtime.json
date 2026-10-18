@@ -5,7 +5,7 @@
   "files": {
     "stage-select.js": "346e673950c5914f5146617ed7dc17801398b3b5e52cda17ef5443e3d29d59e4",
     "game.wasm": "709d779ab14fdfbcbb967d5f63683f401b692dc4d6f973da1b5f407b5e297bd2",
-    "bgm-version.js": "3ca57a0854152ba09c89e058be8f540e72f144aaf8cf44ab437fdaa865964f2c",
+    "bgm-version.js": "83a42bce341658f4e06720bb0542131365cdaf1385a5d091e8dd7ecf059e598a",
     "bgm-track.js": "b50ae259943d019c5531bf89d4ad2544316ee0b51ffd83a1bd80789f179c500f",
     "bgm/akyu/manifest.json": "c0c559559bf6c201f7c425f5052fc5eb6e23ab506b4cf67892ccfb8f41159651",
     "netplay/runtime.js": "b9444d4b7713299a1e9c765cfaec01275edab4b0ba458e2d7acb8de73d7357b3",

@@ -36,7 +36,7 @@ function mount(anchor){
   anchor.dataset.bgmVersionMounted='';
   const label=document.createElement('label');label.className='player-volume bgm-version';label.textContent='本机音乐 ';
   const select=document.createElement('select');select.setAttribute('aria-label','本机音乐版本');
-  for(const [id,text]of [['old','旧版音乐'],['new','新版音乐（幺乐团）']])select.add(new Option(text,id));
+  for(const [id,text]of [['old','游戏原版'],['new','幺乐团专辑版']])select.add(new Option(text,id));
   select.style.cssText='width:auto;min-width:110px;font:inherit';select.value=value;
   select.onchange=()=>setBgmVersion(select.value);label.append(select,document.createElement('small'));controls.add(select);
   if(anchor.matches('.player-toolbar'))anchor.append(label);
