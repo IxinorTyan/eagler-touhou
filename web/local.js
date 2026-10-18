@@ -4,6 +4,7 @@ import {mountFocusSettings} from './focus-settings.js';
 import {mountPlayer} from './player-ui.js';
 import {writeNativeTouch} from './native-touch.js';
 import {configureLauncher,launchConfig} from './netplay/launch-config.js';
+import {SoloMusic} from './solo-music.js';
 
 const $=id=>document.getElementById(id),keyboard=new Set();
 const signature=new TextEncoder().encode('TH02COOPv0002!!\0');
@@ -15,6 +16,7 @@ const bindings=[
 const nativeKeys=[['ArrowUp',1],['ArrowDown',2],['ArrowLeft',4],['ArrowRight',8],['KeyZ',16],['KeyX',32],['Escape',64],['Enter',128]];
 let emulator=null,metadata=null,mailbox=-1,candidates=[],cursor=0,lastNative=0,focused=true,launching=false,lastHud=0;
 let debugInvincible=false;
+let music=null;
 let launchSettings=null;
 let touch=null,touchSlot=0,touchPlay=false,touchMenu=true,touchActive=false;
 const focusSettings=mountFocusSettings(()=>syncInput());
@@ -106,11 +108,15 @@ window.addEventListener('blur',()=>{focused=false;release();});
 window.addEventListener('focus',()=>{focused=true;});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)release();});
 document.addEventListener('focusin',event=>{if(form(event.target))release();});
-$('canvas').addEventListener('pointerdown',()=>{$('canvas').focus();emulator?.audio.context.resume().catch(()=>{});});
+$('canvas').addEventListener('pointerdown',()=>{$('canvas').focus();emulator?.audio.context.resume().catch(()=>{});music?.resume();});
 
 // Reuse TH04's complete touch surface/workbench, retaining the existing canvas.
 const gameCanvas=$('canvas');
-touch=mountPlayer($('screen'),{onGesture:()=>{gameCanvas.focus();return emulator?.audio.context.resume();},onChange:()=>syncInput()});
+touch=mountPlayer($('screen'),{onGesture:()=>{gameCanvas.focus();music?.resume();return emulator?.audio.context.resume();},onChange:()=>syncInput()});
+const musicVolume=document.createElement('label');musicVolume.className='player-volume';
+musicVolume.innerHTML='音乐音量 <input type="range" min="0" max="100" value="70" aria-label="本机音乐音量">';
+$('screen').querySelector('.player-toolbar').append(musicVolume);
+musicVolume.querySelector('input').oninput=event=>music?.player.setVolume(Number(event.target.value)/100);
 const presentation=document.createElement('div');presentation.className='screen';presentation.append(gameCanvas);touch.stage.prepend(presentation);
 const seatLabel=document.createElement('label');seatLabel.className='touch-seat-picker';
 const seatSelect=document.createElement('select');seatSelect.id='touch-seat';seatSelect.setAttribute('aria-label','触摸控制玩家');
@@ -175,6 +181,7 @@ export function readPersonalStats(){
 function tick(now){
   try{
     if(emulator?.module.HEAPU8){scan();
+      music?.poll(emulator.module.HEAPU8,now);
       const state=readState(),active=emulator.state==='running',h=emulator.module.HEAPU8;
       const nativePaused=mailbox>=0&&!!h[mailbox-metadata.entries.mailbox+metadata.entries.touch_paused];
       const playing=!!state&&!nativePaused;
@@ -218,6 +225,10 @@ $('start').onclick=async()=>{
     const configOffset=metadata.headerSize+metadata.codeSegment*16+metadata.entries.run_config;
     exe[configOffset]=launchSettings.p2;exe[configOffset+1]=launchSettings.p3;
     exe[configOffset+2]=launchSettings.players;fat.replace(main,exe);
+    // Reuse the single-player resident music bridge; keep native sound effects.
+    // This edits only the private disk buffer passed to this local emulator.
+    music=new SoloMusic(message=>status(message));
+    await music.install(bytes,'HUMAROKU');music.player.setVolume(Number(musicVolume.querySelector('input').value)/100);
     emulator=await DOSBoxPC98.create({canvas:$('canvas'),artPatch:metadata,
       launchFiles:[{path:'game/HUMAROKU/WEBSTART.COM',contents:configureLauncher(launcher,launchSettings)}],
       onError:error=>status('DOSBox-X 停止：'+error.message),onExit:()=>status('游戏已退出，可重新启动')});
@@ -225,7 +236,7 @@ $('start').onclick=async()=>{
     document.body.dataset.running='true';for(const id of ['pause','menu','confirm','restart','diagnostics'])$(id).disabled=false;
     $('canvas').focus();
     status('正在直接进入所选关卡，无需操作原版菜单…');
-  }catch(error){status('启动失败：'+error.message);emulator?.dispose();emulator=null;mailbox=-1;launchSettings=null;$('start').disabled=false;
+  }catch(error){status('启动失败：'+error.message);music?.dispose();music=null;emulator?.dispose();emulator=null;mailbox=-1;launchSettings=null;$('start').disabled=false;
     for(const id of launchSelects)$(id).disabled=false;for(const button of shotChoices)button.disabled=false;
   }
   finally{launching=false;showLaunchSettings();}
@@ -234,8 +245,8 @@ async function tap(code){if(!emulator)return;emulator.key(code,true);await new P
 $('menu').onclick=()=>tap('Escape');$('confirm').onclick=()=>tap('Enter');
 $('pause').onclick=()=>{
   if(!emulator)return;
-  if(emulator.state==='running'){release();emulator.pause();$('pause').textContent='继续';status('模拟器已暂停');}
-  else if(emulator.state==='paused'){emulator.run();$('pause').textContent='暂停';$('canvas').focus();}
+  if(emulator.state==='running'){release();emulator.pause();music?.suspend();$('pause').textContent='继续';status('模拟器已暂停');}
+  else if(emulator.state==='paused'){emulator.run();music?.resume();$('pause').textContent='暂停';$('canvas').focus();}
 };
 $('restart').onclick=()=>location.reload();
 $('invincible').onclick=()=>{
@@ -259,4 +270,4 @@ $('diagnostics').onclick=()=>{
   const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
   a.href=url;a.download='th02-local-diagnostics.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 };
-window.addEventListener('pagehide',()=>{release();emulator?.dispose();});
+window.addEventListener('pagehide',()=>{release();music?.dispose();emulator?.dispose();});

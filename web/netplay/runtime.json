@@ -13,6 +13,7 @@
   "th02IdleOptimization": true,
   "th02PlayerArt": true,
   "assets": {
+    "bgm-version.js": "56092ea116604a3d7f3cbe2c2bc99c7d673923006ef9ced47dc6e05d98aee5cb",
     "control-settings.css": "8428afa28a1f29d46d5d4bf73da25066a87e6e1714a91405a30661446345e54c",
     "control-settings.js": "4eba3f22cd132473274d44147efe2633e10b388eea402de53074025623b73517",
     "dosbox-adapter.js": "1eff09e453754206f12edea7cf81d8c3b4da03178be5f9744fb573c1ee546634",
@@ -35,7 +36,7 @@
     "netplay/focus-display.js": "077df650a677d1ec25a7c07b6f9dad7b6e2a9db903c5ac93fd1df2a6bf84b282",
     "netplay/input-latch.js": "755218c5dea4bdae65848cb65a98ab3c0deb442ab2758bdfea68187a0fb1f8b6",
     "netplay/launch-config.js": "8b935c440e8e407a97d4efa5a97ea99a58b465ec4798f3494e9401c490104f25",
-    "netplay/local-bgm.js": "3765cf22782dd3b50da82679b03c64ec4fda71d9411b60b781ba8f56fd658daf",
+    "netplay/local-bgm.js": "d1564516dc6539a776b18a812d56aa63e3cd854f326f93207a9c4c77269b376b",
     "netplay/local-sfx.js": "bf230a6680de4acf4a1171148fa84804eeed599ff4064a446988a5407c277efa",
     "netplay/membership.js": "a84a5b38066e29a876db2c900e2411f3d4168f329bcb83fb44a81226a88e6fca",
     "netplay/network-mode.js": "dda8c24274cb84bf50aa50ca9405ffa8d707f9567137cb80cb2133ea45fb019b",
@@ -50,7 +51,7 @@
     "netplay/udp-config.js": "244c1972f3d412455e007c01a7548375d43d38debe71cc077668ed2c977bdfa3",
     "player-art.js": "74d7282128cd7bf8bd40ac1d0218b0c77e0a68469dbed00f06362ee43eb10873",
     "player-ui.css": "336426049fe26ab7dc605359bf230b081a2625a9905fc6bff7a4fcc671cc9a80",
-    "player-ui.js": "876ac9b9b1258795ff792ae8ebfe8bf5505913d5e79e4790546b7c888ac43746",
+    "player-ui.js": "d00180d3326679c5c50975edb624222edb610d2b166f5e939ba015d39a1f689c",
     "room.css": "0941351b7196802708669da4464f3a17f83c1a5e4c54178d2797f3fb37609959",
     "site.css": "ebd8d1925a424846e79b697bfc60347b1a6d5f23e61fffd75a9b0b79ae210ed0",
     "solo-fat12.js": "d17be5e4cd2e677427b9ce0d37d89ccde70658b24801cc83fccdb8d0207cf4b0",
@@ -58,8 +59,8 @@
     "solo-music.js": "2179c9c02b1ebe99d1f5dee15548c444ed69c830c4faa2c173b4f98c6e7c7645",
     "solo-native-music.js": "af26753aabc39cd902610312e61eebb88dc293143ecad1effa58f096e43f2e6d",
     "solo.css": "539970493394985318356dad7e842d72c21b474804c976d2a3c37b41a45b11c4",
-    "solo.html": "6450910aa04f670b759f788f5945847fcf0c8b16a8164c5f57bce60c6353de65",
-    "solo.js": "62da382efc92174717226003632e9abea91ff8a88d6fa43b907f440769a21d5a",
+    "solo.html": "61aed6034b4ae810229dddff53a6973aea4947475945bb9450ae6b7412679f8a",
+    "solo.js": "470b3d008379cb3f8c9a9eedcbd6b675726329c1616ccbd3d25b11dfdc658079",
     "touch-input.js": "1b16b18bb46e7ccf1943c05d17d762ff4393c05088c102fadaff633db7a08179",
     "touch-layout.js": "1d3ead2f73c675dbb62b960f4904df7b0e7d649ee8672138ac5a63f978808f71",
     "touch-overlay.css": "3ea83605ef5ce049ab10dff288e3a49e752d7a590f5b0e8f8cfc4117c1e35da9",
@@ -83,6 +84,7 @@
     "netplay/row-copy-patch.json": "e3d6068f4235e6f581e7a34dea64a050bc3761feb64ec4b297f1db792ebc5fb1",
     "netplay/bullet-bank-patch.json": "f628faae0d271078bf33695b8c933dfc7f1e81bdca01912bf0d3208d1f2d2355",
     "bgm/manifest.json": "7512e652e6dd1ce2e473e3bd230a0690d30093e7e2a1792f5c4c402816e34443",
+    "bgm/akyu/manifest.json": "2d1034d0016d39fa36d0bff5248a354cf74559663a6b94f3b3088c3a54e7416b",
     "solo-patch.json": "f3454898d48357ab97f0d82545ee811d40b135a753519f47c0c6058818b1d981",
     "solo-music.json": "c20439b06b7a80056877b24efbd915fd47170722948cef5e9fd35d9f4c45388b",
     "sfx/manifest.json": "743a7be54818c5483b8b03b89ad138a7a7cd65e4a0de185967322646ea5c3faf",
@@ -99,5 +101,5 @@
       "sha256": "5fb459e5df9232cab4d55f3c36c0bb6b4d00a983fc023661245373ee59ca06d8"
     }
   },
-  "build": "3b4af2ce30709a277223cedc8e442108010952ef9ce66278332222939046d088"
+  "build": "96c81641fa63a01c04d8b319ad7049ed2377a3a9f2ee02d0f09e0a6873d779fc"
 }

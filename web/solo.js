@@ -21,8 +21,13 @@ const pointMask=mountFocusSettings($('control-settings'),{profile:'solo',alwaysP
 $('controls-summary').textContent=controlsSummary('solo');
 const volume=document.createElement('label');volume.className='player-volume';volume.innerHTML='BGM <input type="range" min="0" max="100" value="70" aria-label="音乐音量">';$('control-settings').append(volume);
 volume.querySelector('input').oninput=event=>music?.player.setVolume(Number(event.target.value)/100);
-try{for(const id of ['language','audio-mode','focus-percent','gamepad']){const saved=localStorage.getItem('th02.solo.'+id);if(saved&&[...$(id).options].some(o=>o.value===saved))$(id).value=saved;}}catch{}
-for(const id of ['language','audio-mode','focus-percent','gamepad'])$(id).addEventListener('change',()=>{try{localStorage.setItem('th02.solo.'+id,$(id).value);}catch{};release();});
+try{
+  for(const id of ['language','audio-mode','gamepad']){const saved=localStorage.getItem('th02.solo.'+id);if(saved&&[...$(id).options].some(o=>o.value===saved))$(id).value=saved;}
+  $('focus-enabled').checked=localStorage.getItem('th02.solo.focus-enabled')!=='false';
+  localStorage.removeItem('th02.solo.focus-percent');
+}catch{}
+for(const id of ['language','audio-mode','gamepad'])$(id).addEventListener('change',()=>{try{localStorage.setItem('th02.solo.'+id,$(id).value);}catch{};release();});
+$('focus-enabled').addEventListener('change',()=>{try{localStorage.setItem('th02.solo.focus-enabled',String($('focus-enabled').checked));}catch{}release();});
 const showVolume=()=>{volume.hidden=$('audio-mode').value!=='independent';};$('audio-mode').addEventListener('change',showVolume);showVolume();
 
 function valid(heap,at){
@@ -60,7 +65,8 @@ function syncInput(motion=false){
     // The original game retains its own key sampler. Only focus and direct
     // touch motion use the separate assist mailbox.
     v.setUint16(base+patch.entries.currentInput,enabled&&(bits&64)?0x100:0,true);
-    h[mailbox+100]=Number($('focus-percent').value);h[mailbox+102]=1;
+    // The native assist always uses half of this aircraft's normal speed.
+    h[mailbox+100]=50;h[mailbox+102]=$('focus-enabled').checked?1:0;
     h[mailbox+103]=pointMask()|(player.alwaysPoint()?8:0);
     const touch=base+patch.entries.touch,state=readSoloState(),play=enabled&&state?.mode===1&&!state.hit;
     if(motion){
