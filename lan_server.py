@@ -28,7 +28,7 @@ def build_id():
                'assets/yuuka-afterimages.bin', 'assets/yuuka-afterimages.json',
              'player-ui.js', 'player-ui.css', 'touch-overlay.css', 'touch-layout.js', 'touch-input.js',
              'native-touch.js', 'native-players.js', 'dosbox-memory-diff.js', 'dosbox-snapshots.js', 'solo-native-music.js',
-             'music-files.js', 'music-patch.json', 'bgm/manifest.json',
+             'music-files.js', 'music-patch.json', 'bgm/manifest.json', 'bgm-version.js', 'bgm/akyu/manifest.json',
              'lan-music.com', 'lan-music-patch.json', 'sfx/manifest.json',
              'frame-display.js', 'sidebar-background.js', 'launch-config.js', 'disk-files.js']
     files += [str(p.relative_to(ROOT)).replace('\\', '/') for p in (ROOT / 'netplay').glob('*.js')]

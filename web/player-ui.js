@@ -1,3 +1,4 @@
+import './bgm-version.js';
 // Presentation and local device state only. The caller samples once per tick.
 import {packTouch} from './touch-input.js';
 import {mountTouchLayout} from './touch-layout.js';
