@@ -32,7 +32,7 @@
     "frame-limit.js": "e86164464b488361ae7b32bda2a38d323f7cfd68af66510246d32ee9c04ed6e3",
     "frame-presenter.js": "78f43396c4ac9a0b7acf10659626f9c8c877bf65603be9554ad46745cdc1ba8a",
     "frame-queue.js": "4e2b61c3c339a1fd8aee04b4344581451d5c430ad989ba22377b00413daabeae",
-    "local-bgm.js": "c59b4752a0e1d412d13e9447de4ecb562349c053a3a24648a609d92a23db42b1",
+    "local-bgm.js": "87a7a78851de5931d527a4a825054cd073c7708265809c153c13776c0aa5e37c",
     "local-sfx.js": "89fade391ab1039fead206728641c67852de69e0d27bf4b0c2ff04618df9ebb4",
     "local-worker-client.js": "d39d0b521a49101608069cba342ea7301cee854aa17bb14c6965117cc9f17aa7",
     "local.html": "1731de0b9107aee141d03d63ff72e5a405385a466cd7c41eaae92b8f9707bc7e",
@@ -55,7 +55,7 @@
     "network-performance.js": "2888cbfc383f767d1cfec80c72b11176449a33876ffd80de05f92cd315d97fc9",
     "pause-search.js": "588cdb51f6c78d86b33a20cc6da471469d785f858800b3dc38aa7e9b5e7602d0",
     "player-ui.css": "b0ade5c1127a26c493f4409bd6fd1f0c04cb77fbc4479ab9b607c1de5afb0699",
-    "player-ui.js": "61761d4e7c16349610d2465794fac683340791339897b5df2fad8ba1d8c3b63c",
+    "player-ui.js": "85c9a6adf9f70f1fe77ccd2c60b0d8a72b442e6344e373336b0641dc43e3339b",
     "scores.js": "8e4bb9dc606f09ce010d3791921ffd255e8a9da3ecb292a79d9a57f00268b205",
     "sfx/manifest.json": "0d47fa07bb09315fce90add01722baeb5c15a229c16c69a556fce54bed4e95c7",
     "sfx/se-01.wav": "996cca2ffecd2db64b2324489c462d589f018f902a45a5264d82e847750e6840",
@@ -98,7 +98,9 @@
     "vendor/dosbox-x/snapshot-diff-tracked.wasm": "d3eff5c0bb6c0dd7df1abb1f61ae38ff15b7139b7fdb3142bab465e13c564bec",
     "vendor/dosbox-x/snapshot-diff.wasm": "20235d6360a49d633f2db03832ef5ad3fbe6daffd4f44e4d7f8e790875a4662f",
     "vendor/dosbox-x/wdosbox-x-rollback-tracked.wasm": "270d5d491e09f04028d4f89cf828c1d6c4a8ad462ecdcfb326193117f8602a99",
-    "vendor/dosbox-x/wdosbox-x-rollback.wasm": "cc557b7af3651f166c59968310863d300e7caa23830fff300cde2a1a9c3c2bd3"
+    "vendor/dosbox-x/wdosbox-x-rollback.wasm": "cc557b7af3651f166c59968310863d300e7caa23830fff300cde2a1a9c3c2bd3",
+    "bgm-version.js": "d27acd57fbd0d2fd06f5a17c9a6ccf6551134f778bde14dec6e117659ba05826",
+    "bgm/akyu/manifest.json": "261621ba5a329d7f6e46fbaf29ab8bdf773f3ca8946f3b81949bd77871b934b3"
   },
   "snapshotScan": "adaptive-word8",
   "nativeScheduling": true,
