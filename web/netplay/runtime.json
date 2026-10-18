@@ -4,7 +4,7 @@
   "tickDenominator": 24830,
   "files": {
     "stage-select.js": "346e673950c5914f5146617ed7dc17801398b3b5e52cda17ef5443e3d29d59e4",
-    "game.wasm": "1ceae6a045e11796eb533e102fad8ccc44ad145f246f635026bbd32f3a348af8",
+    "game.wasm": "709d779ab14fdfbcbb967d5f63683f401b692dc4d6f973da1b5f407b5e297bd2",
     "netplay/runtime.js": "b9444d4b7713299a1e9c765cfaec01275edab4b0ba458e2d7acb8de73d7357b3",
     "netplay/session.js": "59427f834f65c36b5ea5e2b6d73f4792117660ad2f595abc20ba7c9d02410477",
     "netplay/queue.js": "5a488cd5c1b11fb9cd094408465b6a85d0a1091a07d76596f6f3371a8247c26b",
