@@ -35,7 +35,7 @@
     "local-bgm.js": "87a7a78851de5931d527a4a825054cd073c7708265809c153c13776c0aa5e37c",
     "local-sfx.js": "89fade391ab1039fead206728641c67852de69e0d27bf4b0c2ff04618df9ebb4",
     "local-worker-client.js": "d39d0b521a49101608069cba342ea7301cee854aa17bb14c6965117cc9f17aa7",
-    "local.html": "1731de0b9107aee141d03d63ff72e5a405385a466cd7c41eaae92b8f9707bc7e",
+    "local.html": "721b1d06f1180d8c2b6881dc30b34f8e3d85407351baef27af259ad371ec08cc",
     "lockstep.js": "12c6ba030fff22565a037b2927c27913365c2e8a0a6925c768af7877658cba21",
     "native-music.js": "3c64d5eafd35cfc1da86f2a23394d80424e5b36833daa60768856e0e57bdb976",
     "native-patch.json": "11ff9c5473d2497d96b0ada615685155decda5078c6bb3340722e5b47159a2ac",
@@ -99,7 +99,7 @@
     "vendor/dosbox-x/snapshot-diff.wasm": "20235d6360a49d633f2db03832ef5ad3fbe6daffd4f44e4d7f8e790875a4662f",
     "vendor/dosbox-x/wdosbox-x-rollback-tracked.wasm": "270d5d491e09f04028d4f89cf828c1d6c4a8ad462ecdcfb326193117f8602a99",
     "vendor/dosbox-x/wdosbox-x-rollback.wasm": "cc557b7af3651f166c59968310863d300e7caa23830fff300cde2a1a9c3c2bd3",
-    "bgm-version.js": "d27acd57fbd0d2fd06f5a17c9a6ccf6551134f778bde14dec6e117659ba05826",
+    "bgm-version.js": "048351571e53ef740010f3b42bf84b1f338739e7f481cef74a5a67594153aaa4",
     "bgm/akyu/manifest.json": "261621ba5a329d7f6e46fbaf29ab8bdf773f3ca8946f3b81949bd77871b934b3"
   },
   "snapshotScan": "adaptive-word8",

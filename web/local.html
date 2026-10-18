@@ -15,6 +15,11 @@
 <header class="masthead"><a class="brand" href="index.html">TOUHOU / 03 · 测试 beta0.3 · 性能版</a><small>東方夢時空 · PHANTASMAGORIA OF DIM.DREAM</small></header><nav class="mode-nav" aria-label="游戏模式"><a data-mode="solo" href="solo.html">单机游戏</a><a data-mode="local" aria-current="page" href="local.html">本地双人</a><a data-mode="lan" data-network="lan" href="lan.html?network=lan">局域网联机</a><a data-mode="public" data-network="public" href="lan.html?network=public">公网联机</a></nav>
   <main>
     <header class="intro"><span class="eyebrow">LOCAL / TWO PLAYERS</span><h1>本地双人</h1><p>一台电脑，两位玩家。选择游戏版本与难度，再进入原生双人选人画面。</p></header>
+<section class="panel local-music-settings" aria-label="本机音乐">
+<label class="bgm-version">本机音乐 <select data-bgm-version-control aria-label="本机音乐版本"><option value="old">游戏原版</option><option value="new">幺乐团专辑版</option></select><small data-bgm-restart-note></small></label>
+<p class="muted">仅影响本机播放的音乐，不改变其他玩家的选择；自动保存，游戏中切换会从头播放当前曲目。</p>
+</section>
+
     <fieldset class="launch-settings"><legend>本局设置</legend><div class="settings-grid">
       <label>游戏语言 <select id="language"><option value="jp">日文原版</option><option value="cn">中文汉化</option></select></label>
       <label>难度 <select id="difficulty"><option value="0">Easy</option><option value="1">Normal</option><option value="2">Hard</option><option value="3" selected>Lunatic</option></select></label>
@@ -65,5 +70,5 @@
     <div class="settings-footer"><span id="binding-status" role="status"></span><button id="defaults" type="button">恢复默认键位</button></div>
   </dialog>
   <script type="module" src="app.js"></script>
-</body>
+<script type="module" src="bgm-version.js"></script></body>
 </html>
