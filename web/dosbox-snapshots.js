@@ -11,7 +11,7 @@ export function createDosboxSnapshots(emulator){
     if(tracking){const block=diff.pack(pages);if(block)tracking.undo.push(block);}
     else if(diff.syncPages)diff.syncPages(pages);
     else for(const page of pages)diff.sync(page);
-    total=Math.max(total,diff.bytes+[...frames.values()].reduce((n,s)=>n+s.undo.reduce((bytes,block)=>bytes+block.buffer.length,0),0));}
+    total=Math.max(total,diff.bytes+[...frames.values()].reduce((n,s)=>n+s.undo.reduce((bytes,block)=>bytes+(block.buffer?.length||0),0),0));}
   function release(saved){if(saved.memory)pool.push(saved.memory);else for(const block of saved.undo)diff.release(block);}
   const write=m.MEMFS.stream_ops.write;
   m.MEMFS.stream_ops.write=function(stream,buffer,offset,length,position,canOwn){
@@ -34,7 +34,8 @@ export function createDosboxSnapshots(emulator){
     // heap scan at every boundary. Filesystem writes remain tracked meanwhile.
     seal(){active=null;},
     restore(frame){active=null;const s=frames.get(frame);if(!s)throw Error('DOSBox-X 快照已过期');
-      syncMemory();for(const key of [...frames.keys()].sort((a,b)=>b-a))if(key>=frame){const saved=frames.get(key);for(const [buffer,pages]of saved.writes)for(const [at,data]of pages)buffer.set(data,at);if(diff)for(let i=saved.undo.length-1;i>=0;i--)diff.restoreBlock(saved.undo[i]);}
+      syncMemory();const undo=[];for(const key of [...frames.keys()].sort((a,b)=>b-a))if(key>=frame){const saved=frames.get(key);for(const [buffer,pages]of saved.writes)for(const [at,data]of pages)buffer.set(data,at);if(diff)for(let i=saved.undo.length-1;i>=0;i--)undo.push(saved.undo[i]);}
+      if(diff){if(diff.restoreBlocks)diff.restoreBlocks(undo);else for(const block of undo)diff.restoreBlock(block);}
       if(s.memory)m.HEAPU8.set(s.memory);globals.forEach((g,i)=>{g.value=s.globals[i];});m.restoreContinuation(s.continuation);emulator.tick=s.tick;emulator.keys=new Set(s.keys);emulator.ci.keyMatrix={...s.keyMatrix};
       // Restore the framebuffer pointer/size alongside the native allocation.
       // The GPU stays unchanged until the room finishes catching up.

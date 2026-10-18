@@ -48,6 +48,36 @@ async function boot(settings){
  if(disk.length!==entry.size||await sha256(disk)!==entry.sha256)throw Error('TH02 游戏磁盘校验失败');
  const fat=new Fat12(disk),main=fat.find('HUMAROKU/MAIN.EXE'),exe=fat.read(main);
  if(await sha256(exe)!==entry.mainSha256)throw Error('TH02 主程序校验失败');
+ // Patch only this session's verified MAIN; shipped disks and art layouts stay pinned.
+ const swap=await get('./state-swap-patch.json'),swapBase=patch.headerSize+patch.codeSegment*16;
+ const swapBytes=hex=>Uint8Array.from(hex.match(/../g)||[],n=>parseInt(n,16));
+ const swapEntry=swapBytes(swap.entryExpected),swapJump=swapBytes(swap.entryReplacement),swapCode=swapBytes(swap.replacement);
+ if(swap.schema!==1||swap.codeSegment!==patch.codeSegment||swap.bankBytes!==62||swap.sourceMainSha256[config.language]!==entry.mainSha256||
+    swap.entry!==0x5016||swap.target!==0x8600||swapJump.length!==3||swapEntry.length!==3||swapCode.length!==swap.bytes||swap.target+swap.bytes>0x8960||
+    !swapEntry.every((b,i)=>exe[swapBase+swap.entry+i]===b)||
+    !exe.subarray(swapBase+swap.target,swapBase+swap.target+swap.bytes).every(b=>b===0))throw Error('TH02 玩家状态交换补丁版本不匹配');
+ exe.set(swapJump,swapBase+swap.entry);exe.set(swapCode,swapBase+swap.target);
+ const rowCopy=await get('./row-copy-patch.json'),rowEdits=rowCopy.edits?.[config.language];
+ if(rowCopy.schema!==1||rowCopy.codeSegment!==patch.codeSegment||rowCopy.entryImageOffset!==0x442a||
+    rowCopy.targetCodeOffset!==0x8700||rowCopy.bytes!==169||rowCopy.targetCodeOffset+rowCopy.bytes>0x8960||
+    rowCopy.rows!==16||rowCopy.stride!==80||!rowCopy.wordAccessOrderPreserved||
+    rowCopy.sourceMainSha256[config.language]!==entry.mainSha256||!Array.isArray(rowEdits)||rowEdits.length!==4)throw Error('TH02 图形复制补丁版本不匹配');
+ for(const edit of rowEdits){
+  const expected=swapBytes(edit.expected),replacement=swapBytes(edit.replacement);
+  if(!Number.isInteger(edit.fileOffset)||edit.fileOffset<0||edit.fileOffset+replacement.length>exe.length||
+     expected.length!==replacement.length||!expected.every((b,i)=>exe[edit.fileOffset+i]===b))throw Error('TH02 图形复制原程序不匹配');
+ }
+ for(const edit of rowEdits)exe.set(swapBytes(edit.replacement),edit.fileOffset);
+ const bulletBank=await get('./bullet-bank-patch.json');
+ if(bulletBank.schema!==1||bulletBank.codeSegment!==patch.codeSegment||bulletBank.entry!==patch.entries.collision_0||
+    bulletBank.target!==0x87b0||bulletBank.bytes<=0||bulletBank.target+bulletBank.bytes>0x8960||
+    !bulletBank.ordinaryOnly||!bulletBank.activeNonzeroFallback||!bulletBank.mailboxInactiveFallback||
+    bulletBank.sourceMainSha256[config.language]!==entry.mainSha256)throw Error('TH02 普通弹碰撞补丁版本不匹配');
+ const bulletExpected=swapBytes(bulletBank.entryExpected),bulletBody=swapBytes(bulletBank.replacement),bulletJump=swapBytes(bulletBank.entryReplacement);
+ if(bulletExpected.length!==5||bulletJump.length!==5||bulletBody.length!==bulletBank.bytes||
+    !bulletExpected.every((b,i)=>exe[swapBase+bulletBank.entry+i]===b)||
+    !exe.subarray(swapBase+bulletBank.target,swapBase+bulletBank.target+bulletBank.bytes).every(b=>b===0))throw Error('TH02 普通弹碰撞原程序不匹配');
+ exe.set(bulletJump,swapBase+bulletBank.entry);exe.set(bulletBody,swapBase+bulletBank.target);
  soundPolicy=await get('./sound-patch.json');
  for(const edit of soundPolicy.edits){
   const offset=patch.headerSize+edit.imageOffset,expected=edit.expected.match(/../g).map(n=>parseInt(n,16));
@@ -102,7 +132,10 @@ function nativeInput(inputs){
   const ack=v.getUint16(mailbox+138+i*2,true);
   if(ack!==consumedNative[i]||paused||heap[mailbox+23]&(1<<i))pendingNative[i]=0;
   consumedNative[i]=ack;
-  if(!paused){pendingNative[i]=(pendingNative[i]&~15)|((value&15)||(pendingNative[i]&15));pendingNative[i]|=value&112;}
+  if(!paused){// Retain each unacknowledged axis independently until MAIN consumes it.
+   if(value&3)pendingNative[i]=(pendingNative[i]&~3)|(value&3);
+   if(value&12)pendingNative[i]=(pendingNative[i]&~12)|(value&12);
+   pendingNative[i]|=value&112;}
   return value-(value&127)+((value&127)|pendingNative[i]);
  });
 }
@@ -214,7 +247,7 @@ function checksum(){
  let h=0x811c9dc5;const hash=n=>{h=Math.imul(h^n,0x01000193);};
  hash(ticks);hash(emulatedTicks);hash(oldP1);previousInputs.forEach(n=>{hash(n%4294967296);hash(Math.floor(n/4294967296));});
  pendingNative.forEach(hash);consumedNative.forEach(hash);hash(musicSequence);hash(sfxSequence);for(const c of musicName)hash(c.charCodeAt(0));
- if(mailbox>=0){const heap=emulator.module.HEAPU8,base=guestBase(heap,mailbox,patch);for(let at=base;at<base+0xa0000;at++)hash(heap[at]);}
+ if(mailbox>=0){const heap=emulator.module.HEAPU8,base=guestBase(heap,mailbox,patch);let memoryHash=h;for(let at=base,end=base+0xa0000;at<end;at++)memoryHash=Math.imul(memoryHash^heap[at],0x01000193);h=memoryHash;}
  return {tick:ticks,hash:(h>>>0).toString(16).padStart(8,'0'),gameFrame:state()?.gameFrame||0};
 }
 function present(){

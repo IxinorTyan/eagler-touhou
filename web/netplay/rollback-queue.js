@@ -4,6 +4,18 @@ export const TICK_MS=1000/60;
 export const BOOT_DELAY=2;
 export const MAX_ROLLBACK=12;
 export const MAX_INPUT_DELAY=12;
+export const MAX_ROLLBACK_INPUT_DELAY=6;
+export function rollbackRttForSamples(samples){
+  if(!Array.isArray(samples)||samples.length!==3||samples.some(n=>!Number.isFinite(n)||n<0||n>30000))throw Error('无效开局延迟采样');
+  return [...samples].sort((a,b)=>a-b)[1];
+}
+// Sample all directed links after native loading, before gameplay starts.
+// Keep low-RTT play immediate; give WAN input one transit plus a scheduling step.
+export function rollbackInputDelayForRtt(rtt){
+  if(!Number.isFinite(rtt)||rtt<0)throw Error('无效网络延迟');
+  if(rtt<=20)return 0;
+  return Math.min(MAX_ROLLBACK_INPUT_DELAY,Math.ceil(rtt/2/TICK_MS)+1);
+}
 // One-way transit plus one scheduling step. The three-player host includes
 // all directed peer measurements; using a whole RTT doubles ordinary delay.
 export function lockstepDelayForRtt(rtt){
@@ -18,15 +30,14 @@ const HELD=32|64|2048,DIRECTIONS=15;
 export class RollbackQueue {
   constructor(slot,players=2,{inputDelay=0,directionPrediction=3,rollbackEnabled=true}={}){
     if(![2,3].includes(players)||!Number.isInteger(slot)||slot<0||slot>=players)throw Error('无效玩家槽位');
-    // Limit delay to the prefilled boot prefix, so activation cannot create
-    // uncaptured input holes. Policy is fixed and checked during hello.
-    if(!Number.isInteger(inputDelay)||inputDelay<0||inputDelay>BOOT_DELAY||
+    // A longer rollback lead must be negotiated and prefilled before activation.
+    if(!Number.isInteger(inputDelay)||inputDelay<0||inputDelay>MAX_ROLLBACK_INPUT_DELAY||
        !Number.isInteger(directionPrediction)||directionPrediction<0||directionPrediction>MAX_ROLLBACK||
        typeof rollbackEnabled!=='boolean')throw Error('无效预测策略');
     this.inputDelay=inputDelay;this.directionPrediction=directionPrediction;this.rollbackEnabled=rollbackEnabled;
     this.lockstepDelay=BOOT_DELAY;
     this.slot=slot;this.players=players;this.frame=0;this.confirmed=BOOT_DELAY;
-    this.activation=null;this.dirty=null;this.inputs=Array.from({length:players},()=>new Map());
+    this.activation=null;this.dirty=null;this.skippedCorrections=0;this.inputs=Array.from({length:players},()=>new Map());
     this.used=new Map();
     this.offline=new Map();
     for(const lane of this.inputs)for(let n=0;n<BOOT_DELAY;n++)lane.set(n,0);
@@ -43,8 +54,14 @@ export class RollbackQueue {
     }
     this.updateConfirmed();
   }
+  setInputDelay(delay){
+    if(this.frame!==0||this.activation!==null||!Number.isInteger(delay)||delay<0||
+       delay>MAX_ROLLBACK_INPUT_DELAY||delay>this.lockstepDelay)throw Error('无效回滚输入缓冲');
+    this.inputDelay=delay;
+  }
   arm(frame){
     if(!this.rollbackEnabled||this.activation!==null||!Number.isSafeInteger(frame)||frame<this.frame||frame>this.frame+240)throw Error('无效回滚启用帧');
+    if(this.inputDelay>this.lockstepDelay)throw Error('回滚输入缓冲尚未预填');
     this.activation=frame;
   }
   capture(buttons){
@@ -78,6 +95,20 @@ export class RollbackQueue {
       this.dirty=this.dirty===null?at:Math.min(this.dirty,at);break;
     }
     this.updateConfirmed();
+  }
+  refreshCorrection(){
+    if(this.dirty===null)return null;
+    // Several packets can change a prediction and then restore the exact
+    // input already simulated. Recheck the complete used history once, just
+    // before restoring native state, rather than replaying a transient gap.
+    this.dirty=null;
+    for(const [at,pair]of this.used){
+      if(pair.some((value,slot)=>value!==this.predicted(slot,at))){
+        this.dirty=this.dirty===null?at:Math.min(this.dirty,at);
+      }
+    }
+    if(this.dirty===null)this.skippedCorrections++;
+    return this.dirty;
   }
   isOffline(slot,frame){return this.offline.has(slot)&&frame>=this.offline.get(slot);}
   offlineMask(frame=this.frame){let mask=0;for(const [slot,at]of this.offline)if(frame>=at)mask|=1<<slot;return mask;}

@@ -1,6 +1,6 @@
 import {startFrameLoop} from '../frame-limit.js';
 import {readNetworkMode,networkUrl} from './network-mode.js';
-import {PROTOCOL,RollbackQueue,TICK_MS,MAX_ROLLBACK,BOOT_DELAY,MAX_INPUT_DELAY,lockstepDelayForRtt} from './rollback-queue.js';
+import {PROTOCOL,RollbackQueue,TICK_MS,MAX_ROLLBACK,BOOT_DELAY,MAX_INPUT_DELAY,MAX_ROLLBACK_INPUT_DELAY,lockstepDelayForRtt,rollbackInputDelayForRtt,rollbackRttForSamples} from './rollback-queue.js';
 import {mountPlayer} from '../player-ui.js';
 import {isBound,keyboardBits,gamepadBits,gamepadStatus,normalize} from './controls.js';
 import {mountFocusSettings} from './focus-display.js';
@@ -23,7 +23,7 @@ let useRelay=mode.transport==='ws';
 const defaultRollback=mode.rollback!=='off';
 const inputLatch=new InputLatch();
 let inputPolicy;
-let timingSent=false,runDelay=null;
+let timingSent=false,runDelay=null,runInputDelay=null;
 let relay;
 let preparing=false,running=false,stopped=false,busy=false,runRequested=false;
 let pollTimer,heartbeatTimer,loadTimer,raf,wakeTimer=null,wakeAt=0;
@@ -397,12 +397,15 @@ function attachChannel(peer,channel){
         case 'ready':peer.ready=m.build;maybeRun();break;
         case 'timing':
           if(!Number.isFinite(m.rtt)||m.rtt<0||m.rtt>30000)throw Error('无效网络测量');
-          peer.startRtt=m.rtt;maybeRun();break;
+          if(!Number.isFinite(m.rollbackRtt)||m.rollbackRtt<0||m.rollbackRtt>30000)throw Error('无效回滚延迟测量');
+          peer.startRtt=m.rtt;peer.startRollbackRtt=m.rollbackRtt;maybeRun();break;
         case 'run':
           if(peer.role!=='host'||session.role==='host')throw Error('无效开局通知');
           if(runRequested)throw Error('重复开局通知');
           if(!Number.isInteger(m.delay)||m.delay<BOOT_DELAY||m.delay>MAX_INPUT_DELAY)throw Error('无效开局输入缓冲');
-          runDelay=m.delay;
+          if(!Number.isInteger(m.inputDelay)||m.inputDelay<0||m.inputDelay>MAX_ROLLBACK_INPUT_DELAY||
+             m.inputDelay>m.delay||(!inputPolicy.rollbackEnabled&&m.inputDelay!==0))throw Error('无效回滚输入策略');
+          runDelay=m.delay;runInputDelay=m.inputDelay;
           runRequested=true;maybeRun();break;
         case 'input':
           if(membership?.roles.includes(peer.role))break;
@@ -522,7 +525,7 @@ async function requestRelayFallback(reason){
 }
 async function setupConnections(){
   const attempt=++connectionAttempt,relayMode=useRelay;
-  connectionReadySent=false;runRequested=false;timingSent=false;runDelay=null;connectionConfigPending=true;pendingConnectionSignals=[];
+  connectionReadySent=false;runRequested=false;timingSent=false;runDelay=null;runInputDelay=null;connectionConfigPending=true;pendingConnectionSignals=[];
   const oldPeers=[...peers.values()];peers.clear();
   for(const peer of oldPeers){clearTimeout(peer.connectTimer);peer.channel?.close();peer.pc.close();}
   relay?.close();relay=null;
@@ -699,7 +702,7 @@ function maybeRun(){
   if(![...peers.values()].every(peer=>peer.timingSamples?.length===3))return;
   if(!timingSent){
     timingSent=true;
-    broadcast({type:'timing',rtt:Math.max(...[...peers.values()].flatMap(peer=>peer.timingSamples))});
+    broadcast({type:'timing',rtt:Math.max(...[...peers.values()].flatMap(peer=>peer.timingSamples)),rollbackRtt:Math.max(...[...peers.values()].map(peer=>rollbackRttForSamples(peer.timingSamples)))});
   }
   // All browsers acknowledge the same route before the host can send run.
   // An atomic server decision prevents a 3P partial mesh from splitting into
@@ -714,11 +717,15 @@ function maybeRun(){
   }
   if(session.role==='host'){
     if(![...peers.values()].every(peer=>Number.isFinite(peer.startRtt)))return;
-    runDelay=inputPolicy.rollbackEnabled?BOOT_DELAY:lockstepDelayForRtt(Math.max(...[...peers.values()].flatMap(peer=>[peer.startRtt,...peer.timingSamples])));
-    broadcast({type:'run',delay:runDelay});runRequested=true;
+    const rtt=Math.max(...[...peers.values()].flatMap(peer=>[peer.startRtt,...peer.timingSamples]));
+    const rollbackRtt=Math.max(...[...peers.values()].flatMap(peer=>[peer.startRollbackRtt,rollbackRttForSamples(peer.timingSamples)]));
+    runInputDelay=inputPolicy.rollbackEnabled?rollbackInputDelayForRtt(rollbackRtt):0;
+    runDelay=inputPolicy.rollbackEnabled?Math.max(BOOT_DELAY,runInputDelay):lockstepDelayForRtt(rtt);
+    broadcast({type:'run',delay:runDelay,inputDelay:runInputDelay});runRequested=true;
   }
   if(!runRequested)return;
-  queue.setLockstepDelay(runDelay);
+  queue.setLockstepDelay(runDelay);queue.setInputDelay(runInputDelay);
+  inputPolicy=Object.freeze({...inputPolicy,inputDelay:runInputDelay});
   if(inputPolicy.rollbackEnabled)queue.arm(0);
   clearTimeout(loadTimer);runtime.start();running=true;player.setActive(true);
   for(const peer of onlinePeers()){peer.lastPacket=performance.now();peer.suspectAt=null;}
@@ -857,6 +864,7 @@ function pump(now){
   try{
     accumulator=Math.min(accumulator+Math.max(0,now-lastNow),TICK_MS*4);lastNow=now;
     let count=0,waiting=false;const budgetStart=performance.now();
+    if(queue.dirty!==null)queue.refreshCorrection();
     if(queue.dirty!==null){
       // Publish the due frontier input before costly replay. Never sample a
       // historical replay frame, and never resample an already captured frame.
