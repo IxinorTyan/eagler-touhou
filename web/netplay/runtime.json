@@ -13,7 +13,7 @@
   "th02IdleOptimization": true,
   "th02PlayerArt": true,
   "assets": {
-    "bgm-version.js": "56092ea116604a3d7f3cbe2c2bc99c7d673923006ef9ced47dc6e05d98aee5cb",
+    "bgm-version.js": "417716afe84a022430ee3069485a1b9676aee9706c16696b7ad3bf1d9f3f1524",
     "control-settings.css": "8428afa28a1f29d46d5d4bf73da25066a87e6e1714a91405a30661446345e54c",
     "control-settings.js": "4eba3f22cd132473274d44147efe2633e10b388eea402de53074025623b73517",
     "dosbox-adapter.js": "1eff09e453754206f12edea7cf81d8c3b4da03178be5f9744fb573c1ee546634",
@@ -24,7 +24,7 @@
     "frame-limit.js": "e984d0b2adcf5dce3828e5b6e15bb7cf6aebd1ddbd9f5d7950a5dfda11998d03",
     "frame-presenter.js": "7c9c834d6627ae044fa3b7d33b572e95fa20b7d79e7ac3d4a1cf0df3e016434a",
     "index.html": "efa7ae1750da73988a446f8d2cf53fc204df9c76204280332100063708a41e47",
-    "lan.html": "bb7dd2c18fa03024bcbfff32a71730e0cf499edb8ea0f26de62734a73bfeda77",
+    "lan.html": "6dd78a9fa3731227764f7ac1293907d18ea5bbb66395183c17c3747d2a010f15",
     "lan.js": "b2b260e540b195ae8dd09812412f81aa653bff0493beaee6dc11623580a4a49d",
     "local.css": "657647d9b6798cbb21d09bb8a6ef2eddf163b631b7453598b0a6f913e24c2b52",
     "native-touch.js": "4399ed78b5f4219458717669592e3e05de3c3ad3086ca76e724b555c557078a8",
@@ -59,7 +59,7 @@
     "solo-music.js": "2179c9c02b1ebe99d1f5dee15548c444ed69c830c4faa2c173b4f98c6e7c7645",
     "solo-native-music.js": "af26753aabc39cd902610312e61eebb88dc293143ecad1effa58f096e43f2e6d",
     "solo.css": "539970493394985318356dad7e842d72c21b474804c976d2a3c37b41a45b11c4",
-    "solo.html": "61aed6034b4ae810229dddff53a6973aea4947475945bb9450ae6b7412679f8a",
+    "solo.html": "a68a34c738d0f44c36cd9cc8f9f59fd3b126dbfa19d5da644779c965949488c1",
     "solo.js": "470b3d008379cb3f8c9a9eedcbd6b675726329c1616ccbd3d25b11dfdc658079",
     "touch-input.js": "1b16b18bb46e7ccf1943c05d17d762ff4393c05088c102fadaff633db7a08179",
     "touch-layout.js": "1d3ead2f73c675dbb62b960f4904df7b0e7d649ee8672138ac5a63f978808f71",
@@ -101,5 +101,5 @@
       "sha256": "5fb459e5df9232cab4d55f3c36c0bb6b4d00a983fc023661245373ee59ca06d8"
     }
   },
-  "build": "96c81641fa63a01c04d8b319ad7049ed2377a3a9f2ee02d0f09e0a6873d779fc"
+  "build": "be6758e9dba97d9ebb446715767bf7f7f345ca8b70e4bd2663476338d86c945b"
 }

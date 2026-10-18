@@ -6,6 +6,11 @@
 <link rel="stylesheet" href="site.css"><link rel="stylesheet" href="local.css"><body class="shell">
 <header class="masthead"><a class="brand" href="index.html">TOUHOU / 02</a><small>東方封魔録 · STORY OF EASTERN WONDERLAND</small></header><nav class="mode-nav" aria-label="游戏模式"><a data-mode="solo" href="solo.html">单人游戏</a><a data-mode="local" aria-current="page" href="local.html">本机合作</a><a data-mode="lan" href="lan.html?network=lan">局域网联机</a><a data-mode="public" href="lan.html?network=public">公网联机</a></nav><main>
   <header class="intro"><span class="eyebrow">ONE DEVICE / COOPERATIVE PLAY</span><h1>本机合作</h1><p>两人或三人共用一台设备，各自控制灵梦，共同面对封魔录的异变。</p></header>
+<section class="panel local-music-settings" aria-label="本机音乐">
+<label class="bgm-version">本机音乐 <select data-bgm-version-control aria-label="本机音乐版本"><option value="old">游戏原版</option><option value="new">幺乐团专辑版</option></select><small data-bgm-restart-note></small></label>
+<p class="muted">仅影响本机播放的音乐，不改变其他玩家的选择；自动保存，游戏中切换会从头播放当前曲目。</p>
+</section>
+
   <section id="launch" class="panel">
     <h2>本局设置</h2><p class="hint">选好各自机体与本局规则，启动后直接进入关卡。</p>
     <div class="settings-grid launch-settings">
@@ -49,4 +54,4 @@
   </section>
 </main><footer class="footer"><a href="index.html">← 返回启动器</a><span>TH02 · STORY OF EASTERN WONDERLAND</span></footer>
 <script type="module" src="local.js"></script>
-<script type="module" src="navigation.js"></script></body></html>
+<script type="module" src="navigation.js"></script><script type="module" src="bgm-version.js"></script></body></html>
