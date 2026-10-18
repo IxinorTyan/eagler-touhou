@@ -1,8 +1,10 @@
+import {onBgmVersion} from '../bgm-version.js';
+import {loadMusicTrack} from '../bgm-track.js';
 import {musicRoomTracks} from '../music-room.js';
 
 // Sound is local presentation; downloads and audio clocks never gate a game step.
 export class LocalAudio{
-  constructor(){this.volume=.35;this.buffers=new Map();this.effects=new Map();this.cursor=0;this.stopped=false;this.trackRequest=0;}
+  constructor(){this.unsubscribeVersion=onBgmVersion(()=>{++this.trackRequest;this.source?.stop();this.source?.disconnect();this.source=null;this.trackKey=null;this.buffers.clear();if(this.core)this.update(this.core);});this.volume=.35;this.buffers=new Map();this.effects=new Map();this.cursor=0;this.stopped=false;this.trackRequest=0;}
   async unlock(){
     if(this.stopped)return;
     this.context??=new AudioContext();this.gain??=this.context.createGain();this.gain.gain.value=this.volume;
@@ -18,9 +20,7 @@ export class LocalAudio{
     if(key==='silent')return;
     try{
       if(!this.buffers.has(key)){
-        const pending=Promise.all([
-        fetch(`bgm/${key}.opus`).then(async r=>{if(!r.ok)throw Error('音乐读取失败');return this.context.decodeAudioData(await r.arrayBuffer());}),
-        fetch(`bgm/${key}.json`).then(async r=>{if(!r.ok)throw Error('循环点读取失败');return r.json();})]);
+        const pending=loadMusicTrack(this.context,key);
         this.buffers.set(key,pending);
         void pending.catch(()=>{if(this.buffers.get(key)===pending)this.buffers.delete(key);});
       }
@@ -57,5 +57,5 @@ export class LocalAudio{
       source.start();this.effect=source;
     }
   }
-  stop(){this.stopped=true;++this.trackRequest;this.source?.stop();this.source?.disconnect();this.source=null;this.effect?.stop();this.effect?.disconnect();this.effect=null;void this.context?.close();}
+  stop(){this.unsubscribeVersion();this.stopped=true;++this.trackRequest;this.source?.stop();this.source?.disconnect();this.source=null;this.effect?.stop();this.effect?.disconnect();this.effect=null;void this.context?.close();}
 }

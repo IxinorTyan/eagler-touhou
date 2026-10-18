@@ -1,3 +1,4 @@
+import '../bgm-version.js';
 import {populateStages,stageLabel} from '../stage-select.js';
 import {NetSession} from './session.js';
 import {readNetworkMode,describeNetwork,networkParams} from './network-mode.js';

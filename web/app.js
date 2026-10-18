@@ -1,3 +1,5 @@
+import {loadMusicTrack} from './bgm-track.js';
+import {onBgmVersion} from './bgm-version.js';
 import {populateStages,stageLabel,stageSelection,applyStage} from './stage-select.js';
 import {musicRoomTracks} from './music-room.js';
 const $=id=>document.getElementById(id);
@@ -40,6 +42,7 @@ function saveScores(){
   scoreRevision=revision;
 }
 const musicTracks=new Map();
+onBgmVersion(()=>{musicTracks.clear();stopMusicSource();musicTrack=null;if(core&&musicWanted)void startMusic();});
 function musicCue(){
   const cue=core?.th_get(79,0)??0;
   return cue===2?'silent':cue<2?musicRoomTracks[cue].key:musicRoomTracks[cue-3].key;
@@ -181,7 +184,7 @@ async function startMusic(){
     musicContext??=new AudioContext();await musicContext.resume();
     if(musicRequest!==request||!musicWanted||musicCue()!==track)return;
     if(!musicTracks.has(track)){
-      const pending=Promise.all([fetch(`bgm/${track}.opus`).then(async response=>{if(!response.ok)throw Error('音乐资源读取失败');return musicContext.decodeAudioData(await response.arrayBuffer());}),fetch(`bgm/${track}.json`).then(async response=>{if(!response.ok)throw Error('音乐循环点读取失败');return response.json();})]);
+      const pending=loadMusicTrack(musicContext,track);
       musicTracks.set(track,pending);
       void pending.catch(()=>{if(musicTracks.get(track)===pending)musicTracks.delete(track);});
     }
