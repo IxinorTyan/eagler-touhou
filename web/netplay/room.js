@@ -1,6 +1,6 @@
 import {startFrameLoop} from '../frame-limit.js';
 import {readNetworkMode,networkUrl} from './network-mode.js';
-import {PROTOCOL,RollbackQueue,TICK_MS,MAX_ROLLBACK} from './rollback-queue.js';
+import {PROTOCOL,RollbackQueue,TICK_MS,MAX_ROLLBACK,BOOT_DELAY,MAX_INPUT_DELAY,MAX_ROLLBACK_INPUT_DELAY,lockstepDelayForRtt,rollbackInputDelayForRtt,rollbackRttForSamples} from './rollback-queue.js';
 import {mountPlayer} from '../player-ui.js';
 import {isBound,keyboardBits,gamepadBits,gamepadStatus,normalize} from './controls.js';
 import {mountFocusSettings} from '../focus-settings.js';
@@ -20,6 +20,7 @@ const useRelay=mode.transport==='ws';
 // always use the host's server-authoritative setting, frozen at game start.
 const defaultRollback=mode.rollback==='on';
 let inputPolicy;
+let timingSent=false,runDelay=null,runInputDelay=null;
 let relay;
 let preparing=false,running=false,stopped=false,busy=false,runRequested=false;
 let pollTimer,heartbeatTimer,loadTimer,raf,wakeTimer=null,wakeAt=0;
@@ -200,12 +201,17 @@ function send(peer,message){
 }
 function broadcast(message){for(const peer of onlinePeers())send(peer,message);}
 function pingPeer(peer){
-  const id=++peer.pingId;peer.pings.set(id,performance.now());trim(peer.pings);
+  const id=++peer.pingId;peer.pings.set(id,{at:performance.now(),startup:!!peer.timingStarted&&!running});trim(peer.pings);
   send(peer,{type:'ping',id});
 }
 function recordPong(peer,id){
   if(!peer.pings.has(id))return;
-  peer.rtt=performance.now()-peer.pings.get(id);peer.pings.delete(id);
+  const ping=peer.pings.get(id);peer.rtt=performance.now()-ping.at;peer.pings.delete(id);
+  if(ping.startup&&(peer.timingSamples?.length||0)<3){
+    (peer.timingSamples??=[]).push(peer.rtt);
+    if(peer.timingSamples.length<3)pingPeer(peer);
+    maybeRun();
+  }
 }
 function clearInput(){keys.clear();childBits=0;pendingAction=0;bits=0;player.reset();}
 function clearTimers(){
@@ -366,10 +372,19 @@ function attachChannel(peer,channel){
           if(m.inputPolicy?.inputDelay!==inputPolicy.inputDelay||m.inputPolicy?.directionPrediction!==inputPolicy.directionPrediction||m.inputPolicy?.rollbackEnabled!==inputPolicy.rollbackEnabled)throw Error('联机性能策略不一致，请全员刷新并使用相同网络模式');
           peer.hello=true;maybeRun();break;
         case 'ready':peer.ready=m.build;maybeRun();break;
+        case 'timing':
+          if(!Number.isFinite(m.rtt)||m.rtt<0||m.rtt>30000)throw Error('无效网络测量');
+          if(!Number.isFinite(m.rollbackRtt)||m.rollbackRtt<0||m.rollbackRtt>30000)throw Error('无效回滚延迟测量');
+          peer.startRtt=m.rtt;peer.startRollbackRtt=m.rollbackRtt;maybeRun();break;
         case 'run':
           if(peer.role!=='host'||session.role==='host')throw Error('无效开局通知');
           if(runRequested)throw Error('重复开局通知');
+          if(!Number.isInteger(m.delay)||m.delay<BOOT_DELAY||m.delay>MAX_INPUT_DELAY)throw Error('无效开局输入缓冲');
+          if(!Number.isInteger(m.inputDelay)||m.inputDelay<0||m.inputDelay>MAX_ROLLBACK_INPUT_DELAY||
+             m.inputDelay>m.delay||(!inputPolicy.rollbackEnabled&&m.inputDelay!==0))throw Error('无效回滚输入策略');
+          runDelay=m.delay;runInputDelay=m.inputDelay;
           runRequested=true;maybeRun();break;
+
         case 'input':
           if(m.slot!==state.slots[peer.role])throw Error('玩家输入身份不匹配');
           if(membership?.roles.includes(peer.role))break;
@@ -510,6 +525,7 @@ async function receivedSignal({from,message}){
 async function beginGame(){
   // Six steps cover a slow peer's input delivery without the old twelve-step
   // speculative tail. Real input still corrects a predicted release immediately.
+  timingSent=false;runDelay=null;runInputDelay=null;
   inputPolicy=Object.freeze({inputDelay:0,directionPrediction:6,rollbackEnabled:state.settings.rollback});
   bootStartedAt=performance.now();
   if(!useRelay&&!window.RTCPeerConnection)throw Error('请使用新版 Chrome 或 Edge');
@@ -583,8 +599,26 @@ function maybeRun(){
   showStartup();
   if(running||stopped||!localReady||![...peers.values()].every(peer=>peer.channel?.readyState==='open'&&peer.hello&&peer.ready))return;
   if([...peers.values()].some(peer=>JSON.stringify(peer.ready)!==JSON.stringify(localReady)))throw Error('游戏资源版本不一致，请所有玩家刷新页面');
-  if(session.role==='host'){broadcast({type:'run'});runRequested=true;}
+  // Boot can block the browser for far longer than the actual network RTT.
+  // Start the three policy samples only after everyone's native stage is ready;
+  // loading pings remain diagnostic and never set the match's fixed delay.
+  for(const peer of peers.values())if(!peer.timingStarted){peer.timingStarted=true;peer.pings.clear();peer.timingSamples=[];pingPeer(peer);}
+  if(![...peers.values()].every(peer=>peer.timingSamples?.length===3))return;
+  if(!timingSent){
+    timingSent=true;
+    broadcast({type:'timing',rtt:Math.max(...[...peers.values()].flatMap(peer=>peer.timingSamples)),rollbackRtt:Math.max(...[...peers.values()].map(peer=>rollbackRttForSamples(peer.timingSamples)))});
+  }
+  if(session.role==='host'){
+    if(![...peers.values()].every(peer=>Number.isFinite(peer.startRtt)))return;
+    const rtt=Math.max(...[...peers.values()].flatMap(peer=>[peer.startRtt,...peer.timingSamples]));
+    const rollbackRtt=Math.max(...[...peers.values()].flatMap(peer=>[peer.startRollbackRtt,rollbackRttForSamples(peer.timingSamples)]));
+    runInputDelay=inputPolicy.rollbackEnabled?rollbackInputDelayForRtt(rollbackRtt):0;
+    runDelay=inputPolicy.rollbackEnabled?Math.max(BOOT_DELAY,runInputDelay):lockstepDelayForRtt(rtt);
+    broadcast({type:'run',delay:runDelay,inputDelay:runInputDelay});runRequested=true;
+  }
   if(!runRequested)return;
+  queue.setLockstepDelay(runDelay);queue.setInputDelay(runInputDelay);
+  inputPolicy=Object.freeze({...inputPolicy,inputDelay:runInputDelay});
   clearTimeout(loadTimer);runtime.start();running=true;player.setActive(true);
   for(const peer of onlinePeers()){peer.lastPacket=performance.now();peer.suspectAt=null;}
   lastNow=lastMeasure=performance.now();measureFrame=queue.frame;accumulator=0;

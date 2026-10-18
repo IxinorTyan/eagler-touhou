@@ -35,7 +35,7 @@ function reportRuntimeFailure(kind,error){
   const message=String(error?.message||error);
   runtimeFailure={kind,message,tick:ticks,emulatedTicks};
   enabled=false;closed=true;bgm?.dispose();localSe?.dispose();details.textContent=message;
-  window.parent.postMessage({protocol:'th04-rollback/3',event:'runtime-error',message,kind},location.origin);
+  window.parent.postMessage({protocol:'th04-rollback/4',event:'runtime-error',message,kind},location.origin);
 }
 let controlsBlocked=false;
 function localButtons(){
@@ -94,7 +94,7 @@ async function get(path,type='json'){
 }
 async function bootProgress(message,step){
   details.textContent=`启动进度：${message}`;
-  window.parent.postMessage({protocol:'th04-rollback/3',event:'boot-progress',message,step},location.origin);
+  window.parent.postMessage({protocol:'th04-rollback/4',event:'boot-progress',message,step},location.origin);
   // Give the parent page a chance to display the stage before expensive work.
   await new Promise(resolve=>setTimeout(resolve,0));
 }

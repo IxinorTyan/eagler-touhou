@@ -1,7 +1,7 @@
 // Manual, two-device probe. No emulator, game loop or rollback modules imported.
 // Uses the existing lobby API, but a distinct DataChannel label/wire handshake.
 import {countIceCandidate,describeIceCandidates,describeIceAddresses,describeRtcConfiguration,recordIceServerError,refreshRtcPath} from './connection.js';
-const PROTOCOL='th04-rollback/3',LABEL='th04-connection-check-v1';
+const PROTOCOL='th04-rollback/4',LABEL='th04-connection-check-v1';
 const $=id=>document.getElementById(id);
 let session,peer,channel,busy=false,stopped=false,pollTimer,deadline,heartbeat;
 let localSlot;

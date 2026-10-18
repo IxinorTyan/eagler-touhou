@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from turn_service import credentials as turn_credentials, TurnError
 
-PROTOCOL='th04-rollback/3'
+PROTOCOL='th04-rollback/4'
 ROLES=('host','guest','guest2')
 ROOMS={}
 LOCK=threading.Lock()
