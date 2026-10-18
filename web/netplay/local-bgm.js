@@ -1,8 +1,17 @@
+import {bgmVersion,onBgmVersion} from '../bgm-version.js';
 // Local presentation only. The game emits commands; the audio device owns time.
 // Never seek to a network tick, refill PCM per frame, or write guest memory here.
 export class LocalBgm {
   constructor(context,report){
-    this.context=context;this.report=report;this.encoded=new Map();this.decoded=new Map();
+    this.context=context;this.report=report;this.newTracks={};
+    this.unsubscribeVersion=onBgmVersion(()=>{
+      if(this.closed||this.lastHash===undefined||!this.manifest)return;
+      const previous=this.requested,hash=this.lastHash;
+      this.play(hash);
+      if(previous&&this.requested?.generation===this.generation){
+        this.requested.volume=previous.volume;this.requested.fade=previous.fade;
+      }
+    });this.encoded=new Map();this.decoded=new Map();
     this.downloads=new Map();this.pendingCommands=[];this.abort=new AbortController();
     this.generation=0;this.sequence=0;this.mailbox=-1;this.active=null;this.closed=false;
     this.status='本地音乐：准备中';this.volume=context.createGain();
@@ -12,7 +21,11 @@ export class LocalBgm {
     const response=await fetch(new URL('../bgm/manifest.json',import.meta.url),
       {cache:'no-store',signal:AbortSignal.any([this.abort.signal,AbortSignal.timeout(15000)])});
     if(!response.ok)throw Error('本地音乐清单读取失败');
-    this.manifest=await response.json();
+    const manifest=await response.json();
+    const alternate=await fetch(new URL('../bgm/akyu/manifest.json',import.meta.url),{signal:this.abort.signal});
+    if(!alternate.ok)throw Error('新版音乐清单读取失败');
+    this.newTracks=(await alternate.json()).tracks;
+    this.manifest=manifest;
     if(this.closed)return;
     this.status='本地音乐：按需加载';
     const commands=this.pendingCommands.splice(0);
@@ -22,37 +35,39 @@ export class LocalBgm {
     // two full decoded waveforms before the driver selects its music mode.
     if(!commands.length&&config.warmOpening!==false)for(const type of ['m26','m86'])this.prefetch(`${first}-${type}`);
   }
-  download(id){
-    if(this.encoded.has(id))return Promise.resolve(this.encoded.get(id));
-    if(this.downloads.has(id))return this.downloads.get(id);
-    const track=this.manifest.tracks[id];
+  track(id){return bgmVersion()==='new'&&this.newTracks[id]?this.newTracks[id]:this.manifest.tracks[id];}
+  download(id,track=this.track(id)){
+    const cacheKey=track?.url;
+    if(this.encoded.has(cacheKey))return Promise.resolve(this.encoded.get(cacheKey));
+    if(this.downloads.has(cacheKey))return this.downloads.get(cacheKey);
     if(!track)return Promise.reject(Error(`缺少本地曲目：${id}`));
     const pending=(async()=>{
       const response=await fetch(new URL('../bgm/'+track.url,import.meta.url),
         {signal:AbortSignal.any([this.abort.signal,AbortSignal.timeout(30000)])});
       if(!response.ok)throw Error(`音乐下载失败：${id}`);
       const bytes=await response.arrayBuffer();
-      if(!this.closed)this.encoded.set(id,bytes);
+      if(!this.closed)this.encoded.set(cacheKey,bytes);
       return bytes;
     })();
-    this.downloads.set(id,pending);
-    pending.then(()=>this.downloads.delete(id),()=>this.downloads.delete(id));
+    this.downloads.set(cacheKey,pending);
+    pending.then(()=>this.downloads.delete(cacheKey),()=>this.downloads.delete(cacheKey));
     return pending;
   }
   prefetch(id){
     if(!this.closed&&this.manifest.tracks[id])this.download(id).catch(()=>{});
   }
-  decode(id){
+  decode(id,track=this.track(id)){
+    const cacheKey=track?.url;
     if(!this.manifest.tracks[id])return Promise.reject(Error(`缺少本地曲目：${id}`));
-    if(!this.decoded.has(id)){
-      const pending=this.download(id).then(bytes=>{
+    if(!this.decoded.has(cacheKey)){
+      const pending=this.download(id,track).then(bytes=>{
         if(this.closed)throw Error('房间已关闭');
         return this.context.decodeAudioData(bytes.slice(0));
       });
-      this.decoded.set(id,pending);
-      pending.catch(()=>{if(this.decoded.get(id)===pending)this.decoded.delete(id);});
+      this.decoded.set(cacheKey,pending);
+      pending.catch(()=>{if(this.decoded.get(cacheKey)===pending)this.decoded.delete(cacheKey);});
     }
-    return this.decoded.get(id);
+    return this.decoded.get(cacheKey);
   }
   setVolume(value){this.volume.gain.setTargetAtTime(value,this.context.currentTime,0.015);}
   retire(){
@@ -62,22 +77,24 @@ export class LocalBgm {
     item.gain.gain.linearRampToValueAtTime(0,now+0.015);
     item.source.stop(now+0.016);this.active=null;
   }
-  stop(){this.generation++;this.retire();this.status='本地音乐：已停止';}
+  stop(){this.lastHash=undefined;this.requested=null;this.generation++;this.retire();this.status='本地音乐：已停止';}
   play(hash){
+    this.lastHash=hash;
     const id=this.manifest.headers[String(hash)];
     this.retire();const generation=++this.generation;
-    if(!id){this.status=`本地音乐：未识别曲目 ${hash.toString(16)}`;return;}
+    if(!id){this.lastHash=undefined;this.requested=null;this.status=`本地音乐：未识别曲目 ${hash.toString(16)}`;return;}
     // Commands arriving while decoding belong to this generation only.
     const item={id,generation,source:null,gain:null,volume:1,fade:null};
     this.requested=item;this.status=`本地音乐：正在加载 ${id}（不影响游戏）`;
-    this.decode(id).then(buffer=>{
+    const track=this.track(id);
+    this.decode(id,track).then(buffer=>{
       if(this.closed||generation!==this.generation)return;
       const source=this.context.createBufferSource(),gain=this.context.createGain();
       source.buffer=buffer;
-      const track=this.manifest.tracks[id];
-      if(track.loopEnd>track.loopStart){
-        if(track.loopEnd>buffer.duration+0.025)throw Error(`本地曲目长度不足：${id}`);
-        source.loop=true;source.loopStart=track.loopStart;source.loopEnd=Math.min(track.loopEnd,buffer.duration);
+      const loopEnd=track.fullLoop?buffer.duration:track.loopEnd;
+      if(loopEnd>track.loopStart){
+        if(loopEnd>buffer.duration+0.025)throw Error(`本地曲目长度不足：${id}`);
+        source.loop=true;source.loopStart=track.loopStart;source.loopEnd=Math.min(loopEnd,buffer.duration);
       }
       gain.gain.value=item.volume;source.connect(gain);gain.connect(this.volume);
       item.source=source;item.gain=gain;this.active=item;
@@ -92,7 +109,7 @@ export class LocalBgm {
         if(next<=6)this.prefetch(`st${String(next).padStart(2,'0')}-${stage[3]}`);
       }
       // Only keep the current decoded waveform. Compressed tracks stay local.
-      for(const key of this.decoded.keys())if(key!==id)this.decoded.delete(key);
+      for(const key of this.decoded.keys())if(key!==track.url)this.decoded.delete(key);
     }).catch(error=>{if(generation===this.generation)this.status=`本地音乐错误：${error.message}`;});
   }
   fade(speed){
@@ -155,5 +172,5 @@ export class LocalBgm {
     }
     this.mailbox=at;
   }
-  dispose(){this.closed=true;this.abort.abort();this.stop();this.pendingCommands=[];this.encoded.clear();this.decoded.clear();this.volume.disconnect();}
+  dispose(){this.unsubscribeVersion();this.closed=true;this.abort.abort();this.stop();this.pendingCommands=[];this.encoded.clear();this.decoded.clear();this.volume.disconnect();}
 }
