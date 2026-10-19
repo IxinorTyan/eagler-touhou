@@ -62,7 +62,8 @@ export class GameRuntime{
       e.th_menu_open(3,this.settings.lifeCompensation?1:0);handled=true;
     }else if(menu){
       let key=edge&16?0:edge&32?1:edge&1?2:edge&2?3:edge&64?(menu===12?6:4):edge&4?4:edge&(8|128)?5:-1;
-      if((edge&256)&&menu===9){e.th_menu_input(0);key=4;}
+      // Dedicated Continue selects Yes; confirmation remains a separate input.
+      if((edge&256)&&menu===9)key=0;
       if(key>=0){
         const action=e.th_menu_input(key);
         if(action===1)this.reset();

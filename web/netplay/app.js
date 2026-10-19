@@ -63,6 +63,7 @@ function render(current){
   $('runtime').textContent=`确认步 ${current.queue.frame} · 最近一致摘要 ${current.lastHash}\n${state?`第 ${state.stage} 关 · ${state.entrance?'过场':state.menu?'菜单 '+state.menu:['等待开球','游戏中','关卡完成','全员阵亡'][state.phase]} · 倒计时 ${state.timer}`:'加载中'}`;
   $('menu-touch').hidden=!state?.menu||identity.role!=='host';
   $('continue-game').hidden=identity.role!=='host'||state?.menu!==9;
+  $('continue-game').textContent='选择续关（再按 Z 确认）';
   $('menu-note').textContent=state?.menu===12?'姓名登记：房主方向键选字符，Z输入，X删除，Enter保存。联机成绩与本地单机成绩分开保存。':state?.phase===2&&!state.menu?'房主按 Z／Enter 查看结算或进入下一关。':state?.menu?'菜单由房主操作。':state?.phase===0&&!state.entrance?'任意玩家按 Z 后开球和倒计时。':'';
   if(current.game.scoreSaveError)$('menu-note').textContent+=' 本机成绩保存失败，本局可继续。';
   $('coop-hud').replaceChildren(...(state?.players||[]).map((p,i)=>{const el=document.createElement('span');el.textContent=`P${i+1}${i===current.slot?'（你）':''} · ${p.ghost?'幽灵':`残机 ${p.lives} / Bomb ${p.bombs}`} · 获救 ${p.rescues}`;return el;}));

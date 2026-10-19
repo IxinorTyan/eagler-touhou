@@ -120,7 +120,7 @@ function updatePhase(){
   if(menu){
     overlay.hidden=false;$('phase').textContent='菜单';$('phaseLabel').textContent=menu===9?'CONTINUE':menu===8?'MUSIC ROOM':menu===6?'ROUTE':menu===7?'ROUND CLEAR':menu===3?'PAUSE':'TITLE';
     $('phaseTitle').textContent=menu===9?'是否全员续关？':menu===8?musicRoomTracks[core.th_get(76,0)].title:menu===6?'选择下一条路线':menu===7?'第 20 关调试清关':menu===2?'选项':menu===4?'确认退出':menu===3?'暂停':'东方灵异传';
-    $('phaseHint').textContent=menu===9?'上下选择 Yes / No，Z 或 Enter 确认；Yes 从当前关重开，分数清零，全员恢复残机和 1 枚 Bomb':menu===8?'方向键切换并试听，Z / Enter 播放或停止，X / Esc 返回；音乐开关保持有效':menu===6?'方向键选择魔界／地狱，Z 或 Enter 确认并查看结算':menu===7?'调试命令跳过了 Boss 击破流程；确认返回标题':menu===2?'方向键调整；返回标题后 START 应用设置，CONTINUE 恢复当前局':'方向键选择，Z 或 Enter 确认，X 或 Esc 返回';
+    $('phaseHint').textContent=menu===9?'先按上选择续关／下选择结束，再按 Z 或 Enter 确认。X 不退出；续关从当前关重开，分数清零。':menu===8?'方向键切换并试听，Z / Enter 播放或停止，X / Esc 返回；音乐开关保持有效':menu===6?'方向键选择魔界／地狱，Z 或 Enter 确认并查看结算':menu===7?'调试命令跳过了 Boss 击破流程；确认返回标题':menu===2?'方向键调整；返回标题后 START 应用设置，CONTINUE 恢复当前局':'方向键选择，Z 或 Enter 确认，X 或 Esc 返回';
     $('launch').hidden=false;$('launch').textContent='确定';return;
   }
   if(core.th_get(117,0)&&!paused){
