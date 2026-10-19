@@ -39,14 +39,15 @@
     "netplay/local-bgm.js": "d1564516dc6539a776b18a812d56aa63e3cd854f326f93207a9c4c77269b376b",
     "netplay/local-sfx.js": "bf230a6680de4acf4a1171148fa84804eeed599ff4064a446988a5407c277efa",
     "netplay/membership.js": "a84a5b38066e29a876db2c900e2411f3d4168f329bcb83fb44a81226a88e6fca",
+    "netplay/native-hash.js": "30d0ed6c11b9c11a88c38f82152c9b57a49b06d186d15dd5fed1594312c9094b",
     "netplay/network-mode.js": "dda8c24274cb84bf50aa50ca9405ffa8d707f9567137cb80cb2133ea45fb019b",
     "netplay/relay.js": "8189520a9dd4b8900bfb76065787056234ad1a4331b021d99cafe2652251aacf",
     "netplay/rollback-queue.js": "628ff59b0ecad48fffd57021c50307a7d15b054496c03a3eda765a8409508ab7",
-    "netplay/room.js": "532873f26f709119cb9cd5792d19244e681c057ce378bcd26db956dcd8a1dd79",
-    "netplay/runtime-worker-client.js": "8a19544dee33c951038f40b2e48f3bd5854df5b3c8b95fa3c4225d04d76087d1",
-    "netplay/runtime-worker.js": "ee408fd00aacab998c741056a089d4b57f1bb0c021cb7dd53f43f3d4b74b2990",
+    "netplay/room.js": "4fe907c4cab7bea7f9b76dbbae3ec2216e06e3883671e2c3562146d1d3182fda",
+    "netplay/runtime-worker-client.js": "d693f76d2f6fa999bcf941444701b628bd8f14edad87f797fde10c8da012c878",
+    "netplay/runtime-worker.js": "b89e386e000e09736e954011a09a091b1911c1af2909344d740bc862da12c226",
     "netplay/runtime.html": "e2c5a129ac58cfc4824fc14e8b33fe036f548ec3621249734f06ab2568f70028",
-    "netplay/runtime.js": "6bceedbffdb7f0f5ac134e05678bca8d63e0a2ac277441308bc3f50094d749ee",
+    "netplay/runtime.js": "5abfa0f9fd430edd2ba1961a543f3f423d86f3dedfa30edbd7b365b461e90a14",
     "netplay/sha256.js": "9cb7be2bc039bcea2a4d727ef98bcd9047a78dfd4c11950355723147423e1f43",
     "netplay/th02-launch.com": "956a4d9d9ea3ff08f0d98c793a35d03cfaf3aeb129cdbdf5b3dbcf70be9b6dd0",
     "netplay/th02-state.js": "8afa95a7705a90d2b63ae0beb728c176b7b36e29d900548864691cc3c37d32ad",
@@ -103,5 +104,5 @@
       "sha256": "5fb459e5df9232cab4d55f3c36c0bb6b4d00a983fc023661245373ee59ca06d8"
     }
   },
-  "build": "091aa6bda78b0d0eab0a5dd332c4b193e2d16b90b102ca09b87bdce43a9e7a81"
+  "build": "e2e8b3eea141022df59c0e47ca159830f2dfebb53f44047b25b0c0b8ec448d00"
 }

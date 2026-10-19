@@ -5,6 +5,7 @@ import {nativeBits,locateMailbox,guestBase,mailboxActive,nativePaused,writeInput
 import {configureLauncher,launchConfig,launchDefaults} from './launch-config.js';
 import {runBoot} from './boot-runner.js';
 import {LocalSfx} from './local-sfx.js';
+import {hashNativeMemory} from './native-hash.js';
 const workerHost=globalThis.th02WorkerHost;
 const PROTOCOL='th02-rollback/6',canvas=workerHost?.canvas??document.getElementById('canvas'),details=workerHost?{}:document.getElementById('details');
 const nativeCanvas=workerHost?new OffscreenCanvas(640,400):document.createElement('canvas');nativeCanvas.width=640;nativeCanvas.height=400;
@@ -229,7 +230,11 @@ function step(inputs,{frame=ticks,replay=false,offlineMask=0}={}){
   // seat can request pause/confirm; all key events carry the virtual timestamp.
   const mapped=inputs.map(nativeBits);
   applyKeys(mapped[0]|mapped.slice(1).reduce((v,n)=>v|(n&192),0));
-  previousInputs=inputs.slice();emulator.step();ticks++;emulatedTicks++;
+  previousInputs=inputs.slice();
+  const nativeStarted=workerHost?performance.now():0;
+  emulator.step();
+  workerHost?.recordNative?.(performance.now()-nativeStarted,frame,replay);
+  ticks++;emulatedTicks++;
   refreshMailbox();
   if(emulator.state==='failed'||emulator.state==='exited')throw Error('TH02 模拟器停止运行');
   if(mailbox>=0&&!m.bootCPUMetrics){
@@ -278,7 +283,7 @@ function checksum(){
  let h=0x811c9dc5;const hash=n=>{h=Math.imul(h^n,0x01000193);};
  hash(ticks);hash(emulatedTicks);hash(oldP1);previousInputs.forEach(n=>{hash(n%4294967296);hash(Math.floor(n/4294967296));});
  pendingNative.forEach(hash);consumedNative.forEach(hash);hash(musicSequence);hash(sfxSequence);for(const c of musicName)hash(c.charCodeAt(0));
- if(guestMemoryBase>=0){const heap=emulator.module.HEAPU8,base=guestMemoryBase;let memoryHash=h;for(let at=base,end=base+0xa0000;at<end;at++)memoryHash=Math.imul(memoryHash^heap[at],0x01000193);h=memoryHash;}
+ if(guestMemoryBase>=0)h=hashNativeMemory(emulator.module.nativeExports().memory,guestMemoryBase,guestMemoryBase+0xa0000,h);
  return {tick:ticks,hash:(h>>>0).toString(16).padStart(8,'0'),gameFrame:state()?.gameFrame||0};
 }
 function present(){

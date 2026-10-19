@@ -845,7 +845,7 @@ function updateMetrics(now,waiting){
     waitPercent=Math.min(100,Math.max(0,(totalWait-measuredWaitMs)*100/span));measuredWaitMs=totalWait;
     gameHz=game&&measuredGame&&game.generation===measuredGame.generation&&game.stage===measuredGame.stage&&game.gameFrame>=measuredGame.gameFrame?(game.gameFrame-measuredGame.gameFrame)*1000/span:null;
     measuredGame=game;
-    performanceHistory.push({timeMs:Math.round(now),frame:queue.frame,hz,gameHz,waitPercent,stepMs:averageCost,lockstepDelay:queue.lockstepDelay,predictionLeadLimit:queue.active?Math.max(1,queue.directionPrediction):0,rollbackCount,resimulated,maxRewind,costs:{...costs},rtt:onlinePeers().map(peer=>({role:peer.role,ms:peer.rtt}))});
+    performanceHistory.push({timeMs:Math.round(now),frame:queue.frame,hz,gameHz,waitPercent,stepMs:averageCost,lockstepDelay:queue.lockstepDelay,predictionLeadLimit:queue.active?Math.max(1,queue.directionPrediction):0,rollbackCount,resimulated,maxRewind,costs:{...costs},workerPerformance:runtime.performanceInfo?.(),rtt:onlinePeers().map(peer=>({role:peer.role,ms:peer.rtt}))});
     if(performanceHistory.length>120)performanceHistory.shift();
     costs=newCosts();lastMeasure=now;measureFrame=queue.frame;stepCost=stepCount=maxCost=0;
   }
