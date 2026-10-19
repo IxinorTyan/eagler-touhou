@@ -4,7 +4,7 @@
   "tickDenominator": 24830,
   "files": {
     "stage-select.js": "346e673950c5914f5146617ed7dc17801398b3b5e52cda17ef5443e3d29d59e4",
-    "game.wasm": "ae07a74eab2ebcd76895663e9fd594e11c32039675d851c5c7aa43e29a554f70",
+    "game.wasm": "d47618d99e17c65f8a52ec4a651a94c731c9882527a4130325b3509ef72e4986",
     "bgm-version.js": "83a42bce341658f4e06720bb0542131365cdaf1385a5d091e8dd7ecf059e598a",
     "bgm-track.js": "b50ae259943d019c5531bf89d4ad2544316ee0b51ffd83a1bd80789f179c500f",
     "bgm/akyu/manifest.json": "c0c559559bf6c201f7c425f5052fc5eb6e23ab506b4cf67892ccfb8f41159651",
