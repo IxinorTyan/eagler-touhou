@@ -1,15 +1,16 @@
 import {unpackTouch} from '../touch-input.js';
 export const signature=new TextEncoder().encode('TH02COOPv0002!!\0');
+export const mailboxActive=(heap,patch,at)=>at>=0&&at+patch.players.mailboxSize<=heap.length&&heap[at+22]===1&&signature.every((b,i)=>heap[at+i]===b);
 // Network/player UI bits stay common to the other games; only this boundary
 // translates them into TH02's native shot/bomb/focus/menu convention.
 export const nativeBits=value=>(value&15)|((value&32)>>1)|((value&16)<<1)|((value&64)<<2)|((value&128)>>1)|((value&256)>>1);
 export function locateMailbox(heap,patch,previous=-1){
  const valid=at=>at>=0&&at+patch.players.mailboxSize<=heap.length&&signature.every((b,i)=>heap[at+i]===b);
- if(valid(previous)&&heap[previous+22])return previous;
+ if(valid(previous)&&heap[previous+22]===1)return previous;
  const view=new DataView(heap.buffer),found=[];
  for(let at=heap.indexOf(signature[0]);at>=0;at=heap.indexOf(signature[0],at+1))
   if(valid(at)&&heap[at+22]===1&&view.getUint16(at+20,true)>0)found.push(at);
- return found.length===1?found[0]:valid(previous)?previous:-1;
+ return found.length===1?found[0]:-1;
 }
 export function guestBase(heap,mailbox,patch){
  const data=mailbox-patch.entries.mailbox+(patch.dataSegment-patch.codeSegment)*16;
@@ -17,9 +18,9 @@ export function guestBase(heap,mailbox,patch){
  if(base<0||base+1048576>heap.length)throw Error('TH02 客体内存布局不匹配');
  return base;
 }
-export function nativePaused(heap,mailbox,patch){return mailbox>=0&&!!heap[mailbox-patch.entries.mailbox+patch.entries.touch_paused];}
+export function nativePaused(heap,mailbox,patch){return mailboxActive(heap,patch,mailbox)&&!!heap[mailbox-patch.entries.mailbox+patch.entries.touch_paused];}
 export function writeInputs(heap,mailbox,patch,inputs,players,settings={}){
- if(mailbox<0)return;
+ if(!mailboxActive(heap,patch,mailbox))return;
  const v=new DataView(heap.buffer),cb=mailbox-patch.entries.mailbox,blocked=!heap[mailbox+22]||nativePaused(heap,mailbox,patch);
  for(let slot=0;slot<3;slot++){
   const offline=!!(heap[cb+patch.entries.offline_mask]&(1<<slot));
@@ -40,7 +41,7 @@ export function writeInputs(heap,mailbox,patch,inputs,players,settings={}){
  heap[mailbox+patch.debug.invincibilityMailboxOffset]=0;
 }
 export function readState(heap,mailbox,patch){
- if(mailbox<0||!heap[mailbox+22])return null;
+ if(!mailboxActive(heap,patch,mailbox))return null;
  const v=new DataView(heap.buffer),cb=mailbox-patch.entries.mailbox,b=patch.balance;
  const count=heap[mailbox+patch.players.countOffset];
  // The stage hook publishes its address before its first complete snapshot.

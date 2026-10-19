@@ -1,7 +1,7 @@
 import {DOSBoxPC98,supportsWriteJournal} from '../dosbox-adapter.js';
 import {Fat12,sha256} from '../solo-fat12.js';
 import {keyboardBits,isBound,useControlSnapshot,isFormTarget,controlsSummary} from '../control-settings.js';
-import {nativeBits,locateMailbox,guestBase,nativePaused,writeInputs,readState} from './th02-state.js';
+import {nativeBits,locateMailbox,guestBase,mailboxActive,nativePaused,writeInputs,readState} from './th02-state.js';
 import {configureLauncher,launchConfig,launchDefaults} from './launch-config.js';
 import {runBoot} from './boot-runner.js';
 import {LocalSfx} from './local-sfx.js';
@@ -16,6 +16,28 @@ const states=new Map(),effects=new Map();
 let soundPolicy,bgm,musicTask,musicError='',musicVolume=.7,musicSequence=-1,musicName='',playedName='',pendingMusic=[];
 let pendingNative=[0,0,0],consumedNative=[0,0,0];
 let sfx,sfxSequence=0;
+let guestMemoryBase=-1,residentAddress=-1,gameplaySeen=false;
+const residentSignature=new TextEncoder().encode('MIKOConfig\0');
+function refreshMailbox(scan=false){
+ const h=emulator.module.HEAPU8,v=new DataView(h.buffer);
+ const residentValid=at=>at>=guestMemoryBase&&at+48<=guestMemoryBase+0xa0000&&residentSignature.every((b,i)=>h[at+i]===b)&&h[at+11]<=5;
+ // MAIN's exit hook clears +22 before freeing its resources. Mima also
+ // publishes resident.stage=0x7f before executing the ending program.
+ // A surviving signature alone does not mean MAIN still owns that memory.
+ if(mailbox>=0&&(!mailboxActive(h,patch,mailbox)||!residentValid(residentAddress)))mailbox=-1;
+ if(mailbox>=0||!scan)return;
+ if(residentAddress>=0&&residentSignature.every((b,i)=>h[residentAddress+i]===b)&&h[residentAddress+11]>5)return;
+ const candidate=locateMailbox(h,patch);
+ if(candidate<0)return;
+ const base=guestBase(h,candidate,patch),d=candidate-patch.entries.mailbox+(patch.dataSegment-patch.codeSegment)*16;
+ if((guestMemoryBase>=0&&base!==guestMemoryBase)||d<base||d+0x2800>base+0xa0000)return;
+ const resident=base+v.getUint16(d+0x27fc,true)+v.getUint16(d+0x27fe,true)*16;
+ const previousBase=guestMemoryBase;guestMemoryBase=base;
+ if(!residentValid(resident)){guestMemoryBase=previousBase;return;}
+ mailbox=candidate;residentAddress=resident;gameplaySeen=true;
+ pendingNative.fill(0);consumedNative=[0,1,2].map(i=>v.getUint16(mailbox+138+i*2,true));
+ sfxSequence=readSfxSequence();musicSequence=-1;musicName='';
+}
 const state=()=>emulator?readState(emulator.module.HEAPU8,mailbox,patch):null;
 function clearKeys(){keys.clear();inputListener(0);}
 window.addEventListener('keydown',e=>{if(editing||isFormTarget(e.target)||e.metaKey||e.ctrlKey||e.altKey||!isBound(e.code))return;e.preventDefault();e.stopImmediatePropagation();keys.add(e.code);inputListener(keyboardBits(keys));},true);
@@ -107,7 +129,7 @@ async function boot(settings){
  try{
   const ready=await runBoot({step:()=>{
    emulator.step();
-   if(emulator.tick%15===0)mailbox=locateMailbox(emulator.module.HEAPU8,patch,mailbox);
+   refreshMailbox(emulator.tick%15===0);
    if(emulator.state==='failed'||emulator.state==='exited')throw Error('TH02 启动失败，请检查加载详情');
   },ready:()=>!!state(),tick:()=>emulator.tick,cancelled:()=>closed,progress:message=>progress(message,6)});
   if(!ready)return;
@@ -127,6 +149,7 @@ function applyKeys(bits){
  oldP1=bits;
 }
 function nativeInput(inputs){
+ if(mailbox<0){pendingNative.fill(0);consumedNative.fill(0);return inputs;}
  const heap=emulator.module.HEAPU8,v=new DataView(heap.buffer),paused=nativePaused(heap,mailbox,patch);
  return inputs.map((value,i)=>{
   const ack=v.getUint16(mailbox+138+i*2,true);
@@ -187,7 +210,7 @@ function step(inputs,{frame=ticks,replay=false,offlineMask=0}={}){
  try{
   // MAIN is not resident throughout DOS boot. A full heap signature scan on
   // every step spent most startup work searching memory that cannot match.
-  if(emulatedTicks%15===0)mailbox=locateMailbox(m.HEAPU8,patch,mailbox);
+  refreshMailbox(emulatedTicks%15===0);
   if(mailbox>=0){
    const offlineAt=mailbox-patch.entries.mailbox+patch.entries.offline_mask;
    m.thDirtyMark?.(offlineAt,1);m.HEAPU8[offlineAt]=offlineMask;
@@ -200,19 +223,20 @@ function step(inputs,{frame=ticks,replay=false,offlineMask=0}={}){
   const mapped=inputs.map(nativeBits);
   applyKeys(mapped[0]|mapped.slice(1).reduce((v,n)=>v|(n&192),0));
   previousInputs=inputs.slice();emulator.step();ticks++;emulatedTicks++;
+  refreshMailbox();
   if(emulator.state==='failed'||emulator.state==='exited')throw Error('TH02 模拟器停止运行');
   if(mailbox>=0&&!m.bootCPUMetrics){
    m.bootCPUMetrics=m.UTF8ToString(m._getCPUMetrics());
    if(m.bootCPUMetrics.split('|')[0]!=='30000')throw Error('TH02 联机周期未恢复为 30000');
   }
-  effects.set(frame,{music:readMusic(),sounds:readSfx()});if(!replay)pending=true;
+  effects.set(frame,{music:mailbox>=0?readMusic():null,sounds:mailbox>=0?readSfx():[]});if(!replay)pending=true;
  }finally{m.netEndFrame();}
 }
 function capture(frame,restored=false){
  if(states.has(frame))throw Error('TH02 重复检查点');
  const previous=states.get(frame-1),nativeFrame=previous?.nativeFrame===frame-1?frame-1:frame;
  if(nativeFrame===frame)emulator.module.netCapture(frame,restored);
- states.set(frame,{nativeFrame,ticks,emulatedTicks,oldP1,mailbox,previousInputs:previousInputs.slice(),pendingNative:pendingNative.slice(),consumedNative:consumedNative.slice(),musicSequence,musicName,sfxSequence});
+ states.set(frame,{nativeFrame,ticks,emulatedTicks,oldP1,mailbox,guestMemoryBase,residentAddress,gameplaySeen,previousInputs:previousInputs.slice(),pendingNative:pendingNative.slice(),consumedNative:consumedNative.slice(),musicSequence,musicName,sfxSequence});
 }
 function restore(frame){
  pending=false;const saved=states.get(frame);
@@ -220,7 +244,7 @@ function restore(frame){
  const from=saved.nativeFrame,checkpoint=states.get(from);
  if(!checkpoint||(from!==frame&&!checkpoint.execution))throw Error('TH02 检查点历史缺失');
  emulator.module.netRestore(from);
- ({ticks,emulatedTicks,oldP1,mailbox}=checkpoint);previousInputs=checkpoint.previousInputs.slice();
+ ({ticks,emulatedTicks,oldP1,mailbox,guestMemoryBase,residentAddress,gameplaySeen}=checkpoint);previousInputs=checkpoint.previousInputs.slice();
  pendingNative=checkpoint.pendingNative.slice();consumedNative=checkpoint.consumedNative.slice();({musicSequence,musicName,sfxSequence}=checkpoint);
  for(const at of states.keys())if(at>=from)states.delete(at);
  for(const at of effects.keys())if(at>=from)effects.delete(at);
@@ -247,7 +271,7 @@ function checksum(){
  let h=0x811c9dc5;const hash=n=>{h=Math.imul(h^n,0x01000193);};
  hash(ticks);hash(emulatedTicks);hash(oldP1);previousInputs.forEach(n=>{hash(n%4294967296);hash(Math.floor(n/4294967296));});
  pendingNative.forEach(hash);consumedNative.forEach(hash);hash(musicSequence);hash(sfxSequence);for(const c of musicName)hash(c.charCodeAt(0));
- if(mailbox>=0){const heap=emulator.module.HEAPU8,base=guestBase(heap,mailbox,patch);let memoryHash=h;for(let at=base,end=base+0xa0000;at<end;at++)memoryHash=Math.imul(memoryHash^heap[at],0x01000193);h=memoryHash;}
+ if(guestMemoryBase>=0){const heap=emulator.module.HEAPU8,base=guestMemoryBase;let memoryHash=h;for(let at=base,end=base+0xa0000;at<end;at++)memoryHash=Math.imul(memoryHash^heap[at],0x01000193);h=memoryHash;}
  return {tick:ticks,hash:(h>>>0).toString(16).padStart(8,'0'),gameFrame:state()?.gameFrame||0};
 }
 function present(){
@@ -274,7 +298,7 @@ window.th02Sync={
  async unlockAudio(){const context=emulator?.audio.context;if(context?.state!=='running')await context?.resume();return context?.state==='running';},
  touchContext(){const s=state(),p=s?.players[localSlot],paused=emulator&&nativePaused(emulator.module.HEAPU8,mailbox,patch);return {key:`${s?.generation??0}:${!s||paused?'menu':'game'}`,play:!!p&&!p.hit&&!p.out&&!paused};},
  snapshot:state,checksum,step,present,capture,restore,confirm,
- readyForRollback:()=>!!state()&&!!emulator?.module.netCapture,
+ readyForRollback:()=>gameplaySeen&&!!emulator?.module.netCapture,
  canPredict:()=>!predictionBlockReason(),predictionBlockReason,
  rollbackInfo:()=>({...emulator?.module.netSnapshotInfo(),checkpointFrames:2,checkpointReplays}),
  diagnosticText,renderInfo:()=>emulator?.module.framePresenter.info(),
