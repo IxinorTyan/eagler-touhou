@@ -96,8 +96,9 @@ export class RollbackQueue {
     }
     this.updateConfirmed();
   }
-  refreshCorrection(){
-    if(this.dirty===null)return null;
+  refreshCorrection(force=false){
+    if(this.dirty===null&&!force)return null;
+    const correctionPending=this.dirty!==null;
     // Several packets can change a prediction and then restore the exact
     // input already simulated. Recheck the complete used history once, just
     // before restoring native state, rather than replaying a transient gap.
@@ -107,7 +108,7 @@ export class RollbackQueue {
         this.dirty=this.dirty===null?at:Math.min(this.dirty,at);
       }
     }
-    if(this.dirty===null)this.skippedCorrections++;
+    if(this.dirty===null&&correctionPending)this.skippedCorrections++;
     return this.dirty;
   }
   isOffline(slot,frame){return this.offline.has(slot)&&frame>=this.offline.get(slot);}
@@ -149,8 +150,8 @@ export class RollbackQueue {
     this.frame=frame;this.dirty=null;
     for(const at of this.used.keys())if(at>=frame)this.used.delete(at);
   }
-  prune(){
-    const prefix=Math.min(this.frame,this.confirmed);
+  prune(confirmedPrefix=this.confirmed){
+    const prefix=Math.min(this.frame,this.confirmed,confirmedPrefix);
     for(const at of this.used.keys())if(at<prefix)this.used.delete(at);
     for(const lane of this.inputs)for(const at of lane.keys())if(at<prefix-32)lane.delete(at);
   }

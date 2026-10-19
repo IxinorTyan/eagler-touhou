@@ -26,6 +26,10 @@ let inputPolicy;
 let timingSent=false,runDelay=null,runInputDelay=null;
 let relay;
 let preparing=false,running=false,stopped=false,busy=false,runRequested=false;
+let nativeBusy=false;
+const boundaryActions=[];
+function atNativeBoundary(action){if(nativeBusy)boundaryActions.push(action);else action();}
+function completeNativeBoundary(){nativeBusy=false;for(const action of boundaryActions.splice(0)){if(stopped)break;action();}}
 let pollTimer,heartbeatTimer,loadTimer,raf,wakeTimer=null,wakeAt=0;
 let wakePending=false,wakeToken=0;
 const wakeChannel=new MessageChannel();
@@ -156,6 +160,7 @@ function reportDeparture(role){
   else send(peers.get('host'),{type:'suspect',role});
 }
 function beginDeparture(dropped){
+  if(nativeBusy){boundaryActions.push(()=>beginDeparture(dropped));return;}
   if(stopped||!running||session.role!=='host')return;
   const targets=[...new Set([...(membership?.roles||[]),...dropped])].filter(r=>!peers.get(r)?.offline);
   if(!targets.length||targets.some(r=>r==='host'||!peers.has(r)))throw Error('无效离线目标');
@@ -167,6 +172,7 @@ function beginDeparture(dropped){
   finishDeparture();
 }
 function finishDeparture(){
+  if(nativeBusy){boundaryActions.push(finishDeparture);return;}
   if(session.role!=='host'||!membership)return;
   const remaining=onlinePeers().filter(p=>!membership.roles.includes(p.role));
   if(!remaining.every(p=>membership.reports.has(p.role)))return;
@@ -179,6 +185,7 @@ function finishDeparture(){
   request('drop',{roles:dropped}).then(r=>update(r.state)).catch(()=>{});
 }
 function applyDeparture(message){
+  if(nativeBusy){boundaryActions.push(()=>applyDeparture(message));return;}
   if(!membership||message.id!==membership.id||JSON.stringify(message.roles)!==JSON.stringify(membership.roles)||
      JSON.stringify(message.slots)!==JSON.stringify(message.roles.map(r=>state.slots[r])))throw Error('离线确认不匹配');
   queue.applyDeparture(message);
@@ -438,7 +445,7 @@ function attachChannel(peer,channel){
           membershipId=m.id;
           if(m.roles.includes(session.role)){closeDisconnected('你已与本局断开连接');return;}
           membership={id:m.id,roles:m.roles,started:performance.now()};
-          send(peer,{type:'departure-report',id:m.id,report:queue.membershipReport()});break;
+          atNativeBoundary(()=>send(peer,{type:'departure-report',id:m.id,report:queue.membershipReport()}));break;
         case 'departure-report':
           if(session.role!=='host'||!membership||m.id!==membership.id)break;
           if(!membership.roles.includes(peer.role)){membership.reports.set(peer.role,m.report);finishDeparture();}break;
@@ -758,26 +765,38 @@ function armRollback(){
   // taking snapshots; every peer switches at the same future simulation tick.
   const frame=queue.frame+120;queue.arm(frame);broadcast({type:'rollback',frame});
 }
-function confirmFrames(){
+async function confirmFrames(){
   const before=performance.now();
   const prefix=Math.min(queue.frame,queue.confirmed);
-  if(runtime.confirm(prefix)==='exit'){finishGame();return;}
+  if(await runtime.confirm(prefix)==='exit'){finishGame();return;}
+  if(stopped)return;
   for(const [tick,sample]of pendingHashes)if(tick<=prefix){
     hashes.set(tick,sample);broadcast({type:'hash',...sample});
     for(const peer of onlinePeers())compare(peer,tick);
     pendingHashes.delete(tick);trim(hashes);
   }
-  queue.prune();armRollback();
+  // Receipt may advance confirmed while the Worker acknowledges an older
+  // prefix. Preserve the newer history until its corrections are simulated.
+  queue.prune(prefix);armRollback();
   costs.confirm+=performance.now()-before;
 }
-function simulate(pair,replay){
+async function simulate(pair,replay){
   const before=performance.now();
   const frame=queue.frame;
-  if(queue.active&&frame>=queue.confirmed){
+  const capture=queue.active&&frame>=queue.confirmed;
+  if(capture&&!runtime.asyncExecution){
     const at=performance.now();runtime.capture(frame);costs.capture+=performance.now()-at;costs.captures++;
   }
   const stepAt=performance.now();
-  runtime.step(pair,{frame,replay,offlineMask:queue.offlineMask(frame)});queue.commit(pair);
+  nativeBusy=true;
+  if(runtime.asyncExecution)await runtime.execute(pair,{frame,replay,offlineMask:queue.offlineMask(frame),capture,hash:(frame+1)%120===0});
+  else runtime.step(pair,{frame,replay,offlineMask:queue.offlineMask(frame)});
+  if(stopped){completeNativeBoundary();return;}
+  queue.commit(pair);
+  // Inputs can arrive while a Worker owns this step. Include its actual
+  // completed inputs in the history before checking every changed prediction.
+  if(runtime.asyncExecution&&queue.active)queue.refreshCorrection(true);
+  completeNativeBoundary();
   costs.simulate+=performance.now()-stepAt;costs.steps++;
   costs.lead=Math.max(costs.lead,queue.frame-queue.confirmed);
   if(queue.frame%120===0){
@@ -850,7 +869,7 @@ function updateMetrics(now,waiting){
   player.diagnostics(`${runtime.diagnosticText()}\n\n${$('diagnostics').textContent}`);
   if(!game)player.note(`正在启动 DOS／游戏 · 同步步 ${queue.frame} · ${waiting?waitDetail:'正在推进'}。详情可查看当前状态。`);
 }
-function pump(now){
+async function pump(now){
   if(!running||stopped||pumping)return;
   // Message/timer wakes can run before an rAF carrying an older timestamp.
   // Never move the elapsed-time baseline backward and count that time twice.
@@ -872,17 +891,26 @@ function pump(now){
       const from=queue.dirty;replayUntil=Math.max(replayUntil,queue.frame);
       maxRewind=Math.max(maxRewind,replayUntil-from);rollbackCount++;
       const restoreAt=performance.now();
-      runtime.restore(from);queue.rewind(from);
+      nativeBusy=true;await runtime.restore(from);if(stopped)return;queue.rewind(from);
+      // A still earlier input can arrive during restore, before rewind clears
+      // the old correction marker. Reconcile the retained completed history.
+      if(runtime.asyncExecution&&queue.active)queue.refreshCorrection(true);
+      completeNativeBoundary();
       costs.restore+=performance.now()-restoreAt;costs.restores++;
       for(const at of pendingHashes.keys())if(at>from)pendingHashes.delete(at);
     }
+    if(queue.dirty!==null||membership){wake();return;}
     while(queue.frame<replayUntil&&count<4&&(count===0||performance.now()-budgetStart<6)){
       const pair=nextInputs();if(!pair){waiting=true;break;}
       endWait();const replayAt=performance.now();
-      simulate(pair,queue.frame+1<replayUntil);resimulated++;count++;
+      await simulate(pair,queue.frame+1<replayUntil);if(stopped)return;resimulated++;count++;
       costs.replay+=performance.now()-replayAt;costs.replays++;
+      if(queue.dirty!==null||membership)break;
     }
-    confirmFrames();if(stopped)return;
+    // Never confirm or present a branch that changed while the worker ran.
+    if(queue.dirty!==null||membership){wake();return;}
+    await confirmFrames();if(stopped)return;
+    if(queue.dirty!==null||membership){wake();return;}
     if(queue.frame<replayUntil){
       if(waiting&&!waitingSince)waitingSince=performance.now();
       updateMetrics(performance.now(),waiting);wake(waiting?16:0);return;
@@ -891,12 +919,15 @@ function pump(now){
       captureLocalInput();
       const pair=nextInputs();if(!pair){waiting=true;break;}
       endWait();
-      simulate(pair,false);
+      await simulate(pair,false);if(stopped)return;
       const after=performance.now();
       const at=captureTimes.get(queue.frame-1);if(pair[queue.slot]!==lastApplied&&at)inputAge=after-at;
       lastApplied=pair[queue.slot];captureTimes.delete(queue.frame-1);accumulator-=TICK_MS;count++;
-      confirmFrames();if(stopped)return;
+      if(queue.dirty!==null||membership)break;
+      await confirmFrames();if(stopped)return;
+      if(queue.dirty!==null||membership)break;
     }
+    if(queue.dirty!==null||membership){wake();return;}
     const presentAt=performance.now();
     if(runtime.present()){costs.present+=performance.now()-presentAt;costs.presentations++;}
     const after=performance.now();
@@ -905,7 +936,7 @@ function pump(now){
     // Native execution time counts toward this tick's budget. The old timer
     // waited another full interval after a 15 ms step, reducing throughput.
     wake(waiting?16:Math.max(0,TICK_MS-accumulator-(after-lastNow)));
-  }catch(error){fail(error);}finally{pumping=false;}
+  }catch(error){fail(error);}finally{nativeBusy=false;pumping=false;}
 }
 const focusSettings=mountFocusSettings($('control-settings'),{alwaysPointControl:player.alwaysPointControl});
 const controlEditor=mountControlSettings($('control-settings'),{

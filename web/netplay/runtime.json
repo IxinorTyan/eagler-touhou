@@ -41,10 +41,12 @@
     "netplay/membership.js": "a84a5b38066e29a876db2c900e2411f3d4168f329bcb83fb44a81226a88e6fca",
     "netplay/network-mode.js": "dda8c24274cb84bf50aa50ca9405ffa8d707f9567137cb80cb2133ea45fb019b",
     "netplay/relay.js": "8189520a9dd4b8900bfb76065787056234ad1a4331b021d99cafe2652251aacf",
-    "netplay/rollback-queue.js": "e2840d2c675de43385af2379d092d81677a332ab5c466654c04d0e3ca37d79b2",
-    "netplay/room.js": "9dff08b697e2b776254f1600b72a5748226c6424be14dfec056890d8d3db0ace",
-    "netplay/runtime.html": "87e6a3efedac1562341573631b19746b8432395920345f38bea10c1def29ec8c",
-    "netplay/runtime.js": "a6c61fdbdae9105ef1337de7ab0875786f4c0c730149748a471806695c7e75f6",
+    "netplay/rollback-queue.js": "628ff59b0ecad48fffd57021c50307a7d15b054496c03a3eda765a8409508ab7",
+    "netplay/room.js": "532873f26f709119cb9cd5792d19244e681c057ce378bcd26db956dcd8a1dd79",
+    "netplay/runtime-worker-client.js": "8a19544dee33c951038f40b2e48f3bd5854df5b3c8b95fa3c4225d04d76087d1",
+    "netplay/runtime-worker.js": "ee408fd00aacab998c741056a089d4b57f1bb0c021cb7dd53f43f3d4b74b2990",
+    "netplay/runtime.html": "e2c5a129ac58cfc4824fc14e8b33fe036f548ec3621249734f06ab2568f70028",
+    "netplay/runtime.js": "6bceedbffdb7f0f5ac134e05678bca8d63e0a2ac277441308bc3f50094d749ee",
     "netplay/sha256.js": "9cb7be2bc039bcea2a4d727ef98bcd9047a78dfd4c11950355723147423e1f43",
     "netplay/th02-launch.com": "956a4d9d9ea3ff08f0d98c793a35d03cfaf3aeb129cdbdf5b3dbcf70be9b6dd0",
     "netplay/th02-state.js": "8afa95a7705a90d2b63ae0beb728c176b7b36e29d900548864691cc3c37d32ad",
@@ -101,5 +103,5 @@
       "sha256": "5fb459e5df9232cab4d55f3c36c0bb6b4d00a983fc023661245373ee59ca06d8"
     }
   },
-  "build": "e804582189dfefb2b952e9ddca62268f8ad08233bd24fa424cad782d633f5d01"
+  "build": "091aa6bda78b0d0eab0a5dd332c4b193e2d16b90b102ca09b87bdce43a9e7a81"
 }
