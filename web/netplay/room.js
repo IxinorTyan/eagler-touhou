@@ -38,6 +38,34 @@ let pumping=false,lastNow=0,accumulator=0,lastUi=0,lastMeasure=0,measureFrame=0;
 let stepCost=0,stepCount=0,maxCost=0,hz=0,averageCost=0,peakCost=0,inputAge=0,lastApplied=0,receivedInputs=0;
 const newCosts=()=>({capture:0,captures:0,simulate:0,steps:0,present:0,presentations:0,hash:0,restore:0,restores:0,confirm:0,replay:0,replays:0,lead:0});
 let costs=newCosts(),measuredCosts=newCosts(),waitDetail='',earlyInputs=0;
+// Local observations only; never read by the deterministic input queue.
+const stalls={events:[],waits:0,waitMs:0,maxWaitMs:0,maxPumpGapMs:0};
+function peerTiming(now){
+  return onlinePeers().map(peer=>({role:peer.role,slot:state.slots[peer.role],hidden:!!peer.hidden,
+    rttMs:peer.rtt??null,lastPacketAgeMs:Math.round(now-peer.lastPacket),
+    lastInputFrame:peer.lastInputFrame??null,lastInputAgeMs:peer.lastInputAt==null?null:Math.round(now-peer.lastInputAt),
+    bufferedBytes:peer.channel?.bufferedAmount??0}));
+}
+function recordStall(kind,durationMs,detail=''){
+  const now=performance.now();
+  stalls.events.push({kind,atMs:Math.round(now),durationMs:Math.round(durationMs),
+    frame:queue?.frame,confirmed:queue?.confirmed,hidden:document.hidden,detail,peers:peerTiming(now)});
+  if(stalls.events.length>64)stalls.events.shift();
+}
+function endInputWait(){
+  if(!waitingSince)return;
+  const duration=performance.now()-waitingSince;
+  if(duration>=50){stalls.waits++;stalls.waitMs+=duration;stalls.maxWaitMs=Math.max(stalls.maxWaitMs,duration);recordStall('input-wait',duration,waitDetail);}
+  waitingSince=0;
+}
+function stallReport(){
+  const now=performance.now();
+  return {...stalls,events:stalls.events.slice(),currentWaitMs:waitingSince?Math.round(now-waitingSince):0,
+    waitDetail,peers:peerTiming(now)};
+}
+function observePeerInput(peer,frame){
+  if(peer.lastInputFrame==null||frame>peer.lastInputFrame){peer.lastInputFrame=frame;peer.lastInputAt=performance.now();}
+}
 const activeRoles=()=>roles.slice(0,state.settings.players);
 const onlinePeers=()=>[...peers.values()].filter(peer=>!peer.offline);
 const GRACE_MS=5000;
@@ -66,7 +94,8 @@ faultDownload.onclick=()=>{
   try{downloadFaultReport({schema:'touhou-network-fault/1',recordedAt:new Date().toISOString(),
     environment:{userAgent:navigator.userAgent,visibility:document.visibilityState},
     settings:state?.settings,slot:queue?.slot,frame:queue?.frame,confirmed:queue?.confirmed,
-    running,stopped,stopReason,diagnostics:$('diagnostics').textContent,runtime:runtime.faultReport()},'th04-network-fault.json');
+    timing:{lockstepDelay:queue?.lockstepDelay,inputDelay:queue?.inputDelay,jitterReserveSteps:inputPolicy?.jitterSteps},
+    running,stopped,stopReason,stalls:stallReport(),diagnostics:$('diagnostics').textContent,runtime:runtime.faultReport()},'th04-network-fault.json');
     player.note('故障信息已下载，只保存在本机。');
   }catch(error){player.note('读取故障信息失败：'+error.message);}
 };
@@ -369,7 +398,7 @@ function attachChannel(peer,channel){
       switch(m.type){
         case 'hello':
           if(JSON.stringify(m.settings)!==JSON.stringify(state.settings)||JSON.stringify(m.slots)!==JSON.stringify(state.slots))throw Error('开局设置不一致');
-          if(m.inputPolicy?.inputDelay!==inputPolicy.inputDelay||m.inputPolicy?.directionPrediction!==inputPolicy.directionPrediction||m.inputPolicy?.rollbackEnabled!==inputPolicy.rollbackEnabled)throw Error('联机性能策略不一致，请全员刷新并使用相同网络模式');
+          if(m.inputPolicy?.inputDelay!==inputPolicy.inputDelay||m.inputPolicy?.directionPrediction!==inputPolicy.directionPrediction||m.inputPolicy?.rollbackEnabled!==inputPolicy.rollbackEnabled||m.inputPolicy?.jitterSteps!==inputPolicy.jitterSteps)throw Error('联机性能策略不一致，请全员刷新并使用相同网络模式');
           peer.hello=true;maybeRun();break;
         case 'ready':peer.ready=m.build;maybeRun();break;
         case 'timing':
@@ -388,11 +417,11 @@ function attachChannel(peer,channel){
         case 'input':
           if(m.slot!==state.slots[peer.role])throw Error('玩家输入身份不匹配');
           if(membership?.roles.includes(peer.role))break;
-          queue.receive(m.frame,m.buttons,m.slot);receivedInputs++;wake();break;
+          queue.receive(m.frame,m.buttons,m.slot);observePeerInput(peer,m.frame);receivedInputs++;wake();break;
         case 'input-tail':
           if(m.slot!==state.slots[peer.role]||!Array.isArray(m.inputs)||m.inputs.length>160)throw Error('无效输入补包');
           if(membership?.roles.includes(peer.role))break;
-          for(const [frame,buttons]of m.inputs)queue.receive(frame,buttons,m.slot);
+          for(const [frame,buttons]of m.inputs){queue.receive(frame,buttons,m.slot);observePeerInput(peer,frame);}
           wake();break;
         case 'rollback':
           if(peer.role!=='host'||session.role==='host')throw Error('无效回滚启用通知');
@@ -526,7 +555,10 @@ async function beginGame(){
   // Six steps cover a slow peer's input delivery without the old twelve-step
   // speculative tail. Real input still corrects a predicted release immediately.
   timingSent=false;runDelay=null;runInputDelay=null;
-  inputPolicy=Object.freeze({inputDelay:0,directionPrediction:6,rollbackEnabled:state.settings.rollback});
+  // A small fixed reserve absorbs short relay/tunnel jitter without changing
+  // an in-flight authoritative input timeline. LAN and prediction stay as-is.
+  inputPolicy=Object.freeze({inputDelay:0,directionPrediction:6,rollbackEnabled:state.settings.rollback,
+    jitterSteps:!state.settings.rollback&&networkMode==='public'&&useRelay?2:0});
   bootStartedAt=performance.now();
   if(!useRelay&&!window.RTCPeerConnection)throw Error('请使用新版 Chrome 或 Edge');
   connectionConfigPending=true;
@@ -613,7 +645,7 @@ function maybeRun(){
     const rtt=Math.max(...[...peers.values()].flatMap(peer=>[peer.startRtt,...peer.timingSamples]));
     const rollbackRtt=Math.max(...[...peers.values()].flatMap(peer=>[peer.startRollbackRtt,rollbackRttForSamples(peer.timingSamples)]));
     runInputDelay=inputPolicy.rollbackEnabled?rollbackInputDelayForRtt(rollbackRtt):0;
-    runDelay=inputPolicy.rollbackEnabled?Math.max(BOOT_DELAY,runInputDelay):lockstepDelayForRtt(rtt);
+    runDelay=inputPolicy.rollbackEnabled?Math.max(BOOT_DELAY,runInputDelay):lockstepDelayForRtt(rtt,inputPolicy.jitterSteps);
     broadcast({type:'run',delay:runDelay,inputDelay:runInputDelay});runRequested=true;
   }
   if(!runRequested)return;
@@ -629,7 +661,7 @@ function cancelWake(){
   clearTimeout(wakeTimer);wakeTimer=null;wakePending=false;wakeToken++;
 }
 function wake(delay=0){
-  if(!running||stopped||document.hidden)return;
+  if(!running||stopped)return;
   delay=Math.max(0,delay);
   const deadline=performance.now()+delay;if(wakePending&&wakeAt<=deadline)return;
   cancelWake();wakeAt=deadline;wakePending=true;
@@ -676,13 +708,20 @@ function simulate(pair,replay){
     const at=performance.now();pendingHashes.set(queue.frame,{...runtime.checksum(),boot:runtime.readyForRollback()});costs.hash+=performance.now()-at;
   }
   const cost=performance.now()-before;stepCost+=cost;stepCount++;maxCost=Math.max(maxCost,cost);
+  if(cost>=50)recordStall(replay?'replay-step':'simulation-step',cost);
 }
 function captureLocalInput(){
-  player.setContext(runtime.touchContext());
-  runtime.setPointPreferences({focus:!!focusSettings(),always:player.alwaysPoint()});
-  const value=controlEditor.isEditing()?0:normalize(player.sample(keyboardBits(keys)|childBits|gamepadBits()));
-  if(value!==bits){bits=value;inputChangedAt=performance.now();}
-  const captured=queue.capture(player.pack(bits|pendingAction,{includePointPreference:false}));
+  // Hidden pages must still produce authoritative input. Never read a held
+  // gamepad, touch auto-fire or menu pulse while the player is away.
+  let packed=0;
+  if(!document.hidden){
+    player.setContext(runtime.touchContext());
+    runtime.setPointPreferences({focus:!!focusSettings(),always:player.alwaysPoint()});
+    const value=controlEditor.isEditing()?0:normalize(player.sample(keyboardBits(keys)|childBits|gamepadBits()));
+    if(value!==bits){bits=value;inputChangedAt=performance.now();}
+    packed=player.pack(bits|pendingAction,{includePointPreference:false});
+  }else if(bits){bits=0;inputChangedAt=performance.now();}
+  const captured=queue.capture(packed);
   if(!captured)return false;
   player.consume();
   pendingAction=0;captureTimes.set(captured.frame,performance.now());broadcast(captured);return true;
@@ -697,8 +736,9 @@ function nextInputs(){
     return null;
   }
   const allowed=runtime.canPredict(),pair=queue.peek(allowed);
-  if(pair){waitDetail='';return pair;}
-  const missing=queue.inputs.flatMap((lane,slot)=>queue.isOffline(slot,queue.frame)||lane.has(queue.frame)?[]:[`P${slot+1}`]);
+  // Close before clearing the reason, so the recovered event keeps its lane.
+  if(pair){endInputWait();waitDetail='';return pair;}
+  const missing=queue.inputs.flatMap((lane,slot)=>queue.isOffline(slot,queue.frame)||lane.has(queue.frame)?[]:[`P${slot+1}${[...peers.values()].some(p=>state.slots[p.role]===slot&&p.hidden)?'（页面在后台）':''}`]);
   const reasons={window:`预测窗口已满（${MAX_ROLLBACK} 步）`,boot:'启动阶段等待真实输入',
     'prediction-disabled':`禁止预测：${runtime.predictionBlockReason()}`,'local-input':'本步本机输入尚未采样'};
   waitDetail=`${reasons[queue.waitReason]||'等待真实输入'} · 当前步缺 ${missing.join('、')||'无'} · 连续输入确认到 ${queue.confirmed}`;
@@ -708,6 +748,7 @@ function updateMetrics(now,waiting){
   const span=now-lastMeasure;
   costs.lead=Math.max(costs.lead,queue.frame-queue.confirmed);
   if(span>=1000){hz=(queue.frame-measureFrame)*1000/span;averageCost=stepCount?stepCost/stepCount:0;peakCost=maxCost;measuredCosts=costs;costs=newCosts();lastMeasure=now;measureFrame=queue.frame;stepCost=stepCount=maxCost=0;}
+  if(document.hidden)return;
   if(now-lastUi<250)return;lastUi=now;
   const links=[...peers.values()].map(p=>p.offline?`${label(p.role)}：已离线（幽灵）`:`${label(p.role)}：往返 ${p.rtt==null?'—':p.rtt.toFixed(1)} ms · ${p.path||'路径待确认'} · 相同状态步 ${p.confirmed||'等待'}${p.hidden?' · 页面隐藏':''}`).join('\n');
   const c=measuredCosts,game=runtime.snapshot();
@@ -715,12 +756,13 @@ function updateMetrics(now,waiting){
     +`本机 ${hz.toFixed(1)}/60 步每秒 · 执行平均 ${averageCost.toFixed(1)} / 最慢 ${peakCost.toFixed(1)} ms\n`
     +`性能诊断 v2 · 最近统计周期：模拟 ${(c.simulate/Math.max(1,c.steps)).toFixed(1)} ms/步 · 呈现 ${(c.present/Math.max(1,c.presentations)).toFixed(1)} ms/批 · 快照 ${(c.capture/Math.max(1,c.captures)).toFixed(1)} ms/次（${c.captures} 次）\n`
     +`恢复 ${c.restore.toFixed(1)} ms（${c.restores} 次） · 重算 ${c.replay.toFixed(1)} ms（${c.replays} 步，含模拟和快照） · 确认 ${c.confirm.toFixed(1)} ms · 校验 ${c.hash.toFixed(1)} ms\n`
-    +`${queue.active?`预测回滚 · 本地缓冲 ${queue.inputDelay} 步 · 方向预测 ${queue.directionPrediction} 步`:inputPolicy.rollbackEnabled?'确认锁步 · 等待回滚启用':'确认锁步 · 回滚已关闭'} · 最近输入至应用 ${inputAge.toFixed(1)} ms · 已收输入 ${receivedInputs}\n${links}\n`
+    +`${queue.active?`预测回滚 · 本地缓冲 ${queue.inputDelay} 步 · 方向预测 ${queue.directionPrediction} 步`:inputPolicy.rollbackEnabled?'确认锁步 · 等待回滚启用':`确认锁步 · 回滚已关闭 · 输入缓冲 ${queue.lockstepDelay} 步（${(queue.lockstepDelay*TICK_MS).toFixed(0)} ms）${inputPolicy.jitterSteps?' · 已启用公网抖动余量':''}`} · 最近输入至应用 ${inputAge.toFixed(1)} ms · 已收输入 ${receivedInputs}\n${links}\n`
     +`已确认 ${Math.min(queue.frame,queue.confirmed)} · 预测领先 ${Math.max(0,queue.frame-queue.confirmed)}/${MAX_ROLLBACK} 步\n`
     +`最近周期最大领先 ${c.lead} 步 · 游戏帧 ${game?.gameFrame??'启动中'} · 预测条件：${runtime.predictionBlockReason()||'允许'} · 补算前提前发输入 ${earlyInputs} 次\n`
     +`回滚 ${rollbackCount} 次 · 重算 ${resimulated} 步 · 最长 ${maxRewind} 步 · 快照 ${((runtime.rollbackInfo()?.snapshotBytes||0)/1048576).toFixed(0)} MiB\n`
     +`检查点每 ${runtime.rollbackInfo()?.checkpointFrames||1} 步 · 当前 ${runtime.rollbackInfo()?.snapshots||0} 个 · 边界重建 ${runtime.rollbackInfo()?.checkpointReplays||0} 步\n`
     +`当前等待 ${waitingSince?(now-waitingSince).toFixed(0):0} ms\n`
+    +`超过 50 ms 的输入等待 ${stalls.waits} 次 · 最长 ${stalls.maxWaitMs.toFixed(0)} ms · 最长调度间隔 ${stalls.maxPumpGapMs.toFixed(0)} ms\n`
     +(waiting?waitDetail:queue.frame<replayUntil?`正在补算，还剩 ${replayUntil-queue.frame} 步`:'正常推进／等待下一步时刻')+`\n${gamepadStatus}`
     +(roomServiceError?'\n房间服务正在重试（游戏按玩家数据通道继续）：'+roomServiceError:'');
   player.diagnostics(`${runtime.diagnosticText()}\n\n${$('diagnostics').textContent}`);
@@ -731,12 +773,16 @@ function pump(now){
   // rAF's frame timestamp can precede a timer/message wake already handled.
   // Keep the accounting baseline monotonic so that interval is counted once.
   now=Math.max(now,lastNow);
+  const pumpGap=now-lastNow;
+  if(pumpGap>=100){stalls.maxPumpGapMs=Math.max(stalls.maxPumpGapMs,pumpGap);recordStall('pump-gap',pumpGap);}
   if(membership){
     lastNow=now;accumulator=0;waitDetail='正在同步玩家离线边界';
     if(!waitingSince)waitingSince=now;
     updateMetrics(now,true);return;
   }
-  if(document.hidden){lastNow=now;accumulator=0;return;}pumping=true;
+  // Keep timer/message-driven lockstep alive when rAF is suspended. The browser
+  // may still freeze background tabs; that is reported rather than bypassed.
+  pumping=true;
   try{
     accumulator=Math.min(accumulator+Math.max(0,now-lastNow),TICK_MS*4);lastNow=now;
     let count=0,waiting=false;const budgetStart=performance.now();
@@ -748,12 +794,13 @@ function pump(now){
       maxRewind=Math.max(maxRewind,replayUntil-from);rollbackCount++;
       const restoreAt=performance.now();
       runtime.restore(from);queue.rewind(from);
-      costs.restore+=performance.now()-restoreAt;costs.restores++;
+      const restoreMs=performance.now()-restoreAt;costs.restore+=restoreMs;costs.restores++;
+      if(restoreMs>=50)recordStall('restore',restoreMs);
       for(const at of pendingHashes.keys())if(at>from)pendingHashes.delete(at);
     }
     while(queue.frame<replayUntil&&count<4&&(count===0||performance.now()-budgetStart<6)){
       const pair=nextInputs();if(!pair){waiting=true;break;}
-      waitingSince=0;const replayAt=performance.now();
+      const replayAt=performance.now();
       simulate(pair,queue.frame+1<replayUntil);resimulated++;count++;
       costs.replay+=performance.now()-replayAt;costs.replays++;
     }
@@ -765,7 +812,6 @@ function pump(now){
     while(accumulator>=TICK_MS&&count<4&&(count===0||performance.now()-budgetStart<6)){
       captureLocalInput();
       const pair=nextInputs();if(!pair){waiting=true;break;}
-      waitingSince=0;
       simulate(pair,false);
       const after=performance.now();
       const at=captureTimes.get(queue.frame-1);if(pair[queue.slot]!==lastApplied&&at)inputAge=after-at;
@@ -773,7 +819,7 @@ function pump(now){
       confirmFrames();if(stopped)return;
     }
     const presentAt=performance.now();
-    if(runtime.present()){costs.present+=performance.now()-presentAt;costs.presentations++;}
+    if(!document.hidden&&runtime.present()){costs.present+=performance.now()-presentAt;costs.presentations++;}
     const after=performance.now();
     if(waiting&&!waitingSince)waitingSince=after;
     updateMetrics(after,waiting);
@@ -790,7 +836,14 @@ const controlEditor=mountControlSettings($('control-settings'),{
 window.addEventListener('keydown',event=>{if(!running||controlEditor.isEditing()||isFormTarget(event.target)||event.metaKey||!isBound(event.code))return;event.preventDefault();keys.add(event.code);});
 document.addEventListener('focusin',event=>{if(isFormTarget(event.target))clearInput();});
 window.addEventListener('keyup',event=>keys.delete(event.code));window.addEventListener('blur',clearInput);
-document.addEventListener('visibilitychange',()=>{if(document.hidden)clearInput();else wake();});
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden)clearInput();
+  if(running&&!stopped){
+    recordStall(document.hidden?'hidden':'visible',0);
+    broadcast({type:'heartbeat',hidden:document.hidden});
+    wake();
+  }
+});
 window.addEventListener('message',event=>{
   if(event.origin!==location.origin||event.source!==iframe?.contentWindow||event.data?.protocol!==PROTOCOL)return;
   if(event.data.event==='runtime-exit')fail(Error('游戏模拟器已经退出'));

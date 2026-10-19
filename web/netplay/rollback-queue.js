@@ -18,9 +18,11 @@ export function rollbackInputDelayForRtt(rtt){
 }
 // One-way transit plus one scheduling step. The three-player host includes
 // all directed peer measurements; using a whole RTT doubles ordinary delay.
-export function lockstepDelayForRtt(rtt){
+// Public WS lockstep may reserve two extra steps for jitter, within the same cap.
+export function lockstepDelayForRtt(rtt,jitterSteps=0){
   if(!Number.isFinite(rtt)||rtt<0)throw Error('无效网络延迟');
-  return Math.min(MAX_INPUT_DELAY,Math.max(BOOT_DELAY,Math.ceil(rtt/2/TICK_MS)+1));
+  if(!Number.isInteger(jitterSteps)||jitterSteps<0||jitterSteps>2)throw Error('无效网络抖动余量');
+  return Math.min(MAX_INPUT_DELAY,Math.max(BOOT_DELAY,Math.ceil(rtt/2/TICK_MS)+1)+jitterSteps);
 }
 export const VALID_INPUT=MAX_INPUT;
 const HELD=32|64|2048,DIRECTIONS=15;

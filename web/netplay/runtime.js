@@ -52,7 +52,7 @@ document.addEventListener('focusin',event=>{if(isFormTarget(event.target))clearK
 document.addEventListener('visibilitychange',()=>{if(document.hidden){clearKeys();emulator?.module.netFlushAudio?.();localSe?.stop();}});
 canvas.addEventListener('pointerdown',()=>canvas.focus());
 function nativePauseAddress(){
-  return mailbox<0?-1:mailbox-patch.mailbox_cs_offset+patch.native_pause_cs_offset;
+  return !mailboxOwned(mailbox,guestMemoryBase,residentAddress)?-1:mailbox-patch.mailbox_cs_offset+patch.native_pause_cs_offset;
 }
 function nativePauseActive(){
   const at=nativePauseAddress();
@@ -162,12 +162,20 @@ async function boot(config){
   await bootProgress('原游戏磁盘和引擎已就绪，等待全员同步开局',7);
   return {localSe:version.local_se_sha256,projectileArt:version.projectile_art_sha256,presentation:version.presentation_sha256,disk:meta.sha256,runtime:version.generated_js_sha256,wasm:version.wasm_sha256,mobileWasm:version.mobile_wasm_sha256,clock:version.clock_sha256,cpuCycles:version.cpu_cycles,audio:version.audio_output_sha256,nativeSound:sound,queue:version.rollback_queue_sha256,snapshots:version.native_snapshots_sha256,controls:version.controls_sha256,pause:version.pause_sha256,game:version.game_adapter_sha256,room:version.room_sha256,membership:version.membership_sha256,startup:version.startup_sha256,hostSlot:pauseMenu.hostSlot,adapter:version.adapter,dosboxDisk:version.dosbox_disk_sha256,memoryDiff:version.dosbox_memory_diff_sha256,snapshotDiff:version.snapshot_diff_wasm_sha256,fault:version.fault_sha256,trackedWasm:version.write_journal?.wasm_sha256,trackedGlue:version.write_journal?.glue_sha256,trackedDiff:version.write_journal?.diff_sha256};
 }
+function mailboxOwned(at,base,resident){
+  const heap=emulator?.module.HEAPU8;
+  return !!heap&&Number.isInteger(base)&&base>=0&&base+0xa0000<=heap.length&&
+    Number.isInteger(at)&&at>=base&&at+675<base+0xa0000&&
+    Number.isInteger(resident)&&resident>=base&&resident+74<=base+0xa0000&&
+    heap[at+25]===1&&signature.every((v,i)=>heap[at+i]===v)&&
+    residentSignature.every((v,i)=>heap[resident+i]===v)&&heap[resident+48]===0x37;
+}
 function findMailbox(){
   const heap=emulator.module.HEAPU8,view=new DataView(heap.buffer);
   if(mailbox>=0)return;
   // MAIN's original exit sets end_sequence before freeing its code/heap.
   // MAINE reuses that memory; a surviving signature alone is not ownership.
-  if(residentAddress>=0&&heap[residentAddress+48]!==0x37)return;
+  if(residentAddress>=0&&residentSignature.every((v,i)=>heap[residentAddress+i]===v)&&heap[residentAddress+48]!==0x37)return;
   const candidates=[];
   const limit=guestMemoryBase<0?heap.length:guestMemoryBase+0xa0000;
   for(let at=heap.indexOf(signature[0],Math.max(0,guestMemoryBase));at>=0&&at<limit;at=heap.indexOf(signature[0],at+1)){
@@ -177,7 +185,7 @@ function findMailbox(){
     if(base<0||base+0xa0000>heap.length||data<base||data+0xba8a>base+0xa0000)continue;
     if(guestMemoryBase>=0&&base!==guestMemoryBase)continue;
     const resident=base+view.getUint16(data+0xba86,true)+view.getUint16(data+0xba88,true)*16;
-    if(resident<base||resident+74>base+0xa0000||!residentSignature.every((v,i)=>heap[resident+i]===v)||heap[resident+48]!==0x37)continue;
+    if(!mailboxOwned(at,base,resident))continue;
     candidates.push({at,base,resident});
   }
   if(candidates.length===1){
@@ -187,8 +195,7 @@ function findMailbox(){
 }
 function refreshMailbox(){
   if(mailbox<0)return;
-  const heap=emulator.module.HEAPU8;
-  if(heap[residentAddress+48]===0x37&&signature.every((v,i)=>heap[mailbox+i]===v))return;
+  if(mailboxOwned(mailbox,guestMemoryBase,residentAddress))return;
   mailbox=-1;emulator.module.projectileArt?.bind(-1);
 }
 function applyP1(bits){
@@ -278,8 +285,9 @@ function present(){
   // Called once per completed room batch, synchronously after all simulation.
   // Flush the current native RGB before drawing HUD from the same state.
   if(!emulator.module.netPresent())return false;
-  presentPersonalHud({raw:rawPresentation,heap:emulator.module.HEAPU8,mailbox,patch,slot:localSlot,
-    guestBase:mailbox>=0?guestBase():0,points:{...pointPreferences,players:playerCount}});
+  const live=mailboxOwned(mailbox,guestMemoryBase,residentAddress);
+  presentPersonalHud({raw:rawPresentation,heap:emulator.module.HEAPU8,mailbox:live?mailbox:-1,patch,slot:localSlot,
+    guestBase:live?guestBase():0,points:{...pointPreferences,players:playerCount}});
   presentationPending=false;presentationCount++;return true;
 }
 function capture(frame,restored=false){
@@ -341,7 +349,7 @@ function confirm(prefix){
   return exit?'exit':undefined;
 }
 function snapshot(){
-  if(mailbox<0)return null;
+  if(!mailboxOwned(mailbox,guestMemoryBase,residentAddress))return null;
   const v=new DataView(emulator.module.HEAPU8.buffer),m=mailbox;
   const players=[[v.getInt16(m+36,true)/16,v.getInt16(m+38,true)/16],[v.getInt16(m+46,true)/16,v.getInt16(m+48,true)/16]];
   if(playerCount===3){const at=m-patch.mailbox_cs_offset+patch.p3_motion_cs_offset;players.push([v.getInt16(at+2,true)/16,v.getInt16(at+4,true)/16]);}
@@ -397,7 +405,7 @@ function checksum(){
   if(guestMemoryBase<0)return {tick:ticks,hash:(h>>>0).toString(16).padStart(8,'0'),gameFrame:0};
   const heap=emulator.module.HEAPU8,v=new DataView(heap.buffer),base=guestBase();
   for(let at=base;at<base+0xa0000;at++)h=Math.imul(h^heap[at],0x01000193);
-  return {tick:ticks,hash:(h>>>0).toString(16).padStart(8,'0'),gameFrame:mailbox<0?0:v.getUint32(mailbox+16,true)};
+  return {tick:ticks,hash:(h>>>0).toString(16).padStart(8,'0'),gameFrame:mailboxOwned(mailbox,guestMemoryBase,residentAddress)?v.getUint32(mailbox+16,true):0};
 }
 window.th04Sync={
   faultReport(){return {settings:musicSettings,game:snapshot(),runtimeFailure,
@@ -416,7 +424,7 @@ window.th04Sync={
   setRawPresentation(value){rawPresentation=!!value;presentationPending=true;},
   setMusicVolume(value){document.getElementById('bgm-volume').value=value;bgm?.setVolume(Number(value)/100);},
   touchContext(){
-    if(!enabled||mailbox<0)return {key:'boot',play:false};
+    if(!enabled||!mailboxOwned(mailbox,guestMemoryBase,residentAddress))return {key:'boot',play:false};
     const heap=emulator.module.HEAPU8,p=touchPlayer(heap,mailbox,patch,localSlot);
     const stage=new DataView(heap.buffer).getUint16(mailbox+26,true),paused=pauseMenu.paused||nativePauseActive();
     return {key:`${stage}:${paused?'menu':'game'}`,play:!paused&&!p.miss&&!p.entry&&!p.out};
