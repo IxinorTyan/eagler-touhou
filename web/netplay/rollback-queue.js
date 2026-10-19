@@ -39,7 +39,7 @@ export class RollbackQueue {
     this.inputDelay=inputDelay;this.directionPrediction=directionPrediction;this.rollbackEnabled=rollbackEnabled;
     this.lockstepDelay=BOOT_DELAY;
     this.slot=slot;this.players=players;this.frame=0;this.confirmed=BOOT_DELAY;
-    this.activation=null;this.dirty=null;this.inputs=Array.from({length:players},()=>new Map());
+    this.activation=null;this.dirty=null;this.skippedCorrections=0;this.inputs=Array.from({length:players},()=>new Map());
     this.used=new Map();
     this.offline=new Map();
     for(const lane of this.inputs)for(let n=0;n<BOOT_DELAY;n++)lane.set(n,0);
@@ -99,6 +99,21 @@ export class RollbackQueue {
     }
     this.updateConfirmed();
   }
+  refreshCorrection(force=false){
+    if(this.dirty===null&&!force)return null;
+    const correctionPending=this.dirty!==null;
+    // Several packets can change a prediction and then restore the exact
+    // input already simulated. Recheck the complete used history once, just
+    // before restoring native state, rather than replaying a transient gap.
+    this.dirty=null;
+    for(const [at,pair]of this.used){
+      if(pair.some((value,slot)=>value!==this.predicted(slot,at))){
+        this.dirty=this.dirty===null?at:Math.min(this.dirty,at);
+      }
+    }
+    if(this.dirty===null&&correctionPending)this.skippedCorrections++;
+    return this.dirty;
+  }
   isOffline(slot,frame){return this.offline.has(slot)&&frame>=this.offline.get(slot);}
   offlineMask(frame=this.frame){let mask=0;for(const [slot,at]of this.offline)if(frame>=at)mask|=1<<slot;return mask;}
   membershipReport(){
@@ -138,8 +153,8 @@ export class RollbackQueue {
     this.frame=frame;this.dirty=null;
     for(const at of this.used.keys())if(at>=frame)this.used.delete(at);
   }
-  prune(){
-    const prefix=Math.min(this.frame,this.confirmed);
+  prune(acknowledgedPrefix=Math.min(this.frame,this.confirmed)){
+    const prefix=Math.min(this.frame,this.confirmed,acknowledgedPrefix);
     for(const at of this.used.keys())if(at<prefix)this.used.delete(at);
     for(const lane of this.inputs)for(const at of lane.keys())if(at<prefix-32)lane.delete(at);
   }

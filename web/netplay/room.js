@@ -1,3 +1,4 @@
+import {InputLatch} from './input-latch.js';
 import {startFrameLoop} from '../frame-limit.js';
 import {readNetworkMode,networkUrl} from './network-mode.js';
 import {PROTOCOL,RollbackQueue,TICK_MS,MAX_ROLLBACK,BOOT_DELAY,MAX_INPUT_DELAY,MAX_ROLLBACK_INPUT_DELAY,lockstepDelayForRtt,rollbackInputDelayForRtt,rollbackRttForSamples} from './rollback-queue.js';
@@ -34,6 +35,10 @@ let waitingSince=0,replayUntil=0,rollbackCount=0,resimulated=0,maxRewind=0;
 const pendingHashes=new Map();
 let keys=new Set(),childBits=0,pendingAction=0,bits=0,inputChangedAt=0;
 let peers=new Map(),hashes=new Map(),captureTimes=new Map();
+const inputLatch=new InputLatch();
+let nativeBusy=false;const boundaryActions=[];
+function atNativeBoundary(action){if(nativeBusy)boundaryActions.push(action);else action();}
+function completeNativeBoundary(){nativeBusy=false;for(const action of boundaryActions.splice(0)){if(stopped)break;action();}}
 let pumping=false,lastNow=0,accumulator=0,lastUi=0,lastMeasure=0,measureFrame=0;
 let stepCost=0,stepCount=0,maxCost=0,hz=0,averageCost=0,peakCost=0,inputAge=0,lastApplied=0,receivedInputs=0;
 const newCosts=()=>({capture:0,captures:0,simulate:0,steps:0,present:0,presentations:0,hash:0,restore:0,restores:0,confirm:0,replay:0,replays:0,lead:0});
@@ -75,7 +80,7 @@ let bootStep=0,bootStartedAt=0;
 let connectionConfigPending=false,pendingConnectionSignals=[];
 let connectionConfigSummary='尚未读取';
 let stopReason='';
-const player=mountPlayer($('game'),{onChange:()=>{if(running)wake();},onGesture:async()=>{
+const player=mountPlayer($('game'),{onChange:()=>{if(running){observeInput();wake();}},onGesture:async()=>{
   if(!runtime)return;
   if(await runtime.unlockAudio())player.note('声音已启用。低速停火靠近队友可救援；按住“停火救援”即可。');
   else player.note('声音尚未就绪，进入游戏后点击“启用声音”。');
@@ -89,13 +94,14 @@ rawView.textContent='显示：个人 HUD';rawView.setAttribute('aria-pressed','f
 rawView.onclick=()=>{rawEnabled=!rawEnabled;runtime?.setRawPresentation(rawEnabled);rawView.textContent=rawEnabled?'显示：原始画面':'显示：个人 HUD';rawView.setAttribute('aria-pressed',String(rawEnabled));};
 $('game').querySelector('.player-toolbar').append(rawView);
 const faultDownload=document.createElement('button');faultDownload.type='button';faultDownload.dataset.faultDownload='';faultDownload.textContent='下载故障信息';
-faultDownload.onclick=()=>{
+faultDownload.onclick=async()=>{
   if(!runtime){player.note('请先启动游戏。');return;}
-  try{downloadFaultReport({schema:'touhou-network-fault/1',recordedAt:new Date().toISOString(),
+  try{const fault=runtime.collectFaultReport?await runtime.collectFaultReport():runtime.faultReport();
+    downloadFaultReport({schema:'touhou-network-fault/1',recordedAt:new Date().toISOString(),
     environment:{userAgent:navigator.userAgent,visibility:document.visibilityState},
     settings:state?.settings,slot:queue?.slot,frame:queue?.frame,confirmed:queue?.confirmed,
     timing:{lockstepDelay:queue?.lockstepDelay,inputDelay:queue?.inputDelay,jitterReserveSteps:inputPolicy?.jitterSteps},
-    running,stopped,stopReason,stalls:stallReport(),diagnostics:$('diagnostics').textContent,runtime:runtime.faultReport()},'th04-network-fault.json');
+    running,stopped,stopReason,stalls:stallReport(),diagnostics:$('diagnostics').textContent,runtime:fault},'th04-network-fault.json');
     player.note('故障信息已下载，只保存在本机。');
   }catch(error){player.note('读取故障信息失败：'+error.message);}
 };
@@ -180,6 +186,7 @@ function reportDeparture(role){
   else send(peers.get('host'),{type:'suspect',role});
 }
 function beginDeparture(dropped){
+  if(nativeBusy){boundaryActions.push(()=>beginDeparture(dropped));return;}
   if(stopped||!running||session.role!=='host')return;
   const targets=[...new Set([...(membership?.roles||[]),...dropped])].filter(r=>!peers.get(r)?.offline);
   if(!targets.length||targets.some(r=>r==='host'||!peers.has(r)))throw Error('无效离线目标');
@@ -191,6 +198,7 @@ function beginDeparture(dropped){
   finishDeparture();
 }
 function finishDeparture(){
+  if(nativeBusy){boundaryActions.push(finishDeparture);return;}
   if(session.role!=='host'||!membership)return;
   const remaining=onlinePeers().filter(p=>!membership.roles.includes(p.role));
   if(!remaining.every(p=>membership.reports.has(p.role)))return;
@@ -203,6 +211,7 @@ function finishDeparture(){
   request('drop',{roles:dropped}).then(r=>update(r.state)).catch(()=>{});
 }
 function applyDeparture(message){
+  if(nativeBusy){boundaryActions.push(()=>applyDeparture(message));return;}
   if(!membership||message.id!==membership.id||JSON.stringify(message.roles)!==JSON.stringify(membership.roles)||
      JSON.stringify(message.slots)!==JSON.stringify(message.roles.map(r=>state.slots[r])))throw Error('离线确认不匹配');
   queue.applyDeparture(message);
@@ -242,7 +251,7 @@ function recordPong(peer,id){
     maybeRun();
   }
 }
-function clearInput(){keys.clear();childBits=0;pendingAction=0;bits=0;player.reset();}
+function clearInput(){keys.clear();childBits=0;pendingAction=0;bits=0;inputLatch.clear();player.reset();}
 function clearTimers(){
   player.setActive(false);player.exit();
   clearTimeout(pollTimer);clearTimeout(loadTimer);clearInterval(heartbeatTimer);
@@ -445,7 +454,7 @@ function attachChannel(peer,channel){
           membershipId=m.id;
           if(m.roles.includes(session.role)){closeDisconnected('你已与本局断开连接');return;}
           membership={id:m.id,roles:m.roles,started:performance.now()};
-          send(peer,{type:'departure-report',id:m.id,report:queue.membershipReport()});break;
+          atNativeBoundary(()=>send(peer,{type:'departure-report',id:m.id,report:queue.membershipReport()}));break;
         case 'departure-report':
           if(session.role!=='host'||!membership||m.id!==membership.id)break;
           if(!membership.roles.includes(peer.role)){membership.reports.set(peer.role,m.report);finishDeparture();}break;
@@ -622,7 +631,7 @@ async function beginGame(){
   iframe.contentWindow.addEventListener('blur',()=>player.reset());
   player.setLabel(`你操作 P${state.slots[session.role]+1}`);
   runtime.updateControls(controlSnapshot(),controlEditor.isEditing());
-  runtime.onInput(value=>{childBits=value;});runtime.onMenuAction(value=>{pendingAction|=value;wake();});
+  runtime.onInput(value=>{childBits=value;observeInput();wake();});runtime.onMenuAction(value=>{pendingAction|=value;observeInput();wake();});
   localReady=await runtime.load({...state.settings});if(stopped){runtime.stop();return;}
   runtime.setMusicVolume(musicVolume.querySelector('input').value);
   for(const peer of peers.values())if(peer.channel?.readyState==='open')send(peer,{type:'ready',build:localReady});maybeRun();
@@ -682,26 +691,35 @@ function armRollback(){
   // taking snapshots; every peer switches at the same future simulation tick.
   const frame=queue.frame+120;queue.arm(frame);broadcast({type:'rollback',frame});
 }
-function confirmFrames(){
+async function confirmFrames(){
   const before=performance.now();
   const prefix=Math.min(queue.frame,queue.confirmed);
-  if(runtime.confirm(prefix)==='exit'){finishGame();return;}
+  if(await runtime.confirm(prefix)==='exit'){finishGame();return;}
+  if(stopped)return;
   for(const [tick,sample]of pendingHashes)if(tick<=prefix){
     hashes.set(tick,sample);broadcast({type:'hash',...sample});
     for(const peer of onlinePeers())compare(peer,tick);
     pendingHashes.delete(tick);trim(hashes);
   }
-  queue.prune();armRollback();
+  queue.prune(prefix);armRollback();
   costs.confirm+=performance.now()-before;
 }
-function simulate(pair,replay){
+async function simulate(pair,replay){
   const before=performance.now();
   const frame=queue.frame;
-  if(queue.active&&frame>=queue.confirmed){
+  const capture=queue.active&&frame>=queue.confirmed;
+  if(capture&&!runtime.asyncExecution){
     const at=performance.now();runtime.capture(frame);costs.capture+=performance.now()-at;costs.captures++;
   }
   const stepAt=performance.now();
-  runtime.step(pair,{frame,replay,offlineMask:queue.offlineMask(frame)});queue.commit(pair);
+  nativeBusy=true;
+  if(runtime.asyncExecution)await runtime.execute(pair,{frame,replay,offlineMask:queue.offlineMask(frame),capture,hash:(frame+1)%120===0});
+  else runtime.step(pair,{frame,replay,offlineMask:queue.offlineMask(frame)});
+  if(stopped){completeNativeBoundary();return;}
+  queue.commit(pair);
+  // Authority can arrive before this completed step enters used history.
+  if(runtime.asyncExecution&&queue.active)queue.refreshCorrection(true);
+  completeNativeBoundary();
   costs.simulate+=performance.now()-stepAt;costs.steps++;
   costs.lead=Math.max(costs.lead,queue.frame-queue.confirmed);
   if(queue.frame%120===0){
@@ -710,6 +728,10 @@ function simulate(pair,replay){
   const cost=performance.now()-before;stepCost+=cost;stepCount++;maxCost=Math.max(maxCost,cost);
   if(cost>=50)recordStall(replay?'replay-step':'simulation-step',cost);
 }
+function observeInput(){
+  if(!running||document.hidden)return;
+  inputLatch.observe(controlEditor.isEditing()?0:normalize(player.sample(keyboardBits(keys)|childBits|gamepadBits())|pendingAction));
+}
 function captureLocalInput(){
   // Hidden pages must still produce authoritative input. Never read a held
   // gamepad, touch auto-fire or menu pulse while the player is away.
@@ -717,13 +739,14 @@ function captureLocalInput(){
   if(!document.hidden){
     player.setContext(runtime.touchContext());
     runtime.setPointPreferences({focus:!!focusSettings(),always:player.alwaysPoint()});
-    const value=controlEditor.isEditing()?0:normalize(player.sample(keyboardBits(keys)|childBits|gamepadBits()));
+    observeInput();
+    const value=normalize(inputLatch.sample());
     if(value!==bits){bits=value;inputChangedAt=performance.now();}
     packed=player.pack(bits|pendingAction,{includePointPreference:false});
   }else if(bits){bits=0;inputChangedAt=performance.now();}
   const captured=queue.capture(packed);
   if(!captured)return false;
-  player.consume();
+  player.consume();inputLatch.consume();
   pendingAction=0;captureTimes.set(captured.frame,performance.now());broadcast(captured);return true;
 }
 function nextInputs(){
@@ -768,10 +791,10 @@ function updateMetrics(now,waiting){
   player.diagnostics(`${runtime.diagnosticText()}\n\n${$('diagnostics').textContent}`);
   if(!game)player.note(`正在启动 DOS／游戏 · 同步步 ${queue.frame} · ${waiting?waitDetail:'正在推进'}。详情可查看当前状态。`);
 }
-function pump(now){
+async function pump(now){
   if(!running||stopped||pumping)return;
-  // rAF's frame timestamp can precede a timer/message wake already handled.
-  // Keep the accounting baseline monotonic so that interval is counted once.
+  // Message/timer wakes can run before an rAF carrying an older timestamp.
+  // Never move the elapsed-time baseline backward and count that time twice.
   now=Math.max(now,lastNow);
   const pumpGap=now-lastNow;
   if(pumpGap>=100){stalls.maxPumpGapMs=Math.max(stalls.maxPumpGapMs,pumpGap);recordStall('pump-gap',pumpGap);}
@@ -780,12 +803,11 @@ function pump(now){
     if(!waitingSince)waitingSince=now;
     updateMetrics(now,true);return;
   }
-  // Keep timer/message-driven lockstep alive when rAF is suspended. The browser
-  // may still freeze background tabs; that is reported rather than bypassed.
   pumping=true;
   try{
     accumulator=Math.min(accumulator+Math.max(0,now-lastNow),TICK_MS*4);lastNow=now;
     let count=0,waiting=false;const budgetStart=performance.now();
+    if(queue.dirty!==null)queue.refreshCorrection();
     if(queue.dirty!==null){
       // Publish the due frontier input before costly replay. Never sample a
       // historical replay frame, and never resample an already captured frame.
@@ -793,18 +815,27 @@ function pump(now){
       const from=queue.dirty;replayUntil=Math.max(replayUntil,queue.frame);
       maxRewind=Math.max(maxRewind,replayUntil-from);rollbackCount++;
       const restoreAt=performance.now();
-      runtime.restore(from);queue.rewind(from);
+      nativeBusy=true;await runtime.restore(from);if(stopped)return;queue.rewind(from);
+      // A still earlier input can arrive during restore, before rewind clears
+      // the old correction marker. Reconcile the retained completed history.
+      if(runtime.asyncExecution&&queue.active)queue.refreshCorrection(true);
+      completeNativeBoundary();
       const restoreMs=performance.now()-restoreAt;costs.restore+=restoreMs;costs.restores++;
       if(restoreMs>=50)recordStall('restore',restoreMs);
       for(const at of pendingHashes.keys())if(at>from)pendingHashes.delete(at);
     }
+    if(queue.dirty!==null||membership){wake();return;}
     while(queue.frame<replayUntil&&count<4&&(count===0||performance.now()-budgetStart<6)){
       const pair=nextInputs();if(!pair){waiting=true;break;}
-      const replayAt=performance.now();
-      simulate(pair,queue.frame+1<replayUntil);resimulated++;count++;
+      endInputWait();const replayAt=performance.now();
+      await simulate(pair,queue.frame+1<replayUntil);if(stopped)return;resimulated++;count++;
       costs.replay+=performance.now()-replayAt;costs.replays++;
+      if(queue.dirty!==null||membership)break;
     }
-    confirmFrames();if(stopped)return;
+    // Never confirm or present a branch that changed while the worker ran.
+    if(queue.dirty!==null||membership){wake();return;}
+    await confirmFrames();if(stopped)return;
+    if(queue.dirty!==null||membership){wake();return;}
     if(queue.frame<replayUntil){
       if(waiting&&!waitingSince)waitingSince=performance.now();
       updateMetrics(performance.now(),waiting);wake(waiting?16:0);return;
@@ -812,12 +843,16 @@ function pump(now){
     while(accumulator>=TICK_MS&&count<4&&(count===0||performance.now()-budgetStart<6)){
       captureLocalInput();
       const pair=nextInputs();if(!pair){waiting=true;break;}
-      simulate(pair,false);
+      endInputWait();
+      await simulate(pair,false);if(stopped)return;
       const after=performance.now();
       const at=captureTimes.get(queue.frame-1);if(pair[queue.slot]!==lastApplied&&at)inputAge=after-at;
       lastApplied=pair[queue.slot];captureTimes.delete(queue.frame-1);accumulator-=TICK_MS;count++;
-      confirmFrames();if(stopped)return;
+      if(queue.dirty!==null||membership)break;
+      await confirmFrames();if(stopped)return;
+      if(queue.dirty!==null||membership)break;
     }
+    if(queue.dirty!==null||membership){wake();return;}
     const presentAt=performance.now();
     if(!document.hidden&&runtime.present()){costs.present+=performance.now()-presentAt;costs.presentations++;}
     const after=performance.now();
@@ -826,16 +861,16 @@ function pump(now){
     // Native execution time counts toward this tick's budget. The old timer
     // waited another full interval after a 15 ms step, reducing throughput.
     wake(waiting?16:Math.max(0,TICK_MS-accumulator-(after-lastNow)));
-  }catch(error){fail(error);}finally{pumping=false;}
+  }catch(error){fail(error);}finally{nativeBusy=false;pumping=false;}
 }
 const focusSettings=mountFocusSettings($('control-settings'),{alwaysPointControl:player.alwaysPointControl});
 const controlEditor=mountControlSettings($('control-settings'),{
   onChange:value=>{clearInput();runtime?.updateControls(value,controlEditor.isEditing());},
   onEditing:editing=>{clearInput();runtime?.updateControls(controlSnapshot(),editing);}
 });
-window.addEventListener('keydown',event=>{if(!running||controlEditor.isEditing()||isFormTarget(event.target)||event.metaKey||!isBound(event.code))return;event.preventDefault();keys.add(event.code);});
+window.addEventListener('keydown',event=>{if(!running||controlEditor.isEditing()||isFormTarget(event.target)||event.metaKey||!isBound(event.code))return;event.preventDefault();keys.add(event.code);observeInput();wake();});
 document.addEventListener('focusin',event=>{if(isFormTarget(event.target))clearInput();});
-window.addEventListener('keyup',event=>keys.delete(event.code));window.addEventListener('blur',clearInput);
+window.addEventListener('keyup',event=>{keys.delete(event.code);observeInput();wake();});window.addEventListener('blur',clearInput);
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden)clearInput();
   if(running&&!stopped){

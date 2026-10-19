@@ -4,9 +4,10 @@ import {drawCollisionPoints} from './collision-points.js';
 // Only final pixels differ by local seat. Never write a local seat selector
 // into NP21 RAM, VRAM, devices, snapshots or the state checksum.
 export function createPersonalHud(canvas,nativeCanvas){
+  const makeCanvas=()=>typeof document==='undefined'||typeof document.createElement!=='function'?new OffscreenCanvas(1,1):document.createElement('canvas');
   const context=canvas.getContext('2d',{alpha:false});
   let tramAddress=-1,tramBuffer=null,lastTramSearch=-Infinity;
-  const atlas=document.createElement('canvas');atlas.width=160;atlas.height=16;
+  const atlas=makeCanvas();atlas.width=160;atlas.height=16;
   const ink=atlas.getContext('2d'),pixels=ink.createImageData(160,16);
   for(let digit=0;digit<10;digit++)for(let y=0;y<16;y++)for(let x=0;x<16;x++){
     if(!(hudDigits[digit][y*2+(x>>>3)]&(0x80>>>(x&7))))continue;
@@ -19,7 +20,7 @@ export function createPersonalHud(canvas,nativeCanvas){
     const key=x+','+y+','+count;
     let row=numbers.get(key);
     if(!row){
-      const image=document.createElement('canvas');image.width=count*16;image.height=16;
+      const image=makeCanvas();image.width=count*16;image.height=16;
       row={image,ink:image.getContext('2d',{alpha:false}),text:null};numbers.set(key,row);
     }
     if(row.text!==text){

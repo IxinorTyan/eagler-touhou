@@ -9,11 +9,12 @@ import {PauseMenu} from './pause.js';
 import {createPersonalHud} from './personal-hud.js';
 import {readSoloFault} from '../solo-fault.js';
 import {LocalSe,readNativeSe} from './local-se.js';
-const canvas=document.getElementById('canvas'),details=document.getElementById('details');
-const nativeCanvas=document.createElement('canvas');
-nativeCanvas.width=640;nativeCanvas.height=400;nativeCanvas.hidden=true;
-nativeCanvas.style.display='none';
-document.body.append(nativeCanvas);
+const workerHost=globalThis.th04WorkerHost;
+const canvas=workerHost?.canvas??document.getElementById('canvas'),details=workerHost?{}:document.getElementById('details');
+const nativeCanvas=workerHost?new OffscreenCanvas(640,400):document.createElement('canvas');
+nativeCanvas.width=640;nativeCanvas.height=400;
+if(!workerHost){nativeCanvas.hidden=true;nativeCanvas.style.display='none';document.body.append(nativeCanvas);}
+function notifyParent(message){if(workerHost)workerHost.notify(message);else window.parent.postMessage(message,location.origin);}
 const presentPersonalHud=createPersonalHud(canvas,nativeCanvas);
 let rawPresentation=false,presentationCount=0,presentationPending=false;
 let pointPreferences={focus:true,always:false};
@@ -35,13 +36,14 @@ function reportRuntimeFailure(kind,error){
   const message=String(error?.message||error);
   runtimeFailure={kind,message,tick:ticks,emulatedTicks};
   enabled=false;closed=true;bgm?.dispose();localSe?.dispose();details.textContent=message;
-  window.parent.postMessage({protocol:'th04-rollback/4',event:'runtime-error',message,kind},location.origin);
+  notifyParent({protocol:'th04-rollback/4',event:'runtime-error',message,kind});
 }
 let controlsBlocked=false;
 function localButtons(){
   return keyboardBits(keys);
 }
 function clearKeys(){keys.clear();inputListener(0);}
+if(!workerHost){
 window.addEventListener('keydown',event=>{
   if(controlsBlocked||isFormTarget(event.target)||event.metaKey||!isBound(event.code))return;
   event.preventDefault();event.stopImmediatePropagation();keys.add(event.code);inputListener(localButtons());
@@ -51,6 +53,7 @@ window.addEventListener('blur',clearKeys);
 document.addEventListener('focusin',event=>{if(isFormTarget(event.target))clearKeys();});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){clearKeys();emulator?.module.netFlushAudio?.();localSe?.stop();}});
 canvas.addEventListener('pointerdown',()=>canvas.focus());
+}
 function nativePauseAddress(){
   return !mailboxOwned(mailbox,guestMemoryBase,residentAddress)?-1:mailbox-patch.mailbox_cs_offset+patch.native_pause_cs_offset;
 }
@@ -64,6 +67,7 @@ function predictionBlockReason(){
   if(nativePauseActive())return '原生暂停菜单尚未退出';
   return '';
 }
+if(!workerHost){
 document.getElementById('bgm-volume').addEventListener('input',event=>bgm?.setVolume(Number(event.target.value)/100));
 window.addEventListener('pagehide',()=>{closed=true;bgm?.dispose();localSe?.dispose();});
 document.getElementById('sound').onclick=async()=>{
@@ -73,6 +77,7 @@ document.getElementById('sound').onclick=async()=>{
     await context.resume();document.getElementById('sound').textContent='本机声音已启用';canvas.focus();
   }catch(error){details.textContent=error.message;}
 };
+}
 async function get(path,type='json'){
   const response=await fetch(path,{cache:'no-cache'});if(!response.ok)throw Error(`资源读取失败：${path}`);
   if(type==='arrayBuffer'&&response.body){
@@ -94,7 +99,7 @@ async function get(path,type='json'){
 }
 async function bootProgress(message,step){
   details.textContent=`启动进度：${message}`;
-  window.parent.postMessage({protocol:'th04-rollback/4',event:'boot-progress',message,step},location.origin);
+  notifyParent({protocol:'th04-rollback/4',event:'boot-progress',message,step});
   // Give the parent page a chance to display the stage before expensive work.
   await new Promise(resolve=>setTimeout(resolve,0));
 }
@@ -125,13 +130,14 @@ async function boot(config){
   }
   for(const edit of sound.edits)edit.targets.forEach((at,i)=>{disk[at]=edit.values[i];});
   await bootProgress('下载、编译并初始化 DOSBox-X WASM 与音频设备',5);
-  emulator=await NP21.create({canvas:nativeCanvas,artPatch:patch,lockstep:true,externalEffects:true,rollbackEnabled:config.rollback!==false,lockstepEpoch:version.epoch,
+  emulator=await NP21.create({canvas:nativeCanvas,artPatch:patch,lockstep:true,externalEffects:true,
+    ...(workerHost?{workerRuntime:true,audioContext:workerHost.audioContext}:{}),rollbackEnabled:config.rollback!==false,lockstepEpoch:version.epoch,
     ExMemory:7,Latencys:40,SampleHz:44100,SNDboard:4,
     no_mouse:true,use_menu:false,fontfile:'font.bmp',
     onError:error=>reportRuntimeFailure('emulator-error',Error('模拟器异常：'+String(error?.message||error))),
     onExit:()=>reportRuntimeFailure('emulator-exit',Error('游戏模拟器已经退出'))});
   if(closed){emulator.pause();return;}
-  localSe=new LocalSe(emulator.module.SDL2.audioContext);
+  localSe=workerHost?workerHost.se:new LocalSe(emulator.module.SDL2.audioContext);
   const seLoading=localSe.load().catch(error=>{if(!closed)seError='浏览器音效加载失败：'+error.message;});
   await bootProgress('挂载游戏磁盘',6);
   emulator.addDiskImage('th04-sync.hdi',disk);await emulator.setHdd(0,'th04-sync.hdi');
@@ -160,7 +166,7 @@ async function boot(config){
   // No music imports/downloads/decoding until an actual game frame is observed.
   musicSettings=config;
   await bootProgress('原游戏磁盘和引擎已就绪，等待全员同步开局',7);
-  return {localSe:version.local_se_sha256,projectileArt:version.projectile_art_sha256,presentation:version.presentation_sha256,disk:meta.sha256,runtime:version.generated_js_sha256,wasm:version.wasm_sha256,mobileWasm:version.mobile_wasm_sha256,clock:version.clock_sha256,cpuCycles:version.cpu_cycles,audio:version.audio_output_sha256,nativeSound:sound,queue:version.rollback_queue_sha256,snapshots:version.native_snapshots_sha256,controls:version.controls_sha256,pause:version.pause_sha256,game:version.game_adapter_sha256,room:version.room_sha256,membership:version.membership_sha256,startup:version.startup_sha256,hostSlot:pauseMenu.hostSlot,adapter:version.adapter,dosboxDisk:version.dosbox_disk_sha256,memoryDiff:version.dosbox_memory_diff_sha256,snapshotDiff:version.snapshot_diff_wasm_sha256,fault:version.fault_sha256,trackedWasm:version.write_journal?.wasm_sha256,trackedGlue:version.write_journal?.glue_sha256,trackedDiff:version.write_journal?.diff_sha256};
+  return {worker:version.network_worker_sha256,inputLatch:version.input_latch_sha256,localSe:version.local_se_sha256,projectileArt:version.projectile_art_sha256,presentation:version.presentation_sha256,disk:meta.sha256,runtime:version.generated_js_sha256,wasm:version.wasm_sha256,mobileWasm:version.mobile_wasm_sha256,clock:version.clock_sha256,cpuCycles:version.cpu_cycles,audio:version.audio_output_sha256,nativeSound:sound,queue:version.rollback_queue_sha256,snapshots:version.native_snapshots_sha256,controls:version.controls_sha256,pause:version.pause_sha256,game:version.game_adapter_sha256,room:version.room_sha256,membership:version.membership_sha256,startup:version.startup_sha256,hostSlot:pauseMenu.hostSlot,adapter:version.adapter,dosboxDisk:version.dosbox_disk_sha256,memoryDiff:version.dosbox_memory_diff_sha256,snapshotDiff:version.snapshot_diff_wasm_sha256,fault:version.fault_sha256,trackedWasm:version.write_journal?.wasm_sha256,trackedGlue:version.write_journal?.glue_sha256,trackedDiff:version.write_journal?.diff_sha256};
 }
 function mailboxOwned(at,base,resident){
   const heap=emulator?.module.HEAPU8;
@@ -356,6 +362,7 @@ function snapshot(){
   return {gameFrame:v.getUint32(m+16,true),stageFrame:v.getUint16(m+40,true),players,p1:players[0],p2:players[1]};
 }
 function deliverMusic(ax,name){
+  if(workerHost){workerHost.music({ax,name});return;}
   if(musicReady)bgm.commandTrack(ax,name);
   else{pendingMusic.push([ax,name]);if(pendingMusic.length>64)pendingMusic.shift();}
 }
@@ -378,7 +385,7 @@ function observeMusic({name,sequence,ax,mode}){
     lastMusicName=name;
   }else if(changed&&lastMusicName)deliverMusic(ax,lastMusicName);
   lastMusicSequence=sequence;
-  if(!musicTask){
+  if(!workerHost&&!musicTask){
     musicStatus='浏览器音乐：游戏已运行，正在后台加载';
     musicTask=new Promise(resolve=>setTimeout(resolve,0)).then(async()=>{
       if(closed)return;
@@ -407,12 +414,12 @@ function checksum(){
   for(let at=base;at<base+0xa0000;at++)h=Math.imul(h^heap[at],0x01000193);
   return {tick:ticks,hash:(h>>>0).toString(16).padStart(8,'0'),gameFrame:mailboxOwned(mailbox,guestMemoryBase,residentAddress)?v.getUint32(mailbox+16,true):0};
 }
-window.th04Sync={
-  faultReport(){return {settings:musicSettings,game:snapshot(),runtimeFailure,
+const sync={
+  faultReport({cpu=true}={}){return {settings:musicSettings,game:snapshot(),runtimeFailure,
     sound:{...localSe?.info(),error:seError},
     emulator:emulator?{state:emulator.state,error:emulator.failedError?.message??null,logs:emulator.logs??[]}:null,
     pause:pauseMenu?{paused:pauseMenu.paused,selection:pauseMenu.selection,exited:pauseMenu.exited,hostSlot:pauseMenu.hostSlot}:null,
-    cpu:emulator?readSoloFault(emulator.module.HEAPU8,emulator.module):null,diagnostics:details.textContent};},
+    cpu:cpu&&emulator?readSoloFault(emulator.module.HEAPU8,emulator.module):null,diagnostics:details.textContent};},
   setPointPreferences({focus,always}){pointPreferences={focus:!!focus,always:!!always};},
   diagnosticText:()=>{
     const r=emulator?.module.framePresenter?.info(),ms=value=>value==null?'—':value.toFixed(1);
@@ -422,7 +429,7 @@ window.th04Sync={
   soundInfo:()=>({...localSe?.info(),error:seError}),
   renderInfo:()=>({canvasSubmitted:presentationCount,...emulator?.module.framePresenter?.info()}),
   setRawPresentation(value){rawPresentation=!!value;presentationPending=true;},
-  setMusicVolume(value){document.getElementById('bgm-volume').value=value;bgm?.setVolume(Number(value)/100);},
+  setMusicVolume(value){if(!workerHost)document.getElementById('bgm-volume').value=value;bgm?.setVolume(Number(value)/100);},
   touchContext(){
     if(!enabled||!mailboxOwned(mailbox,guestMemoryBase,residentAddress))return {key:'boot',play:false};
     const heap=emulator.module.HEAPU8,p=touchPlayer(heap,mailbox,patch,localSlot);
@@ -434,7 +441,7 @@ window.th04Sync={
     if(context&&context.state!=='running')await context.resume();
     return context?.state==='running';
   },
-  updateControls(value,editing=false){clearKeys();useControlSnapshot(value);controlsBlocked=editing;document.getElementById('controls-summary').textContent=controlsSummary('online');},
+  updateControls(value,editing=false){clearKeys();useControlSnapshot(value);controlsBlocked=editing;if(!workerHost)document.getElementById('controls-summary').textContent=controlsSummary('online');},
   configure(host,local,players=2){
     if(![2,3].includes(players)||![host,local].every(n=>Number.isInteger(n)&&n>=0&&n<players))throw Error('无效暂停菜单座位');
     playerCount=players;blocked=Array(players).fill(0);pauseMenu=new PauseMenu(host,players);localSlot=local;
@@ -442,10 +449,12 @@ window.th04Sync={
   onMenuAction(callback){menuAction=callback;},
   load(config){if(!bootPromise)bootPromise=boot(config);return bootPromise;},
   onInput(callback){inputListener=callback;},
-  start(){emulator.run();enabled=true;details.textContent='启动进度：全员已同步开局，正在启动 DOS 和游戏。';canvas.focus();},
+  start(){emulator.run();enabled=true;details.textContent='启动进度：全员已同步开局，正在启动 DOS 和游戏。';canvas.focus?.();},
   stop(){enabled=false;closed=true;clearKeys();bgm?.dispose();localSe?.dispose();if(emulator){emulator.module.netFlushAudio();emulator.pause();}},
   step,present,checksum,snapshot,capture,restore,confirm,
   readyForRollback:()=>gameplaySeen&&!!emulator?.module.netCapture,
   canPredict:()=>!predictionBlockReason(),predictionBlockReason,
   rollbackInfo:()=>({...emulator?.module.netSnapshotInfo(),checkpointFrames:2,checkpointReplays})
 };
+
+if(workerHost)workerHost.runtime=sync;else window.th04Sync=sync;

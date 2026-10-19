@@ -24,7 +24,8 @@
   }
   window.addEventListener('error',function(e){warning(e.message||'资源加载异常',e.filename||(e.target&&e.target.src),e.error&&e.error.stack);},true);
   window.addEventListener('unhandledrejection',function(e){warning(e.reason&&e.reason.message||String(e.reason),'未处理的 Promise',e.reason&&e.reason.stack);});
-  window.th04RuntimeReady=import('./runtime.js').then(function(){return true;},function(error){
+  var workerCapable=typeof Worker==='function'&&typeof OffscreenCanvas==='function'&&typeof ImageBitmap!=='undefined'&&typeof OffscreenCanvas.prototype.transferToImageBitmap==='function';
+  window.th04RuntimeReady=import(workerCapable?'./runtime-worker-client.js':'./runtime.js').then(function(){return true;},function(error){
     var message='游戏模块加载失败：'+String(error&&error.message||error);
     document.getElementById('details').textContent=message;
     window.parent.postMessage({protocol:'th04-rollback/4',event:'boot-error',message:message},location.origin);
