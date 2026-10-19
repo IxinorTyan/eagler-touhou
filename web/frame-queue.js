@@ -62,5 +62,5 @@ export class FrameQueue {
   }
   commit(pair){this.used.set(this.frame,pair.map(value=>structuredClone(value)));this.frame++;}
   rewind(frame){this.frame=frame;this.dirty=null;for(const at of this.used.keys())if(at>=frame)this.used.delete(at);}
-  prune(){const prefix=Math.min(this.frame,this.confirmed);for(const at of this.used.keys())if(at<prefix)this.used.delete(at);for(const lane of this.inputs)for(const at of lane.keys())if(at<prefix-32)lane.delete(at);}
+  prune(acknowledgedPrefix=this.confirmed){const prefix=Math.min(this.frame,this.confirmed,acknowledgedPrefix);for(const at of this.used.keys())if(at<prefix)this.used.delete(at);for(const lane of this.inputs)for(const at of lane.keys())if(at<prefix-32)lane.delete(at);}
 }

@@ -22,6 +22,10 @@ if(build){
   assert.deepEqual(build.inputPolicy,{mode:'room-rtt-fixed',minInputDelay:0,maxInputDelay:6,zeroDelayRttMs:20,rttSamples:3,directionPrediction:6,maxPredictionLead:6,maxRollback:12,lockstepBootDelay:2});
   assert.deepEqual(network.inputPolicy,build.inputPolicy);assert.deepEqual(runtime.network.inputPolicy,build.inputPolicy);
  }
+ if(build.networkWorker){
+  assert.deepEqual(build.networkWorker,{version:1,default:'page',selection:'per-device-opt-in',maxImageTransfers:2,serializedGuestTransactions:true});
+  for(const name of ['async-lockstep.js','frame-controls.js','simulation.js','simulation-worker.js','simulation-client.js'])assert(build.behaviorFiles['netplay/'+name]);
+ }
  assert(read('dosbox-adapter.js').includes(Buffer.from('deterministic:net,nativeScheduling:true,nativeCpu:true,nativePlanar:false,nativeFramePresentation:false,')));
 }else{
  const before=JSON.parse(fs.readFileSync(path.join(root,'build/before-dirty-pages-20261014/web/vendor/dosbox-x/runtime.json')));
@@ -46,7 +50,7 @@ function inspect(name){if(visited.has(name))return;visited.add(name);const sourc
  const syntax=spawnSync(process.execPath,['--input-type=module','--check'],{input:source,encoding:'utf8'});assert.equal(syntax.status,0,name+' '+syntax.stderr);
  for(const match of source.matchAll(/\b(?:from\s*|import\s*\(?\s*)['"](\.[^'"]+)['"]/g)){const child=path.posix.normalize(path.posix.join(path.posix.dirname(name),match[1]));assert(fs.existsSync(path.join(web,child)),child);if(/\.(js|mjs)$/.test(child))inspect(child);}
 }
-for(const name of ['app.js','solo-bootstrap.js','solo.js','solo-worker.js','lan.js','launcher.js','vendor/dosbox-x/dosbox-rollback-tracked.mjs'])inspect(name);
+for(const name of ['app.js','solo-bootstrap.js','solo.js','solo-worker.js','netplay/simulation-worker.js','lan.js','launcher.js','vendor/dosbox-x/dosbox-rollback-tracked.mjs'])inspect(name);
 const helper=new WebAssembly.Module(read('vendor/dosbox-x/snapshot-diff-tracked.wasm'));
 for(const name of ['scan','packPages','restorePages'])assert(WebAssembly.Module.exports(helper).some(e=>e.name===name));
 assert(read('dosbox-disk.js').includes(Buffer.from('16000')));

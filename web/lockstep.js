@@ -3,9 +3,9 @@ export class Lockstep {
   constructor({network,step,present,hash,onError,onState,capture,restore,confirm,rollbackEnabled=false,directionPrediction=DIRECTION_PREDICTION,inputDelay=0,snapshotStride=1}){
     if(!Number.isInteger(snapshotStride)||snapshotStride<1||snapshotStride>2)throw Error('无效回滚检查点间隔');
     Object.assign(this,{network,step,present,hash,onError,onState,capture,restore,confirm,rollbackEnabled,snapshotStride});
-    this.checkpoints=new Set();
+    this.checkpoints=new Set();this.lastConfirmation=null;
     this.queue=new FrameQueue(network.localSeat,{rollbackEnabled,directionPrediction,inputDelay});this.hashes=new Map();this.remoteHashes=new Map();this.pendingHashes=new Map();
-    this.costs={simulate:0,steps:0,capture:0,captures:0,restore:0,restores:0,hash:0,confirm:0,replays:0};
+    this.costs={simulate:0,steps:0,capture:0,captures:0,restore:0,restores:0,hash:0,confirm:0,confirmCallbacks:0,skippedConfirmations:0,replays:0};
     this.running=false;this.applying=false;this.last=0;this.budget=0;this.lastProgress=performance.now();this.replayUntil=null;
     this.timer=null;this.wakeTimer=null;this.wakePending=false;this.wakeToken=0;this.frameHandle=null;this.pumping=false;
     this.wakeChannel=typeof MessageChannel==='function'?new MessageChannel():null;
@@ -36,7 +36,13 @@ export class Lockstep {
     // between checkpoints. Audio still confirms at the exact input frontier.
     const preceding=[...this.checkpoints].filter(frame=>frame<=prefix).at(-1);
     const retainFrom=this.snapshotStride===1?prefix:(preceding??prefix);
-    this.confirm?.(prefix,retainFrom);
+    // Waiting pumps often revisit the same frontier. Keep the exact audio
+    // prefix AND the stride-dependent snapshot retention boundary: either
+    // changing requires a callback, including after a rewind.
+    if(this.lastConfirmation?.prefix!==prefix||this.lastConfirmation?.retainFrom!==retainFrom){
+      this.confirm?.(prefix,retainFrom);this.costs.confirmCallbacks++;
+      this.lastConfirmation={prefix,retainFrom};
+    }else this.costs.skippedConfirmations++;
     for(const frame of this.checkpoints)if(frame<retainFrom)this.checkpoints.delete(frame);
     for(const [frame,hash] of this.pendingHashes)if(frame<=prefix){
       this.hashes.set(frame,hash);this.network.sendPacket({type:'check',frame,hash});this.compare(frame);this.pendingHashes.delete(frame);
@@ -116,6 +122,7 @@ export class Lockstep {
         if(from===undefined)throw Error('回滚检查点已过期');
         this.replayUntil=Math.max(this.replayUntil??0,this.queue.frame);
         const restored=timed('restore',()=>this.restore?.(from)??from);this.queue.rewind(restored);this.costs.restores++;
+        this.lastConfirmation=null;
         for(const frame of this.checkpoints)if(frame>=restored)this.checkpoints.delete(frame);
         for(const at of this.pendingHashes.keys())if(at>restored)this.pendingHashes.delete(at);
       }

@@ -10,6 +10,8 @@ import {NativePause} from './native-pause.js';
 import {Netplay} from './netplay.js';
 import {mountPlayer} from './player-ui.js';
 import {Lockstep} from './lockstep.js';
+import {AsyncLockstep} from './netplay/async-lockstep.js';
+import {WorkerNetworkSimulation,supportsNetworkWorker,workerNetworkPause} from './netplay/simulation-client.js';
 import {createFrameGate} from './frame-limit.js';
 import {LocalBgm} from './local-bgm.js';
 import {LocalSfx} from './local-sfx.js';
@@ -76,6 +78,7 @@ function performanceTotals(){
     uploads:module?.frameUploads||0,presentations:online?presentationCount:module?.frameUploads||0,
     capture:costs?.capture||0,captures:costs?.captures||0,hash:costs?.hash||0,
     restore:costs?.restore||0,restores:costs?.restores||0,replays:costs?.replays||0,presentationMs,
+    confirm:costs?.confirm||0,confirmCallbacks:costs?.confirmCallbacks||0,skippedConfirmations:costs?.skippedConfirmations||0,
     native:module?.stepMetrics?.totalMs||0,nativeSteps:module?.stepMetrics?.count||0};
 }
 setInterval(()=>{
@@ -88,6 +91,7 @@ setInterval(()=>{
     simulateMs:delta('simulate')/Math.max(1,delta('executed')),
     snapshotMs:delta('capture')/Math.max(1,delta('captures')),hashMs:delta('hash'),
     replaySteps:delta('replays'),rollbackCount:delta('restores'),restoreMs:delta('restore'),snapshotBytes:emulator.module.netSnapshotInfo?.().snapshotBytes||0,
+    confirmMs:delta('confirm'),confirmCallbacks:delta('confirmCallbacks'),skippedConfirmations:delta('skippedConfirmations'),
     nativeMs:delta('native')/Math.max(1,delta('nativeSteps')),presentationMs:delta('presentationMs')/Math.max(1,delta('presentations'))};
   window.th03Performance=stats;
   if(online)networkHistory.push({at:next.at,intervalMs:dt,...stats,frame:sync?.queue.frame??null,confirmed:sync?.queue.confirmed??null,
@@ -98,8 +102,9 @@ setInterval(()=>{
     predictionLeadLimit:sync?.queue.active?Math.max(1,sync.queue.directionPrediction):0,
     phase:nativeState?.phase??0,selecting:nativePause?.selecting??false,pauseSeat,hiddenSeats:[...hiddenSeats],documentHidden:document.hidden,
     nativeMaxMs:emulator.module.stepMetrics?.maxMs??0,program:emulator.module.programReads?.at(-1)?.name??null,
-    snapshotStorage:emulator.module.netSnapshotInfo?.().storage??'disabled',writeJournal:emulator.module.mobileRuntime.writeJournal,heapBytes:emulator.module.HEAPU8.length,
-    nativeCore:readNativeCoreDiagnostics(emulator.module),pauseSearch:nativePause?.search?'wasm-simd':'javascript',
+    snapshotStorage:emulator.module.netSnapshotInfo?.().storage??'disabled',writeJournal:emulator.module.mobileRuntime.writeJournal,heapBytes:emulator.module.HEAPU8?.length??emulator.module.heapBytes,
+    executionThread:emulator.module.executionThread??'page',workerRpcCount:emulator.rpcCount??0,workerExecutionMs:emulator.executionMs??0,workerPending:emulator.pending?.size??0,
+    nativeCore:emulator.isNetworkWorker?emulator.snapshot.nativeCore:readNativeCoreDiagnostics(emulator.module),pauseSearch:emulator.isNetworkWorker?emulator.snapshot.pauseSearch:nativePause?.search?'wasm-simd':'javascript',
     audioState:emulator.audio.context.state,soundEffects:localSfx?.info()??null,status:$('status').textContent,connection:$('connection-path').textContent});
   $('performance-stats').textContent=`模拟 ${stats.stepsHz.toFixed(1)}/60 步/秒 · 画面上传 ${stats.uploadsHz.toFixed(1)} 次/秒 · 显示提交 ${stats.presentationsHz.toFixed(1)} 次/秒\n模拟 ${stats.simulateMs.toFixed(2)} ms/步 · 快照 ${stats.snapshotMs.toFixed(2)} ms/次 · 校验 ${stats.hashMs.toFixed(2)} ms\n补算 ${stats.replaySteps} 步 · 恢复 ${stats.restoreMs.toFixed(2)} ms · 快照 ${(stats.snapshotBytes/1048576).toFixed(1)} MiB\n${localBgm?.status||'音乐准备中'}`;
 },1000);
@@ -482,6 +487,14 @@ function syncHash(){
   else for(let i=start;i<end;i++)h=Math.imul(h^heap[i],16777619);
   return (h>>>0).toString(16).padStart(8,'0')+':'+emulator.module.netInfo().tick+':'+pauseSeat+':'+[...hiddenSeats].sort().join(',');
 }
+function reflectNetworkSnapshot(snapshot){
+  const oldPause=pauseSeat;nativeState=snapshot.nativeState;
+  pauseSeat=snapshot.pauseSeat;pauseSelection=snapshot.selection;hiddenSeats.clear();for(const seat of snapshot.hidden||[])hiddenSeats.add(seat);
+  $('pause-menu').hidden=$('pause-shade').hidden=pauseSeat===null;
+  if(pauseSeat!==null){$('pause-menu').dataset.seat=String(pauseSeat);localizePause();refreshPauseMenu();}
+  if(oldPause!==pauseSeat){controls.release();if(pauseSeat!==null)pauseButtons()[pauseSelection].focus();reflectState();}
+  window.th03SyncState={frame:sync?.queue.frame??0,tick:snapshot.tick,phase:nativeState?.phase??0,selecting:snapshot.selecting,pauseSeat,hidden:[...hiddenSeats]};
+}
 $('start').addEventListener('click', async () => {
   if (starting || (emulator && !closed) || closing) return;
   if (closed) {
@@ -541,8 +554,17 @@ $('start').addEventListener('click', async () => {
         nativePause.reset(); reflectState(); save();
       }};
     const useWorker=!online&&netQuery.get('runtime')!=='main'&&supportsSoloWorker();
-    emulator=useWorker?await WorkerNP21.create(config,{game:'03local',patch:nativePause.meta,music:(await nativeAssets()).meta.startup.music,onError:report}):await DOSBoxPC98.create(config);
-    if(emulator.isWorker)nativePause=workerLocalPause(emulator);
+    // Opt in until the owner completes real-game/device validation. Both
+    // backends retain the same resource identity and accepted input policy.
+    const useNetworkWorker=online&&netQuery.get('netWorker')==='1'&&supportsNetworkWorker();
+    emulator=useNetworkWorker?await WorkerNetworkSimulation.create(config,{patch:nativePause.meta,music:networkAudio,
+      focusEnabled:roomFocusEnabled,touchUnlimitedAllowed:roomTouchUnlimitedAllowed,fullHash:netQuery.get('fullHash')==='1'})
+      :useWorker?await WorkerNP21.create(config,{game:'03local',patch:nativePause.meta,music:(await nativeAssets()).meta.startup.music,onError:report}):await DOSBoxPC98.create(config);
+    if(emulator.isWorker)nativePause=emulator.isNetworkWorker?workerNetworkPause(emulator):workerLocalPause(emulator);
+    if(emulator.isNetworkWorker){
+      emulator.onSnapshot=reflectNetworkSnapshot;emulator.onExit=()=>sync?.stop();
+      emulator.onDraw=bitmap=>{const began=performance.now();visibleContext.imageSmoothingEnabled=false;visibleContext.drawImage(bitmap,0,0,640,400);presentationCount++;presentationMs+=performance.now()-began;};
+    }
     localBgm = new LocalBgm(emulator.module.SDL2.audioContext, () => {});
     nativeMusic = new NativeMusic(online?networkAudio:(await nativeAssets()).meta.startup.music);
     if(online){
@@ -555,7 +577,8 @@ $('start').addEventListener('click', async () => {
     confirmedMusic = new ConfirmedMusic({command:(ax,hash)=>{
       if((ax>>>8)===0x0c)localSfx?.command(ax);else localBgm.command(ax,hash);
     }});
-    if(emulator.isWorker)emulator.onMusic=(ax,hash)=>localBgm?.command(ax,hash);
+    if(emulator.isNetworkWorker)emulator.onAudio=(ax,hash)=>{if((ax>>>8)===0x0c)localSfx?.command(ax);else localBgm?.command(ax,hash);};
+    else if(emulator.isWorker)emulator.onMusic=(ax,hash)=>localBgm?.command(ax,hash);
     // The device decodes music asynchronously; downloads cannot stall game start.
     const loadingBgm=localBgm;
     loadingBgm.load({warmOpening:true}).catch(error => {
@@ -567,8 +590,9 @@ $('start').addEventListener('click', async () => {
     await emulator.setHdd(0, `3-${activeLang}.hdi`);
     let bootMusic=[];
     if(online){
-      bootMusic=await bootToSelection({emulator,pause:nativePause,music:nativeMusic,clearInput:()=>controls.release(),progress:message=>{status(message);notifyRoom(message);}});
-      syncIdentity.boot=syncHash();
+      const progress=message=>{status(message);notifyRoom(message);};
+      if(emulator.isNetworkWorker){const boot=await emulator.boot(progress);bootMusic=boot.events;syncIdentity.boot=boot.hash;controls.release();}
+      else{bootMusic=await bootToSelection({emulator,pause:nativePause,music:nativeMusic,clearInput:()=>controls.release(),progress});syncIdentity.boot=syncHash();}
     }
     if (online) {
       netplay = new Netplay({room: netQuery.get('room'), token: netQuery.get('token'), role: netQuery.get('role'), mode: netQuery.get('net'),sampleLocal:controls.sampleLocal,
@@ -583,8 +607,10 @@ $('start').addEventListener('click', async () => {
       await netplay.synchronize(syncIdentity);
       status('正在确认双方输入缓冲');
       const inputPolicy=await netplay.negotiateInputPolicy({rollbackEnabled});
-      sync=new Lockstep({network:netplay,rollbackEnabled,inputDelay:inputPolicy.inputDelay,snapshotStride:2,step:stepSynchronized,present:()=>{if(presentationDue(performance.now()))presentFrame();},hash:syncHash,capture:captureSynchronized,restore:restoreSynchronized,confirm:confirmSynchronized,onError:report,
-        onState:message=>status(message)});
+      const options={network:netplay,rollbackEnabled,inputDelay:inputPolicy.inputDelay,snapshotStride:2,onError:report,onState:message=>status(message)};
+      sync=emulator.isNetworkWorker?new AsyncLockstep({...options,execute:(inputs,frame)=>emulator.execute(inputs,frame),restore:frame=>emulator.restore(frame),
+        confirm:(prefix,retain)=>emulator.confirm(prefix,retain),present:()=>emulator.present(presentationDue)})
+        :new Lockstep({...options,step:stepSynchronized,present:()=>{if(presentationDue(performance.now()))presentFrame();},hash:syncHash,capture:captureSynchronized,restore:restoreSynchronized,confirm:confirmSynchronized});
     }
     // Boot can contain menu SE while the other device is still loading.
     // Keep its BGM commands; do not play those old effects at room start.
@@ -597,6 +623,7 @@ $('start').addEventListener('click', async () => {
     if (!storageWarning) $('save-status').textContent = online ? '联机镜像' : '存档已就绪';
     if (online) notifyRoom('游戏已启动', true);
   } catch (error) {
+    if(emulator?.isNetworkWorker)emulator.dispose();
     localSfx?.dispose();localSfx=null;
     netplay?.close(); netplay = null; report(error); $('start').textContent = '刷新重试'; $('start').disabled = false;
     $('start').onclick = () => location.reload();
@@ -663,4 +690,4 @@ window.addEventListener('blur', clearEscape);
 window.addEventListener('beforeunload', event => {
   if (emulator && dirty !== saved) { event.preventDefault(); event.returnValue = ''; }
 });
-window.addEventListener('pagehide', () => { netplay?.close(); localBgm?.dispose(); });
+window.addEventListener('pagehide', () => { sync?.stop();netplay?.close(); localBgm?.dispose();localSfx?.dispose();if(emulator?.isNetworkWorker)emulator.dispose(); });

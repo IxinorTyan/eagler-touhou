@@ -1,8 +1,14 @@
 import {readNetworkMode,networkParams,describeNetwork} from './netplay/network-mode.js';
 import {readRoomPreferences,saveRoomPreferences} from './room-preferences.js';
+import {supportsNetworkWorker} from './netplay/simulation-client.js';
 const $ = id => document.getElementById(id), protocol = 'th03-lan/1';
 let session = null, timer = null, busy = false, state = null, runtime = null;
 const query = new URLSearchParams(location.search);
+const networkRuntime=$('network-runtime');
+try{networkRuntime.value=query.has('netWorker')?(query.get('netWorker')==='1'?'worker':'main'):(localStorage.getItem('th03-network-runtime')||'main');}catch{}
+if(networkRuntime.value!=='worker')networkRuntime.value='main';
+if(!supportsNetworkWorker()){networkRuntime.value='main';networkRuntime.querySelector('[value="worker"]').disabled=true;}
+networkRuntime.onchange=()=>{try{localStorage.setItem('th03-network-runtime',networkRuntime.value);}catch{}};
 let connection=readNetworkMode();
 const preferredConnection=readRoomPreferences().connections[connection.network];
 if(preferredConnection){
@@ -79,6 +85,7 @@ function render(value) {
   $('ready').textContent = state.ready[session.role] ? '取消准备' : '准备';
   $('start').disabled = busy || session.role !== 'host' || state.started || !state.present.guest || !state.ready.host || !state.ready.guest;
   $('startup-progress').hidden = !state.started;
+  networkRuntime.disabled=state.started;
   if (state.started && !runtime) launch();
   if (runtime && (!state.present.host || !state.present.guest)) {
     runtime.remove(); status('另一位玩家已离开，本局已结束', true);
@@ -89,6 +96,7 @@ function launch() {
   const params = new URLSearchParams({net: state.mode, room: session.room, token: session.token, role: session.role,
     embedded: '1', language: state.settings.language, difficulty: state.settings.difficulty, clock: state.settings.clock,
     rollback: state.settings.rollback ? '1' : '0'});
+  if(networkRuntime.value==='worker')params.set('netWorker','1');
   runtime = document.createElement('iframe'); runtime.title = '梦时空联机对战';
   runtime.allow = 'autoplay; fullscreen; gamepad'; runtime.src = `local.html?${params}`;
   $('game').hidden = false; $('game').replaceChildren(runtime);
