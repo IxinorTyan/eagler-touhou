@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TH05 · 外部 Replay 实验</title><link rel="icon" href="data:,"><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="site-adapter.css"></head>
+<body class="shell"><header class="masthead"><a class="brand" href="solo.html">TOUHOU / 05</a><small>单人 REPLAY 实验</small></header>
+<main><header class="intro"><h1>游戏输入 Replay</h1><p>保存开局条件和按帧操作，导入文件后由游戏重新运行。浏览器负责记录和文件，游戏内没有录像缓冲。</p></header>
+<section class="panel"><div class="settings-grid"><label>语言<select id="language"><option value="cn">汉化版</option><option value="jp">日文版</option></select></label><label>导入录像<input id="file" type="file" accept=".th05r"></label><label>游戏／结算测试<select id="test-case"><option value="">正常游戏</option><option value="good">普通通关 · Good Ending 测试</option><option value="bad">普通通关 · Bad Ending 测试</option><option value="extra">EX 通关测试</option></select></label></div>
+<div class="row"><button id="record" class="primary">启动游戏</button><button id="finish" disabled>提前结束录制</button><button id="download" disabled>导出录像</button><button id="play" disabled>重新启动并回放</button><button id="hold" disabled>暂停播放</button><button id="stop" disabled>关闭模拟器</button></div>
+<p>在原版菜单开始游戏即可。换关与暂停会继续录制；从暂停菜单退出本局后选择保存或丢弃。方向键、Z、X、Shift、Enter、Esc；本轮实验只支持键盘。</p>
+<p>只记录游戏输入帧；启动、标题菜单和暂停等待不写入文件，播放时不重演暂停菜单；剧情由观看者按 Z / Enter 推进，按住 Ctrl 可连续快速对话，松开即停止。Esc / 空格或“暂停播放”按钮可暂停回放。音乐使用浏览器独立播放。每局独立录制，保存或丢弃后可继续游玩，下一局自动录制。</p>
+<p>通关后自动跳过结局剧情、制作人员表与 EX 全员介绍，直接显示游戏原有的成绩／评价画面。选择结算测试后，正常进入关卡约 2 秒即可触发，不必亲自打通；成绩显示后询问保存。测试文件会保留测试身份，回放自动使用相同条件；此测试不代表完整关卡通关验证。</p>
+<p>这是新的输入格式，与旧时钟轨迹文件不兼容。仍在验证整局、对话、续关与跨关重现；关闭页面前请导出录像。</p></section>
+<p id="status" role="status" aria-live="polite">等待录制或导入。</p><canvas id="canvas" width="640" height="400" tabindex="0" aria-label="TH05 单人 Replay 实验画面" style="max-width:100%;image-rendering:pixelated"></canvas>
+<details><summary>实验详情</summary><pre id="diagnostics"></pre></details></main>
+<dialog id="save-dialog" aria-labelledby="save-title"><h2 id="save-title">保存本局 Replay？</h2><p id="save-size"></p><div class="row"><button id="save-replay" class="primary">保存录像</button><button id="discard-replay">不保存</button></div></dialog>
+<dialog id="end-dialog" aria-labelledby="end-title"><h2 id="end-title">Replay 播放结束</h2><p id="end-summary"></p><div class="row"><button id="replay-again" class="primary">再播放一次</button><button id="end-replay">结束回放</button></div></dialog>
+<script type="module" src="solo-frame-replay.js"></script></body></html>

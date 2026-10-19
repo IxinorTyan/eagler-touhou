@@ -32,6 +32,7 @@ export class LocalSfx {
     item.gain.gain.linearRampToValueAtTime(0,now+0.003);
     try{item.source.stop(now+0.003);}catch{}
   }
+  resetTimeline(){this.flush();this.lastFrame=-1;}
   push(events){
     if(this.closed)return;
     // PMD has one FM effect part. Catch-up confirmation keeps its latest

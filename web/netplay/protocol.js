@@ -6,8 +6,8 @@ export const ROLLBACK_ARM_AHEAD=120,REPLAY_MAX_STEPS=4,REPLAY_BUDGET_MS=6;
 // Match TH04's paced prediction: retain 12-step recovery history, but never
 // simulate beyond the six-step held-direction horizon on the faster peer.
 export const PREDICTION_LEAD_LIMIT=6;
-export function inputPolicy(transport,rollbackEnabled){
-  return Object.freeze({inputDelay:0,directionPrediction:PREDICTION_LEAD_LIMIT,rollbackEnabled});
+export function inputPolicy(transport,rollbackEnabled,inputDelay=0){
+  return Object.freeze({inputDelay,directionPrediction:PREDICTION_LEAD_LIMIT,rollbackEnabled});
 }
 export function nextInputs(queue,allowPrediction=true){
   if(queue.active&&queue.frame-queue.confirmed>=PREDICTION_LEAD_LIMIT){

@@ -11,7 +11,7 @@ export async function prepareFastCore(){
   const manifest=await response.json();
   return loadCompiledCore(new URL('wdosbox-x-fast.wasm',vendor),manifest.files['wdosbox-x-fast.wasm']);
 }
-export async function createFastCore({canvas,disk,patch,qa=false,core='simple',cycles='max 100%',presentation='bitmap',viewSlot=0,solo=false,independentMusic=true,coreTask}){
+export async function createFastCore({canvas,disk,patch,qa=false,core='simple',cycles='max 100%',presentation='bitmap',viewSlot=0,solo=false,independentMusic=true,coreTask,externalReplay,frameReplay}){
   if(typeof WebAssembly.Suspending!=='function'||typeof WebAssembly.promising!=='function')throw Error('此性能版需要支持 JSPI 的新版 Chrome / Edge 浏览器。');
   if(typeof OffscreenCanvas!=='function')throw Error('此性能版需要支持后台画布的浏览器。');
   const mode=qa&&['direct','upstream'].includes(presentation)?presentation:'bitmap';
@@ -25,6 +25,8 @@ export async function createFastCore({canvas,disk,patch,qa=false,core='simple',c
     inputs:input=>worker.postMessage({type:'input',input}),
     viewSlot:slot=>worker.postMessage({type:'view-slot',slot}),
     gamePause:({onlyPause=false}={})=>worker.postMessage({type:'game-pause',onlyPause}),
+    finishReplay:()=>worker.postMessage({type:'external-replay-finish'}),
+    pauseReplay:value=>{worker.postMessage({type:'external-replay-pause',value});api.state=value?'paused':'running';api.bgm?.setPaused(value);if(value){api.audioOutput?.flush();api.audio?.suspend();}else api.audio?.resume();},
     pause(){api.state='paused';worker.postMessage({type:'pause'});api.audioOutput?.flush();api.audio?.suspend();},
     run(){api.state='running';worker.postMessage({type:'resume'});api.audio?.resume();},
     stop(){if(stopped)return;stopped=true;display?.stop();document.removeEventListener('visibilitychange',visibility);worker.terminate();api.bgm?.dispose();api.audioOutput?.disconnect();api.audioInput?.close();api.audioNode?.disconnect();api.audio?.close();api.state='stopped';for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error('游戏已停止'));}pending.clear();},
@@ -46,6 +48,14 @@ export async function createFastCore({canvas,disk,patch,qa=false,core='simple',c
     if(data.type==='game-exit'){api.stop();api.onExit?.();return;}
     if(data.type==='music'){for(const [ax,hash]of data.events)api.bgm?.command(ax,hash);}
     if(data.type==='state'){latest=data.state;worker.postMessage({type:'ack'});}
+    if(data.type==='external-replay-chunk')externalReplay?.onChunk?.(data);
+    if(data.type==='external-replay-run')externalReplay?.onRun?.(data.run);
+    if(data.type==='external-replay-end')externalReplay?.onEnd?.(data.result);
+    if(data.type==='frame-replay-run')frameReplay?.onRun?.(data.run);
+    if(data.type==='frame-replay-dialog')frameReplay?.onDialog?.(data.active);
+    if(data.type==='frame-replay-phase')frameReplay?.onPhase?.(data);
+    if(data.type==='frame-replay-chunk')frameReplay?.onChunk?.(data.inputs);
+    if(data.type==='frame-replay-end')frameReplay?.onEnd?.(data.result);
     if(data.type==='error'){fail(Error(data.message));return;}
     if(data.type==='qa-result'){const p=pending.get(data.id);if(p){clearTimeout(p.timer);pending.delete(data.id);p.resolve(data);}}
     if(data.type==='capture'){const p=pending.get(data.id);if(p){clearTimeout(p.timer);pending.delete(data.id);p.resolve(data.blob);}}
@@ -71,12 +81,17 @@ export async function createFastCore({canvas,disk,patch,qa=false,core='simple',c
   let files,musicPatch;
   let compiledCore;
   try{
-    files=gameFiles(disk,{solo});const assets=await musicTask;
+    files=gameFiles(disk,{solo});if(frameReplay){files.find(f=>f.path==='game/KAIKI/MAIN.EXE').contents=frameReplay.exe;files.find(f=>f.path==='game/KAIKI/MAINE.EXE').contents=frameReplay.endingExe;}
+    const assets=await musicTask;
     if(independentMusic)musicPatch=await installMusicFiles(files,{solo,assets});
     compiledCore=await compiledTask;
   }catch(e){api.stop();throw e;}
   const offscreen=mode==='bitmap'?new OffscreenCanvas(canvas.width,canvas.height):canvas.transferControlToOffscreen(),transfer=[offscreen,audioPort,...files.map(f=>f.contents.buffer)];
-  worker.postMessage({type:'boot',base:new URL('.',import.meta.url).href,canvas:offscreen,audioPort,files,patch,musicPatch,compiledCore,core,cycles,qa,presentation:mode,presentationActive:!document.hidden,viewSlot,solo},transfer);
+  const replayConfig=externalReplay?{mode:externalReplay.mode,clocks:externalReplay.clocks,events:externalReplay.events,endBoundary:externalReplay.endBoundary}:null;
+  if(replayConfig?.clocks)transfer.push(replayConfig.clocks.buffer);
+  const frameConfig=frameReplay?{mode:frameReplay.mode,header:frameReplay.header,inputs:frameReplay.inputs}:null;
+  if(frameConfig?.inputs)transfer.push(frameConfig.inputs.buffer);
+  worker.postMessage({type:'boot',base:new URL('.',import.meta.url).href,canvas:offscreen,audioPort,files,patch,musicPatch,compiledCore,core,cycles,qa,presentation:mode,presentationActive:!document.hidden,viewSlot,solo,externalReplay:replayConfig,frameReplay:frameConfig},transfer);
   const timeout=setTimeout(()=>rejectReady(Error('PC-98 核心初始化超时')),30000);
   try{await ready;return api;}catch(e){api.stop();throw e;}finally{clearTimeout(timeout);}
 }

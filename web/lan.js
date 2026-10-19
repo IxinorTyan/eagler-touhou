@@ -7,7 +7,30 @@ import {LocalBgm} from './netplay/local-bgm.js';
 import {loadRtcConfiguration} from './netplay/connection.js';
 import {deploymentIceConfiguration} from './netplay/udp-config.js';
 import {mergeDeparture} from './netplay/membership.js';
+import {createHistoryHost} from './netplay/history-host.js';
+import {timingReport,validateTimingReport,selectStartupPolicy,validateStartupPolicy} from './netplay/startup-policy.js';
 const GRACE_MS=5000;
+let historyHost=null,historyWarning='',finishing=false,historyRequest=0;
+const historyFlushes=new Map();
+function historyUI(){
+  const h=historyHost;
+  $('history-save').disabled=!h||(!h.blob&&!h.recordFrames);
+  $('history-save').textContent=h?.blob?'再次下载多人 Replay':'结束录制并导出';
+  $('history-watch').hidden=!h;
+  $('history-network-watch').hidden=!h?.networkURL;
+  if(h?.networkURL)$('history-network-watch').href=h.networkURL;
+  $('history-network-status').textContent=h?.networkStatus||'';
+  if(h)$('history-watch').href='coop-replay.html?live='+encodeURIComponent(h.id);
+  $('history-enabled').disabled=!!worker||!!auth;$('history-record').disabled=!!worker||!!auth;
+  $('history-status').textContent=historyWarning||(h?`浏览器已保留 ${h.history.frames} 个已确认同步帧${h.recording?' · 正在录制':''}${h.history.end?' · 本段结束':''}`:'多人录像与旁观使用相同的已确认帧；不记录现实时间。');
+}
+function flushHistory(){
+  if(!worker||!historyHost)return Promise.resolve();
+  const request=++historyRequest;return new Promise(resolve=>{
+    const timeout=setTimeout(()=>{historyFlushes.delete(request);resolve();},2000);
+    historyFlushes.set(request,()=>{clearTimeout(timeout);resolve();});worker.postMessage({type:'history-flush',request});
+  });
+}
 const requestedNetwork=new URLSearchParams(location.search).get('network');
 let network=['public-ws','direct-ws'].includes(requestedNetwork)?'public-ws':['public','public-rtc'].includes(requestedNetwork)?'public-rtc':requestedNetwork==='lan'?'lan':null;
 let rtcPreparing=false,pendingSignals=[];
@@ -34,6 +57,8 @@ const activeRoles=()=>roles.slice(0,room?.settings.players||2);
 const remoteRoles=()=>activeRoles().filter(role=>role!==auth?.role&&!offlineRoles.has(role));
 let relay=null;
 let pendingGo=false;
+let timingSent=false,runSettings=null;
+const startupSamples=new Map(),startupReports=new Map();
 let earlyPackets=[];
 const $=id=>document.getElementById(id),names=['灵梦','魔理沙','魅魔','幽香'];
 let auth=null,room=null,version=null,pc=null,channel=null,worker=null,display=null,audio=null,context=null;
@@ -90,11 +115,11 @@ function diagnostics(){
   const reason={'boot':'等待队友输入','window':'等待预测帧确认','prediction-disabled':'等待菜单输入确认','local-input':'等待本机输入',
     'prediction-lead':`等待队友输入（预测领先已达 ${PREDICTION_LEAD_LIMIT} 步）`,
     'network-wait':'等待队友输入',worker:'核心计算中',replay:'纠正迟到输入',restore:'恢复游戏状态',clock:'等待下一步',idle:'同步中'};
-  $('net-performance').textContent=running?`${paused?'已暂停':`游戏 ${number(perf.nativeGameFps)} 帧/秒`} · 每步 ${number(perf.stepMeanMs)} ms · 往返 ${number(networkMs)} ms · 累计等输入 ${perf.timePercent['network-wait']||0}% · ${reason[queue?.waitReason||perf.phase]||'同步中'}`:'';
+  $('net-performance').textContent=running?`${paused?'已暂停':`游戏 ${number(perf.nativeGameFps)} 帧/秒`} · 缓冲 ${queue.active?queue.inputDelay:queue.lockstepDelay} 步 · 每步 ${number(perf.stepMeanMs)} ms · 往返 ${number(networkMs)} ms · 累计等输入 ${perf.timePercent['network-wait']||0}% · ${reason[queue?.waitReason||perf.phase]||'同步中'}`:'';
   $('diagnostics').textContent=JSON.stringify({protocol:PROTOCOL,seat:auth&&room?room.slots[auth.role]+1:null,
     frame:queue?.frame,confirmed:queue?.confirmed,hashMatches,paused,steps,waits,elapsedMs:sessionStarted?performance.now()-sessionStarted:0,
     rollbackEnabled:room?.settings.rollback,rollbackActive:queue?.active,activation:queue?.activation,inputPolicy:sessionPolicy,
-    prediction:runtimePolicy,lead:queue?Math.max(0,queue.frame-queue.confirmed):0,predictionLeadLimit:PREDICTION_LEAD_LIMIT,maxRollback:MAX_ROLLBACK,
+    prediction:runtimePolicy,startupTiming:{policy:runSettings,reports:Object.fromEntries(startupReports)},lead:queue?Math.max(0,queue.frame-queue.confirmed):0,predictionLeadLimit:PREDICTION_LEAD_LIMIT,maxRollback:MAX_ROLLBACK,
     waitReason:queue?.waitReason,rollbackCount,resimulated,maxRewind,earlyInputs,inputAgeMs:inputAge,
     startup:bootProgress,bootTimings:boot?.bootTimings,performance:perf,music:bgm?.status,connection:pc?.connectionState,channel:channel?.readyState,transport,networkEvents,recovery:recoveryInfo(),audio:audio?.info(),display:display?.metrics,state:lastState,endedReason},null,2);
   player.diagnostics($('diagnostics').textContent);
@@ -105,6 +130,7 @@ async function api(action,extra={},identity=auth){
   const data=await response.json();if(!response.ok)throw Error(data.error||'局域网服务请求失败');return data;
 }
 function render(){
+  historyUI();
   const lobby=auth&&room?.phase==='lobby',host=auth?.role==='host';
   const publicRoom=(room?.network||network)?.startsWith('public-');
   document.title=`怪绮谈 · ${publicRoom?'公网':'局域网'} 2–3 人`;
@@ -195,7 +221,15 @@ function sendTo(role,message){
   catch(error){networkFailure(error.message,{role});return false;}
 }
 function send(message){let sent=true;for(const role of remoteRoles())sent=sendTo(role,message)&&sent;return sent;}
-function sendHandshake(role){if(!boot)return;sendTo(role,hello());if(loadedSent)sendTo(role,{type:'loaded'});}
+function sendHandshake(role){
+  if(!boot)return;sendTo(role,hello());if(loadedSent)sendTo(role,{type:'loaded'});
+  if(timingSent)sendTo(role,{type:'timing',...startupReports.get(auth.role)});
+  const samples=startupSamples.get(role);
+  if(samples&&samples.length<3){
+    for(const [id,ping]of pings)if(ping.startupRole===role)pings.delete(id);
+    startupPing(role);
+  }
+}
 function hello(){return {type:'hello',protocol:PROTOCOL,build:version.build,generation:auth.generation,slot:room.slots[auth.role],
   settings:room.settings,characters:room.characters,slots:room.slots,inputPolicy:makeInputPolicy(transport,room.settings.rollback),
   coreSha:boot.coreSha,diskSha:boot.diskSha,guestSha:boot.guestSha,checksum:boot.checksum};}
@@ -212,20 +246,43 @@ function tryLoaded(){
 }
 function tryGo(){
   if(running||!loadedSent||!remoteRoles().every(role=>peerLoaded.has(role)))return;
-  if(auth?.role==='host'){send({type:'go'});activate();}
+  // Discard loading-era timings. Measure each directed link only after every
+  // native core is ready; median-of-three rejects a single scheduling spike.
+  for(const role of remoteRoles())if(!startupSamples.has(role)){startupSamples.set(role,[]);startupPing(role);}
+  if(!remoteRoles().every(role=>startupSamples.get(role)?.length===3))return;
+  if(!timingSent){
+    timingSent=true;const report=timingReport([...startupSamples.values()]);
+    startupReports.set(auth.role,report);send({type:'timing',...report});
+  }
+  if(auth?.role==='host'){
+    if(!activeRoles().every(role=>startupReports.has(role)))return;
+    runSettings=selectStartupPolicy(activeRoles().map(role=>startupReports.get(role)),room.settings.rollback);
+    send({type:'go',...runSettings});activate();
+  }
   else if(pendingGo)activate();
 }
+function startupPing(role){
+  const id=++pingSeq;pings.set(id,{at:performance.now(),roles:new Set([role]),startupRole:role});
+  sendTo(role,{type:'ping',id});
+}
+function resetStartupTiming(){startupSamples.clear();startupReports.clear();timingSent=false;runSettings=null;pings.clear();}
 function activate(){
   if(running||!boot||!loadedSent||!remoteRoles().every(role=>peerLoaded.has(role)))throw Error('全员尚未完成同步开局');
+  runSettings=validateStartupPolicy(runSettings,room.settings.rollback);
   clearTimeout(bootTimeout);running=true;connecting=true;paused=false;busy=false;
-  sessionPolicy=makeInputPolicy(transport,room.settings.rollback);
+  sessionPolicy=makeInputPolicy(transport,room.settings.rollback,runSettings.inputDelay);
+  historyHost?.dispose();historyHost=null;historyWarning='';
+  if(boot.historyHeader)historyHost=createHistoryHost({...boot.historyHeader,coreSha:boot.coreSha,diskSha:boot.diskSha,guestSha:boot.guestSha,checksum:boot.checksum},{record:$('history-record').checked,onChange:historyUI,onError:error=>{historyWarning='浏览器录像停止：'+error.message;historyUI();}});
+  if(historyHost&&auth.role==='host'&&version?.historyAvailable)historyHost.connectNetwork(auth);
+  historyUI();
   queue=new GameQueue(room.slots[auth.role],room.settings.rollback,room.settings.players,sessionPolicy);
+  queue.setLockstepDelay(runSettings.delay);queue.setInputDelay(runSettings.inputDelay);
   committedPrefix=0;inflight=null;rollbackCount=resimulated=maxRewind=earlyInputs=0;replayUntil=0;pendingKind='';inflightPlans=[];
   steps=waits=hashMatches=0;hashes.clear();peerHashes.clear();rollbackPeers.clear();captureTimes.clear();
   hashHistory.clear();comparedFrames.clear();for(const peer of peers.values()){peer.lastMessage=performance.now();peer.suspectAt=null;}
   activity={phase:'clock',since:performance.now(),totals:{}};nativeFps=null;
   for(const packet of earlyPackets)queue.receive(packet);earlyPackets=[];
-  sessionStarted=lastNow=performance.now();accumulator=TICK_MS;capture();render();status('已连接。点击画面即可操作自己的角色。');
+  sessionStarted=lastNow=performance.now();accumulator=TICK_MS;capture();render();status(`已连接 · 输入缓冲 ${room.settings.rollback?sessionPolicy.inputDelay:queue.lockstepDelay} 步。点击画面即可操作自己的角色。`);
   $('canvas').focus();schedule();diagnostics();
 }
 function capture(){
@@ -253,7 +310,13 @@ function onPacket(event,source){try{
   }else if(message.type==='loaded'){
     if(!peerHello.has(role))throw Error('准备消息顺序异常');peerLoaded.add(role);tryGo();
   }else if(message.type==='go'){
-    if(role!=='host'||auth.role==='host')throw Error('非法开局消息');pendingGo=true;tryGo();
+    if(role!=='host'||auth.role==='host'||pendingGo||running)throw Error('非法开局消息');
+    runSettings=validateStartupPolicy(message,room.settings.rollback);pendingGo=true;tryGo();
+  }else if(message.type==='timing'){
+    if(!peerHello.has(role)||!loadedSent)throw Error('开局测量阶段无效');
+    const report=validateTimingReport(message),previous=startupReports.get(role);
+    if(previous&&JSON.stringify(previous)!==JSON.stringify(report))throw Error('开局延迟测量冲突');
+    startupReports.set(role,report);tryGo();
   }else if(message.type==='resume'){
     acceptResume(role,message);
   }else if(message.type==='suspect'){
@@ -298,7 +361,13 @@ function onPacket(event,source){try{
     if(!Number.isSafeInteger(message.id)||!activeRoles().includes(message.to))throw Error('无效延迟应答');
     if(message.to===auth.role){
       const pending=pings.get(message.id);
-      if(pending?.roles.delete(role))rtt.set(role,Math.round((performance.now()-pending.at)*10)/10);
+      if(pending?.roles.delete(role)){
+        const elapsed=performance.now()-pending.at;rtt.set(role,Math.round(elapsed*10)/10);
+        if(!running&&pending.startupRole===role){
+          const samples=startupSamples.get(role);
+          if(samples&&samples.length<3){samples.push(elapsed);if(samples.length<3)startupPing(role);tryGo();}
+        }
+      }
       if(pending&&!pending.roles.size)pings.delete(message.id);
     }
   }else if(message.type==='stop'){
@@ -313,13 +382,21 @@ function suspect(role,reason){
   const peer=peers.get(role);if(!peer)return;
   if(peer.suspectAt==null){peer.suspectAt=performance.now();status(`P${room.slots[role]+1} 连接中断，等待恢复（5 秒）…`);networkEvents.push({message:reason,role,transport,atMs:Math.round(performance.now())});if(networkEvents.length>10)networkEvents.shift();}
 }
-function resumePacket(){return {type:'resume',hello:hello(),frame:queue.frame,activation:queue.activation,
+function resumePacket(){return {type:'resume',hello:hello(),inputPolicy:sessionPolicy,lockstepDelay:queue.lockstepDelay,frame:queue.frame,activation:queue.activation,
   inputs:[...queue.inputs[queue.slot]].filter(([at])=>at>=queue.frame-32),hashes:[...hashHistory.values()]};}
 function sendResume(role){if(!running)return;sendTo(role,resumePacket());const change=membership||lastDeparture;if(change){sendTo(role,{type:'departure-prepare',id:change.id,roles:change.roles});if(!membership)sendTo(role,lastDeparture);}}
 function acceptResume(role,message){
   const remote=message.hello,own=hello();
   if(!remote||remote.slot!==room.slots[role])throw Error('重连身份无效');
   for(const key of ['protocol','build','generation','settings','characters','slots','inputPolicy','coreSha','diskSha','guestSha','checksum'])if(JSON.stringify(remote[key])!==JSON.stringify(own[key]))throw Error('重连游戏版本或开局身份不一致');
+  const settings=validateStartupPolicy({delay:message.lockstepDelay,inputDelay:message.inputPolicy?.inputDelay},room.settings.rollback);
+  if(JSON.stringify(message.inputPolicy)!==JSON.stringify(makeInputPolicy(transport,room.settings.rollback,settings.inputDelay)))throw Error('重连输入策略不一致');
+  if(running){
+    if(JSON.stringify(message.inputPolicy)!==JSON.stringify(sessionPolicy)||settings.delay!==queue.lockstepDelay)throw Error('重连输入策略不一致');
+  }else if(role==='host'){
+    if(runSettings&&JSON.stringify(settings)!==JSON.stringify(runSettings))throw Error('重连输入策略不一致');
+    runSettings=settings;
+  }
   if(!running){peerHello.set(role,{...remote,...(transport==='relay'?{to:auth.role}:{} )});peerLoaded.add(role);if(role==='host')pendingGo=true;tryLoaded();tryGo();}
   if(!running)return;
   if(!Number.isSafeInteger(message.frame)||Math.abs(message.frame-queue.frame)>120||!Array.isArray(message.inputs)||message.inputs.length>160||!Array.isArray(message.hashes)||message.hashes.length>8)throw Error('重连状态越界');
@@ -429,7 +506,7 @@ async function requestRelay(reason){
 function switchRelay(){
   if(transport==='relay'||!auth)return;
   if(running){finish('队友连接中断，本局结束，请重新建房。');return;}
-  closeTransport();transport='relay';peerHello.clear();peerLoaded.clear();loadedSent=false;pendingGo=false;earlyPackets=[];
+  closeTransport();transport='relay';peerHello.clear();peerLoaded.clear();loadedSent=false;pendingGo=false;earlyPackets=[];resetStartupTiming();
   for(const role of remoteRoles())peers.set(role,{role,pc:null,channel:null,lastMessage:performance.now(),suspectAt:null});
   openRelay();
 }
@@ -482,11 +559,16 @@ async function connect(){
   worker.onmessage=({data})=>{
     if(current!==epoch){data.bitmap?.close();return;}
     try{
+      if(data.type==='confirmed-history'){
+        if(historyHost&&!historyHost.history.end)try{historyHost.append(data.first,data.bytes);}catch(error){historyWarning='帧历史停止：'+error.message;historyHost.end(historyWarning);worker?.postMessage({type:'history-disable'});historyUI();}return;
+      }
+      if(data.type==='history-flushed'){historyFlushes.get(data.request)?.();historyFlushes.delete(data.request);return;}
+      if(finishing){data.bitmap?.close();return;}
       if(data.control){liveControl=data.control;touchContext();}
       if(data.type==='boot-progress'){
         bootProgress[data.stage]=data.message;
         if(!running)status(data.message);diagnostics();
-      }else if(data.type==='session-exit'){finish('已从游戏暂停菜单退出，本局结束。');return;}
+      }else if(data.type==='session-exit'){finish('已从游戏暂停菜单退出，本局结束。',true,false);return;}
       else if(data.type==='frame')display.receive(data);
       else if(data.type==='sfx')audio?.push(data.events);
       else if(data.type==='music'){for(const [ax,hash]of data.events)bgm?.command(ax,hash);}
@@ -519,7 +601,7 @@ async function connect(){
   };
   const config={rank:room.settings.rank,players:[]};
   for(const role of activeRoles())config.players[room.slots[role]]={character:room.characters[role],spares:room.settings.spares,bombs:room.settings.bombs};
-  worker.postMessage({type:'boot',settings:room.settings,config,viewSlot:room.slots[auth.role]});
+  worker.postMessage({type:'boot',settings:room.settings,config,captureHistory:$('history-enabled').checked,viewSlot:room.slots[auth.role]});
 if(room?.transport==='relay'){switchRelay();return;}
   await Promise.all(remoteRoles().filter(role=>roles.indexOf(identity.role)<roles.indexOf(role)).map(role=>offerPeer(peers.get(role))));
 }
@@ -629,8 +711,11 @@ function pump(){try{
   worker.postMessage({type:'step',frame:queue.frame,pair,predicted:queue.active&&queue.frame>=queue.confirmed,offlineMask:queue.offlineMask()});
 }catch(error){finish(error.message);}}
 function pauseControl(){if(!running)return;clearInputs();controls|=paused?RESUME:PAUSE;$('canvas').focus();schedule(0);}
-async function finish(reason,notify=true){
-  if(!auth&&!worker)return;const identity=auth;
+async function finish(reason,notify=true,flush=true){
+  if(finishing||(!auth&&!worker))return;finishing=true;const identity=auth;
+  running=false;clearTimeout(timer);wakePending=false;
+  if(flush)await flushHistory();
+  historyHost?.end(reason);
   if(notify&&channel?.readyState==='open')try{send({type:'stop',reason:reason.slice(0,250)});}catch{}
   auth=null;epoch++;running=connecting=busy=paused=false;rtcPreparing=false;pendingSignals=[];liveControl=null;controls=0;clearInputs();
   setActivity('ended');pings.clear();rtt.clear();nativeFps=null;
@@ -640,8 +725,8 @@ async function finish(reason,notify=true){
   bgm?.dispose();bgm=null;context?.close().catch(()=>{});context=null;player.setActive(false);player.exit();
   closeTransport();fallbackPending=false;
   offlineRoles.clear();membership=null;membershipId=0;lastDeparture=null;hashHistory.clear();comparedFrames.clear();
-  boot=null;peerHello.clear();peerLoaded.clear();loadedSent=pendingGo=false;earlyPackets=[];queue=null;room=null;
-  endedReason=reason;status(reason);overlay(reason);render();diagnostics();
+  boot=null;peerHello.clear();peerLoaded.clear();loadedSent=pendingGo=false;earlyPackets=[];queue=null;room=null;resetStartupTiming();
+  endedReason=reason;status(reason);overlay(reason);render();diagnostics();finishing=false;historyUI();
   if(identity)try{await api('leave',{},identity);}catch{}
 }
 function action(fn){return async()=>{try{await fn();}catch(error){status(error.message);}};}
@@ -657,6 +742,11 @@ function change(action,extra={}){
   });
   lobbyChanges=request;return request;
 }
+$('history-save').onclick=async()=>{
+  try{const h=historyHost;if(!h)return;await flushHistory();const blob=h.blob||await h.seal();
+    const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='th05-multiplayer.th05m';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }catch(error){historyWarning='录像导出失败：'+error.message;}historyUI();
+};
 $('create').onclick=action(()=>enter('create'));$('join').onclick=action(()=>enter('join'));
 $('leave').onclick=()=>finish('已离开房间，可重新建房。');
 $('character').onchange=action(()=>change('character',{character:Number($('character').value)}));
@@ -682,9 +772,9 @@ for(const button of document.querySelectorAll('[data-input]')){
 }
 addEventListener('blur',()=>{clearInputs();if(running&&!paused){controls|=PAUSE;schedule(0);}});
 document.addEventListener('visibilitychange',()=>{clearInputs();if(document.hidden&&running&&!paused){controls|=PAUSE;schedule(0);}});
-addEventListener('pagehide',()=>{if(!auth)return;const data=JSON.stringify({...auth,protocol:PROTOCOL});navigator.sendBeacon('/api/leave',new Blob([data],{type:'application/json'}));});
+addEventListener('pagehide',()=>{historyHost?.end('来源页面已关闭（已接收片段结束）');if(!auth)return;const data=JSON.stringify({...auth,protocol:PROTOCOL});navigator.sendBeacon('/api/leave',new Blob([data],{type:'application/json'}));});
 // Read-only diagnostics for repeatable two-browser validation.
-globalThis.th05Lan={get info(){return {running,paused,rollbackEnabled:room?.settings.rollback,rollbackActive:queue?.active,activation:queue?.activation,inputPolicy:sessionPolicy,prediction:runtimePolicy,
+globalThis.th05Lan={get info(){return {history:historyHost?{frames:historyHost.history.frames,recording:historyHost.recording,ended:!!historyHost.history.end}:null,running,paused,rollbackEnabled:room?.settings.rollback,rollbackActive:queue?.active,activation:queue?.activation,inputPolicy:sessionPolicy,startupTiming:{policy:runSettings,reports:Object.fromEntries(startupReports)},prediction:runtimePolicy,
   performance:performanceInfo(),recovery:recoveryInfo(),
   replayUntil,resimulated,maxRewind,earlyInputs,inputAgeMs:inputAge,lead:queue?Math.max(0,queue.frame-queue.confirmed):0,predictionLeadLimit:PREDICTION_LEAD_LIMIT,waitReason:queue?.waitReason,
   rollbackCount,music:bgm?{status:bgm.status,id:bgm.active?.id,generation:bgm.generation,audioTime:context?.currentTime,sourceStart:bgm.sourceStart,paused:bgm.paused}:null,frame:queue?.frame,confirmed:queue?.confirmed,state:lastState,boot,hashMatches,steps,waits,endedReason,transport,network:room?.network||network,networkEvents:networkEvents.slice(),display:display?.metrics,audio:audio?.info(),role:auth?.role,slot:auth&&room?room.slots[auth.role]:null,room:auth?.room,
@@ -696,5 +786,5 @@ try{
   if(network==='public-ws'&&!data.relayAvailable){status('公网中继尚未就绪，可选择优先直连，或由部署者安装 requirements-lan.txt 后重启服务。');}
   else status(`${network.startsWith('public-')?'公网':'局域网'}服务已就绪，创建或加入房间。`);
 }catch{status('请关闭旧版 TH05 局域网服务，再运行本项目的 start-lan.bat，并刷新页面。');}
-render();
+render();historyUI();
 $('public-transport').onchange=()=>{if(auth||entering)return;network=$('public-transport').value;render();};

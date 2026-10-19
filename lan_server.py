@@ -11,11 +11,13 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from lan_relay import available as relay_available, handle as relay_handle
+from lan_history import HistoryService
 
-PROTOCOL = 'th05-netplay/7'
+PROTOCOL = 'th05-netplay/8'
 ROOT = Path(__file__).resolve().parent / 'web'
 ROOMS = {}
 LOCK = threading.Lock()
+HISTORY = HistoryService()
 ROLES = ('host', 'guest', 'guest2')
 
 def active_roles(room):
@@ -39,7 +41,7 @@ def build_id():
     for name in sorted(files):
         digest.update(name.encode())
         digest.update((ROOT / name).read_bytes())
-    for name in ('lan_server.py', 'lan_relay.py'):
+    for name in ('lan_server.py', 'lan_relay.py', 'lan_history.py'):
         digest.update(name.encode())
         digest.update((ROOT.parent / name).read_bytes())
     return digest.hexdigest()
@@ -101,11 +103,19 @@ class Handler(SimpleHTTPRequestHandler):
             if not relay_available():
                 return self.reply({'error': '房主服务缺少 websockets，请安装 requirements-lan.txt'}, 503)
             relay_handle(self, ROOMS, LOCK)
+        elif url.path == '/api/history':
+            try:
+                data = {k: v[0] for k, v in parse_qs(url.query).items()}
+                self.reply(HISTORY.read(data.get('watch'), int(data.get('from', '0'))))
+            except PermissionError as error:
+                self.reply({'error': str(error)}, 403)
+            except (ValueError, TypeError) as error:
+                self.reply({'error': str(error)}, 400)
         elif url.path == '/api/events':
             self.api('events', {k: v[0] for k, v in parse_qs(url.query).items()})
         elif url.path == '/api/version':
             self.reply({'protocol': PROTOCOL, 'build': self.server.build, 'relayAvailable': relay_available(),
-                        'defaultNetwork': getattr(self.server, 'default_network', 'lan')})
+                        'defaultNetwork': getattr(self.server, 'default_network', 'lan'), 'historyAvailable': True})
         elif url.path.startswith('/api/'):
             self.reply({'error': '未知接口'}, 404)
         else:
@@ -188,6 +198,36 @@ class Handler(SimpleHTTPRequestHandler):
             if action == 'events':
                 messages, room['queues'][role] = room['queues'][role], []
                 return self.reply({'state': snapshot(room), 'messages': messages})
+            if action.startswith('history-'):
+                if role != 'host':
+                    return self.reply({'error': '只有房主可以发布旁观帧'}, 403)
+                owner = (code, room['generation'], room['tokens']['host'])
+                try:
+                    if action == 'history-open':
+                        if room['phase'] != 'loading':
+                            raise ValueError('旁观需在游戏开局后发布')
+                        header = data.get('header')
+                        if not isinstance(header, dict) or header.get('players') != room['settings']['players'] or header.get('language') != room['settings']['language']:
+                            raise ValueError('旁观配置与房间不一致')
+                        expected = [None] * room['settings']['players']
+                        for player in active_roles(room):
+                            expected[room['slots'][player]] = {'character': room['characters'][player], 'spares': room['settings']['spares'], 'bombs': room['settings']['bombs']}
+                        if header.get('config') != {'rank': room['settings']['rank'], 'players': expected}:
+                            raise ValueError('旁观角色与房间不一致')
+                        result = HISTORY.open(owner, header)
+                    elif action == 'history-push':
+                        result = HISTORY.push(owner, data.get('watch'), data.get('first'), data.get('payload'))
+                    elif action == 'history-end':
+                        result = HISTORY.end(owner, data.get('watch'), data.get('frames'), data.get('reason'))
+                    elif action == 'history-interrupt':
+                        result = HISTORY.interrupt(owner, data.get('watch'))
+                    else:
+                        raise ValueError('未知旁观接口')
+                    return self.reply(result)
+                except PermissionError as error:
+                    return self.reply({'error': str(error)}, 403)
+                except (ValueError, TypeError, KeyError) as error:
+                    return self.reply({'error': str(error)}, 400)
             if action == 'leave':
                 if role == 'host':
                     room['phase'] = 'ended'

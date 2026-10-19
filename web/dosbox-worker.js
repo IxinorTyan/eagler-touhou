@@ -5,6 +5,27 @@ let frames=0,audioPackets=0,audioEnergy=0,fatal=false,exited=false,logs=[];
 let presentationActive=true,frameProof=null,frameProofHolding=false;
 let viewSlot=0;
 let soloMode=false,soloInput=null;
+let externalHost=null;
+let frameBridge=null,replayBootAudioDrops=0;
+let replayGuestBase=-1,replayMailbox=-1,replayRun=null;
+function observeReplayRun(){
+  const h=mod.HEAPU8,v=new DataView(h.buffer),s=soloInput.snapshot;
+  if(s){
+    replayMailbox=s.at;
+    replayGuestBase=s.at-patch.mailbox_cs_offset-(v.getUint16(s.at+20,true)-patch.data_segment+patch.code_segment)*16;
+    if(!replayRun&&s.mode===1){
+      replayRun={startBoundary:externalHost.boundary,stage:s.stage,character:s.character};
+      send('external-replay-run',{run:replayRun});
+    }
+  }
+  if(!replayRun||replayMailbox<0)return false;
+  // Mailbox mode 0 also appears between stages. Q_NEXT_STAGE (2) must
+  // continue the same replay; Q_QUIT_TO_OP (1) ends the run.
+  const valid=soloInput.valid(h,replayMailbox);
+  const data=replayMailbox-patch.mailbox_cs_offset+(patch.data_segment-patch.code_segment)*16;
+  return !valid||h[replayMailbox+22]===3||h[replayMailbox+22]===4||
+    (h[replayMailbox+22]===0&&h[data+0x576c]===1);
+}
 const frameTransfers=new Set();
 let p2Pulse=0,p2PulseTick=-1,p3Pulse=0,p3PulseTick=-1;
 const keyPressTicks=new Map(),deferredKeyUps=new Set();
@@ -21,7 +42,7 @@ const emitError=e=>{if(fatal)return;fatal=true;send('error',{message:e?.stack||e
 addEventListener('error',e=>emitError(e.error||e.message));
 addEventListener('unhandledrejection',e=>emitError(e.reason));
 function scan(){
-  if(soloMode){soloInput?.read(mod.HEAPU8);releaseConsumedKeys();return;}
+  if(soloMode){soloInput?.read(mod.HEAPU8,externalHost?externalHost.boundary*24:performance.now());releaseConsumedKeys();return;}
   if(!mod)return;const h=mod.HEAPU8,v=new DataView(h.buffer);
   if(mailbox>=0&&signature.every((b,i)=>h[mailbox+i]===b)&&h[mailbox+25]===1)return;
   mailbox=-1;guestBase=-1;
@@ -43,7 +64,7 @@ function nativeStatus(){
 function exitSession(){if(exited)return;exited=true;paused=true;ci?.pause();send('game-exit');}
 function state(){
   if(soloMode)return {solo:true,...(soloInput?.snapshot||{mode:0}),program:mod.UTF8ToString(mod._emGetRunningProgram()).toUpperCase(),
-    core:'DOSBox-X JSPI',executionThread:'worker',frames,render:mod.framePresenter,audioPackets,audioEnergy,paused,nativePaused:nativeStatus().paused};
+    core:'DOSBox-X JSPI',executionThread:'worker',frames,render:mod.framePresenter,audioPackets,audioEnergy,paused,nativePaused:nativeStatus().paused,...(frameBridge?{frameReplay:{...frameBridge.status,mutedAudioPackets:replayBootAudioDrops}}:{}),...(externalHost?{externalReplay:externalHost.status}:{})};
   if(mailbox<0)return null;const h=mod.HEAPU8,v=new DataView(h.buffer),at=mailbox,p=patch.mailbox_offsets;
   if(h[at+39]&1)return null;
   const d=at-patch.mailbox_cs_offset+(patch.data_segment-patch.code_segment)*16;
@@ -81,17 +102,79 @@ async function boot(data){
   })();
   const afterimageTask=art?art.loadAfterimageArt(patch):Promise.resolve(null);
   compiledTask.catch(()=>{});afterimageTask.catch(()=>{});
-  importScripts(new URL('sidebar-background.js',data.base).href,new URL('frame-presenter.js',data.base).href,new URL('emulators.js',vendor).href,new URL('wdosbox-x-jspi.js',vendor).href);onmessage=dispatch;
+  importScripts(new URL('sidebar-background.js',data.base).href,new URL('frame-presenter.js',data.base).href,new URL('emulators.js',vendor).href);
+  let factory;
+  if(data.externalReplay){
+    if(!soloMode||data.musicPatch)throw Error('外部 Replay 实验目前仅支持单人原版模拟音源');
+    const [{createExternalReplayHost},{loadVerifiedBytes},response]=await Promise.all([dependency('external-replay-host.js'),dependency('startup-assets.js'),fetch(new URL('runtime.json',vendor),{cache:'no-store'})]);
+    if(!response.ok)throw Error('Replay 核心清单读取失败');
+    const manifest=await response.json();
+    externalHost=createExternalReplayHost({...data.externalReplay,
+      applyInput:command=>dispatch({data:{...command,externalSource:true}}),
+      observe:()=>{if(ci&&!fatal){frames=mod.messageFrame||frames;publish();return observeReplayRun();}},
+      inspect:async()=>{
+        const h=mod.HEAPU8;
+        // The DOS memory allocation survives MAIN returning to OP, while
+        // SoloInput deliberately drops inactive game mailboxes.
+        const base=replayGuestBase>=0&&replayGuestBase+0xa0000<=h.length?replayGuestBase:-1;
+        let hash=2166136261;
+        if(base>=0)for(let i=base;i<base+0xa0000;i++)hash=Math.imul(hash^h[i],16777619);
+        const {sha256}=await dependency('netplay/sha256.js');
+        const guestSha256=base>=0?await sha256(h.subarray(base,base+0xa0000)):null;
+        return {guestHash:base>=0?(hash>>>0).toString(16).padStart(8,'0'):'unavailable',guestSha256,run:replayRun,state:state(),heapBytes:h.length};
+      },
+      onChunk:chunk=>{const transfers=chunk.clocks?[chunk.clocks.buffer]:[];postMessage({type:'external-replay-chunk',...chunk},transfers);},
+      onEnd:result=>send('external-replay-end',{result}),onError:emitError,
+    });
+    const source=new TextDecoder().decode(await loadVerifiedBytes(new URL('wdosbox-x-jspi.js',vendor),manifest.files['wdosbox-x-jspi.js']));
+    // Lexically scope clocks to this loader only; the rest of the browser keeps
+    // its real wall clock. Source is verified before evaluation, never from a replay.
+    factory=new Function('Date','performance',source+';return WDOSBOXXJSPI;')(externalHost.Date,externalHost.performance);
+  }else{importScripts(new URL('wdosbox-x-jspi.js',vendor).href);factory=WDOSBOXXJSPI;}
+  onmessage=dispatch;
   const compiledCore=await compiledTask;
   const init=[...data.files,{dosboxConf:config(data.cycles||'max 100%',data.core||'simple'),jsdosConf:{version:'8'}}];
-  const sessionId='th05-fast-'+Date.now(),queue=[];let receiver;
-  const audioPort={postMessage:(message,transfer)=>{if(message instanceof Float32Array){audioPackets++;for(let i=0;i<message.length;i+=32)audioEnergy+=Math.abs(message[i]);}data.audioPort.postMessage(message,transfer||[]);}};
-  mod={canvas:data.canvas,audioPort,instantiateWasm:(imports,receive)=>receive(new WebAssembly.Instance(compiledCore,imports),compiledCore),locateFile:file=>new URL(file==='wdosbox-x-jspi.wasm'?'wdosbox-x-fast.wasm':file,vendor).href,
+  const sessionId=externalHost?'th05-external-replay-v1':'th05-fast-'+Date.now(),queue=[];let receiver;
+  const audioPort={postMessage:(message,transfer)=>{if(message instanceof Float32Array){audioPackets++;for(let i=0;i<message.length;i+=32)audioEnergy+=Math.abs(message[i]);}if(message instanceof Float32Array&&data.frameReplay?.mode==='playback'&&(!frameBridge?.started||paused)){replayBootAudioDrops++;return;}
+    data.audioPort.postMessage(message,transfer||[]);}};
+  mod={canvas:data.canvas,audioPort,instantiateWasm:(imports,receive)=>{
+      externalHost?.attach(mod,imports);
+      if(frameBridge)imports.env.th05_replay=new WebAssembly.Suspending((port,packed)=>{
+        try{frameBridge.signal(port,packed);}catch(e){emitError(e);throw e;}
+        // Ordinary frames return synchronously. Suspend only at EOF so the
+        // guest cannot execute an extra update before the browser stops it.
+        if(frameBridge.done&&data.frameReplay.mode==='playback')return new Promise(()=>{});
+      });
+      return receive(new WebAssembly.Instance(compiledCore,imports),compiledCore);
+    },locateFile:file=>new URL(file==='wdosbox-x-jspi.wasm'?'wdosbox-x-fast.wasm':file,vendor).href,
     postMessage:(name,props)=>{if(receiver)receiver(name,props);else queue.push([name,props]);}};
+  if(data.frameReplay){
+    const {createFrameReplayBridge}=await dependency('frame-replay-bridge.js');
+    frameBridge=createFrameReplayBridge({mod,patch,config:data.frameReplay,
+      onRun:run=>send('frame-replay-run',{run}),
+      onPhase:phase=>send('frame-replay-phase',phase),
+      onDialog:active=>{
+        if(!active&&data.frameReplay.mode==='playback')for(const code of [90,88,257])ci.sendKeyEvent(code,false);
+        send('frame-replay-dialog',{active});
+      },
+      onChunk:inputs=>postMessage({type:'frame-replay-chunk',inputs},[inputs.buffer]),
+      onEnd:result=>setTimeout(()=>{if(data.frameReplay.mode==='record')for(const code of [265,264,263,262,88,90,340,256,257])ci.sendKeyEvent(code,false);paused=true;ci.pause();send('frame-replay-end',{result});},0),
+    });
+  }
   const transport={sessionId,module:mod,net:null,sendMessageToServer:(name,props)=>mod.messageHandler({data:{name,props}}),
     initMessageHandler:handler=>{receiver=handler;for(const [name,props]of queue)handler(name,props);queue.length=0;},exit:()=>{}};
-  await WDOSBOXXJSPI(mod);mod.callMain([sessionId]);
+  await factory(mod);mod.callMain([sessionId]);
   ci=await emulators.backend(init,transport,{});
+  if(data.frameReplay?.mode==='playback'){
+    let down=false;
+    const timer=setInterval(()=>{
+      if(frameBridge.launched||fatal){clearInterval(timer);if(down)ci.sendKeyEvent(90,false);return;}
+      down=!down;ci.sendKeyEvent(90,down);
+    },250);
+  }
+  // The protocol helper otherwise stamps keys with its unrelated real Date.
+  // Stamp them from the same observed clock tape, including deferred key-ups.
+  if(externalHost)ci.sendKeyEvent=(code,down)=>ci.addKey(code,down,externalHost.keyTime());
   if(!soloMode){
     mod.afterimageArt=await art.installAfterimageArt(mod,patch,await afterimageTask);
   }
@@ -104,6 +187,7 @@ async function boot(data){
   mod.getHitPoints=()=>soloMode?soloInput.markers(mod.HEAPU8):nativeStatus().paused?[]:nativeHitPoints(mod.HEAPU8,mailbox,patch,input.touch||[0,0]);
   mod.getPersonalHud=createPersonalHud(()=>mailbox<0||nativeStatus().paused?null:{heap:mod.HEAPU8,mailbox,patch},()=>viewSlot);
   mod.onFrameRendered=(frame,width,height,seq)=>{
+    if(data.frameReplay?.mode==='playback'&&!frameBridge.started)return;
     if(frameProofHolding)return; // QA: retain the exact verified image until resume.
     if(!presentationActive||frameTransfers.size>=4){mod.framePresenter.backpressureDropped++;return;}
     const proof=frameProof;frameProof=null;
@@ -127,11 +211,15 @@ async function boot(data){
   ci.events().onSoundPush(samples=>{audioPackets++;if(audioPackets<500)for(let i=0;i<samples.length;i+=16)audioEnergy+=Math.abs(samples[i]);});
   // This upstream counter counts dirty framebuffer updates, not screen scanout.
   // Actual adapter submissions/draws are recorded separately in framePresenter.
-  setInterval(()=>{frames=mod.messageFrame||frames;publish();},16);
+  if(!externalHost)setInterval(()=>{frames=mod.messageFrame||frames;publish();},16);
   send('ready');
 }
 onmessage=async({data})=>{try{
   if(data.type==='boot'){await boot(data);return;}
+  if(data.type==='external-replay-finish'){if(frameBridge)frameBridge.finish();else if(replayRun)externalHost?.finish();return;}
+  if(data.type==='external-replay-pause'){if(frameBridge){paused=!!data.value;if(paused)ci.pause();else ci.resume();}else externalHost?.pause(data.value);return;}
+  if(externalHost&&data.type==='key'&&!data.externalSource){externalHost.queue({type:'key',code:data.code,down:!!data.down});return;}
+  if(externalHost&&['input','game-pause','pause','resume','qa'].includes(data.type))throw Error('外部 Replay 实验仅通过记录的键盘输入控制游戏');
   if(data.type==='ack'){statePending=false;return;}
   if(data.type==='frame-ack'){frameTransfers.delete(data.seq);return;}
   if(data.type==='view-slot'&&Number.isInteger(data.slot)&&data.slot>=0&&data.slot<3){viewSlot=data.slot;mod.framePresenter?.flush();return;}
@@ -141,6 +229,7 @@ onmessage=async({data})=>{try{
     input=data.input;if(input.p2&16){p2Pulse|=16;p2PulseTick=nativeInputTick();}if(input.p3&16){p3Pulse|=16;p3PulseTick=nativeInputTick();}inputs();nativeTouch?.(mod?.HEAPU8,mailbox,patch,input.touch||[0,0],paused||nativeStatus().paused);return;
   }
   if(data.type==='key'){
+    if(frameBridge?.status.mode==='playback'&&(!frameBridge.dialog||paused||![90,88,257].includes(data.code)))return;
     // A short touch tap can be cleared before the next native player update.
     // Keep gameplay Bomb pressed until the guest has had one actual update.
     // Menu confirm must be releasable while the native player tick is frozen.

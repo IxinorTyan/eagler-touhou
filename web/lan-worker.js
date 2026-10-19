@@ -16,6 +16,16 @@ import {installMusicFiles,loadMusicAssets} from './music-files.js';
 import {NativeMusic} from './solo-native-music.js';
 import {createDosboxSnapshots} from './dosbox-snapshots.js';
 import {makeMemoryDiff} from './dosbox-memory-diff.js';
+import {historyProof} from './netplay/history-proof.js';
+import {packHistoryRows,HISTORY_VERSION} from './netplay/confirmed-history.js';
+import {historyIdentity} from './netplay/history-identity.js';
+let captureHistory=false,verifyHistory=false,historyRows=[],historyFirst=0;
+function flushHistory(){
+  if(!historyRows.length)return;
+  const bytes=packHistoryRows(historyRows,historyRows[0].pair.length);
+  send('confirmed-history',{first:historyFirst,bytes},[bytes.buffer]);
+  historyFirst+=historyRows.length;historyRows=[];
+}
 let snapshots=null,shim=null,music=null,effect=null,confirmed=0,replaying=false,rollbackCount=0;
 let restoredBoundary=null;
 const saved=new Map(),effects=new Map();
@@ -23,6 +33,7 @@ const rollbackMetrics={captures:0,captureMs:0,sharedCaptures:0,checkpointReplays
 
 let mod,ci,patch,mailbox=-1,guestBase=-1,tick=0,frame=0,oldP1=0,paused=false,warming=true,fatal=false;
 let escapeTicks=0,lastPauseRequests=0;
+let pauseHeld=[];
 let frames=0,audioPackets=0,audioEnergy=0,lastStateSent=0;
 let sfxEvents=0;
 const transfers=new Set(),costs=[],signature=new TextEncoder().encode('TH05LOCALv002!!\0');
@@ -83,6 +94,7 @@ function checksum(){
   let hash=2166136261;const h=mod.HEAPU8;
   for(let at=guestBase;at<guestBase+0xa0000;at++)hash=Math.imul(hash^h[at],16777619);
   for(const n of [tick,oldP1,paused?1:0,escapeTicks,lastPauseRequests,frame])hash=Math.imul(hash^n,16777619);
+  for(const held of pauseHeld)hash=Math.imul(hash^held,16777619);
   return (hash>>>0).toString(16).padStart(8,'0');
 }
 function step(){
@@ -92,7 +104,11 @@ function step(){
 }
 function input(pair){
   pointInputs=pair;
-  const combined=pair.reduce((bits,value)=>bits|value%4096,0);
+  // The original menu waits for all gameplay keys to be released. Ignore
+  // keys already held on entry until that seat releases them; fresh presses
+  // from any seat still operate the menu.
+  if(paused)pauseHeld=pair.map((value,slot)=>(pauseHeld[slot]||0)&value&(127|256));
+  const combined=pair.reduce((bits,value,slot)=>bits|((value%4096)&~(paused?pauseHeld[slot]||0:0)),0);
   let requests=0,wantsPause=false,wantsResume=false,toggle=false;
   for(let slot=0;slot<pair.length;slot++){
     const value=pair[slot],kind=(value&128?1:0)|(value&PAUSE?2:0)|(value&RESUME?4:0);
@@ -113,6 +129,7 @@ function input(pair){
 }
 async function boot(data){
   const bootStarted=performance.now(),timings={};
+  captureHistory=!!data.captureHistory;verifyHistory=!!data.verifyHistory;
   const progress=(stage,message)=>send('boot-progress',{stage,message});
   const viewSlot=data.viewSlot;
   progress('resources','正在并行加载游戏与核心…');
@@ -207,7 +224,8 @@ async function boot(data){
   // covers both resources; allow capable and fallback clients in one room.
   timings.nativeBootMs=performance.now()-started;
   timings.locator={...gameLocator.metrics};
-  send('ready',{state:state(),bootMs:performance.now()-bootStarted,bootTimings:timings,checksum:checksum(),guestSha:await sha256(mod.HEAPU8.slice(guestBase,guestBase+0xa0000)),diskSha:patch.sha256,
+  const identity=(captureHistory||verifyHistory)?await historyIdentity(manifest,patch,musicPatch):null;
+  send('ready',{historyHeader:identity?{version:HISTORY_VERSION,protocol:'th05-netplay/7',identity,language:data.settings.language,players:data.config.players.length,config:data.config}:null,state:state(),bootMs:performance.now()-bootStarted,bootTimings:timings,checksum:checksum(),guestSha:await sha256(mod.HEAPU8.slice(guestBase,guestBase+0xa0000)),diskSha:patch.sha256,
     coreSha:manifest.files['wdosbox-x-rollback.wasm'],executionCoreSha:manifest.files[core]});
 }
 function advance(pair,predicted=true,offlineMask=0){
@@ -219,7 +237,7 @@ function advance(pair,predicted=true,offlineMask=0){
     const previous=saved.get(frame-1),nativeFrame=previous?.nativeFrame===frame-1?frame-1:frame;
     if(nativeFrame===frame){snapshots.capture(frame,restoredBoundary===frame);rollbackMetrics.captures++;}
     else rollbackMetrics.sharedCaptures++;
-    saved.set(frame,{nativeFrame,oldP1,paused,escapeTicks,lastPauseRequests,frame,mailbox,guestBase,music:music.capture(),execution:pair.slice(),offlineMask});
+    saved.set(frame,{nativeFrame,oldP1,paused,escapeTicks,lastPauseRequests,pauseHeld:pauseHeld.slice(),frame,mailbox,guestBase,music:music.capture(),execution:pair.slice(),offlineMask});
     rollbackMetrics.captureMs+=performance.now()-captureAt;
   }
   restoredBoundary=null;
@@ -238,6 +256,8 @@ function advance(pair,predicted=true,offlineMask=0){
   }
   input(pair);step();
   paused=nativePause()!==0;
+  if(!before&&paused)pauseHeld=pair.map(value=>value&(127|256));
+  else if(before&&!paused)pauseHeld=[];
   if(before!==paused)escapeTicks=0;
   effect.exit=nativePause()===2;
   for(const event of music.read(mod.HEAPU8)){
@@ -246,6 +266,8 @@ function advance(pair,predicted=true,offlineMask=0){
   }
   effect.paused=paused;effect.transition=before!==paused;
   effects.set(frame,effect);frame++;effect.hash=frame%120===0?checksum():null;
+  if(captureHistory||verifyHistory)effect.proof={...historyProof(mod.HEAPU8,mailbox,patch,{frame,oldP1,paused,escapeTicks,lastPauseRequests,pauseHeld}),nativeHash:effect.hash?Number.parseInt(effect.hash,16):0};
+  if(captureHistory)effect.history={pair:pair.slice(),offlineMask,...effect.proof};
   if(predicted)snapshots?.seal();effect=null;
   rollbackMetrics.simulateMs+=performance.now()-simulateAt;
   if(!replaying){costs.push(performance.now()-started);if(costs.length>180)costs.shift();}
@@ -261,6 +283,7 @@ function confirm(prefix){
     sfx.push(...e.sfx);sfxEvents+=e.sfx.length;
     if(e.music.length)send('music',{events:e.music});
     if(e.hash)send('hash',{frame:n+1,hash:e.hash,boot:syncPolicy().ready});
+    if(captureHistory&&e.history){historyRows.push(e.history);if(historyRows.length===6)flushHistory();}
     effects.delete(n);
   }
   if(sfx.length)send('sfx',{events:sfx});
@@ -271,20 +294,23 @@ function confirm(prefix){
   confirmed=prefix;snapshots?.confirm(prefix,retain);
   for(const n of saved.keys())if(n<retain)saved.delete(n);
   rollbackMetrics.confirmMs+=performance.now()-started;
-  if(exit){fatal=true;send('session-exit',{frame:prefix});}
+  if(exit){flushHistory();fatal=true;send('session-exit',{frame:prefix});}
 }
 onmessage=async({data})=>{try{
+  if(data.type==='history-present'){mod?.framePresenter?.flush({redraw:true});return;}
   if(fatal)return;
   if(data.type==='boot'){await boot(data);return;}
   if(data.type==='frame-ack'){transfers.delete(data.seq);return;}
-  if(data.type==='confirm'){confirm(data.prefix);return;}
+  if(data.type==='confirm'){confirm(data.prefix);if(data.notify)send('history-confirmed',{frame:confirmed});return;}
+  if(data.type==='history-disable'){captureHistory=false;historyRows=[];return;}
+  if(data.type==='history-flush'){flushHistory();send('history-flushed',{request:data.request,prefix:historyFirst});return;}
   if(data.type==='restore'){
     const started=performance.now();
     if(!snapshots||!saved.has(data.frame)||data.frame<confirmed)throw Error('回滚状态已过期');
     const target=data.frame,from=saved.get(target).nativeFrame,s=saved.get(from);
     if(!s||(from!==target&&!s.execution))throw Error('回滚检查点缺失');
     snapshots.restore(from);
-    ({oldP1,paused,escapeTicks,lastPauseRequests,frame,mailbox,guestBase}=s);music.restore(s.music);restoredBoundary=from;
+    ({oldP1,paused,escapeTicks,lastPauseRequests,pauseHeld,frame,mailbox,guestBase}=s);pauseHeld=pauseHeld.slice();music.restore(s.music);restoredBoundary=from;
     for(const n of saved.keys())if(n>=from)saved.delete(n);
     for(const n of effects.keys())if(n>=from)effects.delete(n);
     if(from!==target){
@@ -318,11 +344,13 @@ onmessage=async({data})=>{try{
   }
   if(data.type==='step'){
     if(data.frame!==frame)throw Error('同步帧顺序异常');
-    advance(data.pair,data.predicted,data.offlineMask);
+    if(data.quiet&&!verifyHistory)throw Error('静默推进仅用于只读回放');
+    mod.suppressPresentation=!!data.quiet;
+    try{advance(data.pair,data.predicted,data.offlineMask);}finally{mod.suppressPresentation=false;}
     // Keep the final image of this step; intermediate native updates still run.
-    mod.framePresenter.flush();
+    if(!data.quiet)mod.framePresenter.flush();
     const now=performance.now(),publish=frame%30===0||now-lastStateSent>=1000;
     if(publish)lastStateSent=now;
-    send('stepped',{frame,policy:syncPolicy(),control:controlState(),state:publish?state():null});
+    send('stepped',{frame,proof:verifyHistory?effects.get(frame-1)?.proof:null,policy:syncPolicy(),control:controlState(),state:publish?state():null});
   }
 }catch(error){fail(error);}};

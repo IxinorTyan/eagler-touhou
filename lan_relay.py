@@ -184,7 +184,7 @@ def handle(handler, rooms, room_lock):
                 text = fragments.decode('utf-8')
                 fragments.clear()
                 message = json.loads(text)
-                if not isinstance(message, dict) or message.get('type') not in ('hello', 'loaded', 'go', 'input', 'input-tail', 'rollback', 'hash', 'stop', 'ping', 'pong', 'resume', 'suspect', 'departure-prepare', 'departure-report', 'departure-commit'):
+                if not isinstance(message, dict) or message.get('type') not in ('hello', 'loaded', 'timing', 'go', 'input', 'input-tail', 'rollback', 'hash', 'stop', 'ping', 'pong', 'resume', 'suspect', 'departure-prepare', 'departure-report', 'departure-commit'):
                     raise ValueError('invalid packet')
                 if (message['type'] in ('input', 'input-tail') and message.get('slot') != slot) or (message['type'] in ('go', 'rollback', 'departure-prepare', 'departure-commit') and role != 'host') or (message['type'] == 'resume' and (not isinstance(message.get('hello'), dict) or message['hello'].get('slot') != slot)):
                     raise ValueError('wrong source')
