@@ -29,9 +29,9 @@ if(build){
 }
 for(const name of ['disks/manifest.json','native-patch.json','native/main.exe','native/start.com','native/music.com','controls.js','fire-control.js','native-music.js','lockstep.js','dosbox-disk.js']){
  const old=spawnSync('git',['show','HEAD:web/'+name],{cwd:root,maxBuffer:64*1024*1024});assert.equal(old.status,0);
- // The input-pacing migration intentionally changes the scheduler; its exact
- // current bytes are still covered by behaviorFiles and both release manifests.
- if(name==='lockstep.js'&&build?.inputPolicy){
+ // Intentional host changes are frozen separately. Native music lifecycle
+ // now retains the DOS base across TSR removal; all DOS binaries stay fixed.
+ if((name==='lockstep.js'&&build?.inputPolicy)||(name==='native-music.js'&&build?.bridgeLifecycle)){
   assert(build.behaviorFiles[name]);continue;
  }
  if(/\.(js|json)$/.test(name))assert.equal(read(name).toString().replace(/\r\n/g,'\n'),old.stdout.toString().replace(/\r\n/g,'\n'),'Behavior resource changed '+name);

@@ -14,7 +14,8 @@ export class NativePause {
   }
   valid(heap, at) {
     return at >= 0 && at + this.meta.mailboxSize <= heap.length
-      && this.signature.every((byte, i) => heap[at + i] === byte);
+      && this.signature.every((byte, i) => heap[at + i] === byte)
+      && heap[at + this.meta.fields.phase] <= 3;
   }
   update(now = performance.now(), scanRange = null) {
     const emulator = this.getEmulator(), heap = emulator?.module.HEAPU8;
@@ -88,7 +89,7 @@ export class NativePause {
   }
   setFocus(mask, points) {
     const emulator = this.getEmulator(), heap = emulator?.module.HEAPU8;
-    if (!heap || !this.valid(heap, this.live)) return;
+    if (!heap || !this.valid(heap, this.live) || heap[this.live + this.meta.fields.phase] !== 1) return;
     const at = this.live, f = this.meta.fields;
     emulator.module.thDirtyMark?.(at,this.meta.mailboxSize);
     heap[at + f.points] = 0; // Draw browser-local markers outside emulated VRAM.
@@ -96,7 +97,7 @@ export class NativePause {
   }
   setTouch(inputs) {
     const emulator=this.getEmulator(),heap=emulator?.module.HEAPU8,f=this.meta.fields;
-    if(!heap||!this.valid(heap,this.live)||f.touch===undefined)return;
+    if(!heap||!this.valid(heap,this.live)||heap[this.live+f.phase]!==1||f.touch===undefined)return;
     const view=new DataView(heap.buffer,heap.byteOffset,heap.byteLength),at=this.live;
     emulator.module.thDirtyMark?.(at,this.meta.mailboxSize);
     const running=emulator.state==='running'&&heap[at+f.phase]===1;

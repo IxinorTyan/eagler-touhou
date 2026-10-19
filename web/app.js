@@ -474,13 +474,10 @@ function syncHash(){
   // Match TH04: verify all 640 KiB of DOS conventional memory instead of
   // synchronously hashing the complete DOSBox-X heap every two seconds.
   // Keep full-heap checking available for emulator regression tests.
-  let base=-1;
-  if(nativeMusic?.valid(heap,nativeMusic.at)){
-    const segment=new DataView(heap.buffer).getUint16(nativeMusic.at+16,true);
-    base=nativeMusic.at-nativeMusic.patch.mailbox_com_offset-segment*16;
-  }
+  const range=nativeMusic?.dosRange(heap);
   const full=netQuery.get('fullHash')==='1';
-  const start=full?0:Math.max(0,base),end=full?heap.length:base<0?0:base+0xa0000;
+  if(!full&&!range)throw Error('DOS 常规内存校验范围尚未绑定');
+  const start=full?0:range.start,end=full?heap.length:range.end;
   if(emulator.module.netHash)h=emulator.module.netHash(start,end);
   else for(let i=start;i<end;i++)h=Math.imul(h^heap[i],16777619);
   return (h>>>0).toString(16).padStart(8,'0')+':'+emulator.module.netInfo().tick+':'+pauseSeat+':'+[...hiddenSeats].sort().join(',');

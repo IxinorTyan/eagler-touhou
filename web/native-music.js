@@ -5,8 +5,8 @@ export class NativeMusic {
     this.patch=patch;this.signature=new TextEncoder().encode(patch.signature);
     this.reset();
   }
-  reset(){this.cursor=0;this.at=-1;this.sequence=0;}
-  capture(){return {cursor:this.cursor,at:this.at,sequence:this.sequence};}
+  reset(){this.cursor=0;this.at=-1;this.sequence=0;this.ramBase=-1;}
+  capture(){return {cursor:this.cursor,at:this.at,sequence:this.sequence,ramBase:this.ramBase};}
   restore(state){Object.assign(this,state);}
   valid(heap,at){
     if(at<0||at+20+64*8>heap.length||!this.signature.every((b,i)=>heap[at+i]===b))return false;
@@ -21,9 +21,15 @@ export class NativeMusic {
       &&view.getUint16(base+0x60*4,true)<this.patch.mailbox_com_offset;
   }
   dosRange(heap) {
-    if (!this.valid(heap,this.at)) return null;
-    const segment=new DataView(heap.buffer,heap.byteOffset,heap.byteLength).getUint16(this.at+16,true);
-    const start=this.at-this.patch.mailbox_com_offset-segment*16;
+    // The DOS allocation outlives the TSR observation bridge. Keep its base
+    // through EXEC/uninstall so checksum and pause scans never use an empty
+    // range or search unrelated host buffers after losing the music vector.
+    if(this.valid(heap,this.at)){
+      const segment=new DataView(heap.buffer,heap.byteOffset,heap.byteLength).getUint16(this.at+16,true);
+      this.ramBase=this.at-this.patch.mailbox_com_offset-segment*16;
+    }
+    const start=this.ramBase;
+    if(!Number.isSafeInteger(start)||start<0||start+0x100000>heap.length)return null;
     return {start,end:start+0xa0000};
   }
   read(heap,scanBytes=2*1024*1024){
@@ -38,6 +44,7 @@ export class NativeMusic {
       this.cursor=end===heap.length?0:end;
     }
     if(this.at<0)return [];
+    this.dosRange(heap);
     const view=new DataView(heap.buffer,heap.byteOffset,heap.byteLength);
     const latest=view.getUint16(this.at+18,true),events=[];
     let count=(latest-this.sequence)&65535;
