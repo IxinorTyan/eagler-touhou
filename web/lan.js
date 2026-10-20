@@ -10,13 +10,13 @@ import {mergeDeparture} from './netplay/membership.js';
 import {createHistoryHost} from './netplay/history-host.js';
 import {timingReport,validateTimingReport,selectStartupPolicy,validateStartupPolicy} from './netplay/startup-policy.js';
 const GRACE_MS=5000;
-let historyHost=null,historyWarning='',finishing=false,historyRequest=0;
+let historyHost=null,historyWarning='',finishing=false,historyRequest=0,historyPromptEpoch=0,pendingHistorySave=null,historyExporting=false;
 const historyFlushes=new Map();
 function historyUI(){
   const h=historyHost;
-  $('history-save').disabled=!h||(!h.blob&&!h.recordFrames);
-  $('history-save').textContent=h?.blob?'再次下载多人 Replay':'结束录制并保存';
-  $('history-watch').hidden=!h;
+  $('history-save').disabled=historyExporting||!h||(!h.blob&&!h.recordFrames);
+  $('history-save').textContent=h?.blob?'再次下载多人 Replay':'导出当前 Replay 片段';
+  $('history-watch').hidden=!h?.watch;
   $('history-network-watch').hidden=!h?.networkURL;
   if(h?.networkURL)$('history-network-watch').href=h.networkURL;
   $('history-network-status').textContent=h?.networkStatus||'';
@@ -195,7 +195,7 @@ async function poll(){
   }finally{pollBusy=false;}
 }
 async function enter(action){
-  if(entering||auth)return;entering=true;render();
+  if(entering||auth||finishing)return;historyPromptEpoch++;pendingHistorySave=null;$('save-dialog').close();entering=true;render();
   try{
   const data=await api(action,action==='join'?{room:$('room-code').value.trim()}:{network});
   auth={room:data.room,token:data.token,role:data.role,generation:data.state.generation};
@@ -273,8 +273,8 @@ function activate(){
   clearTimeout(bootTimeout);running=true;connecting=true;paused=false;busy=false;
   sessionPolicy=makeInputPolicy(transport,room.settings.rollback,runSettings.inputDelay);
   historyHost?.dispose();historyHost=null;historyWarning='';
-  if(boot.historyHeader)historyHost=createHistoryHost({...boot.historyHeader,coreSha:boot.coreSha,diskSha:boot.diskSha,guestSha:boot.guestSha,checksum:boot.checksum},{record:$('history-record').checked,onChange:historyUI,onError:error=>{historyWarning='浏览器录像停止：'+error.message;historyUI();}});
-  if(historyHost&&auth.role==='host'&&version?.historyAvailable)historyHost.connectNetwork(auth);
+  if(boot.historyHeader)historyHost=createHistoryHost({...boot.historyHeader,coreSha:boot.coreSha,diskSha:boot.diskSha,guestSha:boot.guestSha,checksum:boot.checksum},{record:$('history-record').checked,watch:$('history-enabled').checked,onChange:historyUI,onError:error=>{historyWarning='浏览器录像停止：'+error.message;historyUI();}});
+  if(historyHost?.watch&&auth.role==='host'&&version?.historyAvailable)historyHost.connectNetwork(auth);
   historyUI();
   queue=new GameQueue(room.slots[auth.role],room.settings.rollback,room.settings.players,sessionPolicy);
   queue.setLockstepDelay(runSettings.delay);queue.setInputDelay(runSettings.inputDelay);
@@ -602,7 +602,7 @@ async function connect(){
   };
   const config={rank:room.settings.rank,players:[]};
   for(const role of activeRoles())config.players[room.slots[role]]={character:room.characters[role],spares:room.settings.spares,bombs:room.settings.bombs};
-  worker.postMessage({type:'boot',settings:room.settings,config,captureHistory:$('history-enabled').checked,viewSlot:room.slots[auth.role]});
+  worker.postMessage({type:'boot',settings:room.settings,config,captureHistory:$('history-enabled').checked||$('history-record').checked,viewSlot:room.slots[auth.role]});
 if(room?.transport==='relay'){switchRelay();return;}
   await Promise.all(remoteRoles().filter(role=>roles.indexOf(identity.role)<roles.indexOf(role)).map(role=>offerPeer(peers.get(role))));
 }
@@ -716,7 +716,8 @@ async function finish(reason,notify=true,flush=true){
   if(finishing||(!auth&&!worker))return;finishing=true;const identity=auth;
   running=false;clearTimeout(timer);wakePending=false;
   if(flush)await flushHistory();
-  historyHost?.end(reason);
+  const endedHistory=worker?historyHost:null,promptEpoch=historyPromptEpoch;
+  endedHistory?.end(reason);
   if(notify&&channel?.readyState==='open')try{send({type:'stop',reason:reason.slice(0,250)});}catch{}
   auth=null;epoch++;running=connecting=busy=paused=false;rtcPreparing=false;pendingSignals=[];liveControl=null;controls=0;clearInputs();
   setActivity('ended');pings.clear();rtt.clear();nativeFps=null;
@@ -728,6 +729,13 @@ async function finish(reason,notify=true,flush=true){
   offlineRoles.clear();membership=null;membershipId=0;lastDeparture=null;hashHistory.clear();comparedFrames.clear();
   boot=null;peerHello.clear();peerLoaded.clear();loadedSent=pendingGo=false;earlyPackets=[];queue=null;room=null;resetStartupTiming();
   endedReason=reason;status(reason);overlay(reason);render();diagnostics();finishing=false;historyUI();
+  // Compression and user choice must not delay transport/room cleanup.
+  if(endedHistory?.recordFrames)endedHistory.seal(reason).then(blob=>{
+    if(promptEpoch!==historyPromptEpoch||historyHost!==endedHistory||auth||worker||entering)return;
+    pendingHistorySave=endedHistory;
+    $('save-size').textContent=`${endedHistory.recordFrames} 帧 · ${(blob.size/1024).toFixed(1)} KiB\n${reason}`;
+    $('save-dialog').showModal();
+  }).catch(error=>{if(historyHost===endedHistory){historyWarning='录像导出失败：'+error.message;historyUI();}});
   if(identity)try{await api('leave',{},identity);}catch{}
 }
 function action(fn){return async()=>{try{await fn();}catch(error){status(error.message);}};}
@@ -743,11 +751,21 @@ function change(action,extra={}){
   });
   lobbyChanges=request;return request;
 }
+function downloadHistory(blob){
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='th05-multiplayer.th05m';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
 $('history-save').onclick=async()=>{
-  try{const h=historyHost;if(!h)return;await flushHistory();const blob=h.blob||await h.seal();
-    const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='th05-multiplayer.th05m';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-  }catch(error){historyWarning='录像导出失败：'+error.message;}historyUI();
+  if(historyExporting)return;historyExporting=true;historyUI();
+  try{const h=historyHost;if(!h)return;await flushHistory();downloadHistory(await h.snapshot());}
+  catch(error){historyWarning='录像导出失败：'+error.message;}
+  finally{historyExporting=false;historyUI();}
 };
+$('save-replay').onclick=()=>{
+  if(pendingHistorySave?.blob)downloadHistory(pendingHistorySave.blob);
+  pendingHistorySave=null;$('save-dialog').close();
+};
+$('discard-replay').onclick=()=>{pendingHistorySave?.discard();pendingHistorySave=null;$('save-dialog').close();};
+$('save-dialog').addEventListener('cancel',event=>event.preventDefault());
 $('create').onclick=action(()=>enter('create'));$('join').onclick=action(()=>enter('join'));
 $('watch').onclick=action(async()=>{
   const code=$('room-code').value.trim();

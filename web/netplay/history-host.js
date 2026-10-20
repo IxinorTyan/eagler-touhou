@@ -5,14 +5,14 @@ import {encodeMultiplayerReplay} from './history-codec.js';
 // Browser-owned history feeds independent file, local-channel and optional
 // HTTP publishers. BroadcastChannel remains same-browser only; the current
 // server transport does not imply main-project lobby integration.
-export function createHistoryHost(header,{record=true,onChange=()=>{},onError=()=>{}}={}){
+export function createHistoryHost(header,{record=true,watch=true,onChange=()=>{},onError=()=>{}}={}){
   const history=new ConfirmedHistory(header),id=historySessionId(),channel=new BroadcastChannel('th05-history-'+id);
   let store=record?createReplayStore(failRecord):null,recordFrames=0,blob=null,sealing=null,closed=false,recordError=null;
   const requests=new Map();let network=null,networkURL=null,networkStatus='';
   function failRecord(error){recordError=error;store?.dispose();store=null;onError(error);onChange();}
   function post(message,to){channel.postMessage({...message,to});}
   channel.onmessage=({data})=>{
-    if(closed||data?.type!=='subscribe'||typeof data.viewer!=='string'||!/^[a-f0-9-]{36}$/.test(data.viewer))return;
+    if(!watch||closed||data?.type!=='subscribe'||typeof data.viewer!=='string'||!/^[a-f0-9-]{36}$/.test(data.viewer))return;
     const now=performance.now(),last=requests.get(data.viewer);
     if((last!==undefined&&now-last<2000)||(!requests.has(data.viewer)&&requests.size>=8))return;
     requests.set(data.viewer,now);
@@ -38,6 +38,18 @@ export function createHistoryHost(header,{record=true,onChange=()=>{},onError=()
       network?.kick();onChange();
     },
     seal,
+    get watch(){return watch;},
+    async snapshot(){
+      if(history.end)return blob||seal(history.end.reason);
+      if(!store||!recordFrames)throw recordError||Error('尚无已确认输入可导出');
+      // Copy a fixed confirmed prefix on demand; the live recorder keeps running.
+      const frames=recordFrames,batches=history.batches.slice(),copy=createReplayStore(()=>{});
+      try{
+        for(const batch of batches)copy.add(batch.bytes.slice());
+        return await encodeMultiplayerReplay({...history.header,frames,reason:'途中导出的已确认片段'},await copy.finish());
+      }finally{copy.dispose();}
+    },
+    discard(){store?.dispose();store=null;blob=null;recordFrames=0;onChange();},
     get networkURL(){return networkURL;},get networkStatus(){return networkStatus;},
     connectNetwork(identity){network=publishNetworkHistory(identity,history,{onLink:url=>{networkURL=url;onChange();},onStatus:value=>{networkStatus=value;onChange();}});},
     end(reason){

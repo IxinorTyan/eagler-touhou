@@ -26,6 +26,7 @@ export async function createFastCore({canvas,disk,patch,qa=false,core='simple',c
     viewSlot:slot=>worker.postMessage({type:'view-slot',slot}),
     gamePause:({onlyPause=false}={})=>worker.postMessage({type:'game-pause',onlyPause}),
     finishReplay:()=>worker.postMessage({type:'external-replay-finish'}),
+    setReplayCheat:value=>worker.postMessage({type:'frame-replay-cheat',value}),
     pauseReplay:value=>{worker.postMessage({type:'external-replay-pause',value});api.state=value?'paused':'running';api.bgm?.setPaused(value);if(value){api.audioOutput?.flush();api.audio?.suspend();}else api.audio?.resume();},
     pause(){api.state='paused';worker.postMessage({type:'pause'});api.audioOutput?.flush();api.audio?.suspend();},
     run(){api.state='running';worker.postMessage({type:'resume'});api.audio?.resume();},

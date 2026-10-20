@@ -7,6 +7,18 @@ const $=id=>document.getElementById(id),held=new Set(),controls=new Set(),sentKe
 let fastTimer=null,fastPulse=false;
 const keys={ArrowUp:265,ArrowDown:264,ArrowLeft:263,ArrowRight:262,KeyX:88,KeyZ:90,ShiftLeft:340,ShiftRight:340,Escape:256,Enter:257};
 let core=null,mode=null,busy=false,store=null,bytes=0,metadata=null,result=null,loaded=null,recording=null,paused=false,run=null,dialog=false,ending=false;
+let tainted=false,session=0,recordEpoch=0;
+const cheat=()=>$('invincible')?.checked||false;
+function invalidateReplay(){
+  recordEpoch++;tainted=true;store?.dispose();store=null;recording=null;loaded=null;result=null;bytes=0;
+  $('save-dialog').close();core?.setReplayCheat(cheat());
+  if(core?.state==='paused'&&mode==='record')core.pauseReplay(false);
+  status('已启用作弊，本局不保存 Replay。关闭作弊后，新的一局恢复录制。');update();
+}
+function setCheat(){
+  if(mode==='playback'){if($('invincible'))$('invincible').checked=false;return;}
+  if(cheat())invalidateReplay();else{core?.setReplayCheat(false);update();}
+}
 const status=text=>{$('status').textContent=text;};
 async function resources(language,testProfile){
   const names=['solo-disks.json','frame-replay.json','frame-replay-core.json','vendor/dosbox-x/runtime.json','music-patch.json'];
@@ -24,13 +36,18 @@ async function resources(language,testProfile){
   return {disk,exe,endingExe,patch:overlay.patch,compiled,identity};
 }
 function update(){
-  $('record').disabled=busy||!!core;$('finish').disabled=busy||mode!=='record'||!run||!!result||ending;
-  $('download').disabled=busy||!recording;$('play').disabled=busy||!(loaded||recording);
+  $('record').disabled=busy||!!core;$('finish').disabled=busy||mode!=='record'||!run||!!result||ending||tainted;
+  $('download').disabled=busy||!recording||tainted||cheat();$('play').disabled=busy||!(loaded||recording)||cheat();
   $('hold').disabled=busy||mode!=='playback'||!!result;$('stop').disabled=busy||!core;
   $('file').disabled=busy||!!core;$('language').disabled=busy||!!core;
   $('test-case').disabled=busy||!!core;
+  if($('invincible'))$('invincible').disabled=busy||mode==='playback';
+  if($('restart'))$('restart').disabled=busy;
+  for(const id of ['pause','capture','sound'])if($(id))$(id).disabled=busy||!core;
+  if($('pause'))$('pause').textContent=mode==='playback'?'暂停 / 继续回放':'暂停游戏';
+  if($('replay-state'))$('replay-state').textContent=mode==='playback'?'REPLAY PLAYBACK':cheat()||tainted?'REPLAY OFF · 本局作弊':run&&!result?'REPLAY REC':'REPLAY AUTO · 进入关卡后录制';
 }
-function close(){release();core?.stop();core=null;store?.dispose();store=null;held.clear();mode=null;paused=false;run=null;dialog=false;ending=false;$('save-dialog').close();$('end-dialog').close();$('hold').textContent='暂停播放';update();}
+function close(){session++;recordEpoch++;release();core?.stop();core=null;store?.dispose();store=null;held.clear();mode=null;paused=false;run=null;dialog=false;ending=false;$('save-dialog').close();$('end-dialog').close();$('hold').textContent='暂停播放';update();}
 function failure(error){close();busy=false;status('实验停止：'+error.message);update();}
 function key(code,down){
   if(!core)return;
@@ -39,7 +56,9 @@ function key(code,down){
   if(pressed)sentKeys.add(code);else sentKeys.delete(code);core.key(code,pressed);
 }
 async function start(playback=null){
+  if(playback&&cheat()){status('请先关闭作弊，再播放 Replay。');return;}
   if(busy)return;busy=true;close();result=null;if(!playback)recording=null;bytes=0;
+  tainted=!playback&&cheat();const owner=session;
   mode=playback?'playback':'record';const language=playback?.header.language||$('language').value;
   const testProfile=playback?playback.header.testProfile:$('test-case').value||undefined;
   $('test-case').value=testProfile||'';
@@ -51,18 +70,24 @@ async function start(playback=null){
     const canvas=document.createElement('canvas');canvas.id='canvas';canvas.width=640;canvas.height=400;canvas.tabIndex=0;canvas.style.cssText=$('canvas').style.cssText;canvas.setAttribute('aria-label','TH05 单人 Replay 画面');$('canvas').replaceWith(canvas);
     core=await createFastCore({canvas,disk,patch,solo:true,independentMusic:true,coreTask:Promise.resolve(compiled),frameReplay:{
       mode,exe,endingExe,header:playback?.header,inputs:playback?.inputs.slice(),
-      onRun:started=>{ending=false;if(mode==='record'){store?.dispose();store=createReplayStore(failure);result=null;bytes=0;}run=started;status(mode==='record'?'正在记录游戏帧输入 · 暂停菜单与等待时间不写入录像。':'游戏正在播放 Replay · Esc / 空格暂停，剧情可按 Z 或 Enter 推进。');update();},
+      onRun:started=>{ending=false;recordEpoch++;tainted=!!started.tainted||cheat();if(mode==='record'){store?.dispose();store=tainted?null:createReplayStore(failure);recording=null;result=null;bytes=0;}run=started;status(tainted?'本局已启用作弊，不保存 Replay。':mode==='record'?'正在记录游戏帧输入 · 暂停菜单与等待时间不写入录像。':'游戏正在播放 Replay · Esc / 空格暂停，剧情可按 Z 或 Enter 推进。');update();},
       onDialog:active=>{releaseKeys();dialog=active;updateFast();if(mode==='playback')status(active?'剧情中 · Z / Enter 推进，按住 Ctrl 连续对话，Esc / 空格暂停。':'游戏正在播放 Replay · Esc / 空格暂停。');},
       onPhase:()=>{ending=true;status('已通关 · 正在跳过结局动画并生成成绩／评价画面…');update();},
-      onChunk:inputs=>{bytes+=inputs.length;store?.add(inputs);},
+      onChunk:inputs=>{if(!tainted){bytes+=inputs.length;store?.add(inputs);}},
       onEnd:async ended=>{
+        if(owner!==session)return;
+        if(mode==='record'&&(tainted||ended.discarded)){result=null;continueGame();status('本局使用过作弊，不保存 Replay；可继续游玩。');return;}
         release();result=ended;busy=true;update();
+        const sealing=recordEpoch;
         try{
           if(mode==='record'){
-            recording=await encodeFrameReplay({...metadata,...ended},await store.finish());
+            const blob=await encodeFrameReplay({...metadata,...ended},await store.finish());
+            if(owner!==session||sealing!==recordEpoch||tainted||cheat())return;
+            recording=blob;
             const endpoint=ended.ending?'已到达通关成绩／评价画面。':'本局结束。',label=testProfile?'结算流程测试录像 · ':'';
             status(`${label}${endpoint} ${ended.frames} 游戏帧，文件 ${(recording.size/1024).toFixed(1)} KiB。`);
-            $('save-size').textContent=`${label}${endpoint} 本局 ${ended.frames} 游戏帧，录像 ${(recording.size/1024).toFixed(1)} KiB。`;$('save-dialog').showModal();
+            const character=['灵梦','魔理沙','魅魔','幽香'][ended.state.character],rank=['Easy','Normal','Hard','Lunatic','Extra'][ended.state.rank];
+            $('save-size').textContent=`${label}${character} · ${rank} · ${ended.ending?'通关':`第 ${ended.state.stage+1} 关`}\n${ended.frames} 帧 · ${(recording.size/1024).toFixed(1)} KiB`;$('save-dialog').showModal();
           }else {
             core.pauseReplay(true);
             status(ended.matches?`Replay 播放完成 · ${ended.frames} 帧，关键游戏状态校验一致。`:'Replay 失步：结束游戏状态不一致。');
@@ -75,6 +100,8 @@ async function start(playback=null){
       },
     }});
     core.onError=failure;core.onExit=()=>{close();status('游戏核心已退出。');};
+    if(cheat())core.setReplayCheat(true);
+    if($('bgm-volume'))core.bgm?.setVolume(Number($('bgm-volume').value)/100);
     status(playback?'正在载入关卡，随后由游戏播放 Replay…':'等待进入关卡 · 菜单和演示不记录，音乐由浏览器独立播放。');canvas.focus();
   }catch(e){failure(e);}finally{busy=false;update();}
 }
@@ -91,6 +118,7 @@ for(const type of ['keydown','keyup'])window.addEventListener(type,event=>{
     else if(core&&!(result&&mode==='playback')&&!event.target?.closest?.('input,select,button'))controls.add(event.code);
     updateFast();return;
   }
+  if($('save-dialog').open||$('end-dialog').open)return;
   if(mode==='playback'&&core&&!result&&['Escape','Space'].includes(event.code)&&!event.target?.closest?.('input,select,button')){event.preventDefault();if(type==='keydown'&&!event.repeat)togglePause();return;}
   if(!(event.code in keys)||event.ctrlKey||event.metaKey||event.altKey||event.target?.closest?.('input,select,button'))return;
   if(!core)return;event.preventDefault();if((result&&mode==='playback')||busy||$('save-dialog').open)return;
@@ -104,7 +132,7 @@ window.addEventListener('blur',release);document.addEventListener('visibilitycha
 $('record').onclick=()=>{loaded=null;start();};$('finish').onclick=()=>core?.finishReplay();
 $('play').onclick=async()=>{try{await start(loaded||await decodeFrameReplay(recording));}catch(e){failure(e);}};
 $('file').onchange=async()=>{try{const file=$('file').files[0];if(!file)return;loaded=await decodeFrameReplay(file);recording=null;$('test-case').value=loaded.header.testProfile||'';status(`已导入${loaded.header.testProfile?'结算流程测试录像':'录像'} · ${loaded.header.frames} 帧，可由游戏播放。`);update();}catch(e){loaded=null;failure(e);}};
-function download(){if(!recording)return;const url=URL.createObjectURL(recording),a=document.createElement('a');a.href=url;a.download=metadata?.testProfile?`th05-test-${metadata.testProfile}.th05r`:'th05-solo.th05r';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function download(){if(!recording||tainted||cheat())return;const url=URL.createObjectURL(recording),a=document.createElement('a');a.href=url;a.download=metadata?.testProfile?`th05-test-${metadata.testProfile}.th05r`:'th05-solo.th05r';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 $('download').onclick=download;
 function continueGame(){
   $('save-dialog').close();store?.dispose();store=null;paused=false;
@@ -118,9 +146,22 @@ $('replay-again').onclick=()=>$('play').onclick();
 $('end-replay').onclick=()=>{close();status('Replay 已结束，可以导入其他文件或启动游戏。');};
 $('end-dialog').addEventListener('cancel',event=>{event.preventDefault();$('end-replay').click();});
 $('stop').onclick=()=>{close();status('模拟器已关闭。');};
+if($('invincible'))$('invincible').onchange=setCheat;
+if($('restart'))$('restart').onclick=()=>{loaded=null;start();};
+if($('pause'))$('pause').onclick=()=>{release();if(mode==='playback')togglePause();else core?.gamePause();$('canvas').focus();};
+if($('fullscreen'))$('fullscreen').onclick=()=>{const target=$('game-stage');if(document.fullscreenElement)document.exitFullscreen();else target?.requestFullscreen().catch(error=>status(error.message));};
+if($('sound'))$('sound').onclick=()=>core?.audio?.resume();
+if($('bgm-volume'))$('bgm-volume').oninput=()=>core?.bgm?.setVolume(Number($('bgm-volume').value)/100);
+if($('capture'))$('capture').onclick=async()=>{if(!core)return;try{const url=URL.createObjectURL(await core.capture()),a=document.createElement('a');a.href=url;a.download='th05-solo.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(e){status(e.message);}};
+for(const button of document.querySelectorAll('[data-native-key]')){
+  const code=Number(button.dataset.nativeKey);
+  button.onpointerdown=e=>{e.preventDefault();button.setPointerCapture(e.pointerId);key(code,true);};
+  for(const type of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(type,()=>key(code,false));
+}
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&core){release();if(mode==='playback'&&!paused&&!result)togglePause();else if(mode==='record')core.gamePause({onlyPause:true});}});
 setInterval(()=>{if(core&&(mode==='record'||!result))$('diagnostics').textContent=JSON.stringify({mode,bytes,state:core.readState(),music:core.bgm?.status,musicError:core.musicError},null,2);},500);
 if(new URLSearchParams(location.search).get('qa')==='1')window.th05ReplayQA={
-  start:()=>start(),key,finish:()=>core?.finishReplay(),read:()=>({mode,bytes,result,run,savePrompt:$('save-dialog').open,state:core?.readState(),music:core?.bgm?.status,musicError:core?.musicError}),
+  start:()=>start(),key,finish:()=>core?.finishReplay(),read:()=>({mode,bytes,result,run,tainted,hasRecording:!!recording,hasStore:!!store,savePrompt:$('save-dialog').open,state:core?.readState(),music:core?.bgm?.status,musicError:core?.musicError}),
   exportBase64:async()=>{const data=new Uint8Array(await recording.arrayBuffer());let text='';for(let i=0;i<data.length;i+=32768)text+=String.fromCharCode(...data.subarray(i,i+32768));return btoa(text);},
   play:async()=>start(await decodeFrameReplay(recording)),close,
 };

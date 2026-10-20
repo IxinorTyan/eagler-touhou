@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TH05 · 单人 Replay</title><link rel="icon" href="data:,"><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="site-adapter.css"></head>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TH05 · 单人 Replay</title><link rel="icon" href="data:,"><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="site-adapter.css"><link rel="stylesheet" href="replay-menu.css"></head>
 <body class="shell"><header class="masthead"><a class="brand" href="solo.html">TOUHOU / 05</a><small>单人 REPLAY</small></header>
 <main><header class="intro"><h1>游戏输入 Replay</h1><p>保存开局条件和按帧操作，导入文件后由游戏重新运行。浏览器负责记录和文件，游戏内没有录像缓冲。</p></header>
 <section class="panel"><div class="settings-grid"><label>语言<select id="language"><option value="cn">汉化版</option><option value="jp">日文版</option></select></label><label>导入录像<input id="file" type="file" accept=".th05r"></label><label>游戏／结算测试<select id="test-case"><option value="">正常游戏</option><option value="good">普通通关 · Good Ending 测试</option><option value="bad">普通通关 · Bad Ending 测试</option><option value="extra">EX 通关测试</option></select></label></div>
@@ -12,4 +12,4 @@
 <details><summary>实验详情</summary><pre id="diagnostics"></pre></details></main>
 <dialog id="save-dialog" aria-labelledby="save-title"><h2 id="save-title">保存本局 Replay？</h2><p id="save-size"></p><div class="row"><button id="save-replay" class="primary">保存录像</button><button id="discard-replay">不保存</button></div></dialog>
 <dialog id="end-dialog" aria-labelledby="end-title"><h2 id="end-title">Replay 播放结束</h2><p id="end-summary"></p><div class="row"><button id="replay-again" class="primary">再播放一次</button><button id="end-replay">结束回放</button></div></dialog>
-<script type="module" src="solo-frame-replay.js"></script></body></html>
+<script type="module" src="replay-menu.js"></script><script type="module" src="solo-frame-replay.js"></script></body></html>

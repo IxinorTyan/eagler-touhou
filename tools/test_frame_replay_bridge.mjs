@@ -43,3 +43,15 @@ const early=fixture(),e=create(early,{mode:'playback',header:r.result,inputs:Uin
 e.bridge.signal(0x7ff0,early.packed);e.bridge.signal(0x7ff1,early.packed);
 assert.throws(()=>e.bridge.signal(0x7ff1,early.packed),/尚未触发通关/,'input exhaustion must not masquerade as a clear');
 console.log('PASS: clear input commit, MAIN→MAINE lifetime, score endpoint, slowdown metadata and mismatch rejection');
+const cheated=fixture(),c=create(cheated,{mode:'record'});
+c.bridge.signal(0x7ff0,cheated.packed);c.bridge.signal(0x7ff1,cheated.packed);
+c.bridge.setCheat(true);c.bridge.signal(0x7ff1,cheated.packed);
+assert.equal(c.bridge.status.bytes,0);assert.equal(cheated.mod.HEAPU8[cheated.data+0x36d0+30],2);
+c.bridge.setCheat(false);c.bridge.finish();assert.equal(c.result,null,'turning cheat off cannot re-enable this run');
+c.bridge.signal(0x7ff2,cheated.packed);assert.equal(c.result.discarded,true);assert.deepEqual(c.chunks,[]);
+c.bridge.signal(0x7ff0,cheated.packed);assert.equal(c.bridge.status.tainted,false,'fresh native MAIN resets the per-run taint');
+c.bridge.signal(0x7ff1,cheated.packed);c.bridge.signal(0x7ff1,cheated.packed);c.bridge.finish();
+assert(!c.result.discarded);assert.equal(c.chunks.length,1,'the clean next run has a fresh input buffer');
+const blocked=create(fixture(),{mode:'playback',header:r.result,inputs:Uint8Array.from(r.chunks)});
+assert.throws(()=>blocked.bridge.setCheat(true),/不能启用作弊/);
+console.log('PASS: cheat destroys recording, native invulnerability, sticky run taint, clean next run and playback cheat rejection');

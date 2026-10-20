@@ -55,24 +55,39 @@ const info=p=>p.evaluate(()=>th05Lan.info);
   const host=await context.newPage(),guest=await context.newPage();
   for(const p of [host,guest]){p.on('pageerror',e=>errors.push(e.message));await p.goto(origin+'/lan.html');await p.waitForFunction(()=>!document.getElementById('create').disabled);}
   await host.click('#create');await host.waitForFunction(()=>!!th05Lan.info.room);
-  await guest.uncheck('#history-record');await guest.fill('#room-code','1234');await guest.click('#join');await guest.waitForFunction(()=>!!th05Lan.info.room);
+  await guest.uncheck('#history-enabled');await guest.fill('#room-code','1234');await guest.click('#join');await guest.waitForFunction(()=>!!th05Lan.info.room);
   await host.click('#ready');await guest.click('#ready');await host.waitForFunction(()=>!document.getElementById('start').disabled);await host.click('#start');
   for(const p of [host,guest])await p.waitForFunction(()=>th05Lan.info.running||!!th05Lan.info.endedReason,null,{timeout:120000});
   report.boot=await Promise.all([host,guest].map(info));assert(report.boot.every(x=>x.running),JSON.stringify(report.boot.map(x=>x.endedReason)));
   const watch=await host.getAttribute('#history-watch','href'),viewer=await context.newPage();viewer.on('pageerror',e=>errors.push(e.message));await viewer.goto(origin+'/'+watch+'&qa=1');
   await host.waitForFunction(()=>th05Lan.info.history.frames>=120,null,{timeout:60000});
   const download=host.waitForEvent('download');await host.click('#history-save');const file=path.join(reports,'lan-history-prefix.th05m');await (await download).saveAs(file);
-  report.guestHistory=(await info(guest)).history;assert.equal(report.guestHistory.recording,false);assert(report.guestHistory.frames>0);assert.equal(await guest.isDisabled('#history-save'),true);
-  report.export=await info(host);assert.equal(report.export.running,true);assert.equal(report.export.history.recording,false);
+  report.guestHistory=(await info(guest)).history;assert.equal(report.guestHistory.recording,true);assert(report.guestHistory.frames>0);assert.equal(await guest.isDisabled('#history-save'),false);
+  report.export=await info(host);assert.equal(report.export.running,true);assert.equal(report.export.history.recording,true);
   // Saving must not end the game or stop the independent spectator stream.
   await host.waitForFunction(n=>th05Lan.info.history.frames>=n+120,report.export.history.frames,{timeout:60000});
   report.afterExport=await info(host);assert(report.afterExport.frame>report.export.frame);
   await host.click('#leave');await host.waitForFunction(()=>!th05Lan.info.room);
+  await host.waitForFunction(()=>document.getElementById('save-dialog').open);
+  await host.screenshot({path:path.join(reports,'lan-save-menu.png'),fullPage:true});
+  const finalDownload=host.waitForEvent('download');await host.click('#save-replay');
+  const finalFile=path.join(reports,'lan-history-full.th05m');await (await finalDownload).saveAs(finalFile);
+  await guest.waitForFunction(()=>document.getElementById('save-dialog').open,null,{timeout:30000});
+  await guest.click('#discard-replay');assert.equal(await guest.isDisabled('#history-save'),true);
+  assert.equal(await guest.isVisible('#history-watch'),false);
+  report.endPrompt={hostSaved:true,guestDiscarded:true};
   await viewer.waitForFunction(()=>th05CoopReplayQA.read().completed||th05CoopReplayQA.read().error,null,{timeout:90000});
   report.live=await viewer.evaluate(()=>th05CoopReplayQA.read());assert.equal(report.live.error,null);assert.equal(report.live.cursor,report.live.frames);
   await viewer.click('#end-close');await viewer.click('#stop');await viewer.setInputFiles('#file',file);await viewer.click('#play');
   await viewer.waitForFunction(()=>th05CoopReplayQA.read().completed||th05CoopReplayQA.read().error,null,{timeout:90000});
   report.replay=await viewer.evaluate(()=>th05CoopReplayQA.read());assert.equal(report.replay.error,null);assert.equal(report.replay.cursor,report.replay.frames);assert(report.replay.frames<report.live.frames);
+  await viewer.click('#end-close');await viewer.click('#stop');await viewer.setInputFiles('#file',finalFile);await viewer.click('#play');
+  await viewer.waitForFunction(()=>th05CoopReplayQA.read().completed||th05CoopReplayQA.read().error,null,{timeout:90000});
+  report.fullReplay=await viewer.evaluate(()=>th05CoopReplayQA.read());assert.equal(report.fullReplay.error,null);assert.equal(report.fullReplay.cursor,report.live.frames);
+  // Lobby-only exits have no new recording and must not reopen the previous prompt.
+  state.phase='lobby';state.ready.host=false;state.ready.guest=false;
+  await host.click('#create');await host.waitForFunction(()=>!!th05Lan.info.room);await host.click('#leave');await host.waitForFunction(()=>!th05Lan.info.room);
+  await host.waitForTimeout(500);assert.equal(await host.evaluate(()=>document.getElementById('save-dialog').open),false);
   assert.deepEqual(errors,[]);console.log('PASS actual LAN UI, delayed input, swapped seats, export while running, independent live tail and fresh-core file replay');
  }finally{report.errors=errors;fs.writeFileSync(path.join(reports,'lan-history.json'),JSON.stringify(report,null,2));await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

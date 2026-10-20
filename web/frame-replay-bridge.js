@@ -7,6 +7,7 @@ export function createFrameReplayBridge({mod,patch,config,onRun,onChunk,onEnd,on
   let phase='battle',battleEnd=null,slowFrames=null;
   let buffer=new Uint8Array(4096),checks=[];
   const playback=config.mode==='playback',source=config.inputs,expected=config.header;
+  let cheat=false,tainted=false;
   function locate(packed){
     const heap=mod.HEAPU8,ds=packed>>>16,cs=packed&65535;
     if(base>=0){data=base+ds*16;return;}
@@ -48,6 +49,7 @@ export function createFrameReplayBridge({mod,patch,config,onRun,onChunk,onEnd,on
   }
   function scoreReady(){
     if(phase!=='ending'||done)return;
+    if(tainted){done=true;onEnd({discarded:true,reason:'cheat'});return;}
     const sequence=mod.HEAPU8[resident+26];
     if(slowFrames===null)throw Error('Replay 缺少通关统计提交标记');
     const ending={sequence,endpoint:'score',residentHash:residentHash(),slowFrames};
@@ -65,6 +67,11 @@ export function createFrameReplayBridge({mod,patch,config,onRun,onChunk,onEnd,on
       ...(playback?{matches:frames===expected.frames&&hash===expected.gameHash}:{} )});
   }
   return {
+    setCheat(value){
+      if(playback)throw Error('Replay 播放期间不能启用作弊');
+      cheat=!!value;
+      if(cheat){tainted=true;pending=null;checks=[];buffer=new Uint8Array(0);used=0;lastHash=lastState=null;battleEnd=null;}
+    },
     signal(port,packed){
       if(done){
         if(playback||port!==0x7ff0)return;
@@ -72,6 +79,7 @@ export function createFrameReplayBridge({mod,patch,config,onRun,onChunk,onEnd,on
         base=data=resident=-1;initial=null;started=done=dialog=false;frames=used=0;
         pending=lastHash=lastState=null;checks=[];buffer=new Uint8Array(4096);
         phase='battle';battleEnd=null;slowFrames=null;
+        tainted=cheat;buffer=new Uint8Array(tainted?0:4096);
       }
       // MAINE has its own DS and no MAIN mailbox. Keep the browser's resident
       // pointer across exec; never relocate MAIN from an ending marker.
@@ -91,6 +99,7 @@ export function createFrameReplayBridge({mod,patch,config,onRun,onChunk,onEnd,on
       locate(packed);
       const h=mod.HEAPU8,v=new DataView(h.buffer);
       if(port===0x7ff2){
+        if(tainted&&started){done=true;onEnd({discarded:true,reason:'cheat'});return;}
         const sequence=h[resident+26];
         if(started&&[253,254,255].includes(sequence)){beginEnding(sequence);return;}
         if(playback&&expected.ending)throw Error('Replay 提前退出，未进入预期结局');
@@ -101,6 +110,7 @@ export function createFrameReplayBridge({mod,patch,config,onRun,onChunk,onEnd,on
         dialog=port===0x7ff3;onDialog(dialog);return;
       }
       if(port===0x7ff0){
+        if(!started&&!playback){tainted=cheat;buffer=new Uint8Array(tainted?0:4096);}
         resident=base+v.getUint16(data+0x41fe,true)*16+v.getUint16(data+0x41fc,true);
         if(h[resident+0x1f])return; // Native attract demos do not create a run.
         if(playback)h.set(expected.initial,resident);
@@ -108,7 +118,14 @@ export function createFrameReplayBridge({mod,patch,config,onRun,onChunk,onEnd,on
         return;
       }
       if(!initial||h[resident+0x1f])return;
-      if(!started){started=true;onRun(state());}
+      if(!started){started=true;onRun({...state(),tainted});}
+      if(tainted){
+        if(h[data+0x576c]===1){done=true;onEnd({discarded:true,reason:'cheat'});return;}
+        // The native player's invulnerability timer is refreshed at the
+        // synchronous input boundary. No cheat ever enters a replay file.
+        if(cheat)h[data+0x36d0+30]=2;
+        return;
+      }
       if(!playback)commit();
       if(h[data+0x576c]===1||(playback&&frames===source.length)){
         if(playback&&expected.ending)throw Error('Replay 输入已用完，但游戏尚未触发通关');
@@ -130,8 +147,8 @@ export function createFrameReplayBridge({mod,patch,config,onRun,onChunk,onEnd,on
       }
       frames++;
     },
-    finish(){if(started&&phase==='battle'&&frames>1&&!playback)finish(false);},
+    finish(){if(!tainted&&started&&phase==='battle'&&frames>1&&!playback)finish(false);},
     get dialog(){return dialog;},get launched(){return initial!==null;},get started(){return started;},get done(){return done;},
-    get status(){return {mode:config.mode,frames,started,done,dialog,phase,bytes:frames,clockBytes:0};},
+    get status(){return {mode:config.mode,frames,started,done,dialog,phase,bytes:tainted?0:frames,clockBytes:0,tainted,cheat};},
   };
 }

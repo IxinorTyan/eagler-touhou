@@ -79,6 +79,8 @@
 !/tools/test_network_history.cjs
 !/tools/analyze_replay_checkpoints.cjs
 !/tools/test_frame_replay_bridge.mjs
+!/tools/test_solo_replay_ui.cjs
+!/tools/build_replay_menu_font.py
 !/tools/unpack_replay_maine.py
 !/patches/
 /patches/*

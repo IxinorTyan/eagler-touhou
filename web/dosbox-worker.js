@@ -224,6 +224,7 @@ onmessage=async({data})=>{try{
   if(data.type==='frame-ack'){frameTransfers.delete(data.seq);return;}
   if(data.type==='view-slot'&&Number.isInteger(data.slot)&&data.slot>=0&&data.slot<3){viewSlot=data.slot;mod.framePresenter?.flush();return;}
   if(data.type==='presentation-active'){presentationActive=!!data.value;return;}
+  if(data.type==='frame-replay-cheat'){frameBridge?.setCheat(data.value);return;}
   if(data.type==='input'){
     if(soloMode){soloInput.write(mod.HEAPU8,data.input,paused);return;}
     input=data.input;if(input.p2&16){p2Pulse|=16;p2PulseTick=nativeInputTick();}if(input.p3&16){p3Pulse|=16;p3PulseTick=nativeInputTick();}inputs();nativeTouch?.(mod?.HEAPU8,mailbox,patch,input.touch||[0,0],paused||nativeStatus().paused);return;
