@@ -9,12 +9,13 @@ import {PauseMenu} from './pause.js';
 import {createPersonalHud} from './personal-hud.js';
 import {readSoloFault} from '../solo-fault.js';
 import {LocalSe,readNativeSe} from './local-se.js';
+import {assetBytes} from '../preload-cache.js';
 const workerHost=globalThis.th04WorkerHost;
 const canvas=workerHost?.canvas??document.getElementById('canvas'),details=workerHost?{}:document.getElementById('details');
 const nativeCanvas=workerHost?new OffscreenCanvas(640,400):document.createElement('canvas');
 nativeCanvas.width=640;nativeCanvas.height=400;
 if(!workerHost){nativeCanvas.hidden=true;nativeCanvas.style.display='none';document.body.append(nativeCanvas);}
-function notifyParent(message){if(workerHost)workerHost.notify(message);else window.parent.postMessage(message,location.origin);}
+function notifyParent(message){if(workerHost)workerHost.notify(message);else if(typeof globalThis.th04RuntimeNotify==='function')globalThis.th04RuntimeNotify(message);}
 const presentPersonalHud=createPersonalHud(canvas,nativeCanvas);
 let rawPresentation=false,presentationCount=0,presentationPending=false;
 let pointPreferences={focus:true,always:false};
@@ -79,7 +80,7 @@ document.getElementById('sound').onclick=async()=>{
 };
 }
 async function get(path,type='json'){
-  const response=await fetch(path,{cache:'no-cache'});if(!response.ok)throw Error(`资源读取失败：${path}`);
+  const response=await fetch(new URL(path,import.meta.url),{cache:'no-cache'});if(!response.ok)throw Error(`资源读取失败：${path}`);
   if(type==='arrayBuffer'&&response.body){
     const total=Number(response.headers.get('content-length'))||0,reader=response.body.getReader(),chunks=[];
     let received=0,last=0;
@@ -108,11 +109,11 @@ async function boot(config){
   await bootProgress('下载游戏磁盘与版本清单',1);
   if(typeof WebAssembly==='undefined')throw Error('浏览器不支持 WebAssembly，请使用最新版 Chrome / Edge / Safari');
   if(typeof DecompressionStream==='undefined')throw Error('浏览器缺少 gzip 解压支持，请更新浏览器');
-  const [compressed,meta,manifest,version]=await Promise.all([
-    get('../'+selected.coopDisk,'arrayBuffer'),get('../'+selected.coopMeta),get('../'+selected.coopPatch),get('./runtime.json')]);
+  const [meta,manifest,version]=await Promise.all([
+    get('../'+selected.coopMeta),get('../'+selected.coopPatch),get('./runtime.json')]);
   patch=manifest;
   await bootProgress('解压游戏磁盘',2);
-  const disk=new Uint8Array(await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+  const disk=await assetBytes(selected.coopDisk,{hash:meta.sha256,size:meta.size,gzip:true});
   await bootProgress('校验游戏磁盘（局域网 HTTP 下可能需要更长时间）',3);
   if(disk.length!==meta.size||await sha256(disk)!==meta.sha256)throw Error('游戏磁盘校验失败，请刷新页面');
   installConfig(disk,patch,encodeConfig(config));
@@ -130,7 +131,11 @@ async function boot(config){
   }
   for(const edit of sound.edits)edit.targets.forEach((at,i)=>{disk[at]=edit.values[i];});
   await bootProgress('下载、编译并初始化 DOSBox-X WASM 与音频设备',5);
-  emulator=await NP21.create({canvas:nativeCanvas,artPatch:patch,lockstep:true,externalEffects:true,
+  const tracked=config.rollback!==false&&WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,5,2,0,1,0,1]));
+  const core=tracked?'wdosbox-x-rollback-tracked.wasm':'wdosbox-x-rollback.wasm';
+  const wasmHash=tracked?version.write_journal?.wasm_sha256:version.rollback_wasm?.sha256;
+  const wasmBinary=await assetBytes(`vendor/dosbox-x/${core}`,{hash:wasmHash});
+  emulator=await NP21.create({canvas:nativeCanvas,artPatch:patch,wasmBinary,lockstep:true,externalEffects:true,
     ...(workerHost?{workerRuntime:true,audioContext:workerHost.audioContext}:{}),rollbackEnabled:config.rollback!==false,lockstepEpoch:version.epoch,
     ExMemory:7,Latencys:40,SampleHz:44100,SNDboard:4,
     no_mouse:true,use_menu:false,fontfile:'font.bmp',

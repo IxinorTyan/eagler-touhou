@@ -27,7 +27,7 @@
       "payload_bytes_added": 0
     }
   ],
-  "sha256": "6a701f8e5421cd44f09bfdaa79ae4888d6fd391acb68e11390b3824f0645a4e6",
+  "sha256": "372e19ee88af49d41dbd3e1c80001a08a283216876ec500483fc11341729ba88",
   "insert_image_offset": 78048,
   "insert_size": 1584,
   "code_segment": 2735,
@@ -144,6 +144,15 @@
       "replacement": "e9ea6c909090",
       "target_cs_offset": 35816,
       "name": "point-bullet full six-row blit"
+    },
+    {
+      "image_offset": 48744,
+      "original": "56578bc8c1f8038bf880e10732e48a878a0fd3c88bdac1e20603fac1ea0203faba00a88ec2c1ee048bce03cb81f9900177068bce33d2eb09b990012bcb8bd62bd10ae4740990ab83c74ee2faeb06aa83c74fe2fa0bd2740881ef007d87caebe15f5ec390",
+      "replacement": "565789c1c1f8039780e10730e48a878a0fd3c889d36bd25001d7ba00a88ec2c1ee04b9900129d989f229ca770489f131d208e4741a49d1e9417207ab83c74e49e313ab2689454e81c79e00e2f5eb06aa83c74fe2fa09d2740881ef007d87d1ebd05f5ec3",
+      "target_cs_offset": 4984,
+      "name": "in-place twin-row Marisa laser body; native row write order",
+      "in_place": true,
+      "payload_bytes_added": 0
     }
   ],
   "near_code_guard": {
@@ -175,7 +184,7 @@
     "main_md5": "06d74719b6f72b11014a392fd34d5f57"
   },
   "disk": {
-    "sha256": "60e1408d1daccc0ee5a0d7d86259baabc03cec5410cfef2422d23a48a6635a83",
+    "sha256": "6e73b2c640eb0da0b8f1bcae4dd195116cb25b0017a7cb718448e94d42a09c8e",
     "size": 21415936
   },
   "unchanged_files": {

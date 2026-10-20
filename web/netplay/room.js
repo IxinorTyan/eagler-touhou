@@ -10,11 +10,14 @@ import {mergeDeparture} from './membership.js';
 import {downloadFaultReport} from '../solo-fault.js';
 import {createRelay} from './relay.js';
 import {loadRtcConfiguration,refreshRtcPath,describeRtcConfiguration,countIceCandidate,describeIceCandidates,recordIceServerError} from './connection.js';
+import {assetBytes,freshJSON} from '../preload-cache.js';
+import {gameVersion} from '../game-version.js';
+import {bgmVersion,onBgmVersion} from '../bgm-version.js';
 const $=id=>document.getElementById(id),roles=['host','guest','guest2'];
 const label=role=>({host:'房主',guest:'客机 1',guest2:'客机 2'})[role];
 const status=text=>{$('status').textContent=text;player.note(text);};
 const settingNames=['players','difficulty','lives','bombs'];
-let session,state,iframe,runtime,queue,localReady;
+let session,state,runtime,queue,localReady;
 const mode=readNetworkMode(),networkMode=mode.network;
 const useRelay=mode.transport==='ws';
 // Legacy URL preference only seeds a newly created room. Joining clients
@@ -24,6 +27,7 @@ let inputPolicy;
 let timingSent=false,runDelay=null,runInputDelay=null;
 let relay;
 let preparing=false,running=false,stopped=false,busy=false,runRequested=false;
+let preloadKey='',preloadPromise=null,preloadGeneration=0,preloadRetryAt=0;
 let pollTimer,heartbeatTimer,loadTimer,raf,wakeTimer=null,wakeAt=0;
 let wakePending=false,wakeToken=0;
 const wakeChannel=new MessageChannel();
@@ -286,6 +290,7 @@ function render(){
   const slot=state.slots[session.role],lobby=state.phase==='lobby'&&!stopped,active=activeRoles();
   $('entry').hidden=true;$('lobby').hidden=false;$('transport').disabled=true;
   $('room-info').textContent=`房间 ${session.room} · ${state.settings.players} 人模式 · ${state.settings.language==='jp'?'日文版':'汉化版'} · 你是${label(session.role)} · ${slot===null?'尚未选座':`P${slot+1}`}`;
+  if(state.phase==='lobby')prepareRoomAssets(state).catch(()=>{});
   $('seats').textContent=Array.from({length:state.settings.players},(_,n)=>{
     const role=active.find(r=>state.slots[r]===n);return `P${n+1}：${role?`${label(role)}${peers.get(role)?.offline?'（已离线）':state.ready[role]?'（已准备）':''}`:'空位'}`;
   }).join(' / ');
@@ -312,6 +317,39 @@ function render(){
   $('ready').textContent=state.ready[session.role]?'取消准备':'准备';
   $('start').hidden=session.role!=='host';
   $('start').disabled=!lobby||busy||!active.every(role=>state.present[role]&&state.ready[role]);
+}
+async function prepareRoomAssets(value){
+  const language=value.settings.language,rollback=value.settings.rollback===true;
+  const key=[language,rollback,bgmVersion()].join(':');
+  if(key===preloadKey&&preloadPromise)return preloadPromise;
+  if(performance.now()<preloadRetryAt)return;
+  const generation=++preloadGeneration;preloadKey=key;
+  const report=text=>{if(generation===preloadGeneration&&state?.phase==='lobby'&&!stopped)$('resource-status').textContent=text;};
+  preloadPromise=(async()=>{
+    report('正在预载游戏磁盘、DOSBox-X、音效与开场音乐…');
+    const selected=gameVersion(language);
+    const [meta,version,patch,soundManifest,bgmManifest,alternate]=await Promise.all([
+      freshJSON(selected.coopMeta),freshJSON('netplay/runtime.json'),freshJSON(selected.coopPatch),
+      freshJSON('assets/se-manifest.json'),freshJSON('bgm/manifest.json'),freshJSON('bgm/akyu/manifest.json')]);
+    const tracked=rollback&&WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,5,2,0,1,0,1]));
+    const core=tracked?'wdosbox-x-rollback-tracked.wasm':'wdosbox-x-rollback.wasm';
+    const coreHash=tracked?version.write_journal?.wasm_sha256:version.rollback_wasm?.sha256;
+    if(!coreHash)throw Error('DOSBox-X 版本清单缺少所选联机核心');
+    const trackManifest=bgmVersion()==='new'&&alternate.tracks?alternate:bgmManifest;
+    const opening=Number(value.settings.difficulty)===4?'st06':'st00';
+    const tracks=[`${opening}-m26`,`${opening}-m86`].map(id=>trackManifest.tracks[id]).filter(Boolean);
+    const assets=[
+      assetBytes(selected.coopDisk,{hash:meta.sha256,size:meta.size,gzip:true}),
+      assetBytes(`vendor/dosbox-x/${core}`,{hash:coreHash}),
+      ...soundManifest.clips.map(clip=>assetBytes(`assets/${clip.url}`,{hash:clip.sha256,size:clip.bytes})),
+      ...tracks.map(track=>assetBytes(`bgm/${track.url}`,{hash:track.audioSha256,size:track.bytes}))
+    ];
+    await Promise.all(assets);
+    if(generation!==preloadGeneration)return;
+    report('游戏磁盘、核心、音效与开场音乐已校验并预载');
+  })();
+  preloadPromise.catch(error=>{if(generation===preloadGeneration){report(`预载失败：${error.message}，稍后重试`);preloadKey='';preloadPromise=null;preloadRetryAt=performance.now()+5000;}});
+  return preloadPromise;
 }
 function update(value){
   if(stopped)return;
@@ -560,6 +598,38 @@ async function receivedSignal({from,message}){
     peer.signalStage='已接收应答，等待连接';showStartup();
   }else throw Error('未知信令');
 }
+function handleRuntimeMessage(message){
+  if(message?.protocol!==PROTOCOL)return;
+  if(message.event==='runtime-exit'){fail(Error('游戏模拟器已经退出'));return;}
+  if(message.event==='runtime-error'){fail(Error(String(message.message).slice(0,600)));return;}
+  if(stopped)return;
+  if(message.event==='boot-progress'){
+    bootStage=String(message.message).slice(0,300);player.note(bootStage);
+    if(Number.isInteger(message.step)&&message.step>=0&&message.step<=7)bootStep=message.step;
+    showStartup();
+    for(const peer of onlinePeers())if(peer.channel?.readyState==='open')send(peer,{type:'heartbeat',hidden:document.hidden,bootStage});
+  }else if(message.event==='boot-error')fail(Error(`游戏页面：${String(message.message).slice(0,600)}`));
+  else if(message.event==='page-warning'){
+    const warning=$('page-warning');if(warning){warning.hidden=false;warning.textContent=`页面异常记录（未自动结束游戏）：\n${String(message.message).slice(0,1500)}`;}
+  }
+}
+async function beginDirectRuntime(){
+  await prepareRoomAssets(state).catch(()=>{});if(stopped)return;
+  bootStage='加载游戏模块';showStartup();
+  const screen=document.createElement('div');screen.className='screen th04-runtime-screen';
+  screen.innerHTML='<canvas id="canvas" width="640" height="400" tabindex="0" aria-label="本机运行的 TH04 游戏"></canvas><span id="controls-summary" hidden></span><button id="sound" type="button" hidden></button><input id="bgm-volume" type="range" min="0" max="100" value="70" hidden><pre id="details" hidden></pre><pre id="page-warning" hidden></pre>';
+  player.stage.prepend(screen);globalThis.th04RuntimeNotify=handleRuntimeMessage;
+  const workerCapable=typeof Worker==='function'&&typeof OffscreenCanvas==='function'&&typeof ImageBitmap!=='undefined'&&typeof OffscreenCanvas.prototype.transferToImageBitmap==='function';
+  if(workerCapable)await import('./runtime-worker-client.js');else await import('./runtime.js');
+  if(stopped)return;
+  runtime=window.th04Sync;if(!runtime)throw Error('游戏模块没有就绪');
+  runtime.configure(state.slots.host,state.slots[session.role],state.settings.players);runtime.setRawPresentation(rawEnabled);
+  player.setLabel(`你操作 P${state.slots[session.role]+1}`);runtime.updateControls(controlSnapshot(),controlEditor.isEditing());
+  runtime.onInput(value=>{childBits=value;observeInput();wake();});runtime.onMenuAction(value=>{pendingAction|=value;observeInput();wake();});
+  localReady=await runtime.load({...state.settings});if(stopped){runtime.stop();return;}
+  runtime.setMusicVolume(musicVolume.querySelector('input').value);
+  for(const peer of peers.values())if(peer.channel?.readyState==='open')send(peer,{type:'ready',build:localReady});maybeRun();
+}
 async function beginGame(){
   // Six steps cover a slow peer's input delivery without the old twelve-step
   // speculative tail. Real input still corrects a predicted release immediately.
@@ -614,27 +684,8 @@ async function beginGame(){
       }
     }catch(error){fail(error);}
   },1000);
-  status('所有玩家正在各自加载游戏并建立网络连接…');
-  loadTimer=setTimeout(()=>fail(Error(`等待全员资源就绪超过 10 分钟；本机：${bootStage}。请查看下方各端加载状态`)),600000);
-  bootStage='加载游戏页面与 JavaScript 模块';showStartup();
-  iframe=document.createElement('iframe');iframe.title='本机游戏模拟器';iframe.allow='autoplay; gamepad; fullscreen';iframe.allowFullscreen=true;
-  const loaded=new Promise((resolve,reject)=>{iframe.onload=resolve;iframe.onerror=()=>reject(Error('游戏页面加载失败'));});
-  iframe.src='netplay/runtime.html';player.stage.append(iframe);await loaded;if(stopped)return;
-  if(!iframe.contentWindow.th04RuntimeReady)throw Error('游戏页面版本不匹配，请刷新所有页面');
-  if(!await iframe.contentWindow.th04RuntimeReady)throw Error('游戏模块加载失败，详情见游戏页面');
-  if(stopped)return;
-  runtime=iframe.contentWindow.th04Sync;if(!runtime)throw Error('游戏模块没有就绪');
-  runtime.configure(state.slots.host,state.slots[session.role],state.settings.players);
-  runtime.setRawPresentation(rawEnabled);
-  // Pointer controls live in the parent; desktop keyboards still focus the
-  // runtime canvas. Reset when crossing either document's lifecycle boundary.
-  iframe.contentWindow.addEventListener('blur',()=>player.reset());
-  player.setLabel(`你操作 P${state.slots[session.role]+1}`);
-  runtime.updateControls(controlSnapshot(),controlEditor.isEditing());
-  runtime.onInput(value=>{childBits=value;observeInput();wake();});runtime.onMenuAction(value=>{pendingAction|=value;observeInput();wake();});
-  localReady=await runtime.load({...state.settings});if(stopped){runtime.stop();return;}
-  runtime.setMusicVolume(musicVolume.querySelector('input').value);
-  for(const peer of peers.values())if(peer.channel?.readyState==='open')send(peer,{type:'ready',build:localReady});maybeRun();
+  loadTimer=setTimeout(()=>fail(Error('等待全员资源就绪超过 10 分钟')),600000);
+  await beginDirectRuntime();
 }
 function maybeRun(){
   showStartup();
@@ -879,27 +930,6 @@ document.addEventListener('visibilitychange',()=>{
     wake();
   }
 });
-window.addEventListener('message',event=>{
-  if(event.origin!==location.origin||event.source!==iframe?.contentWindow||event.data?.protocol!==PROTOCOL)return;
-  if(event.data.event==='runtime-exit')fail(Error('游戏模拟器已经退出'));
-  else if(event.data.event==='runtime-error')fail(Error(String(event.data.message).slice(0,600)));
-});
-window.addEventListener('message',event=>{
-  if(event.origin!==location.origin||event.source!==iframe?.contentWindow||event.data?.protocol!==PROTOCOL||stopped)return;
-  if(event.data.event==='boot-progress'){
-    bootStage=String(event.data.message).slice(0,300);
-    player.note(bootStage);
-    if(Number.isInteger(event.data.step)&&event.data.step>=0&&event.data.step<=7)bootStep=event.data.step;
-    showStartup();
-    for(const peer of onlinePeers())if(peer.channel?.readyState==='open')send(peer,{type:'heartbeat',hidden:document.hidden,bootStage});
-  }else if(event.data.event==='boot-error')fail(Error(`游戏页面：${String(event.data.message).slice(0,600)}`));
-  else if(event.data.event==='page-warning'){
-    let warning=$('page-warning');
-    if(!warning){warning=document.createElement('pre');warning.id='page-warning';$('diagnostics').after(warning);}
-    warning.textContent=`页面异常记录（未自动结束游戏）：\n${String(event.data.message).slice(0,1500)}`;
-    if(event.data.externalScript)warning.textContent+='\n堆栈包含站外脚本。请暂停此站点上的相关用户脚本／扩展并刷新复测；尚不能据此认定它导致了网络连接失败。';
-  }
-});
 window.addEventListener('pagehide',()=>{if(session)navigator.sendBeacon('/api/leave',new Blob([JSON.stringify(session)],{type:'application/json'}));});
 $('create').onclick=()=>enter('host');$('join').onclick=()=>enter('guest');
 for(let n=0;n<3;n++)$(`seat${n}`).onclick=()=>action('seat',{slot:n});
@@ -914,3 +944,4 @@ $('ready').onclick=()=>{
 };
 $('start').onclick=()=>{action('start');};
 $('leave').onclick=async()=>{stopped=true;running=false;clearInput();runtime?.stop();clearTimers();disconnect();try{await request('leave');}finally{location.href=networkUrl(mode);}};
+onBgmVersion(()=>{if(session&&state?.phase==='lobby'&&!stopped)prepareRoomAssets(state).catch(()=>{});});

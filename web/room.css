@@ -38,3 +38,4 @@ body.shell:has(#entry) #loadout-status{margin-top:12px;margin-bottom:0;color:#d8
 body.shell .rollback-option{display:flex;align-items:center;gap:10px;margin-top:16px;cursor:pointer}
 body.shell .rollback-option input{width:20px;height:20px;flex:none;accent-color:var(--pink)}
 body.shell #rollback-help{font-size:13px;line-height:1.6;margin-bottom:0}
+.th04-runtime-screen,.th04-runtime-screen>canvas{touch-action:none}

@@ -1,4 +1,4 @@
-import {sha256} from './sha256.js';
+import {assetBytes} from '../preload-cache.js';
 
 // Confirmed commands only. Complete samples run on the audio clock even when
 // network/game steps stop arriving; playback never writes simulation state.
@@ -18,11 +18,8 @@ export class LocalSe {
     if(manifest.schema!==1||manifest.sampleRate!==44100||manifest.channels!==1||manifest.clips.length!==17)throw Error('音效资源版本不匹配');
     await Promise.all(manifest.clips.map(async(clip,id)=>{
       if(clip.id!==id||clip.url!==`se-${String(id).padStart(2,'0')}.wav`)throw Error('音效编号不匹配');
-      const response=await fetch(new URL(clip.url,base),{signal:this.abort.signal});
-      if(!response.ok)throw Error(`音效 ${id} 读取失败`);
-      const bytes=await response.arrayBuffer();
-      if(bytes.byteLength!==clip.bytes||await sha256(new Uint8Array(bytes))!==clip.sha256)throw Error(`音效 ${id} 校验失败`);
-      const buffer=await this.context.decodeAudioData(bytes);
+      const bytes=await assetBytes(`assets/${clip.url}`,{hash:clip.sha256,size:clip.bytes,signal:this.abort.signal});
+      const buffer=await this.context.decodeAudioData(bytes.buffer);
       if(!this.disposed)this.buffers.set(id,buffer);
     }));
     if(!this.disposed)this.status='浏览器音效：独立播放（原版 FM）';

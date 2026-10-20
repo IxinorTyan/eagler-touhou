@@ -54,10 +54,10 @@
     "NOTICE.md": "a273cf230e155381e023320bc4c2e33f7290c5783827163033a767949c3753f5",
     "snapshot-diff-tracked.wasm": "fb69ccf0818caa9199ac3f357435528622413b690af90a353b99c88d81adb5c2",
     "snapshot-diff.wasm": "20235d6360a49d633f2db03832ef5ad3fbe6daffd4f44e4d7f8e790875a4662f",
-    "wdosbox-x-fast.wasm": "3bb11a36b8ff6aefefd983676d1e89b26a06facfe7717c556ddc8c2a74595a5c",
+    "wdosbox-x-fast.wasm": "c58e9f7dcaa0d86b85120794efd353e46c880661362a99984c7607c0af20c932",
     "wdosbox-x-jspi.wasm": "c154235667747e613be00d0955f068b54cbf8e1fb8e5c34d34e5552292f4c72a",
-    "wdosbox-x-rollback-tracked.wasm": "99a54382e62f580d1fc856761ec8388e9bb35d7a57dc7d6d2c4de12bccf390d9",
-    "wdosbox-x-rollback.wasm": "a49eda1d4f1a072c0ff3b0083cc47be7753647190f60617c4ba58705a48c511b"
+    "wdosbox-x-rollback-tracked.wasm": "f4f7f823c693f0d60bd19557c1d3873e0d578bac08e9323797bf1f57f4220c0b",
+    "wdosbox-x-rollback.wasm": "b6c0bc8461db7592222939a7e76389dd2d3af6dc43e8700d52976205cb79b2ef"
   },
   "projectile_rgb": true
 }

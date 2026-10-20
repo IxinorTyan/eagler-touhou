@@ -14,7 +14,8 @@ function request(type,args=[],extra={}){
   requests.set(id,{resolve,reject});try{worker.postMessage({type,args,id,...extra});}catch(e){requests.delete(id);reject(e);}
  });
 }
-function fatal(message){if(stopped)return;window.parent.postMessage({protocol:PROTOCOL,event:'runtime-error',message},location.origin);sync.stop();}
+function notifyRoom(message){if(typeof globalThis.th04RuntimeNotify==='function')globalThis.th04RuntimeNotify(message);}
+function fatal(message){if(stopped)return;notifyRoom({protocol:PROTOCOL,event:'runtime-error',message});sync.stop();}
 function fire(type,args=[]){if(worker)void request(type,args).catch(e=>{if(!stopped)fatal(e.message);});}
 function clearKeys(){keys.clear();listener(0);}
 function releaseFrame(frame){frame.bitmap.close();worker?.postMessage({type:'frame-ack',sequence:frame.sequence});}
@@ -46,7 +47,7 @@ async function load(config){
   if(stopped)return;
   if(data.type==='notify'){
    if(data.message.fault){cache.fault=data.message.fault;lastFaultCpu=data.message.fault.cpu;}
-   window.parent.postMessage(data.message,location.origin);return;
+   notifyRoom(data.message);return;
   }
   if(data.type==='music'){music(data.event);return;}
   if(data.type==='se'){

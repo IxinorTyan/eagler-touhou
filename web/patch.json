@@ -516,9 +516,15 @@
       "original": "a583c74ee2fa",
       "target_cs_offset": 47406,
       "name": "point-bullet full six-row blit"
+    },
+    {
+      "image_offset": 48744,
+      "original": "56578bc8c1f8038bf880e10732e48a878a0fd3c88bdac1e20603fac1ea0203faba00a88ec2c1ee048bce03cb81f9900177068bce33d2eb09b990012bcb8bd62bd10ae4740990ab83c74ee2faeb06aa83c74fe2fa0bd2740881ef007d87caebe15f5ec390",
+      "target_cs_offset": 4984,
+      "name": "in-place twin-row Marisa laser body; native row write order"
     }
   ],
-  "sha256": "56467186ca86018efbea9bd4e3701f64053e7d1f74e7a8cc3191f1a3144513d7",
+  "sha256": "9628e81e10651b8971db05c0b136530c003a3c82662d64ceb7e2a6ee5d3fa67e",
   "source": {
     "language": "zh-CN",
     "file": "4-cn.hdi.gz",
