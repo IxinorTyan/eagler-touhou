@@ -84,7 +84,9 @@ function pump(){
   const limit=target===null?edge():target;
   if(cursor>=limit){status('等待已确认帧 · 游戏帧保持不动。');nextDue=performance.now();schedule(50);return;}
   const row=source.row(cursor);if(!row){fail(Error('缺少下一帧输入'));return;}
-  const fast=target!==null||(following&&edge()-cursor>12);
+  // Batch arrival and a slow browser must not turn passive watching into
+  // silent fast-forward. Only an explicit fixed-target seek/Live accelerates.
+  const fast=target!==null;
   if(fast&&!quiet){audio?.flush();context?.suspend();}
   if(!fast&&quiet){restoreMusic();if(!paused)context?.resume();present();}
   quiet=fast;pending=true;ackFrame=null;
@@ -127,7 +129,7 @@ function start(plan=null){
         pending=false;ackFrame=null;settleGoal();
         if(source.end&&cursor===source.frames){finish();return;}
         if(paused){quiet=false;present();update();return;}
-        if(target!==null||(following&&edge()-cursor>12))schedule(0);
+        if(target!==null)schedule(0);
         else {nextDue=Math.max(nextDue+TICK_MS,performance.now()-TICK_MS);schedule(Math.max(0,nextDue-performance.now()));}
         if(cursor%12===0||target!==null)update();
       }

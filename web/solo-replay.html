@@ -1,6 +1,6 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TH05 · 外部 Replay 实验</title><link rel="icon" href="data:,"><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="site-adapter.css"></head>
-<body class="shell"><header class="masthead"><a class="brand" href="solo.html">TOUHOU / 05</a><small>单人 REPLAY 实验</small></header>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TH05 · 单人 Replay</title><link rel="icon" href="data:,"><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="site-adapter.css"></head>
+<body class="shell"><header class="masthead"><a class="brand" href="solo.html">TOUHOU / 05</a><small>单人 REPLAY</small></header>
 <main><header class="intro"><h1>游戏输入 Replay</h1><p>保存开局条件和按帧操作，导入文件后由游戏重新运行。浏览器负责记录和文件，游戏内没有录像缓冲。</p></header>
 <section class="panel"><div class="settings-grid"><label>语言<select id="language"><option value="cn">汉化版</option><option value="jp">日文版</option></select></label><label>导入录像<input id="file" type="file" accept=".th05r"></label><label>游戏／结算测试<select id="test-case"><option value="">正常游戏</option><option value="good">普通通关 · Good Ending 测试</option><option value="bad">普通通关 · Bad Ending 测试</option><option value="extra">EX 通关测试</option></select></label></div>
 <div class="row"><button id="record" class="primary">启动游戏</button><button id="finish" disabled>提前结束录制</button><button id="download" disabled>导出录像</button><button id="play" disabled>重新启动并回放</button><button id="hold" disabled>暂停播放</button><button id="stop" disabled>关闭模拟器</button></div>

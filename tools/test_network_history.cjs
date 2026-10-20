@@ -62,7 +62,13 @@ async function routes(context){
   for(const page of [host,guest])await page.waitForFunction(()=>th05Lan.info.running||!!th05Lan.info.endedReason,null,{timeout:120000});
   console.log('players booted');report.boot=await Promise.all([host,guest].map(p=>p.evaluate(()=>th05Lan.info)));assert(report.boot.every(x=>x.running),JSON.stringify(report.boot));
   await host.locator('#history-network-watch').waitFor({state:'visible',timeout:30000});const link=await host.getAttribute('#history-network-watch','href');assert(link.includes('#watch='));assert(!link.includes(report.boot[0].token||'TOKEN-NEVER-PRESENT'));
-  viewer=await spectators.newPage();viewer.on('pageerror',e=>errors.push(e.message));const url=new URL(link);url.searchParams.set('qa','1');await viewer.goto(url.href);
+  viewer=await spectators.newPage();viewer.on('pageerror',e=>errors.push(e.message));
+  await viewer.goto(origin+'/lan.html');await viewer.waitForFunction(()=>!document.getElementById('watch').disabled);
+  await viewer.click('#watch');assert.match(await viewer.locator('#status').innerText(),/四位房间号/);
+  await viewer.fill('#room-code',room);assert.equal((await viewer.evaluate(()=>th05Lan.info)).role,undefined);
+  await viewer.click('#watch');await viewer.waitForURL('**/coop-replay.html#watch=*');
+  assert.equal(new URL(viewer.url()).hash,new URL(link).hash,'room button resolves the published read-only stream');
+  const url=new URL(viewer.url());url.searchParams.set('qa','1');await viewer.goto(url.href);
   console.log('watch opened');const read=()=>viewer.evaluate(()=>th05CoopReplayQA.read());
   await viewer.waitForFunction(()=>th05CoopReplayQA.read().cursor>=30||th05CoopReplayQA.read().error,null,{timeout:90000});report.joined=await read();assert.equal(report.joined.error,null);
   await viewer.click('#pause');await viewer.waitForFunction(()=>!th05CoopReplayQA.read().pending);report.paused=await read();

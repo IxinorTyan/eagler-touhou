@@ -15,7 +15,7 @@ const historyFlushes=new Map();
 function historyUI(){
   const h=historyHost;
   $('history-save').disabled=!h||(!h.blob&&!h.recordFrames);
-  $('history-save').textContent=h?.blob?'再次下载多人 Replay':'结束录制并导出';
+  $('history-save').textContent=h?.blob?'再次下载多人 Replay':'结束录制并保存';
   $('history-watch').hidden=!h;
   $('history-network-watch').hidden=!h?.networkURL;
   if(h?.networkURL)$('history-network-watch').href=h.networkURL;
@@ -147,6 +147,7 @@ function render(){
   $('public-transport-label').hidden=!publicRoom;$('public-transport').disabled=!!auth||entering;
   if(publicRoom)$('public-transport').value=room?.network||network;
   $('create').disabled=!!auth||!version||entering||(network==='public-ws'&&!version?.relayAvailable);$('join').disabled=!!auth||!version||entering;$('leave').disabled=!auth;
+  $('watch').disabled=!!auth||!version?.historyAvailable||entering;
   $('lobby').hidden=!auth;$('pause').disabled=!running;
   if(!auth||!room)return;
   $('room-title').textContent=`房间 ${auth.room} · ${host?'我是房主':'我是队友'}`;
@@ -748,6 +749,18 @@ $('history-save').onclick=async()=>{
   }catch(error){historyWarning='录像导出失败：'+error.message;}historyUI();
 };
 $('create').onclick=action(()=>enter('create'));$('join').onclick=action(()=>enter('join'));
+$('watch').onclick=action(async()=>{
+  const code=$('room-code').value.trim();
+  if(!/^[0-9]{4}$/.test(code))throw Error('请输入四位房间号，再点击观战。');
+  if(entering||auth)return;
+  entering=true;render();status('正在连接观战…');
+  try{
+    const data=await api('watch',{room:code},null);
+    if(typeof data.watch!=='string'||!/^[A-Za-z0-9_-]{32,80}$/.test(data.watch))throw Error('观战地址无效，请刷新后重试。');
+    const url=new URL('coop-replay.html',location.href);url.hash='watch='+data.watch;
+    location.assign(url.href);
+  }finally{entering=false;render();}
+});
 $('leave').onclick=()=>finish('已离开房间，可重新建房。');
 $('character').onchange=action(()=>change('character',{character:Number($('character').value)}));
 $('seat').onchange=action(()=>change('seat',{seat:Number($('seat').value)}));

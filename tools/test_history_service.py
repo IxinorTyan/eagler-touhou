@@ -124,6 +124,9 @@ class Tests(unittest.TestCase):
         guest = post('join', {'room': host['room']})['body']
         auth = {'room': host['room'], 'generation': host['state']['generation'], 'token': host['token']}
         other = {**auth, 'token': guest['token']}
+        before = copy.deepcopy(server.ROOMS[host['room']])
+        self.assertEqual(post('watch', {'room': host['room']})['status'], 409)
+        self.assertEqual(server.ROOMS[host['room']], before)
         self.assertEqual(post('history-open', {**auth, 'header': header()})['status'], 400)
         post('ready', {**auth, 'ready': True});post('ready', {**other, 'ready': True});post('start', auth)
         self.assertEqual(post('history-open', {**other, 'header': header()})['status'], 403)
@@ -132,10 +135,16 @@ class Tests(unittest.TestCase):
         opened = post('history-open', {**auth, 'header': header()})
         self.assertEqual(opened['status'], 200)
         watch = opened['body']['watch']
+        before = copy.deepcopy(server.ROOMS[host['room']])
+        self.assertEqual(post('watch', {'room': host['room']})['body'], {'watch': watch})
+        self.assertEqual(server.ROOMS[host['room']], before, 'watch must not occupy a seat or refresh a player lease')
+        self.assertEqual(post('watch', {'room': host['room'], 'protocol': 'old'})['status'], 409)
+        self.assertEqual(post('watch', {'room': 'missing'})['status'], 404)
         self.assertEqual(request('GET', '/api/history?watch='+watch+'&from=0')['status'], 200)
         self.assertEqual(post('leave', {**auth, 'token': watch})['status'], 403)
         self.assertEqual(post('history-push', {**other, 'watch': watch, 'first': 0, 'payload': ''})['status'], 403)
         self.assertEqual(post('history-end', {**auth, 'watch': watch, 'frames': 0, 'reason': 'done'})['status'], 200)
+        self.assertEqual(post('watch', {'room': host['room']})['status'], 409)
         self.assertEqual(request('GET', '/api/history?watch='+watch+'&from=0')['body']['end']['frames'], 0)
         self.assertEqual(request('GET', '/api/history?watch='+watch+'&from=-1')['status'], 400)
 

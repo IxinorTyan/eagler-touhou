@@ -177,6 +177,19 @@ class Handler(SimpleHTTPRequestHandler):
             room = ROOMS.get(code)
             if not room:
                 return self.reply({'error': '房间不存在或已过期'}, 404)
+            if action == 'watch':
+                if data.get('protocol') != PROTOCOL:
+                    return self.reply({'error': '请刷新联机页面'}, 409)
+                watch = room.get('history_watch')
+                if room['phase'] != 'loading' or not watch:
+                    return self.reply({'error': '房间尚未开始游戏或未开启观战，请稍后重试'}, 409)
+                try:
+                    archive = HISTORY.read(watch, 0)
+                except PermissionError:
+                    return self.reply({'error': '本局观战已过期，请联系房主'}, 410)
+                if archive.get('end'):
+                    return self.reply({'error': '本局观战已结束'}, 409)
+                return self.reply({'watch': watch})
             if action == 'join':
                 if data.get('protocol') != PROTOCOL:
                     return self.reply({'error': '请刷新联机页面'}, 409)
@@ -215,6 +228,7 @@ class Handler(SimpleHTTPRequestHandler):
                         if header.get('config') != {'rank': room['settings']['rank'], 'players': expected}:
                             raise ValueError('旁观角色与房间不一致')
                         result = HISTORY.open(owner, header)
+                        room['history_watch'] = result['watch']
                     elif action == 'history-push':
                         result = HISTORY.push(owner, data.get('watch'), data.get('first'), data.get('payload'))
                     elif action == 'history-end':

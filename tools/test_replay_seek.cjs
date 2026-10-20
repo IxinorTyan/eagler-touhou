@@ -78,6 +78,44 @@ if(stress)harness=harness.replace('frame===120?512:frame===165?1024:32|direction
    }
   }else await viewer.waitForFunction(()=>th05CoopReplayQA.read().completed||th05CoopReplayQA.read().error,null,{timeout:60000});
   report.eof=await read();assert.equal(report.eof.error,null);assert.equal(report.eof.cursor,length);assert.equal(await viewer.isVisible('#completed'),true);
+  if(!stress){
+   // Real playback, but deliberately deliver already verified inputs in a
+   // burst: passive following must keep audio and 1x pacing until Live is clicked.
+   const id=await source.evaluate(async bytes=>{
+    const {decodeMultiplayerReplay}=await import('/netplay/history-codec.js');
+    const {createHistoryHost}=await import('/netplay/history-host.js');
+    const {packHistoryRows}=await import('/netplay/confirmed-history.js');
+    const h=await decodeMultiplayerReplay(new Blob([new Uint8Array(bytes)]));
+    window.burstHost=createHistoryHost(h.header,{record:false});
+    window.publishBurst=(first,count)=>{for(let at=first;at<first+count;at+=60)burstHost.append(at,packHistoryRows(Array.from({length:Math.min(60,first+count-at)},(_,i)=>h.row(at+i)),h.header.players));};
+    publishBurst(0,360);return burstHost.id;
+   },bytes);
+   const follower=await context.newPage();follower.on('pageerror',e=>errors.push(e.message));
+   await follower.addInitScript(()=>{
+    window.followSteps=[];const post=Worker.prototype.postMessage;
+    Worker.prototype.postMessage=function(data,...args){if(data?.type==='step')followSteps.push({frame:data.frame,quiet:!!data.quiet});return post.call(this,data,...args);};
+   });
+   await follower.goto(base+'/coop-replay.html?qa=1&live='+id);
+   await follower.waitForFunction(()=>th05CoopReplayQA.read().ready||th05CoopReplayQA.read().error,null,{timeout:60000});
+   await follower.click('#live-edge');
+   await follower.waitForFunction(()=>{const s=th05CoopReplayQA.read();return s.error||s.following&&s.target===null;},null,{timeout:60000});
+   await follower.click('#sound');await follower.waitForFunction(()=>th05CoopReplayQA.read().sound?.state==='running');
+   const before=await follower.evaluate(()=>{followSteps=[];return th05CoopReplayQA.read().cursor;});
+   await source.evaluate(()=>publishBurst(360,360));
+   await follower.waitForFunction(n=>{const s=th05CoopReplayQA.read();return s.error||s.cursor>=n+30;},before,{timeout:15000});
+   report.passiveFollow=await follower.evaluate(()=>({state:th05CoopReplayQA.read(),steps:followSteps.slice()}));
+   assert.equal(report.passiveFollow.state.error,null);
+   assert(report.passiveFollow.steps.length>0);assert(report.passiveFollow.steps.every(step=>!step.quiet),'passive live following must not silently accelerate on a burst');
+   assert.equal(report.passiveFollow.state.sound.state,'running','passive following must retain enabled audio');
+   await follower.click('#live-edge');
+   await follower.waitForFunction(()=>{const s=th05CoopReplayQA.read();return s.error||s.following&&s.target===null&&s.cursor>=630;},null,{timeout:60000});
+   assert.equal((await follower.evaluate(()=>th05CoopReplayQA.read())).error,null);
+   // A quiet frontier can be a deliberately paused source, not a dead run.
+   await follower.waitForTimeout(16000);
+   report.quietFrontier=await follower.evaluate(()=>th05CoopReplayQA.read());
+   assert.equal(report.quietFrontier.error,null);assert.equal(report.quietFrontier.cursor,630);
+   await follower.click('#stop');await follower.close();await source.evaluate(()=>{burstHost.end('test complete');burstHost.dispose();});
+  }
   await viewer.screenshot({path:path.join(reports,stress?'seek-stress-'+language+'-completed.png':'seek-test-completed.png')});assert.deepEqual(errors,[]);
   console.log('PASS exact forward/backward/click seek, paused arrival, replaced target, cancellation, bounds and verified EOF');
  }finally{if(viewer)report.final=await viewer.evaluate(()=>({qa:globalThis.th05CoopReplayQA?.read(),status:document.getElementById('status')?.textContent})).catch(()=>null);report.errors=errors;fs.writeFileSync(path.join(reports,stress?'seek-stress-'+language+'.json':'seek-test.json'),JSON.stringify(report,null,2));await browser.close();}

@@ -1,11 +1,11 @@
 {
   "language": "jp",
-  "sha256": "5e251aa43611c6d0b419029988e4ea19fd068592114c78994c0c9b6b02106029",
+  "sha256": "e5fb4f26f051fa2948e146f7fd562e538a44856dc564006da7c2762fa8a82f68",
   "size": 21415936,
   "source_main_md5": "952585e02435c3b3b111975a78b05983",
   "insert_offset": 84656,
   "insert_size": 18368,
-  "payload_bytes": 18365,
+  "payload_bytes": 18355,
   "heap_bytes": 369776,
   "heap_by_players": {
     "2": 291200,
@@ -39,7 +39,7 @@
   "data_segment": 9497,
   "mailbox_cs_offset": 50912,
   "swap_cs_offset": 40733,
-  "native_pause_cs_offset": 58150,
+  "native_pause_cs_offset": 58140,
   "entries": [
     40401,
     41001,
@@ -100,13 +100,13 @@
     53097,
     55363,
     55451,
-    55471,
-    55621,
+    55474,
+    55624,
     55312,
     55300,
-    55572,
-    55738,
-    55762,
+    55575,
+    55741,
+    55765,
     53096,
     51863,
     51864,
@@ -127,36 +127,36 @@
     51922,
     53102,
     51841,
-    56164,
-    56260,
-    56273,
-    56279,
-    56285,
-    57311,
-    56466,
-    56576,
-    57062,
-    56813,
-    56825,
-    56837,
-    56852,
-    56867,
-    56882,
-    56897,
-    56916,
-    57487,
-    57493,
-    57022,
-    57033,
-    58046,
-    57881,
-    57896,
-    57911,
-    57857,
-    57208,
-    57259,
-    58181,
-    58150,
+    56167,
+    56263,
+    56276,
+    56282,
+    56288,
+    57314,
+    56469,
+    56579,
+    57065,
+    56816,
+    56828,
+    56840,
+    56855,
+    56870,
+    56885,
+    56900,
+    56919,
+    57490,
+    57496,
+    57025,
+    57036,
+    58025,
+    57860,
+    57875,
+    57890,
+    9062,
+    57211,
+    57262,
+    58171,
+    58140,
     48670,
     48673,
     48724,
@@ -165,15 +165,15 @@
     50908,
     49136,
     49217,
-    58152,
-    58151,
+    58142,
+    58141,
     53968,
-    58275,
-    58254,
-    58268,
-    58409,
-    58427,
-    58433
+    58265,
+    58244,
+    58258,
+    58399,
+    58417,
+    58423
   ],
   "entry_map": {
     "init_hook": 40401,
@@ -235,13 +235,13 @@
     "p2_character": 53097,
     "item_hittest": 55363,
     "item_award_leave": 55451,
-    "item_team_1up": 55471,
-    "item_aim": 55621,
+    "item_team_1up": 55474,
+    "item_aim": 55624,
     "item_sound_pointer": 55312,
     "item_pickups": 55300,
-    "item_team_bomb": 55572,
-    "touch_state": 55738,
-    "touch_move": 55762,
+    "item_team_bomb": 55575,
+    "touch_state": 55741,
+    "touch_move": 55765,
     "player_count": 53096,
     "guest_slot": 51863,
     "p3_input": 51864,
@@ -262,36 +262,36 @@
     "p3_bomb_func": 51922,
     "assets_ready": 53102,
     "heap_config": 51841,
-    "personal_stats": 56164,
-    "personal_bonus": 56260,
-    "power_fraction": 56273,
-    "hit_weights": 56279,
-    "hit_owner": 56285,
-    "stats_frame": 57311,
-    "stats_restart": 56466,
-    "stats_stage_reset": 56576,
-    "stats_damage_award": 57062,
-    "stats_active_add": 56813,
-    "stats_kill_add": 56825,
-    "stats_kill_550": 56837,
-    "stats_kill_100": 56852,
-    "stats_clear_big": 56867,
-    "stats_clear_small": 56882,
-    "stats_clear_add": 56897,
-    "stats_world_add": 56916,
-    "stats_stage_bonus": 57487,
-    "stats_allclear_bonus": 57493,
-    "stats_damage_second_begin": 57022,
-    "stats_damage_second_add": 57033,
-    "power_pickup_bonus": 58046,
-    "boss_main_damage": 57881,
-    "boss_other_damage": 57896,
-    "boss_mid_damage": 57911,
-    "boss_balance": 57857,
-    "stats_world_dream_grow": 57208,
-    "stats_world_dream_drop": 57259,
-    "native_pause_hook": 58181,
-    "native_pause_state": 58150,
+    "personal_stats": 56167,
+    "personal_bonus": 56263,
+    "power_fraction": 56276,
+    "hit_weights": 56282,
+    "hit_owner": 56288,
+    "stats_frame": 57314,
+    "stats_restart": 56469,
+    "stats_stage_reset": 56579,
+    "stats_damage_award": 57065,
+    "stats_active_add": 56816,
+    "stats_kill_add": 56828,
+    "stats_kill_550": 56840,
+    "stats_kill_100": 56855,
+    "stats_clear_big": 56870,
+    "stats_clear_small": 56885,
+    "stats_clear_add": 56900,
+    "stats_world_add": 56919,
+    "stats_stage_bonus": 57490,
+    "stats_allclear_bonus": 57496,
+    "stats_damage_second_begin": 57025,
+    "stats_damage_second_add": 57036,
+    "power_pickup_bonus": 58025,
+    "boss_main_damage": 57860,
+    "boss_other_damage": 57875,
+    "boss_mid_damage": 57890,
+    "boss_balance": 9062,
+    "stats_world_dream_grow": 57211,
+    "stats_world_dream_drop": 57262,
+    "native_pause_hook": 58171,
+    "native_pause_state": 58140,
     "art_variants": 48670,
     "select_art_variants": 48673,
     "recolor_guest_player": 48724,
@@ -300,15 +300,15 @@
     "hud_scroll_line": 50908,
     "afterimage_put": 49136,
     "afterimage_context": 49217,
-    "offline_apply": 58152,
-    "offline_mask": 58151,
+    "offline_apply": 58142,
+    "offline_mask": 58141,
     "bomb_background_load": 53968,
-    "shots_allocate": 58275,
-    "shots_begin": 58254,
-    "shots_end": 58268,
-    "shots_next": 58409,
-    "shots_compare": 58427,
-    "shots_clear": 58433
+    "shots_allocate": 58265,
+    "shots_begin": 58244,
+    "shots_end": 58258,
+    "shots_next": 58399,
+    "shots_compare": 58417,
+    "shots_clear": 58423
   },
   "hooks": [
     {
@@ -321,7 +321,7 @@
       "name": "native_pause",
       "image_offset": 44747,
       "expected": "e86907",
-      "entry": 58181
+      "entry": 58171
     },
     {
       "name": "player_update",
@@ -393,32 +393,32 @@
       "name": "touch_move",
       "image_offset": 52442,
       "expected": "e8f5fd",
-      "entry": 55762
+      "entry": 55765
     },
     {
       "name": "shots_allocate",
       "image_offset": 58252,
       "expected": "33c08b1e004281fb0ebf732a83c312803f0075f2c707010066a1d2366689470266c7470a000040ffc7470e14008bc383c312891e0042c3",
-      "entry": 58275,
+      "entry": 58265,
       "tail_jump": true
     },
     {
       "name": "shots_next",
       "image_offset": 78765,
       "expected": "83c612",
-      "entry": 58409
+      "entry": 58399
     },
     {
       "name": "shots_next",
       "image_offset": 79108,
       "expected": "83c612",
-      "entry": 58409
+      "entry": 58399
     },
     {
       "name": "shots_clear",
       "image_offset": 76601,
       "expected": "688eba682001e820a4",
-      "entry": 58433
+      "entry": 58423
     },
     {
       "name": "shot_draw",
@@ -472,175 +472,175 @@
       "name": "stats_damage_second_begin",
       "image_offset": 79932,
       "expected": "33ffc646f500",
-      "entry": 57022
+      "entry": 57025
     },
     {
       "name": "stats_damage_second_add",
       "image_offset": 79997,
       "expected": "03f8fe064ec6",
-      "entry": 57033
+      "entry": 57036
     },
     {
       "name": "stats_frame",
       "image_offset": 44906,
       "expected": "e80c16",
-      "entry": 57311
+      "entry": 57314
     },
     {
       "name": "stats_damage_award",
       "image_offset": 79879,
       "expected": "6601061237",
-      "entry": 57062
+      "entry": 57065
     },
     {
       "name": "stats_damage_award",
       "image_offset": 80089,
       "expected": "6601061237",
-      "entry": 57062
+      "entry": 57065
     },
     {
       "name": "stats_kill_add",
       "image_offset": 93442,
       "expected": "6601061237",
-      "entry": 56825
+      "entry": 56828
     },
     {
       "name": "stats_kill_550",
       "image_offset": 99614,
       "expected": "668106123726020000",
-      "entry": 56837
+      "entry": 56840
     },
     {
       "name": "stats_clear_big",
       "image_offset": 115014,
       "expected": "668306123764",
-      "entry": 56867
+      "entry": 56870
     },
     {
       "name": "stats_clear_small",
       "image_offset": 115022,
       "expected": "66830612370a",
-      "entry": 56882
+      "entry": 56885
     },
     {
       "name": "stats_active_add",
       "image_offset": 115479,
       "expected": "6601061237",
-      "entry": 56813
+      "entry": 56816
     },
     {
       "name": "stats_clear_add",
       "image_offset": 115734,
       "expected": "6601061237",
-      "entry": 56897
+      "entry": 56900
     },
     {
       "name": "stats_world_add",
       "image_offset": 116063,
       "expected": "6601061237",
-      "entry": 56916
+      "entry": 56919
     },
     {
       "name": "stats_world_add",
       "image_offset": 116170,
       "expected": "6601061237",
-      "entry": 56916
+      "entry": 56919
     },
     {
       "name": "stats_stage_bonus",
       "image_offset": 117187,
       "expected": "6601061237",
-      "entry": 57487
+      "entry": 57490
     },
     {
       "name": "stats_allclear_bonus",
       "image_offset": 117766,
       "expected": "6601061237",
-      "entry": 57493
+      "entry": 57496
     },
     {
       "name": "stats_active_add",
       "image_offset": 118807,
       "expected": "6601061237",
-      "entry": 56813
+      "entry": 56816
     },
     {
       "name": "stats_kill_100",
       "image_offset": 123284,
       "expected": "668306123764",
-      "entry": 56852
+      "entry": 56855
     },
     {
       "name": "stats_world_dream_grow",
       "image_offset": 93715,
       "expected": "803ef636807309fe06f6369abd23e10a",
-      "entry": 57208
+      "entry": 57211
     },
     {
       "name": "stats_world_dream_drop",
       "image_offset": 118916,
       "expected": "803ef636017618803ef636807311fe0ef636",
-      "entry": 57259
+      "entry": 57262
     },
     {
       "name": "power_pickup_bonus",
       "image_offset": 118280,
       "expected": "8a450eb4008bd8",
-      "entry": 58046
+      "entry": 58025
     },
     {
       "name": "boss_main_damage",
       "image_offset": 129763,
       "expected": "b4002906c65a",
-      "entry": 57881
+      "entry": 57860
     },
     {
       "name": "boss_mid_damage",
       "image_offset": 96328,
       "expected": "b4002906de5a",
-      "entry": 57911
+      "entry": 57890
     },
     {
       "name": "boss_other_damage",
       "image_offset": 89112,
       "expected": "b4002906b25a",
-      "entry": 57896
+      "entry": 57875
     },
     {
       "name": "boss_other_damage",
       "image_offset": 89711,
       "expected": "b4002906b25a",
-      "entry": 57896
+      "entry": 57875
     },
     {
       "name": "boss_other_damage",
       "image_offset": 89847,
       "expected": "b4002906b25a",
-      "entry": 57896
+      "entry": 57875
     },
     {
       "name": "boss_other_damage",
       "image_offset": 90852,
       "expected": "b4002906b25a",
-      "entry": 57896
+      "entry": 57875
     },
     {
       "name": "boss_other_damage",
       "image_offset": 91816,
       "expected": "b4002906b25a",
-      "entry": 57896
+      "entry": 57875
     },
     {
       "name": "boss_other_damage",
       "image_offset": 92603,
       "expected": "b4002906b25a",
-      "entry": 57896
+      "entry": 57875
     },
     {
       "name": "boss_other_damage",
       "image_offset": 114128,
       "expected": "b4002906b25a",
-      "entry": 57896
+      "entry": 57875
     },
     {
       "name": "bomb_start",
@@ -682,19 +682,19 @@
       "name": "item_team_1up",
       "image_offset": 118738,
       "expected": "fe06d44a9a2522e10a",
-      "entry": 55471
+      "entry": 55474
     },
     {
       "name": "item_team_bomb",
       "image_offset": 118717,
       "expected": "fe06d54abe6400",
-      "entry": 55572
+      "entry": 55575
     },
     {
       "name": "item_aim",
       "image_offset": 119006,
       "expected": "a1d4362b440450a1d2362b4402509a3a1f0000",
-      "entry": 55621
+      "entry": 55624
     },
     {
       "name": "bomb_x",
@@ -934,18 +934,18 @@
         1473564
       ],
       [
-        11864541,
-        11864542,
-        11864543,
-        11864544,
-        11864545,
-        11864546,
-        11864547,
-        11864548,
-        11864549,
-        11864550,
-        11864551,
-        11864552
+        11864509,
+        11864510,
+        11864511,
+        11864512,
+        11864513,
+        11864514,
+        11864515,
+        11864516,
+        11864517,
+        11864518,
+        11864519,
+        11864520
       ]
     ]
   },
@@ -991,7 +991,7 @@
     "palette": "shared native 16 colors; costume hue ramps, original mounts, unchanged stage palette"
   },
   "personal_stats": {
-    "cs_offset": 56164,
+    "cs_offset": 56167,
     "stride": 32,
     "score": 0,
     "high_score": 4,
@@ -1009,7 +1009,7 @@
     "bombs": 26,
     "stage_miss_start": 28,
     "stage_bomb_start": 30,
-    "bonus_cs_offset": 56260,
+    "bonus_cs_offset": 56263,
     "extends": [
       3000000,
       8000000,
@@ -1039,7 +1039,19 @@
     "player_count": 3,
     "pickup_counts": 55300,
     "owner_priority": "first eligible canonical seat, one award per item",
-    "power": "collector only",
+    "power": "collector; at full Power, small/large P supports lowest living teammate, nearest item then seat",
+    "power_support": {
+      "enabled": true,
+      "kinds": [
+        0,
+        3
+      ],
+      "score": "collector",
+      "overlay": [
+        53302,
+        53666
+      ]
+    },
     "bomb": "living seats only; retired teammates excluded; 99 cap",
     "one_up": "all seats; retired teammate revives; 100 total lives cap",
     "point_dream_score": "independent logical-seat counters",
