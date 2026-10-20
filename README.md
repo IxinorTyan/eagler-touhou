@@ -107,6 +107,8 @@ Git 仓库按 `.gitignore` 的发行白名单管理，包含网页、DOSBox-X JS
 
 运行资源随本目录提供，普通游玩不需要 Node.js、NASM 或 Binaryen。以下命令仅用于保留开发文件的本地工作区，固定 npm 来源在 `vendor-source/emulators-8.5.2/`。
 
+合作侧栏以原生整数显示火力，例如 `P 72/128`。上限保持 128 P，双人／三人拾取收益仍为原版的 1.5／2 倍；双人小 P 交替增加 1／2 点，各席位独立保留半点余量，大 P 分别增加 15／20 点。P 值固定占三格，右侧残机与 Bomb 上下对齐。
+
 修改合作原生补丁后，依次运行 `python tools/build_lab.py --keep-vendor` 和 `python tools/build_lockstep_runtime.py`；后一步先刷新中／日文磁盘声音策略，再重建引擎包装器和版本摘要。只改运行时适配 JS 时也需更新摘要。
 
 仅修改游戏盘或多人美术时，第二步使用 `python tools/build_lockstep_runtime.py --game-only`，更新磁盘声音元数据并保留当前优化核心。美术构建读取同级 `ghost-preview/th05-four-player-colors/` 中已审核的灵梦／魔理沙幽灵 PNG，生成文件和来源哈希保存在本机 `build/`、`reports/player-art.json`；原生配色回归运行 `python -B tools/test_player_art_cpu.py`，右侧机型图标回归运行 `python -B tools/test_hud_shot_art_cpu.py`，实际射弹／激光回归运行 `python -B tools/test_projectile_art_cpu.py`。

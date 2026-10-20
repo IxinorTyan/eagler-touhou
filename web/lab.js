@@ -169,7 +169,7 @@ function tick(now){
         if($('diagnostics').closest('details').open&&now-lastDiagnostics>=250){
           lastDiagnostics=now;
           $('diagnostics').textContent=`游戏帧 ${s.ticks} · 关卡帧 ${s.stageFrame} · ${live?'运行中':'暂停 / 非关卡状态'}\nP1 (${s.p1.map(n=>n.toFixed(1)).join(', ')}) 受击动画 ${s.p1Miss}\nP2 (${s.p2.map(n=>n.toFixed(1)).join(', ')}) 无敌 ${s.p2Inv} 受击动画 ${s.p2Miss}\nP2 射击调用 ${s.shots} · 子弹命中 ${s.shotHits} · 碰撞受击 ${s.hits}\nP2 拾取 ${s.items} · 瞄准 / 吸引选择 P2 ${s.targets}\nP2 输入 0x${bits.toString(16)} · ${focus?'低速':'通常速度'}\n手柄输入与 P1 的 SDL 输入已隔离。`;
-          $('diagnostics').textContent+='\n'+s.players.map(p=>`P${p.id} · POWER ${(Math.floor(p.power*100/32)/100).toFixed(2)} · LIFE ${p.lives} · BOMB ${p.bombs}${p.out?' · 已退场':''}`).join('\n');
+          $('diagnostics').textContent+='\n'+s.players.map(p=>`P${p.id} · P ${p.power}/128 · LIFE ${p.lives} · BOMB ${p.bombs}${p.out?' · 已退场':''}`).join('\n');
         }
         for(const [id,xy,miss,index] of [['p1',s.p1,s.p1Miss,0],['p2',s.p2,s.p2Miss,1]]){
           $(id).hidden=!live||miss>0||s.players[index]?.out;
