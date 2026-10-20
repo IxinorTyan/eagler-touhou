@@ -1,6 +1,6 @@
 {
   "language": "jp",
-  "sha256": "06381e8e747640412dee7893ce1e029540d7e4fb52c72d23bae7585be5de8eb4",
+  "sha256": "5e251aa43611c6d0b419029988e4ea19fd068592114c78994c0c9b6b02106029",
   "size": 21415936,
   "source_main_md5": "952585e02435c3b3b111975a78b05983",
   "insert_offset": 84656,
@@ -160,9 +160,9 @@
     48670,
     48673,
     48724,
-    50893,
     50894,
-    50907,
+    50895,
+    50908,
     49136,
     49217,
     58152,
@@ -295,9 +295,9 @@
     "art_variants": 48670,
     "select_art_variants": 48673,
     "recolor_guest_player": 48724,
-    "recolor_guest_shots": 50893,
-    "hud_scroll_capture": 50894,
-    "hud_scroll_line": 50907,
+    "recolor_guest_shots": 50894,
+    "hud_scroll_capture": 50895,
+    "hud_scroll_line": 50908,
     "afterimage_put": 49136,
     "afterimage_context": 49217,
     "offline_apply": 58152,
@@ -664,7 +664,7 @@
       "name": "hud_scroll_capture",
       "image_offset": 7909,
       "expected": "8b5e068b16c803",
-      "entry": 50894
+      "entry": 50895
     },
     {
       "name": "item_hittest",

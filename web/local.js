@@ -90,7 +90,7 @@ function frame(now){
     $('diagnostics').textContent=s?JSON.stringify({...s,music:emulator.musicError||emulator.bgm?.status},null,2):'正在初始化关卡，请稍候。';
     player.diagnostics($('diagnostics').textContent);
     if(s?.nativePaused)status('游戏暂停菜单：方向键选择，Z / Enter 确认，Esc 继续；选择退出结束本局。');
-    else if(live&&emulator.state==='running')status(`本机 ${s.players.length} 人运行中 · ${runConfig.players.map((p,i)=>`P${i+1} ${names[p.character]}`).join(' / ')} · ${s.invincible?'测试无敌已开启':'正常受击'} · ${s.players.map((p,i)=>`P${i+1} ${p.ghost?'幽灵':`残机 ${Math.max(0,p.lives-1)}`} / Bomb ${p.bombs} / Power ${(p.power/32).toFixed(2)}${p.rescue?` / 救援 ${Math.floor(p.rescue/90*100)}%`:''}`).join(' · ')}`);
+    else if(live&&emulator.state==='running')status(`本机 ${s.players.length} 人运行中 · ${runConfig.players.map((p,i)=>`P${i+1} ${names[p.character]}`).join(' / ')} · ${s.invincible?'测试无敌已开启':'正常受击'} · ${s.players.map((p,i)=>`P${i+1} ${p.ghost?'幽灵':`残机 ${Math.max(0,p.lives-1)}`} / Bomb ${p.bombs} / P ${p.power}/128${p.rescue?` / 救援 ${Math.floor(p.rescue/90*100)}%`:''}`).join(' · ')}`);
   }
 }
 requestAnimationFrame(frame);

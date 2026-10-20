@@ -1,6 +1,6 @@
 {
   "language": "cn",
-  "sha256": "a01e269fb78f95cb9c6fe707d866b55d45b40e60daeb8610e6548a9ef222cc16",
+  "sha256": "fb080d09cea55a2ef16f3ce5d58841ca3da04c8c214761bd584b6287699a5d35",
   "size": 21415936,
   "source_main_md5": "553eee5ff79429f45284913870380549",
   "insert_offset": 84656,
@@ -160,9 +160,9 @@
     48670,
     48673,
     48724,
-    50893,
     50894,
-    50907,
+    50895,
+    50908,
     49136,
     49217,
     58152,
@@ -295,9 +295,9 @@
     "art_variants": 48670,
     "select_art_variants": 48673,
     "recolor_guest_player": 48724,
-    "recolor_guest_shots": 50893,
-    "hud_scroll_capture": 50894,
-    "hud_scroll_line": 50907,
+    "recolor_guest_shots": 50894,
+    "hud_scroll_capture": 50895,
+    "hud_scroll_line": 50908,
     "afterimage_put": 49136,
     "afterimage_context": 49217,
     "offline_apply": 58152,
@@ -664,7 +664,7 @@
       "name": "hud_scroll_capture",
       "image_offset": 7909,
       "expected": "8b5e068b16c803",
-      "entry": 50894
+      "entry": 50895
     },
     {
       "name": "item_hittest",
