@@ -5,6 +5,7 @@ import {nativeBits,locateMailbox,guestBase,mailboxActive,nativePaused,writeInput
 import {configureLauncher,launchConfig,launchDefaults} from './launch-config.js';
 import {runBoot} from './boot-runner.js';
 import {LocalSfx} from './local-sfx.js';
+import {assetBytes} from '../preload-cache.js';
 import {hashNativeMemory} from './native-hash.js';
 const workerHost=globalThis.th02WorkerHost;
 const PROTOCOL='th02-rollback/6',canvas=workerHost?.canvas??document.getElementById('canvas'),details=workerHost?{}:document.getElementById('details');
@@ -53,7 +54,10 @@ canvas.addEventListener('pointerdown',()=>canvas.focus());
 function notifyParent(message){if(workerHost)workerHost.notify(message);else window.parent.postMessage(message,location.origin);}
 async function progress(message,step){details.textContent=message;notifyParent({protocol:PROTOCOL,event:'boot-progress',message,step});await new Promise(r=>setTimeout(r,0));}
 async function get(url,type='json'){
- const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error(`资源读取失败：${url}（${r.status}）`);return r[type]();
+ const address=new URL(url,import.meta.url),root=new URL('../',import.meta.url),path=decodeURIComponent(address.pathname.slice(root.pathname.length));
+ const hash=version?.assets?.[path];
+ if(hash){const bytes=await assetBytes(path,{hash});return type==='json'?JSON.parse(new TextDecoder().decode(bytes)):bytes.buffer;}
+ const r=await fetch(address,{cache:'no-store'});if(!r.ok)throw Error(`资源读取失败：${url}（${r.status}）`);return r[type]();
 }
 async function boot(settings){
  config={...launchDefaults,...settings};launchConfig(config);if(config.players!==players)throw Error('TH02 开局人数不匹配');await progress('读取 TH02 游戏磁盘和版本清单',1);
@@ -71,8 +75,7 @@ async function boot(settings){
  }));
  const entry=patch.disks[config.language];if(!entry)throw Error('游戏语言无效');
  await progress('解压并校验 TH02 合作磁盘',3);
- const compressed=await get('../'+entry.file,'arrayBuffer');
- const disk=new Uint8Array(await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+ const disk=await assetBytes(entry.file,{hash:entry.sha256,size:entry.size,gzip:true});
  if(disk.length!==entry.size||await sha256(disk)!==entry.sha256)throw Error('TH02 游戏磁盘校验失败');
  const fat=new Fat12(disk),main=fat.find('HUMAROKU/MAIN.EXE'),exe=fat.read(main);
  if(await sha256(exe)!==entry.mainSha256)throw Error('TH02 主程序校验失败');
@@ -116,7 +119,7 @@ async function boot(settings){
  exe[at]=config.p2;exe[at+1]=config.p3;exe[at+2]=players;fat.replace(main,exe);
  const core=config.rollback&&supportsWriteJournal()?'tracked':'plain',coreEntry=version.cores[core];
  await progress('下载并校验本局 WASM 核心',4);
- const wasmBinary=new Uint8Array(await get('../'+coreEntry.file,'arrayBuffer'));
+ const wasmBinary=await assetBytes(coreEntry.file,{hash:coreEntry.sha256});
  if(await sha256(wasmBinary)!==coreEntry.sha256)throw Error('WASM 核心版本不匹配，请重新构建并刷新');
  const launcher=new Uint8Array(await get('./th02-launch.com','arrayBuffer'));
  if(await sha256(launcher)!==version.assets['netplay/th02-launch.com'])throw Error('TH02 网页启动器校验失败');

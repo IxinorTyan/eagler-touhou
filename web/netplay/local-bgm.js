@@ -1,7 +1,7 @@
 import {bgmVersion,onBgmVersion} from '../bgm-version.js';
+import {assetBytes} from '../preload-cache.js';
 // Local presentation only. The game emits commands; the audio device owns time.
 // Never seek to a network tick, refill PCM per frame, or write guest memory here.
-import {sha256} from './sha256.js';
 export class LocalBgm {
   constructor(context,report){
     this.context=context;this.report=report;this.newTracks={};
@@ -43,13 +43,10 @@ export class LocalBgm {
     if(this.downloads.has(cacheKey))return this.downloads.get(cacheKey);
     if(!track)return Promise.reject(Error(`缺少本地曲目：${id}`));
     const pending=(async()=>{
-      const response=await fetch(new URL('../bgm/'+track.url,import.meta.url),
-        {signal:AbortSignal.any([this.abort.signal,AbortSignal.timeout(30000)])});
-      if(!response.ok)throw Error(`音乐下载失败：${id}`);
-      const bytes=await response.arrayBuffer();
-      if(track.audioSha256&&await sha256(new Uint8Array(bytes))!==track.audioSha256)throw Error(`音乐校验失败：${id}`);
-      if(!this.closed)this.encoded.set(cacheKey,bytes);
-      return bytes;
+      const bytes=await assetBytes(`bgm/${track.url}`,{hash:track.audioSha256||track.sha256,size:track.bytes,
+        signal:AbortSignal.any([this.abort.signal,AbortSignal.timeout(30000)])});
+      if(!this.closed)this.encoded.set(cacheKey,bytes.buffer);
+      return bytes.buffer;
     })();
     this.downloads.set(cacheKey,pending);
     pending.then(()=>this.downloads.delete(cacheKey),()=>this.downloads.delete(cacheKey));

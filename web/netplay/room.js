@@ -10,12 +10,15 @@ const downloadFaultReport=(value,name)=>{const url=URL.createObjectURL(new Blob(
 import {createRelay} from './relay.js';
 import {mergeDeparture} from './membership.js';
 import {loadRtcConfiguration,refreshRtcPath,describeRtcConfiguration,countIceCandidate,describeIceCandidates,recordIceServerError} from './connection.js';
+import {assetBytes,freshJSON,parallelAssets} from '../preload-cache.js';
+import {bgmVersion,onBgmVersion} from '../bgm-version.js';
 const $=id=>document.getElementById(id),roles=['host','guest','guest2'];
 const label=role=>({host:'房主',guest:'客机 1',guest2:'客机 2'})[role];
 const status=text=>{$('status').textContent=text;player.note(text);};
 const settingNames=['players','stage','difficulty','lives','bombs'];
 const assistFlags=['focusEnabled','teamTargeting'];
 let session,state,iframe,runtime,queue,localReady;
+let preloadKey='',preloadPromise=null,preloadGeneration=0,preloadRetryAt=0;
 const mode=readNetworkMode();
 let useRelay=mode.transport==='ws';
 // Legacy URL preference only seeds a newly created room. Joining clients
@@ -256,6 +259,7 @@ function finishGame(){
 }
 function render(){
   if(!session||!state)return;
+  if(state.phase==='lobby')prepareRoomResources(state).catch(()=>{});
   const slot=state.slots[session.role],lobby=state.phase==='lobby'&&!stopped,active=activeRoles();
   $('entry').hidden=true;$('lobby').hidden=false;$('transport').disabled=true;
   $('room-info').textContent=`房间 ${session.room} · ${state.settings.players} 人模式 · ${state.settings.language==='jp'?'日文版':'汉化版'} · 你是${label(session.role)} · ${slot===null?'尚未选座':`P${slot+1}`}`;
@@ -288,6 +292,34 @@ function render(){
   $('ready').textContent=state.ready[session.role]?'取消准备':'准备';
   $('start').hidden=session.role!=='host';
   $('start').disabled=!lobby||busy||!active.every(role=>state.present[role]&&state.ready[role]);
+}
+async function prepareRoomResources(value){
+ const key=[value.settings.language,value.settings.stage,value.settings.rollback,bgmVersion()].join(':');
+ if(key===preloadKey&&preloadPromise)return preloadPromise;
+  if(performance.now()<preloadRetryAt)return;
+ const generation=++preloadGeneration;preloadKey=key;
+ const report=text=>{if(generation===preloadGeneration&&state?.phase==='lobby'&&!stopped)$('resource-status').textContent=text;};
+ preloadPromise=(async()=>{
+  report('正在预载游戏磁盘、DOSBox-X、音效和开场音乐…');
+  const [patch,manifest,sfxManifest,bgmManifest,alternate]=await Promise.all([
+   freshJSON('local-patch.json'),freshJSON('netplay/runtime.json'),freshJSON('sfx/manifest.json'),
+   freshJSON('bgm/manifest.json'),freshJSON('bgm/akyu/manifest.json')]);
+  const disk=patch.disks[value.settings.language];if(!disk)throw Error('找不到所选语言的游戏磁盘');
+  const supports=WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,5,2,0,1,0,1]));
+  const core=!!value.settings.rollback&&supports?'tracked':'plain',coreEntry=manifest.cores[core];
+  const trackManifest=bgmVersion()==='new'&&alternate.tracks?alternate:bgmManifest;
+  const track=trackManifest.tracks[`stage${value.settings.stage}-m86`];
+  await Promise.all([
+   parallelAssets(Object.entries(manifest.assets),async([path,hash])=>assetBytes(path,{hash})),
+   assetBytes(disk.file,{hash:disk.sha256,size:disk.size,gzip:true}),
+   assetBytes(coreEntry.file,{hash:coreEntry.sha256}),
+   parallelAssets(Object.entries(sfxManifest.effects),async([,item])=>assetBytes(`sfx/${item.file}`,{hash:item.sha256})),
+   track&&assetBytes(`bgm/${track.url}`,{hash:track.audioSha256||track.sha256,size:track.bytes})
+  ]);
+  if(generation===preloadGeneration)report('游戏磁盘、核心、音效和当前关卡音乐已校验并预载');
+ })();
+ preloadPromise.catch(error=>{if(generation===preloadGeneration){report(`预载失败：${error.message}，稍后重试`);preloadKey='';preloadPromise=null;preloadRetryAt=performance.now()+5000;}});
+ return preloadPromise;
 }
 function update(value){
   if(stopped)return;
@@ -647,6 +679,7 @@ async function receivedSignal({from,message}){
   }else throw Error('未知信令');
 }
 async function beginGame(){
+  await prepareRoomResources(state).catch(()=>{});if(stopped)return;
   bootStartedAt=performance.now();
   bootStage='获取网络连接配置';showStartup();
   await setupConnections();
@@ -978,3 +1011,4 @@ $('ready').onclick=()=>{
 };
 $('start').onclick=()=>{action('start');};
 $('leave').onclick=async()=>{stopped=true;running=false;clearInput();runtime?.stop();clearTimers();disconnect();try{await request('leave');}finally{location.href=networkUrl(mode);}};
+onBgmVersion(()=>{if(session&&state?.phase==='lobby'&&!stopped)prepareRoomResources(state).catch(()=>{});});

@@ -1,5 +1,5 @@
 // Complete one-shot buffers run on the audio device clock, never network PCM.
-import {sha256} from './sha256.js';
+import {assetBytes} from '../preload-cache.js';
 export class LocalSfx {
  constructor(context){
   this.context=context;this.buffers=new Map();this.active=null;this.closed=false;
@@ -16,10 +16,8 @@ export class LocalSfx {
   // Small lossless bank: download/decode once before ready, no request on fire.
   let next=0;const entries=Object.entries(manifest.effects);
   await Promise.all(Array.from({length:3},async()=>{while(next<entries.length){
-   const [id,item]=entries[next++],response=await fetch(new URL('../sfx/'+item.file,import.meta.url),{signal:this.abort.signal});
-   if(!response.ok)throw Error(`音效读取失败：${id}`);const bytes=await response.arrayBuffer();
-   if(await sha256(new Uint8Array(bytes))!==item.sha256)throw Error(`音效校验失败：${id}`);
-   const buffer=await this.context.decodeAudioData(bytes);
+   const [id,item]=entries[next++],bytes=await assetBytes(`sfx/${item.file}`,{hash:item.sha256,signal:this.abort.signal});
+   const buffer=await this.context.decodeAudioData(bytes.buffer);
    if(buffer.numberOfChannels!==1||Math.abs(buffer.duration-item.frames/44100)>.001)throw Error(`音效长度无效：${id}`);
    if(!this.closed)this.buffers.set(Number(id),buffer);
   }}));
