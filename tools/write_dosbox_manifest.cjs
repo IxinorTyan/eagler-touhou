@@ -27,7 +27,7 @@ function write() {
   for (const name of fs.readdirSync(vendor).sort()) if (name !== 'runtime.json') runtime.files[name] = sha(fs.readFileSync(path.join(vendor, name)));
   fs.writeFileSync(path.join(vendor, 'runtime.json'), JSON.stringify(runtime, null, 2) + '\n');
   const paths = [
-    'app.js','network-performance.js','netplay.js','netplay/udp-config.js','netplay/input-policy.js','lockstep.js','frame-queue.js','controls.js',
+    'app.js','site-adapter.css','fonts/th03-pause-pixel.woff2','fonts/OFL-Unifont.txt','network-performance.js','netplay.js','netplay/udp-config.js','netplay/input-policy.js','lockstep.js','frame-queue.js','controls.js',
     'netplay/async-lockstep.js','netplay/frame-controls.js','netplay/simulation.js','netplay/simulation-worker.js','netplay/simulation-client.js',
     'native-pause.js','pause-search.js','native-patch.json','native/main.exe','native/start.com','native/music.com',
     'local-sfx.js','network-audio.js','network-audio.json','native/network-audio.com','sfx/manifest.json',

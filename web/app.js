@@ -172,7 +172,11 @@ function localizePause(){
   const cn=(activeLang||$('language').value)==='cn';
   $('pause-menu').lang=cn?'zh-CN':'ja';
   $('pause-title').textContent=`${(pauseSeat??0)+1}P ${cn?'暂停':'一時停止'}`;
-  pauseButtons().forEach((button,i)=>{button.textContent=(cn?['继续','本局认输','背水阵']:['再開','ラウンド降参','背水の陣'])[i];});
+  pauseButtons().forEach((button,i)=>{
+    const label=document.createElement('span');label.className='pause-label';
+    label.textContent=(cn?['继续','本局认输','背水阵']:['再開','ラウンド降参','背水の陣'])[i];
+    button.replaceChildren(label);
+  });
 }
 $('language').addEventListener('change',localizePause);localizePause();
 try {
@@ -311,6 +315,8 @@ function refreshPauseMenu() {
   buttons[1].disabled = buttons[2].disabled = !allowed;
   if (buttons[pauseSelection].disabled) pauseSelection = 0;
   buttons.forEach((button, i) => { button.dataset.selected = String(i === pauseSelection); });
+  const cn=(activeLang||$('language').value)==='cn';
+  $('pause-help').textContent=(cn?['返回对局','放弃当前回合','进入背水阵']:['ゲームに戻る','このラウンドを降参','背水の陣に入る'])[pauseSelection];
 }
 function openPause(seat) {
   if(enqueue('pause'))return;

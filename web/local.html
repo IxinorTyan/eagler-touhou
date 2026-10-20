@@ -31,11 +31,12 @@
       <canvas id="canvas" width="640" height="400" tabindex="0" aria-label="梦时空游戏画面"></canvas>
       <div id="cover"><span>选择本局设置，点击“启动游戏”。</span></div>
       <div id="pause-shade" hidden></div>
-      <section id="pause-menu" hidden lang="ja" role="dialog" aria-modal="true" aria-labelledby="pause-title" data-seat="0">
+      <section id="pause-menu" hidden lang="ja" role="dialog" aria-modal="true" aria-labelledby="pause-title" aria-describedby="pause-help pause-message" data-seat="0">
         <h2 id="pause-title">1P 一時停止</h2>
         <button type="button" data-choice="resume">再開</button>
         <button type="button" data-choice="round" disabled>ラウンド降参</button>
         <button type="button" data-choice="match" disabled>背水の陣</button>
+        <p id="pause-help"></p>
         <p id="pause-message" role="status" aria-live="polite"></p>
       </section>
     </section>
