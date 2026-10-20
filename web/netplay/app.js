@@ -1,10 +1,15 @@
-import '../bgm-version.js';
+import {bgmVersion,onBgmVersion} from '../bgm-version.js';
 import {populateStages,stageLabel} from '../stage-select.js';
 import {NetSession} from './session.js';
 import {readNetworkMode,describeNetwork,networkParams} from './network-mode.js';
+import {assetBytes,freshJSON,parallelAssets} from '../preload-cache.js';
+import {preloadMusicTrack} from '../bgm-track.js';
+import {musicRoomTracks} from '../music-room.js';
+import {stageSelection} from '../stage-select.js';
 const $=id=>document.getElementById(id),roles=['host','guest','guest2'];
 populateStages($('startStage'));
 let identity,room,session,polling=false,busy=false,editing=false,leaving=false;
+let roomPreloadKey='',roomPreloadPromise=null,roomPreloadGeneration=0,roomPreloadRetryAt=0;
 const keys=new Set(),touches=new Map();let taps=0,commands=0;
 const keyBits={ArrowLeft:1,ArrowRight:2,KeyZ:4,KeyX:8,KeyC:4096,ArrowUp:16,ArrowDown:32,Enter:64,Escape:128};
 const status=text=>{$('status').textContent=text;};
@@ -47,6 +52,7 @@ async function post(action,data={}){
 }
 function showRoom(value){
   room=value;const host=identity.role==='host',lobby=room.phase==='lobby';
+  if(lobby)prepareRoomAssets(room).catch(()=>{});
   editing=editing&&lobby;$('entry').hidden=!editing;$('lobby').hidden=false;
   $('room-title').textContent=`合作房间 · P${room.seats[identity.role]+1}${host?'（房主）':''}`;$('room-code').textContent=room.room;
   $('room-settings').textContent=`${stageLabel(room.settings.startStage)}${room.settings.startStage!=='normal'?'（练习，不保存正式成绩）':''} · ${room.settings.players} 人 · ${room.settings.count} 玉 · ${['Easy','Normal','Hard','Lunatic'][room.settings.rank]} · ${describeNetwork(room.settings)} · ${room.settings.delay?room.settings.delay+' 步缓冲':'自动缓冲'}`;
@@ -57,6 +63,31 @@ function showRoom(value){
   $('ready').textContent=room.ready[identity.role]?'取消准备':'准备';
   $('start').disabled=!host||!lobby||!roles.slice(0,room.settings.players).every(r=>room.present[r]&&room.ready[r]);
   $('seat-note').textContent=`你控制 P${room.seats[identity.role]+1}；${host?'你负责菜单、路线选择和续关。':'菜单由房主操作，你可以请求暂停。'}`;
+}
+async function prepareRoomAssets(value){
+  const key=String(value.settings.startStage)+':'+bgmVersion();
+  if(key===roomPreloadKey&&roomPreloadPromise)return roomPreloadPromise;
+  if(performance.now()<roomPreloadRetryAt)return;
+  const generation=++roomPreloadGeneration;roomPreloadKey=key;
+  const report=text=>{if(generation===roomPreloadGeneration&&room?.phase==='lobby')$('resource-status').textContent=text;};
+  roomPreloadPromise=(async()=>{
+    report('正在预载原生核心、绘图线程、音效与开场音乐…');
+    const version=await freshJSON('netplay/runtime.json');
+    const assets=Object.entries(version.files);
+    await parallelAssets(assets,async([name,hash])=>assetBytes(name,{hash}));
+    const bytes=await assetBytes('game.wasm',{hash:version.files['game.wasm']});
+    const module=await WebAssembly.compile(bytes);
+    if(WebAssembly.Module.imports(module).length)throw Error('游戏核心含外部导入');
+    const sounds=await freshJSON('sfx/manifest.json');
+    await parallelAssets(sounds.sounds,async sound=>assetBytes(`sfx/${String(sound.id).padStart(2,'0')}.wav`,{hash:sound.sha256}));
+    const stage=stageSelection(value.settings.startStage).stage;
+    const track=musicRoomTracks[stage-1]?.key||'st0';
+    await preloadMusicTrack(track);
+    globalThis.th01RoomPreload={version,module};
+    report('游戏核心、音效与开场音乐已校验并预载');
+  })();
+  roomPreloadPromise.catch(error=>{if(generation===roomPreloadGeneration){report(`预载失败：${error.message}，稍后重试`);roomPreloadKey='';roomPreloadPromise=null;roomPreloadRetryAt=performance.now()+5000;}});
+  return roomPreloadPromise;
 }
 function render(current){
   const state=current.game.state();$('connection').textContent=current.connectionText();
@@ -73,6 +104,7 @@ async function accept(value){
   if(!identity)identity={room:value.room,role:value.role,token:value.token};showRoom(value);
   if(room.ended&&session&&!session.closed){session.fail(Error(room.ended),false);return;}
   if(room.phase==='loading'&&!session){
+    await prepareRoomAssets(room).catch(()=>{});
     clear();$('cover').hidden=true;
     session=new NetSession(identity,room,{canvas:$('canvas'),api:post,status,buttons:sample,render,failure});
     session.game.onMusicStatus=text=>{$('music-status').textContent=text;};session.game.setMusicVolume(Number($('music-volume').value)/100);
@@ -112,3 +144,4 @@ addEventListener('pagehide',()=>{session?.close();if(identity)navigator.sendBeac
 $('code').value=new URLSearchParams(location.search).get('room')?.match(/^\d{4}$/)?.[0]||'';
 fetch('/api/network',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();return r.json();}).then(v=>{$('network-help').textContent+=` TURN：${v.turnConfigured?'已配置':'未配置'}。`;}).catch(()=>status('请使用 start-lan.bat 启动联机服务'));
 setInterval(poll,250);
+onBgmVersion(()=>{if(identity&&room?.phase==='lobby')prepareRoomAssets(room).catch(()=>{});});

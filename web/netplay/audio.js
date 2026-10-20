@@ -1,6 +1,8 @@
 import {onBgmVersion} from '../bgm-version.js';
 import {loadMusicTrack} from '../bgm-track.js';
 import {musicRoomTracks} from '../music-room.js';
+import {assetBytes,freshJSON} from '../preload-cache.js';
+let effectsManifest;
 
 // Sound is local presentation; downloads and audio clocks never gate a game step.
 export class LocalAudio{
@@ -42,7 +44,9 @@ export class LocalAudio{
       const id=core.th_sound_event(this.cursor);if(!id)continue;
       if(!this.effects.has(id)){
         this.effects.set(id,null);
-        fetch(`sfx/${String(id).padStart(2,'0')}.wav`).then(async r=>{if(!r.ok)throw Error();return this.context.decodeAudioData(await r.arrayBuffer());})
+        effectsManifest??=freshJSON('sfx/manifest.json');
+        effectsManifest.catch(()=>{effectsManifest=null;});
+        effectsManifest.then(manifest=>assetBytes(`sfx/${String(id).padStart(2,'0')}.wav`,{hash:manifest.sounds.find(sound=>sound.id===id)?.sha256})).then(bytes=>this.context.decodeAudioData(bytes.buffer))
           .then(buffer=>this.effects.set(id,buffer)).catch(()=>this.effects.delete(id));
       }
       const buffer=this.effects.get(id);if(!buffer)continue;

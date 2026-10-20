@@ -2,6 +2,7 @@ import {applyStage,stageSelection} from '../stage-select.js';
 import {sha256} from './sha256.js';
 import {PROTOCOL} from './queue.js';
 import {LocalAudio} from './audio.js';
+import {assetBytes,freshJSON} from '../preload-cache.js';
 
 // The transport and immutable input queue come from the older multiorb lab.
 // Only this adapter knows about the native C++ core; it never runs its own clock.
@@ -15,18 +16,16 @@ export class GameRuntime{
   }
   async load(settings,progress=()=>{}){
     this.settings={...settings};progress('加载并校验原生游戏与联机版本…');
-    const get=async path=>{const r=await fetch(path,{cache:'no-store'});if(!r.ok)throw Error(`资源读取失败：${path}`);return r;};
-    const version=await (await get('netplay/runtime.json')).json();
+    const version=globalThis.th01RoomPreload?.version??await freshJSON('netplay/runtime.json');
     if(version.protocol!==PROTOCOL||version.tickNumerator!==440000||version.tickDenominator!==24830)throw Error('联机版本不匹配，请刷新页面');
     let binary,rendererSource;
     await Promise.all(Object.entries(version.files).map(async([name,hash])=>{
-      const bytes=new Uint8Array(await (await get(name)).arrayBuffer());
-      if(await sha256(bytes)!==hash)throw Error(`联机资源校验失败：${name}`);
+      const bytes=await assetBytes(name,{hash});
       if(name==='game.wasm')binary=bytes;
       if(name==='netplay/renderer.js')rendererSource=bytes;
     }));
     if(!binary||!rendererSource)throw Error('联机清单缺少游戏核心或绘图线程，请刷新页面');
-    const module=await WebAssembly.compile(binary);
+    const module=globalThis.th01RoomPreload?.module??await WebAssembly.compile(binary);
     if(WebAssembly.Module.imports(module).length)throw Error('游戏核心含外部导入');
     this.core=(await WebAssembly.instantiate(module,{})).exports;
     if(!this.core.th_net_checksum||!this.core.th_set_netplay_rules||this.core.memory.buffer.byteLength!==4194304)throw Error('游戏核心需要更新');
