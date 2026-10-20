@@ -24,7 +24,7 @@
     "frame-limit.js": "e984d0b2adcf5dce3828e5b6e15bb7cf6aebd1ddbd9f5d7950a5dfda11998d03",
     "frame-presenter.js": "7c9c834d6627ae044fa3b7d33b572e95fa20b7d79e7ac3d4a1cf0df3e016434a",
     "index.html": "efa7ae1750da73988a446f8d2cf53fc204df9c76204280332100063708a41e47",
-    "lan.html": "6dd78a9fa3731227764f7ac1293907d18ea5bbb66395183c17c3747d2a010f15",
+    "lan.html": "1ba2615fca67e2a984743050a7b685a4a26cbd5fda6c4f5a5c4fa9848cb6d0e8",
     "lan.js": "b2b260e540b195ae8dd09812412f81aa653bff0493beaee6dc11623580a4a49d",
     "local.css": "657647d9b6798cbb21d09bb8a6ef2eddf163b631b7453598b0a6f913e24c2b52",
     "native-touch.js": "4399ed78b5f4219458717669592e3e05de3c3ad3086ca76e724b555c557078a8",
@@ -71,7 +71,7 @@
     "vendor/dosbox-x/dosbox-rollback-tracked.mjs": "f7224bcb7e5ea881525760f3b71b194d01e127acf31103a5400a06d9d004d048",
     "vendor/dosbox-x/dosbox-rollback.mjs": "b86ffabafe90b43c0e12745ebd2d03e0da3353a53f765ad50a2008d12e291e8e",
     "vendor/dosbox-x/emulators.js": "066176a9e9e6babfb5388552a5154f3c1f81ed778af3bf4a1f9f904161e3c4bb",
-    "local-patch.json": "958f8a7b86f566920e645fbafc0a438ec3152446e972f323267dc0ffb264f279",
+    "local-patch.json": "71582635d6e0a0ea81324c280f9fcabefc2b0c158378af755b8d6151524d1b3a",
     "assets/ghost-32.png": "b65bde17c040b32d2c3ca90436a8905006c4c4fc4dabb899876fecf2374674d2",
     "assets/hud-ofuda-p1-original.png": "b37e36b50161916c1888eda080dcda79132286b06758b9ae2ed0431e7ceab7fa",
     "assets/hud-ofuda-p2-blue.png": "581192e5ee4e668c2daa9c4e3069f526061f8865ea37dbee3c2182a640f3f05f",
@@ -83,9 +83,9 @@
     "assets/th02-player-art.bin": "b7c89902236db00efb8c37dc1d5289985a762508e91ed9df21bb507c8b9ae65b",
     "assets/th02-player-art.json": "e103eb07ab2bbe164f65dd2ab23c215865f93b430e391316802be104fd0dc164",
     "netplay/sound-patch.json": "18cf7b4164560a11ee6ff385196c3a09fe342527d43ee992ae749c569da42791",
-    "netplay/state-swap-patch.json": "5de7e9a775b6473cf6f3b516801ffa75217d34af01d67a06bde1c96b106196a9",
-    "netplay/row-copy-patch.json": "c1c255bc06f1893a17b9df0f40b81fb20e64b1875668d392d1016ffb0b0ba5eb",
-    "netplay/bullet-bank-patch.json": "ce28b8bada1315eb4b9b5ea8d5fdccb98f5376235b58da3c84ffb5f20bb880f2",
+    "netplay/state-swap-patch.json": "5ade0bbff53b7213b0976bd92f6d39e7114703f819c40508c99d837d6992ae34",
+    "netplay/row-copy-patch.json": "edf3a5d989b774e6486516eb7c819caf68fa91a6874030e6b23708f14aa73d72",
+    "netplay/bullet-bank-patch.json": "32c79cb8a00cdceed6afd75ba8396067d8bbc344956112156242ffac1cf6b139",
     "bgm/manifest.json": "7512e652e6dd1ce2e473e3bd230a0690d30093e7e2a1792f5c4c402816e34443",
     "bgm/akyu/manifest.json": "2d1034d0016d39fa36d0bff5248a354cf74559663a6b94f3b3088c3a54e7416b",
     "solo-patch.json": "f3454898d48357ab97f0d82545ee811d40b135a753519f47c0c6058818b1d981",
@@ -104,5 +104,5 @@
       "sha256": "5fb459e5df9232cab4d55f3c36c0bb6b4d00a983fc023661245373ee59ca06d8"
     }
   },
-  "build": "405b3ab8568120812913cc414943d34f3f3cfaaec2f43ed0c96bbee9db8e6815"
+  "build": "3cdf4a15a31de4e25e04e1f52eb0a95df25e2d015b9ae839e6624ee156de53a8"
 }
