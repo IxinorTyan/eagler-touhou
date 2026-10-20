@@ -19,14 +19,16 @@ import {installNetworkAudio} from './network-audio.js';
 import {NativeMusic, ConfirmedMusic} from './native-music.js';
 import {createNetworkHistory,mountNetworkPerformance,readNativeCoreDiagnostics} from './network-performance.js';
 
-const $ = id => document.getElementById(id);
-const netQuery = new URLSearchParams(location.search);
+const roomHost=globalThis.th03RoomHost;
+const $ = id => roomHost?.root?.querySelector(`[data-runtime-id="${id}"]`)??document.getElementById(id);
+const netQuery = new URLSearchParams(roomHost?.params??location.search);
 const controlsOnly=netQuery.get('controlsOnly')==='1';
 let rollbackEnabled = false, roomFocusEnabled = true, roomTouchUnlimitedAllowed = false, roomHostSeat = 0;
 const online = ['rtc', 'relay'].includes(netQuery.get('net')) && ['host', 'guest'].includes(netQuery.get('role'))
   && /^[0-9]{4}$/.test(netQuery.get('room') || '') && !!netQuery.get('token');
-const embedded = online && netQuery.get('embedded') === '1' && window.parent !== window;
+const embedded = !roomHost && online && netQuery.get('embedded') === '1' && window.parent !== window;
 function notifyRoom(message, loaded = false, error = false) {
+  if(roomHost)roomHost.notify({protocol:'th03-lan/1',event:'progress',message,loaded,error});
   if (embedded) window.parent.postMessage({protocol: 'th03-lan/1', event: 'progress', message, loaded, error}, location.origin);
 }
 if (embedded) {
@@ -115,7 +117,8 @@ const screenChildren = [...$('screen').children];
 const player = mountPlayer($('screen'), {solo: true,network:online, onGesture: () => { clearEscape(); resumeAudio(); },
   onFullscreenExit: () => { if(pauseSeat===null)openPause(0); }});
 $('screen').addEventListener('player-viewchange',event=>{
-  if(embedded)window.parent.postMessage({protocol:'th03-lan/1',event:'view',immersive:event.detail.immersive},location.origin);
+  if(roomHost)roomHost.notify({protocol:'th03-lan/1',event:'view',immersive:event.detail.immersive});
+  else if(embedded)window.parent.postMessage({protocol:'th03-lan/1',event:'view',immersive:event.detail.immersive},location.origin);
 });
 $('screen').classList.remove('screen');
 const viewport = document.createElement('div'); viewport.className = 'screen';
@@ -278,7 +281,8 @@ async function loadDisk(lang) {
     }
   }
   status('正在加载梦时空镜像');
-  const data = await loadVerifiedBytes(meta.url, meta.sha256, {gzip: true});
+  const prepared=online&&roomHost?.preloadPromise?await roomHost.preloadPromise:null;
+  const data = prepared?.language===lang?prepared.diskBytes.slice():await loadVerifiedBytes(meta.url, meta.sha256, {gzip: true});
   return prepareDisk(data, meta);
 }
 function diskChanged(name) {
@@ -531,6 +535,7 @@ $('start').addEventListener('click', async () => {
     activeLang = $('language').value;
     localizePause();
     const networkTask = online?(async()=>{
+      if(roomHost?.preloadPromise){const prepared=await roomHost.preloadPromise;return {...prepared,soundAssets:new Map(prepared.soundAssets)};}
       const response=await fetch('lockstep-runtime.json',{cache:'no-store'});
       if(!response.ok)throw Error('同步引擎清单缺失');
       const runtime=await response.json();
@@ -600,11 +605,13 @@ $('start').addEventListener('click', async () => {
       if(emulator.isNetworkWorker){const boot=await emulator.boot(progress);bootMusic=boot.events;syncIdentity.boot=boot.hash;controls.release();}
       else{bootMusic=await bootToSelection({emulator,pause:nativePause,music:nativeMusic,clearInput:()=>controls.release(),progress});syncIdentity.boot=syncHash();}
     }
+    if(roomHost?.stopped)throw Error('房间已结束');
     if (online) {
       netplay = new Netplay({room: netQuery.get('room'), token: netQuery.get('token'), role: netQuery.get('role'), mode: netQuery.get('net'),sampleLocal:controls.sampleLocal,
         onState: message => {
           $('connection-path').hidden=false;$('connection-path').textContent=`本机连接：${message}`;
-          if(embedded)window.parent.postMessage({protocol:'th03-lan/1',event:'connection',message},location.origin);
+          if(roomHost)roomHost.notify({protocol:'th03-lan/1',event:'connection',message});
+          else if(embedded)window.parent.postMessage({protocol:'th03-lan/1',event:'connection',message},location.origin);
         }, onError: error => report(error)});
       emulator.pause();
       status('本机资源已就绪，等待另一位玩家完成加载');
@@ -621,6 +628,7 @@ $('start').addEventListener('click', async () => {
     // Boot can contain menu SE while the other device is still loading.
     // Keep its BGM commands; do not play those old effects at room start.
     for(const [ax,hash]of bootMusic)if((ax>>>8)!==0x0c)localBgm.command(ax,hash);
+    if(roomHost?.stopped)throw Error('房间已结束');
     closed = false; dirty = saved = 0;
     $('cover').hidden = true; emulator.run(); $('canvas').focus(); resumeAudio();
     if(online)sync.start();
@@ -629,13 +637,15 @@ $('start').addEventListener('click', async () => {
     if (!storageWarning) $('save-status').textContent = online ? '联机镜像' : '存档已就绪';
     if (online) notifyRoom('游戏已启动', true);
   } catch (error) {
-    if(emulator?.isNetworkWorker)emulator.dispose();
+    if(emulator?.isNetworkWorker)emulator.dispose();else emulator?.pause();
+    localBgm?.dispose();
     localSfx?.dispose();localSfx=null;
     netplay?.close(); netplay = null; report(error); $('start').textContent = '刷新重试'; $('start').disabled = false;
     $('start').onclick = () => location.reload();
   } finally { starting = false; }
 });
-if (!controlsOnly&&(restartOnLoad || embedded)) $('start').click();
+if(roomHost)roomHost.runtime={openControls:()=>$('controls').click(),stop(){roomHost.stopped=true;closed=true;controls.release();sync?.stop();netplay?.close();localBgm?.dispose();localSfx?.dispose();if(emulator?.isNetworkWorker)emulator.dispose();else emulator?.pause();}};
+if (!controlsOnly&&(restartOnLoad || embedded || roomHost)) $('start').click();
 $('reset').addEventListener('click', async () => {
   if (online || closed || closing || nativePause?.pending) return;
   if (!confirm('重新启动梦时空？当前对局会结束。')) return;

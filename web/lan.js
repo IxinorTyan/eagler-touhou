@@ -1,8 +1,15 @@
 import {readNetworkMode,networkParams,describeNetwork} from './netplay/network-mode.js';
 import {readRoomPreferences,saveRoomPreferences} from './room-preferences.js';
 import {supportsNetworkWorker} from './netplay/simulation-client.js';
-const $ = id => document.getElementById(id), protocol = 'th03-lan/1';
+import {loadNetworkAssets,loadVerifiedBytes} from './startup-assets.js';
+import {preloadOpeningMusic} from './local-bgm.js';
+import {bgmVersion,onBgmVersion} from './bgm-version.js';
+const roomIds={start:'room-start',language:'room-language',difficulty:'room-difficulty',clock:'room-clock','connection-path':'room-connection-path'};
+for(const [source,target]of Object.entries(roomIds)){const node=document.getElementById(source);if(node)node.id=target;}
+const $ = id => document.getElementById(roomIds[id]||id), protocol = 'th03-lan/1';
 let session = null, timer = null, busy = false, state = null, runtime = null;
+let preloadKey='',preloadPromise=null,preloadGeneration=0,preloadRetryAt=0;
+onBgmVersion(()=>{if(session&&state&&!state.started)prepareRoomAssets(state).catch(()=>{});});
 const query = new URLSearchParams(location.search);
 const networkRuntime=$('network-runtime');
 try{networkRuntime.value=query.has('netWorker')?(query.get('netWorker')==='1'?'worker':'main'):(localStorage.getItem('th03-network-runtime')||'main');}catch{}
@@ -85,23 +92,71 @@ function render(value) {
   $('ready').textContent = state.ready[session.role] ? '取消准备' : '准备';
   $('start').disabled = busy || session.role !== 'host' || state.started || !state.present.guest || !state.ready.host || !state.ready.guest;
   $('startup-progress').hidden = !state.started;
+  if(session&&!state.started)prepareRoomAssets(state).catch(()=>{});
   networkRuntime.disabled=state.started;
-  if (state.started && !runtime) launch();
+  if (state.started && !runtime) launch().catch(error=>status(error.message,true));
   if (runtime && (!state.present.host || !state.present.guest)) {
-    runtime.remove(); status('另一位玩家已离开，本局已结束', true);
+    runtime.stop(); status('另一位玩家已离开，本局已结束', true);
   }
 }
-function launch() {
+async function launch() {
+  for(const [source,target]of Object.entries(roomIds)){const node=document.getElementById(source);if(node)node.id=target;}
   $('controls-dialog').close();$('controls-dialog').querySelector('iframe').removeAttribute('src');
-  const params = new URLSearchParams({net: state.mode, room: session.room, token: session.token, role: session.role,
-    embedded: '1', language: state.settings.language, difficulty: state.settings.difficulty, clock: state.settings.clock,
-    rollback: state.settings.rollback ? '1' : '0'});
+  globalThis.th03RoomHost??={};
+  runtime={stop(){globalThis.th03RoomHost.stopped=true;globalThis.th03RoomHost.runtime?.stop();}};
+  const params=new URLSearchParams({net:state.mode,room:session.room,token:session.token,role:session.role,
+    language:state.settings.language,difficulty:state.settings.difficulty,clock:state.settings.clock,rollback:state.settings.rollback?'1':'0'});
   if(networkRuntime.value==='worker')params.set('netWorker','1');
-  runtime = document.createElement('iframe'); runtime.title = '梦时空联机对战';
-  runtime.allow = 'autoplay; fullscreen; gamepad'; runtime.src = `local.html?${params}`;
-  $('game').hidden = false; $('game').replaceChildren(runtime);
-  requestAnimationFrame(()=>$('game').scrollIntoView({block:'start'}));
-  status('正在加载双方游戏');
+  const response=await fetch(new URL('local.html',import.meta.url),{cache:'no-store'});
+  if(globalThis.th03RoomHost.stopped)return;
+  if(!response.ok)throw Error('游戏界面加载失败');
+  const page=new DOMParser().parseFromString(await response.text(),'text/html');
+  const root=$('game');root.replaceChildren();root.hidden=false;
+  const main=page.querySelector('main');
+  for(const node of main.children){
+    if(node.matches('.intro,.local-music-settings'))continue;
+    const copy=document.importNode(node,true);
+    if(copy.matches('.launch-settings,.launch-toolbar,.players'))copy.hidden=true;
+    root.append(copy);
+  }
+  root.append(document.importNode(page.getElementById('settings'),true));
+  // Keep runtime lookups scoped, and leave the lobby's controls addressable.
+  for(const node of root.querySelectorAll('[id]')){
+    node.dataset.runtimeId=node.id;
+    if(document.getElementById(node.id)!==node)node.id='runtime-'+node.id;
+  }
+  globalThis.th03RoomHost??={};Object.assign(globalThis.th03RoomHost,{root,params,notify:handleRuntimeMessage});
+  preloadRetryAt=0;
+  globalThis.th03RoomHost.preloadPromise=prepareRoomAssets(state);
+  await import('./app.js');
+  requestAnimationFrame(()=>root.scrollIntoView({block:'start'}));
+}
+async function prepareRoomAssets(room){
+  const key=`${room.settings.language}:${room.settings.rollback?'rollback':'lockstep'}:${bgmVersion()}`;
+  if(performance.now()<preloadRetryAt&&key===preloadKey)return preloadPromise;
+  if(key===preloadKey&&preloadPromise)return preloadPromise;preloadKey=key;
+  const generation=++preloadGeneration;
+  const report=message=>{if(generation===preloadGeneration)$('resource-status').textContent=message;};
+  preloadPromise=(async()=>{
+    report('正在预载游戏磁盘、DOSBox-X 与音效…');
+    const response=await fetch('disks/manifest.json',{cache:'no-store'});
+    if(!response.ok)throw Error('磁盘清单读取失败');const disks=await response.json();
+    const disk=disks.games[`3-${room.settings.language}`];if(!disk)throw Error('找不到所选语言的游戏磁盘');
+    const runtimeResponse=await fetch('lockstep-runtime.json',{cache:'no-store'});
+    if(!runtimeResponse.ok)throw Error('同步引擎清单缺失');const runtime=await runtimeResponse.json();
+    const soundAssets=new Map();
+    const [diskBytes,networkAssets]=await Promise.all([
+      loadVerifiedBytes(new URL(disk.url,import.meta.url),disk.sha256,{gzip:true}),
+      loadNetworkAssets(runtime,report,{rollbackEnabled:room.settings.rollback,onAsset:(path,bytes,sha256)=>{if(path.startsWith('sfx/'))soundAssets.set(path,{bytes,sha256});}})
+    ]);
+    let musicWarning='';
+    await preloadOpeningMusic().catch(error=>{musicWarning=`；音乐预载失败：${error.message}`;});
+    report(`游戏与音效已校验并预载（${(diskBytes.byteLength/1048576).toFixed(0)} MiB 游戏盘）${musicWarning}`);
+    return {runtime,wasmBinary:networkAssets,soundAssets,diskBytes,language:room.settings.language};
+  })();
+  preloadPromise.catch(error=>{if(generation===preloadGeneration){report(`资源预载失败：${error.message}，稍后自动重试`);preloadRetryAt=performance.now()+5000;preloadPromise=null;}});
+  globalThis.th03RoomHost??={};globalThis.th03RoomHost.preloadPromise=preloadPromise;
+  return preloadPromise;
 }
 async function enter(kind) {
   if (busy || session) return;
@@ -119,7 +174,7 @@ async function poll() {
   if (!session) return;
   try { if (!busy) {const next=await api('state', {}, 'GET');if(!busy&&next.revision>=state.revision)render(next);} }
   catch (error) {
-    runtime?.remove(); status(error.message, true);
+    runtime?.stop(); status(error.message, true);
     if (runtime || /房间不存在|房间身份无效/.test(error.message)) return;
   }
   timer = setTimeout(poll, 1000);
@@ -133,7 +188,7 @@ async function mutate(path, data = {}) {
 }
 $('create').onclick = () => enter('create'); $('join').onclick = () => enter('join');
 $('configure-controls').onclick=()=>{
-  if(runtime){runtime.contentWindow.postMessage({protocol,event:'open-controls'},location.origin);$('game').scrollIntoView({block:'start'});return;}
+  if(runtime){globalThis.th03RoomHost?.runtime?.openControls();$('game').scrollIntoView({block:'start'});return;}
   $('controls-dialog').querySelector('iframe').src='local.html?controlsOnly=1';
   $('controls-dialog').showModal();
 };
@@ -143,27 +198,22 @@ $('ready').onclick = () => mutate('ready'); $('start').onclick = () => mutate('s
 for (const id of ['language', 'difficulty', 'clock', 'rollback', 'focus-enabled', 'touch-unlimited-allowed', 'host-seat-choice']) $(id).onchange = () => mutate('settings', {settings: {
   hostSeat: Number($('host-seat-choice').value), language: $('language').value, difficulty: Number($('difficulty').value), clock: Number($('clock').value), rollback: $('rollback').checked, focusEnabled: $('focus-enabled').checked, touchUnlimitedAllowed: $('touch-unlimited-allowed').checked}});
 $('leave').onclick = async () => {
-  clearTimeout(timer); runtime?.remove();
+  clearTimeout(timer); runtime?.stop();
   try { await api('leave'); } catch {}
   location.href = `lan.html?${networkParams(connection)}`;
 };
-window.addEventListener('message', async event => {
-  if (event.origin !== location.origin || event.source !== runtime?.contentWindow || event.data?.protocol !== protocol) return;
-  const value = event.data;
-  if(value.event==='view'){runtime.classList.toggle('game-immersive',value.immersive===true);return;}
+async function handleRuntimeMessage(value){
+  if(value?.protocol!==protocol)return;
+  if(value.event==='view'){$('game').classList.toggle('game-immersive',value.immersive===true);return;}
   if(value.event==='connection'){
-    $('connection-details').hidden=false;
-    $('connection-path').hidden=false;$('connection-path').textContent=`本机连接：${String(value.message).slice(0,240)}`;return;
+    $('connection-details').hidden=false;$('connection-path').hidden=false;
+    $('connection-path').textContent='本机连接：'+String(value.message).slice(0,240);return;
   }
-  if (value.event === 'resize' && Number.isFinite(value.height)) {
-    runtime.style.height = `${Math.max(400, Math.min(2200, value.height))}px`; return;
-  }
-  if (value.event !== 'progress') return;
-  try { render(await api('progress', {message: value.message, loaded: value.loaded === true, error: value.error === true})); }
-  catch (error) { status(error.message, true); }
-  if (value.error) status(value.message, true);
-  else if (value.loaded) status('本机游戏已启动');
-});
+  if(value.event!=='progress')return;
+  try{render(await api('progress',{message:value.message,loaded:value.loaded===true,error:value.error===true}));}
+  catch(error){status(error.message,true);}
+  if(value.error)status(value.message,true);else if(value.loaded)status('本机游戏已启动');
+}
 window.addEventListener('pagehide', () => {
   if (session) navigator.sendBeacon('/api/leave', new Blob([JSON.stringify({protocol, ...session})], {type: 'application/json'}));
 });

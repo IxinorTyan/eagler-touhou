@@ -1,4 +1,12 @@
 import {bgmVersion,onBgmVersion} from './bgm-version.js';
+import {assetBytes,freshJSON} from './preload-cache.js';
+export async function preloadOpeningMusic(){
+  const [manifest,alternate]=await Promise.all([freshJSON('bgm/manifest.json'),freshJSON('bgm/akyu/manifest.json')]);
+  await Promise.all(['select-m26','select-m86'].map(async id=>{
+    const track=bgmVersion()==='new'&&alternate.tracks[id]?alternate.tracks[id]:manifest.tracks[id];
+    if(track)await assetBytes('bgm/'+track.url,{hash:track.audioSha256,size:track.bytes});
+  }));
+}
 // Local presentation only. The game emits commands; the audio device owns time.
 // Never seek to a network tick, refill PCM per frame, or write guest memory here.
 export class LocalBgm {
@@ -42,10 +50,8 @@ export class LocalBgm {
     if(this.downloads.has(cacheKey))return this.downloads.get(cacheKey);
     if(!track)return Promise.reject(Error(`缺少本地曲目：${id}`));
     const pending=(async()=>{
-      const response=await fetch(new URL('./bgm/'+track.url,import.meta.url),
-        {signal:AbortSignal.any([this.abort.signal,AbortSignal.timeout(30000)])});
-      if(!response.ok)throw Error(`音乐下载失败：${id}`);
-      const bytes=await response.arrayBuffer();
+      const bytes=(await assetBytes('bgm/'+track.url,{hash:track.audioSha256,size:track.bytes,
+        signal:AbortSignal.any([this.abort.signal,AbortSignal.timeout(30000)])})).buffer;
       if(!this.closed)this.encoded.set(cacheKey,bytes);
       return bytes;
     })();

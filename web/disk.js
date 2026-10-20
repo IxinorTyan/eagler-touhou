@@ -1,4 +1,5 @@
 import {sha256} from './sha256.js';
+import {loadVerifiedBytes} from './startup-assets.js';
 export {sha256};
 
 // HDI partition CHS and the FAT12 BPB describe the disk, including saved copies.
@@ -142,14 +143,11 @@ export async function nativeAssets() {
   if (!assets) assets = (async () => {
     const response = await fetch('native-patch.json');
     if (!response.ok) throw Error('暂停补丁清单加载失败');
-    const meta = await response.json(), executable = await fetch(meta.url);
-    if (!executable.ok) throw Error('暂停补丁加载失败');
-    const bytes = new Uint8Array(await executable.arrayBuffer());
+    const meta = await response.json();
+    const bytes = await loadVerifiedBytes(new URL(meta.url,import.meta.url),meta.sha256);
     if (bytes.length !== meta.bytes || await sha256(bytes) !== meta.sha256) throw Error('暂停补丁校验失败');
     const readAsset = async asset => {
-      const response = await fetch(asset.url);
-      if (!response.ok) throw Error('双人启动补丁加载失败');
-      const bytes = new Uint8Array(await response.arrayBuffer());
+      const bytes = await loadVerifiedBytes(new URL(asset.url,import.meta.url),asset.sha256);
       if (bytes.length !== asset.bytes || await sha256(bytes) !== asset.sha256) throw Error('双人启动补丁校验失败');
       return bytes;
     };
