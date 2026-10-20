@@ -9,6 +9,11 @@ import {deploymentIceConfiguration} from './netplay/udp-config.js';
 import {mergeDeparture} from './netplay/membership.js';
 import {createHistoryHost} from './netplay/history-host.js';
 import {timingReport,validateTimingReport,selectStartupPolicy,validateStartupPolicy} from './netplay/startup-policy.js';
+import {loadVerifiedBytes,loadCompiledCore} from './startup-assets.js';
+import {loadMusicAssets} from './music-files.js';
+import {loadAfterimageArt} from './afterimage-art.js';
+import {assetBytes,freshJSON} from './preload-cache.js';
+import {bgmVersion,onBgmVersion} from './bgm-version.js';
 const GRACE_MS=5000;
 let historyHost=null,historyWarning='',finishing=false,historyRequest=0,historyPromptEpoch=0,pendingHistorySave=null,historyExporting=false;
 const historyFlushes=new Map();
@@ -70,6 +75,7 @@ let activity={phase:'idle',since:0,totals:{}};
 let lastMessage=0,heartbeat=0,rtcTimeout=0,bootTimeout=0,sessionStarted=0;
 let lastState=null,liveControl=null,hashes=new Map(),peerHashes=new Map(),hashMatches=0,waits=0,steps=0,endedReason=null;
 let entering=false;
+let preloadKey='',preloadPromise=null,preloadGeneration=0,preloadRetryAt=0;
 let bootProgress={};
 let transport='rtc',fallbackPending=false,networkEvents=[];
 const status=text=>{$('status').textContent=text;};
@@ -150,6 +156,7 @@ function render(){
   $('watch').disabled=!!auth||!version?.historyAvailable||entering;
   $('lobby').hidden=!auth;$('pause').disabled=!running;
   if(!auth||!room)return;
+  if(room.phase==='lobby')prepareRoomResources(room).catch(()=>{});
   $('room-title').textContent=`房间 ${auth.room} · ${host?'我是房主':'我是队友'}`;
   $('my-seat').textContent=`我的角色：P${room.slots[auth.role]+1}`;
   for(const role of activeRoles()){
@@ -164,6 +171,35 @@ function render(){
   $('guest2-seat').hidden=room.settings.players<3;
   $('seat').querySelector('[value="2"]').hidden=room.settings.players<3;
   $('start').disabled=!lobby||!host||!activeRoles().every(role=>room.present[role]&&room.ready[role]);
+}
+async function prepareRoomResources(value){
+  const key=`${value.settings.language}:${value.settings.rollback===true}:${value.settings.rank}:${bgmVersion()}`;
+  if(key===preloadKey&&preloadPromise)return preloadPromise;
+  if(performance.now()<preloadRetryAt)return;
+  const generation=++preloadGeneration;preloadKey=key;
+  const report=text=>{if(generation===preloadGeneration&&room?.phase==='lobby'&&!!auth)$('resource-status').textContent=text;};
+  preloadPromise=(async()=>{
+    report('正在预载游戏磁盘、DOSBox-X 核心和声音资源…');
+    const vendor=new URL('vendor/dosbox-net/',import.meta.url);
+    const [patchResponse,manifestResponse]=await Promise.all([
+      fetch(`patch-${value.settings.language}.json`,{cache:'no-store'}),fetch(new URL('runtime.json',vendor),{cache:'no-store'})]);
+    if(!patchResponse.ok||!manifestResponse.ok)throw Error('游戏或核心清单读取失败');
+    const [patch,manifest]=await Promise.all([patchResponse.json(),manifestResponse.json()]);
+    const tracked=!!value.settings.rollback&&WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,5,2,0,1,0,1]));
+    const core=tracked?'wdosbox-x-rollback-tracked.wasm':'wdosbox-x-rollback.wasm';
+    const [sfxManifest,bgmManifest,alternate]=await Promise.all([freshJSON('sfx/manifest.json'),freshJSON('bgm/manifest.json'),freshJSON('bgm/akyu/manifest.json')]);
+    const tracks=(bgmVersion()==='new'?alternate:bgmManifest).tracks;
+    const opening=Number(value.settings.rank)===4?'st06':'st00';
+    await Promise.all([
+      loadVerifiedBytes(new URL(`th05-local-${value.settings.language}.hdi.gz`,import.meta.url),patch.sha256,{gzip:true,size:patch.size}),
+      loadCompiledCore(new URL(core,vendor),manifest.files[core]),loadMusicAssets({effects:true}),loadAfterimageArt(patch),
+      loadVerifiedBytes(new URL('sfx/'+sfxManifest.url,import.meta.url),sfxManifest.sha256,{size:sfxManifest.bytes}),
+      ...['m26','m86'].map(type=>tracks[`${opening}-${type}`]).filter(Boolean).map(track=>assetBytes('bgm/'+track.url,{hash:track.audioSha256,size:track.bytes}))
+    ]);
+    if(generation===preloadGeneration)report('游戏磁盘、核心和音乐／音效资源已校验并预载');
+  })();
+  preloadPromise.catch(error=>{if(generation===preloadGeneration){report(`预载失败：${error.message}，稍后重试`);preloadKey='';preloadPromise=null;preloadRetryAt=performance.now()+5000;}});
+  return preloadPromise;
 }
 async function setRoom(data){
   if(!auth)return;
@@ -555,6 +591,7 @@ async function connect(){
   if(!directRelay)rtcTimeout=setTimeout(()=>{if(auth===identity&&transport==='rtc')requestRelay('WebRTC 连接超时');},room.network==='public-rtc'?20000:8000);
   bootTimeout=setTimeout(()=>finish('全员启动或同步确认超时，请重新建房。'),600000);
   display=createFrameDisplay($('canvas'),{release:seq=>worker?.postMessage({type:'frame-ack',seq}),onError:error=>finish(error.message)});
+  await prepareRoomResources(room).catch(()=>{});if(current!==epoch||auth!==identity)return;
   worker=new Worker('lan-worker.js',{type:'module'});
   worker.onerror=event=>{if(current===epoch)finish(event.message||'游戏 Worker 启动失败');};
   worker.onmessage=({data})=>{
@@ -819,3 +856,4 @@ try{
 }catch{status('请关闭旧版 TH05 局域网服务，再运行本项目的 start-lan.bat，并刷新页面。');}
 render();historyUI();
 $('public-transport').onchange=()=>{if(auth||entering)return;network=$('public-transport').value;render();};
+onBgmVersion(()=>{if(auth&&room?.phase==='lobby')prepareRoomResources(room).catch(()=>{});});

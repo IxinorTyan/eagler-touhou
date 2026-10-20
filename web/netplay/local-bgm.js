@@ -1,4 +1,5 @@
 import {bgmVersion,onBgmVersion} from '../bgm-version.js';
+import {assetBytes} from '../preload-cache.js';
 // Local presentation only. The game emits commands; the audio device owns time.
 // Never seek to a network tick, refill PCM per frame, or write guest memory here.
 export class LocalBgm {
@@ -30,7 +31,7 @@ export class LocalBgm {
     this.status='本地音乐：按需加载';
     const commands=this.pendingCommands.splice(0);
     for(const [ax,hash]of commands)this.command(ax,hash);
-    const first=Number(config.difficulty)===4?'st06':'st00';
+    const first=Number(config.rank??config.difficulty)===4?'st06':'st00';
     // Warm compressed opening tracks without delaying the game or allocating
     // two full decoded waveforms before the driver selects its music mode.
     if(!commands.length&&config.warmOpening!==false)for(const type of ['m26','m86'])this.prefetch(`${first}-${type}`);
@@ -42,10 +43,8 @@ export class LocalBgm {
     if(this.downloads.has(cacheKey))return this.downloads.get(cacheKey);
     if(!track)return Promise.reject(Error(`缺少本地曲目：${id}`));
     const pending=(async()=>{
-      const response=await fetch(new URL('../bgm/'+track.url,import.meta.url),
-        {signal:AbortSignal.any([this.abort.signal,AbortSignal.timeout(30000)])});
-      if(!response.ok)throw Error(`音乐下载失败：${id}`);
-      const bytes=await response.arrayBuffer();
+      const bytes=(await assetBytes('bgm/'+track.url,{hash:track.audioSha256,size:track.bytes,
+        signal:AbortSignal.any([this.abort.signal,AbortSignal.timeout(30000)])})).buffer;
       if(!this.closed)this.encoded.set(cacheKey,bytes);
       return bytes;
     })();
