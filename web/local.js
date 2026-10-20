@@ -192,7 +192,7 @@ function tick(now){
       touch.setContext({key:`${state?.generation??0}:${touchSlot}:${playing?'game':'menu'}`,play:touchPlay});
       syncInput(true);
       if(now-lastHud>100){lastHud=now;const state=readState();
-        if(state){for(const player of state.players)$('p'+player.id+'-state').textContent=player.out?`P${player.id} · 幽灵，等待救援`:`P${player.id} · ${['高速僚机','平衡僚机','低速僚机'][player.shot]}　备用残机 ${player.lives}　Bomb ${player.bombs}　火力 ${(player.power/20).toFixed(2)}`;
+        if(state){for(const player of state.players)$('p'+player.id+'-state').textContent=player.out?`P${player.id} · 幽灵，等待救援`:`P${player.id} · ${['高速僚机','平衡僚机','低速僚机'][player.shot]}　备用残机 ${player.lives}　Bomb ${player.bombs}　P ${player.power}/80`;
           $('team-score').textContent='团队分数 '+state.score.toLocaleString('zh-CN');
           if(emulator.state==='running')status(`本机${state.playerCount===3?'三':'双'}人 · ${state.stage===5?'EX 关卡':`第 ${state.stage+1} 关`} · ${state.players.map(p=>'P'+p.id).join(' / ')} 独立控制${debugInvincible?' · 测试无敌已开启':''}`);
         }

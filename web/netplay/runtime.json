@@ -71,7 +71,7 @@
     "vendor/dosbox-x/dosbox-rollback-tracked.mjs": "f7224bcb7e5ea881525760f3b71b194d01e127acf31103a5400a06d9d004d048",
     "vendor/dosbox-x/dosbox-rollback.mjs": "b86ffabafe90b43c0e12745ebd2d03e0da3353a53f765ad50a2008d12e291e8e",
     "vendor/dosbox-x/emulators.js": "066176a9e9e6babfb5388552a5154f3c1f81ed778af3bf4a1f9f904161e3c4bb",
-    "local-patch.json": "9e52e8797e14222ad0476e3f8c09400af68bba040dd344c0703bb3c733bbc2c7",
+    "local-patch.json": "958f8a7b86f566920e645fbafc0a438ec3152446e972f323267dc0ffb264f279",
     "assets/ghost-32.png": "b65bde17c040b32d2c3ca90436a8905006c4c4fc4dabb899876fecf2374674d2",
     "assets/hud-ofuda-p1-original.png": "b37e36b50161916c1888eda080dcda79132286b06758b9ae2ed0431e7ceab7fa",
     "assets/hud-ofuda-p2-blue.png": "581192e5ee4e668c2daa9c4e3069f526061f8865ea37dbee3c2182a640f3f05f",
@@ -83,9 +83,9 @@
     "assets/th02-player-art.bin": "b7c89902236db00efb8c37dc1d5289985a762508e91ed9df21bb507c8b9ae65b",
     "assets/th02-player-art.json": "e103eb07ab2bbe164f65dd2ab23c215865f93b430e391316802be104fd0dc164",
     "netplay/sound-patch.json": "18cf7b4164560a11ee6ff385196c3a09fe342527d43ee992ae749c569da42791",
-    "netplay/state-swap-patch.json": "bd7255bf1b07b4bb12f56042c5feabfca3ddf11857c6107b3cbc0de64b0ca52f",
-    "netplay/row-copy-patch.json": "e3d6068f4235e6f581e7a34dea64a050bc3761feb64ec4b297f1db792ebc5fb1",
-    "netplay/bullet-bank-patch.json": "f628faae0d271078bf33695b8c933dfc7f1e81bdca01912bf0d3208d1f2d2355",
+    "netplay/state-swap-patch.json": "5de7e9a775b6473cf6f3b516801ffa75217d34af01d67a06bde1c96b106196a9",
+    "netplay/row-copy-patch.json": "c1c255bc06f1893a17b9df0f40b81fb20e64b1875668d392d1016ffb0b0ba5eb",
+    "netplay/bullet-bank-patch.json": "ce28b8bada1315eb4b9b5ea8d5fdccb98f5376235b58da3c84ffb5f20bb880f2",
     "bgm/manifest.json": "7512e652e6dd1ce2e473e3bd230a0690d30093e7e2a1792f5c4c402816e34443",
     "bgm/akyu/manifest.json": "2d1034d0016d39fa36d0bff5248a354cf74559663a6b94f3b3088c3a54e7416b",
     "solo-patch.json": "f3454898d48357ab97f0d82545ee811d40b135a753519f47c0c6058818b1d981",
@@ -104,5 +104,5 @@
       "sha256": "5fb459e5df9232cab4d55f3c36c0bb6b4d00a983fc023661245373ee59ca06d8"
     }
   },
-  "build": "e2e8b3eea141022df59c0e47ca159830f2dfebb53f44047b25b0c0b8ec448d00"
+  "build": "405b3ab8568120812913cc414943d34f3f3cfaaec2f43ed0c96bbee9db8e6815"
 }
