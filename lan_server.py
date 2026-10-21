@@ -1,3 +1,4 @@
+import replay_history
 """TH03 LAN room/signaling server. Game input is exchanged by the selected transport."""
 import argparse, json, secrets, socket, threading, time
 from urllib.request import urlopen
@@ -49,6 +50,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_response(status); self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
     def do_GET(self):
+        if replay_history.handle_get(self): return
         url = urlparse(self.path)
         if url.path == '/relay':
             from relay_server import handle
@@ -61,6 +63,7 @@ class Handler(SimpleHTTPRequestHandler):
         if '\\' in path or any(p.startswith('.') for p in path.split('/') if p): self.send_error(404); return
         super().do_GET()
     def do_POST(self):
+        if replay_history.handle_post(self, ROOMS, LOCK, '03', lambda r: time.monotonic()-r['seen']['host']>TTL): return
         try:
             origin = self.headers.get('Origin')
             if origin and urlparse(origin).netloc != self.headers.get('Host'): raise ValueError('来源不匹配')

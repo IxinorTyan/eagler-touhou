@@ -34,7 +34,7 @@ async function dispatch(method,args){
     if(options.capture){const at=performance.now();simulation.capture(options.frame);captureMs=performance.now()-at;}
     const at=performance.now();simulation.step(inputs,options.frame,options.replay);const simulateMs=performance.now()-at;
     if(options.hash){const at=performance.now();hash=simulation.hash();hashMs=performance.now()-at;}
-    return {hash,captureMs,hashMs,simulateMs};
+    return {hash,captureMs,hashMs,simulateMs,proof:simulation.proof()};
   }
   if(method==='restore')return simulation.restore(...args);
   if(method==='confirm'){simulation.confirm(...args);return;}

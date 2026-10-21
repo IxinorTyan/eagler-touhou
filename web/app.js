@@ -1,4 +1,6 @@
 import {DOSBoxPC98} from './dosbox-adapter.js';
+import {createRecorder} from './replay/recorder.js';
+import {battleProof} from './replay/battle-proof.js';
 import {WorkerNP21, supportsSoloWorker} from './solo-worker-client.js';
 import {workerLocalPause} from './local-worker-client.js';
 import {bootToSelection} from './dosbox-boot.js';
@@ -40,6 +42,7 @@ let emulator, manifest, database, activeLang, starting = false, dirty = 0, saved
 let visibilityPaused = false, storageWarning = '';
 let nativePause, nativeState, pauseSeat = null, pauseSelection = 0, localBgm, nativeMusic, confirmedMusic;
 let localSfx, networkAudio;
+let replayRecorder;
 let closed = false, closing = false, escapeAt = -Infinity, escapeTimer;
 let sync, syncIdentity, syncFrame=0, syncReplaying=false;
 const nativeCanvas = document.createElement('canvas');
@@ -206,7 +209,7 @@ function status(text, error = false) {
 }
 function report(error) {
   logError('reported',error);
-  sync?.stop();
+  replayRecorder?.finish(String(error.message||error));sync?.stop();
   console.error(error); status(`错误：${error.message || error}`, true);
   if (online) { emulator?.pause(); controls.release(); notifyRoom(`错误：${error.message || error}`, false, true); }
 }
@@ -620,7 +623,10 @@ $('start').addEventListener('click', async () => {
       await netplay.synchronize(syncIdentity);
       status('正在确认双方输入缓冲');
       const inputPolicy=await netplay.negotiateInputPolicy({rollbackEnabled});
-      const options={network:netplay,rollbackEnabled,inputDelay:inputPolicy.inputDelay,snapshotStride:2,onError:report,onState:message=>status(message)};
+      replayRecorder=createRecorder($('screen').querySelector('.player-toolbar'));globalThis.th03Replay=replayRecorder;
+      await replayRecorder.boot({settings:{language:activeLang,difficulty:$('difficulty').value,clock:$('clock').value,rollback:rollbackEnabled,focusEnabled:roomFocusEnabled,touchUnlimitedAllowed:roomTouchUnlimitedAllowed,hostSeat:roomHostSeat},players:2,hostSlot:roomHostSeat,opening:syncIdentity});
+      if(netQuery.get('role')==='host')replayRecorder.connectNetwork({room:netQuery.get('room'),token:netQuery.get('token')});
+      const options={recorder:replayRecorder,proof:()=>battleProof(emulator,nativePause,controls,nativeMusic,pauseSeat,pauseSelection,hiddenSeats),network:netplay,rollbackEnabled,inputDelay:inputPolicy.inputDelay,snapshotStride:2,onError:report,onState:message=>status(message)};
       sync=emulator.isNetworkWorker?new AsyncLockstep({...options,execute:(inputs,frame)=>emulator.execute(inputs,frame),restore:frame=>emulator.restore(frame),
         confirm:(prefix,retain)=>emulator.confirm(prefix,retain),present:()=>emulator.present(presentationDue)})
         :new Lockstep({...options,step:stepSynchronized,present:()=>{if(presentationDue(performance.now()))presentFrame();},hash:syncHash,capture:captureSynchronized,restore:restoreSynchronized,confirm:confirmSynchronized});

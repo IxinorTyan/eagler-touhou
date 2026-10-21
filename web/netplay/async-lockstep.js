@@ -17,6 +17,7 @@ export class AsyncLockstep extends Lockstep {
     if(this.lastConfirmation?.prefix!==prefix||this.lastConfirmation?.retainFrom!==retainFrom){
       await this.confirm?.(prefix,retainFrom);if(!this.running)return false;
       this.costs.confirmCallbacks++;this.lastConfirmation={prefix,retainFrom};
+      this.recorder?.confirm(prefix,this.queue.dirty!==null);
     }else this.costs.skippedConfirmations++;
     for(const frame of this.checkpoints)if(frame<retainFrom)this.checkpoints.delete(frame);
     for(const [frame,hash]of this.pendingHashes)if(frame<=prefix){
@@ -45,6 +46,7 @@ export class AsyncLockstep extends Lockstep {
         if(capture){this.checkpoints.add(frame);this.costs.captures++;this.costs.capture+=result?.captureMs||0;}
         q.commit(pair);this.costs.steps++;this.reconcile();
         if(hash){this.pendingHashes.set(q.frame,result.hash);this.costs.hash+=result.hashMs||0;}
+        this.recorder?.stage(frame,{inputs:pair,offlineMask:0,proof:result.proof,hash:hash?result.hash:null});
         steps++;this.lastProgress=performance.now();return true;
       };
       if(this.queue.dirty!==null)this.reconcile();

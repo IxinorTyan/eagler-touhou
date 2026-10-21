@@ -1,4 +1,5 @@
 import {NativePause} from '../native-pause.js';
+import {battleProof} from '../replay/battle-proof.js';
 import {NativeMusic,ConfirmedMusic} from '../native-music.js';
 import {createFrameControls} from './frame-controls.js';
 import {readNativeCoreDiagnostics} from '../network-performance.js';
@@ -62,6 +63,7 @@ export class NetworkSimulation {
     this.state=saved.state&&{...saved.state};for(const at of this.snapshots.keys())if(at>=frame)this.snapshots.delete(at);return frame;
   }
   confirm(prefix,retainFrom){this.audio.confirm(prefix);this.emulator.module.netConfirm(prefix,retainFrom);for(const at of this.snapshots.keys())if(at<retainFrom)this.snapshots.delete(at);}
+  proof(){return battleProof(this.emulator,this.pause,this.controls,this.music,this.pauseSeat,this.selection,this.hidden);}
   hash(){
     const m=this.emulator.module,heap=m.HEAPU8,range=this.music.dosRange(heap);
     if(!this.fullHash&&!range)throw Error('DOS 常规内存校验范围尚未绑定');
