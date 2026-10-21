@@ -151,7 +151,7 @@ function tick(now){
       syncP1();
       const touch=[player.pack(oldP1)];
       if(nativePatch&&!emulator.isWorker)writeNativeTouch(emulator.module.HEAPU8,mailbox,nativePatch,touch,!play);
-      player.consume();
+      player.consume(s?.ticks);
       if(s){
         if(!stageAnnounced){stageAnnounced=true;status(`已进入关卡 · P1 ${$('loadout-p1').selectedOptions[0].textContent} / P2 ${$('loadout-p2').selectedOptions[0].textContent}`);}
         if(s.ticks!==lastTick){lastTick=s.ticks;lastTickAt=now;}

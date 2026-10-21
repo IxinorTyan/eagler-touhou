@@ -1,7 +1,7 @@
 {
   "original_md5": "06d74719b6f72b11014a392fd34d5f57",
   "original_size": 156258,
-  "patched_size": 169330,
+  "patched_size": 169362,
   "native_crash_fixes": [
     {
       "name": "stage-4 Marisa zero-divisor flystep stays still",
@@ -27,11 +27,11 @@
     }
   ],
   "insert_image_offset": 78048,
-  "insert_size": 13072,
-  "payload_size": 13070,
-  "heap_bytes": 379696,
+  "insert_size": 13104,
+  "payload_size": 13094,
+  "heap_bytes": 379664,
   "payload_and_heap_bytes": 392768,
-  "payload_padding_bytes": 2,
+  "payload_padding_bytes": 10,
   "body_layer_cs_offset": 39879,
   "player_art": {
     "assignment": "occurrence of the same character in seat order",
@@ -148,51 +148,51 @@
     38815,
     38549,
     40618,
-    41348,
-    41124,
+    41414,
+    41190,
     40555,
-    41164,
-    41638,
+    41230,
+    41704,
     35111,
-    43067,
-    43070,
-    44233,
-    44268,
-    44281,
-    44087,
-    44313,
-    44439,
-    44460,
-    44481,
-    44423,
-    44427,
-    44431,
-    44435,
-    44561,
-    44548,
-    44549,
-    44734,
-    45028,
-    45750,
-    45444,
-    45498,
-    45532,
-    45502,
-    45517,
-    45456,
+    43091,
+    43094,
+    44257,
+    44292,
+    44305,
+    44111,
+    44337,
+    44463,
+    44484,
+    44505,
+    44447,
+    44451,
+    44455,
+    44459,
+    44585,
+    44572,
+    44573,
+    44758,
+    45052,
+    45774,
     45468,
-    45483,
-    45894,
-    45900,
-    45551,
+    45522,
+    45556,
+    45526,
+    45541,
+    45480,
+    45492,
+    45507,
+    45918,
+    45924,
     45575,
-    45606,
-    45631,
-    45645,
-    45088,
-    46398,
-    46187,
-    46211
+    45599,
+    45630,
+    45655,
+    45669,
+    45112,
+    46422,
+    46211,
+    46235
   ],
   "near_code_guard": {
     "image_offset": 78048,
@@ -200,14 +200,14 @@
   },
   "mailbox_cs_offset": 37700,
   "relocations_rebased": 1136,
-  "native_pause_cs_offset": 44423,
-  "offline_mask_cs_offset": 44548,
-  "focus_visible_mask_cs_offset": 44734,
+  "native_pause_cs_offset": 44447,
+  "offline_mask_cs_offset": 44572,
+  "focus_visible_mask_cs_offset": 44758,
   "personal_stats": {
-    "cs_offset": 45028,
+    "cs_offset": 45052,
     "stride": 20,
     "players": 3,
-    "bonus_cs_offset": 45088,
+    "bonus_cs_offset": 45112,
     "score": 0,
     "high_score": 4,
     "point": 8,
@@ -249,12 +249,12 @@
   "loadout_file_offset": 88293,
   "bomb_owner_cs_offset": 38815,
   "entry_count": 79,
-  "touch_cs_offset": 46187,
+  "touch_cs_offset": 46211,
   "touch_stride": 8,
-  "touch_status_cs_offset": 46211,
+  "touch_status_cs_offset": 46235,
   "rescue_cs_offset": 40555,
-  "p3_input_cs_offset": 43067,
-  "p3_motion_cs_offset": 43070,
+  "p3_input_cs_offset": 43091,
+  "p3_motion_cs_offset": 43094,
   "boss_damage_call_sites": [
     124409,
     111620,
@@ -307,37 +307,37 @@
     {
       "image_offset": 68469,
       "original": "e8d8fd",
-      "target_cs_offset": 46398,
+      "target_cs_offset": 46422,
       "name": "synchronized direct touch velocity"
     },
     {
       "image_offset": 43934,
       "original": "9ac4060e13",
-      "target_cs_offset": 44561,
+      "target_cs_offset": 44585,
       "name": "offline seats before world update"
     },
     {
       "image_offset": 43950,
       "original": "e81e07",
-      "target_cs_offset": 44439,
+      "target_cs_offset": 44463,
       "name": "native pause entry"
     },
     {
       "image_offset": 45783,
       "original": "9abc060e13",
-      "target_cs_offset": 44460,
+      "target_cs_offset": 44484,
       "name": "pause release at entry"
     },
     {
       "image_offset": 45851,
       "original": "9a33010e13",
-      "target_cs_offset": 44481,
+      "target_cs_offset": 44505,
       "name": "pause synchronized menu input"
     },
     {
       "image_offset": 45991,
       "original": "9abc060e13",
-      "target_cs_offset": 44460,
+      "target_cs_offset": 44484,
       "name": "pause release at resume"
     },
     {
@@ -439,31 +439,31 @@
     {
       "image_offset": 67043,
       "original": "33ffc646f100",
-      "target_cs_offset": 45551,
+      "target_cs_offset": 45575,
       "name": "reset hit ownership"
     },
     {
       "image_offset": 67135,
       "original": "03f8fe064046",
-      "target_cs_offset": 45575,
+      "target_cs_offset": 45599,
       "name": "record shot damage owner"
     },
     {
       "image_offset": 67195,
       "original": "83c705803e5c1b00",
-      "target_cs_offset": 45606,
+      "target_cs_offset": 45630,
       "name": "record Bomb damage owner"
     },
     {
       "image_offset": 67252,
       "original": "83c703fe064046",
-      "target_cs_offset": 45631,
+      "target_cs_offset": 45655,
       "name": "record first P1 laser"
     },
     {
       "image_offset": 67300,
       "original": "83c703fe064046",
-      "target_cs_offset": 45631,
+      "target_cs_offset": 45655,
       "name": "record second P1 laser"
     },
     {
@@ -481,43 +481,43 @@
     {
       "image_offset": 48081,
       "original": "b90800268b0426890583c65083c750e2f281ef8002",
-      "target_cs_offset": 46715,
+      "target_cs_offset": 46739,
       "name": "fixed eight-row EGC tile copy; original read/write order"
     },
     {
       "image_offset": 50622,
       "original": "add3c88af022c226890532c674042688450283c750fecd75e7",
-      "target_cs_offset": 46821,
+      "target_cs_offset": 46845,
       "name": "16x16 even four-row blit; equivalent SHRD rotation"
     },
     {
       "image_offset": 50726,
       "original": "add3c88af022c226880532c686e02689450183c750fecd75e7",
-      "target_cs_offset": 46951,
+      "target_cs_offset": 46975,
       "name": "16x16 odd four-row blit; equivalent SHRD rotation"
     },
     {
       "image_offset": 50306,
       "original": "e8550075fb",
-      "target_cs_offset": 47081,
+      "target_cs_offset": 47105,
       "name": "32x32 even inline cloud rows"
     },
     {
       "image_offset": 50352,
       "original": "e8590075fb",
-      "target_cs_offset": 47134,
+      "target_cs_offset": 47158,
       "name": "32x32 odd inline cloud rows"
     },
     {
       "image_offset": 49728,
       "original": "ad0ae47405268905eb070ac0740326880583c750e2ea",
-      "target_cs_offset": 47196,
+      "target_cs_offset": 47220,
       "name": "spark four-row blit"
     },
     {
       "image_offset": 51691,
       "original": "a583c74ee2fa",
-      "target_cs_offset": 47314,
+      "target_cs_offset": 47338,
       "name": "point-bullet full six-row blit"
     },
     {
@@ -527,7 +527,7 @@
       "name": "in-place twin-row Marisa laser body; native row write order"
     }
   ],
-  "sha256": "2c3479ddd6f6b4fe919cfecf2f988d0619acaa2b01087c55f4fc87f0ebb872d3",
+  "sha256": "dec34802171b9af632ffc2a4f9d7995e6ca4200cdc1f6aea5a8d18dc396de038",
   "source": {
     "language": "ja",
     "file": "4-jp.hdi.gz",
@@ -552,7 +552,7 @@
     ]
   },
   "code_segment": 2735,
-  "data_segment": 9317,
+  "data_segment": 9319,
   "launch_config": {
     "schema": 2,
     "defaults": [

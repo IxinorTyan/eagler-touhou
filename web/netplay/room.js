@@ -88,7 +88,7 @@ let connectionConfigSummary='尚未读取';
 let stopReason='';
 const player=mountPlayer($('game'),{onChange:()=>{if(running){observeInput();wake();}},onGesture:async()=>{
   if(!runtime)return;
-  if(await runtime.unlockAudio())player.note('声音已启用。低速停火靠近队友可救援；按住“停火救援”即可。');
+  if(await runtime.unlockAudio())player.note('声音已启用。靠近队友并停火，低速键连按 5 次；每两次最多间隔 24 个游戏帧。');
   else player.note('声音尚未就绪，进入游戏后点击“启用声音”。');
 }});
 const musicVolume=document.createElement('label');musicVolume.className='player-volume';
