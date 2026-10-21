@@ -2,9 +2,14 @@ import {createFastCore,prepareFastCore} from './dosbox-runtime.js';
 import {loadVerifiedBytes} from './startup-assets.js';
 import {mountPlayer} from './player-ui.js';
 import {unpackTouch} from './touch-input.js';
+import {createBrowserRecorder} from './browser-replay-recorder.js';
 
 const $=id=>document.getElementById(id);
 let emulator=null,busy=false,disposed=false,oldButtons=0,lastInfo=0,menuBits=0,menuUntil=0;
+let recorder=null,recordBlob=null,lastRecordInput='';
+const recordingStatus=text=>{if($('record-status'))$('record-status').textContent=text;};
+function discardRecording(){recordBlob=null;if($('record-save'))$('record-save').disabled=true;if($('record-discard'))$('record-discard').disabled=true;}
+function clearRecorder(){recorder?.dispose();recorder=null;lastRecordInput='';if($('record-finish'))$('record-finish').disabled=true;}
 const held=new Set(),pulses=new Map();
 const keys={ArrowUp:1,ArrowDown:2,ArrowLeft:4,ArrowRight:8,KeyX:16,KeyZ:32,ShiftLeft:64,ShiftRight:64,Escape:128,Enter:256};
 const nativeCodes=[[1,265],[2,264],[4,263],[8,262],[16,88],[32,90],[64,340],[128,256],[256,257]];
@@ -56,7 +61,7 @@ document.addEventListener('focusin',event=>{if(form(event.target))release();});
 document.addEventListener('visibilitychange',()=>{
     if(document.hidden){release();if(emulator?.state==='running'&&emulator.readState()?.mode===1)emulator.gamePause({onlyPause:true});}
 });
-window.addEventListener('pagehide',()=>{disposed=true;release();emulator?.stop();});
+window.addEventListener('pagehide',()=>{disposed=true;release();clearRecorder();emulator?.stop();});
 function tick(now){
   if(disposed)return;
   const state=context();
@@ -79,7 +84,11 @@ function tick(now){
     if((value&3)===3)value&=~3;if((value&12)===12)value&=~12;
     applyButtons(value);
     const touch=unpackTouch(player.pack(value));
-    emulator.inputs({generation:state?.generation,points:points(),touch:game&&!state.flags?touch:null});
+    const command={generation:state?.generation,points:points(),touch:game&&!state.flags?touch:null};
+    // Keep active deltas (even identical ones); idle preferences need one edge.
+    const encoded=JSON.stringify(command),moving=command.touch?.active;
+    if(!recorder||moving||encoded!==lastRecordInput){emulator.inputs(command);lastRecordInput=encoded;}
+    if(recorder&&player.unlimited()&&!recorder.state.failed){recorder.disable();discardRecording();}
     player.consume();
   }
   if(emulator&&now-lastInfo>500){
@@ -100,11 +109,13 @@ async function readDisk(language){
   return {disk,patch:item.inputPatch};
 }
 function failure(error){
+  clearRecorder();
   release();if(emulator&&!['failed','stopped'].includes(emulator.state))emulator.stop();emulator=null;player.setActive(false);
   status('启动或运行失败：'+error.message);player.note('请查看错误原因，调整后重新开始。');
   $('start').disabled=false;$('pause').disabled=true;$('capture').disabled=true;$('sound').disabled=true;
 }
 function endSession(){
+  clearRecorder();
   emulator?.stop();emulator=null;held.clear();pulses.clear();oldButtons=0;player.setActive(false);player.exit();
   const canvas=$('canvas');canvas.replaceWith(canvas.cloneNode(false));
   for(const id of ['pause','capture','sound'])$(id).disabled=true;
@@ -113,18 +124,30 @@ function endSession(){
 async function start(){
   if(busy||disposed)return;busy=true;
   release();emulator?.stop();emulator=null;
+  clearRecorder();discardRecording();
   for(const id of ['start','restart','pause','capture','sound'])$(id).disabled=true;
   player.setActive(false);status('正在载入原版磁盘…');
   const canvas=document.createElement('canvas');canvas.id='canvas';canvas.width=640;canvas.height=400;canvas.tabIndex=0;canvas.setAttribute('aria-label','怪绮谈原版单人游戏画面');
   $('canvas').replaceWith(canvas);canvas.onpointerdown=()=>canvas.focus();
-  const language=$('language').value,independentMusic=$('audio-mode').value==='independent';
+  const language=$('language').value,recordEnabled=!!$('record-enabled')?.checked;
+  const independentMusic=!recordEnabled&&$('audio-mode').value==='independent';
   $('bgm-control').hidden=!independentMusic;
   try{
     const coreTask=prepareFastCore();coreTask.catch(()=>{});
     const {disk,patch}=await readDisk(language);if(disposed)return;
+    if(recordEnabled){
+      try{recorder=await createBrowserRecorder({language,onStatus:recordingStatus,
+        onRun:()=>{$('record-finish').disabled=false;},
+        onResult:()=>{$('record-finish').disabled=true;},
+        onFile:blob=>{recordBlob=blob;$('record-save').disabled=false;$('record-discard').disabled=false;}});
+      }catch(error){recordingStatus('录像未能启动：'+error.message+'；游戏继续。');}
+      if(disposed){clearRecorder();return;}
+    }else recordingStatus('本次启动不录制。');
     status('正在启动 PC-98 原版游戏…');
-    const core=await createFastCore({canvas,disk,patch,solo:true,independentMusic,coreTask});
+    const core=await createFastCore({canvas,disk,patch,solo:true,independentMusic,coreTask,externalReplay:recorder?.config});
     if(disposed){core.stop();return;}emulator=core;emulator.onError=failure;emulator.onExit=endSession;
+    recorder?.attach(core);
+    if(recordEnabled&&recorder&&!recorder.state.failed)recordingStatus('浏览器已记录启动流程，等待进入关卡。');
     emulator.bgm?.setVolume(Number($('bgm-volume').value)/100);
     $('pause').disabled=false;$('capture').disabled=false;$('sound').disabled=false;
     $('pause').textContent='暂停游戏';player.setLabel(`${language==='cn'?'汉化版':'日文版'} · 原版单人`);
@@ -135,6 +158,12 @@ async function start(){
   finally{busy=false;if(!disposed)$('restart').disabled=false;}
 }
 $('start').onclick=start;$('restart').onclick=start;$('pause').onclick=pause;
+if($('record-finish'))$('record-finish').onclick=()=>recorder?.finish();
+if($('record-save'))$('record-save').onclick=()=>{
+  if(!recordBlob)return;const url=URL.createObjectURL(recordBlob),link=document.createElement('a');
+  link.href=url;link.download='th05-solo-browser.th05r';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+if($('record-discard'))$('record-discard').onclick=()=>{discardRecording();recordingStatus('录像已丢弃，游戏继续。');};
 $('fullscreen').onclick=()=>player.enter();$('sound').onclick=enableSound;
 $('bgm-volume').oninput=()=>emulator?.bgm?.setVolume(Number($('bgm-volume').value)/100);
 $('capture').onclick=async()=>{

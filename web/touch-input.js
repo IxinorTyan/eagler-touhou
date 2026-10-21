@@ -1,7 +1,10 @@
-// Exact integers below 2^42 survive JSON, history comparison and retransmission.
+// Exact integers below 2^44 survive JSON, history comparison and retransmission.
 // Low 12 bits retain the existing buttons; two signed 14-bit axes use 1/16 px.
 export const ALWAYS_POINT=2**42;
-export const MAX_INPUT=2**43-1;
+// Sticky per-session policy bit, separate from native movement/button fields.
+export const CHEAT_USED=2**43;
+export const MAX_INPUT=2**44-1;
+export const usesCheat=value=>Math.floor(value/CHEAT_USED)%2===1||Math.floor(value/2**41)%2===1;
 export function packTouch(buttons,{x=0,y=0,active=false,unlimited=false,alwaysPoint=false}={}){
   const axis=v=>Math.max(-8192,Math.min(8191,Math.round(v)))&16383;
   return (alwaysPoint?ALWAYS_POINT:0)+(buttons&4095)+(active?axis(x)*4096+axis(y)*2**26+2**40+(unlimited?2**41:0):0);

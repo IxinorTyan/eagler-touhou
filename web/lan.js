@@ -2,6 +2,7 @@ import {PROTOCOL,TICK_MS,PAUSE,RESUME,GameQueue,inputPolicy as makeInputPolicy,p
 import {createFrameDisplay} from './frame-display.js';
 import {LocalSfx} from './netplay/local-sfx.js';
 import {createRelayChannel} from './netplay/relay-channel.js';
+import {CHEAT_USED} from './touch-input.js';
 import {mountPlayer} from './player-ui.js';
 import {LocalBgm} from './netplay/local-bgm.js';
 import {loadRtcConfiguration} from './netplay/connection.js';
@@ -15,8 +16,16 @@ import {loadAfterimageArt} from './afterimage-art.js';
 import {assetBytes,freshJSON} from './preload-cache.js';
 import {bgmVersion,onBgmVersion} from './bgm-version.js';
 const GRACE_MS=5000;
+let localCheatUsed=false;
 let historyHost=null,historyWarning='',finishing=false,historyRequest=0,historyPromptEpoch=0,pendingHistorySave=null,historyExporting=false;
+let historyCaptureDisabled=false;
 const historyFlushes=new Map();
+function historyChanged(){
+  historyUI();
+  if(worker&&historyHost&&!historyHost.watch&&!historyHost.recording&&!historyCaptureDisabled){
+    historyCaptureDisabled=true;worker.postMessage({type:'history-disable'});
+  }
+}
 function historyUI(){
   const h=historyHost;
   $('history-save').disabled=historyExporting||!h||(!h.blob&&!h.recordFrames);
@@ -27,7 +36,8 @@ function historyUI(){
   $('history-network-status').textContent=h?.networkStatus||'';
   if(h)$('history-watch').href='coop-replay.html?live='+encodeURIComponent(h.id);
   $('history-enabled').disabled=!!worker||!!auth;$('history-record').disabled=!!worker||!!auth;
-  $('history-status').textContent=historyWarning||(h?`浏览器已保留 ${h.history.frames} 个已确认同步帧${h.recording?' · 正在录制':''}${h.history.end?' · 本段结束':''}`:'多人录像与旁观使用相同的已确认帧；不记录现实时间。');
+  if(h?.tainted){pendingHistorySave=null;$('save-dialog').close();}
+  $('history-status').textContent=(h?.tainted?'本局使用过作弊辅助，不保存 Replay；观战继续开放。':'')||historyWarning||(h?`浏览器已保留 ${h.history.frames} 个已确认同步帧${h.recording?' · 正在录制':''}${h.history.end?' · 本段结束':''}`:'多人录像与旁观使用相同的已确认帧；不记录现实时间。');
 }
 function flushHistory(){
   if(!worker||!historyHost)return Promise.resolve();
@@ -45,7 +55,7 @@ let replayUntil=0,inflightPlans=[],pendingKind='',resimulated=0,maxRewind=0,earl
 let accumulator=0,lastNow=0,wakePending=false,wakeAt=0,wakeToken=0;
 const rollbackPeers=new Set(),captureTimes=new Map(),wakeChannel=new MessageChannel();
 wakeChannel.port1.onmessage=({data})=>{if(data!==wakeToken||!wakePending)return;wakePending=false;clearTimeout(timer);pump();};
-const player=mountPlayer(document.getElementById('player'),{onGesture:ensureAudio,onChange:()=>queueMicrotask(()=>schedule(0))});
+const player=mountPlayer(document.getElementById('player'),{onGesture:ensureAudio,onChange:()=>queueMicrotask(()=>{if(queue&&player.unlimited()){localCheatUsed=true;historyHost?.invalidate();}schedule(0);})});
 const screen=document.getElementById('screen');screen.classList.add('screen');player.stage.append(screen);
 player.setLabel('当前玩家');
 function touchContext(){
@@ -186,7 +196,7 @@ async function prepareRoomResources(value){
     if(!patchResponse.ok||!manifestResponse.ok)throw Error('游戏或核心清单读取失败');
     const [patch,manifest]=await Promise.all([patchResponse.json(),manifestResponse.json()]);
     const tracked=!!value.settings.rollback&&WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,5,2,0,1,0,1]));
-    const core=tracked?'wdosbox-x-rollback-tracked.wasm':'wdosbox-x-rollback.wasm';
+    const core=`wdosbox-x-rollback${tracked?'-tracked':''}.wasm`;
     const [sfxManifest,bgmManifest,alternate]=await Promise.all([freshJSON('sfx/manifest.json'),freshJSON('bgm/manifest.json'),freshJSON('bgm/akyu/manifest.json')]);
     const tracks=(bgmVersion()==='new'?alternate:bgmManifest).tracks;
     const opening=Number(value.settings.rank)===4?'st06':'st00';
@@ -308,8 +318,8 @@ function activate(){
   runSettings=validateStartupPolicy(runSettings,room.settings.rollback);
   clearTimeout(bootTimeout);running=true;connecting=true;paused=false;busy=false;
   sessionPolicy=makeInputPolicy(transport,room.settings.rollback,runSettings.inputDelay);
-  historyHost?.dispose();historyHost=null;historyWarning='';
-  if(boot.historyHeader)historyHost=createHistoryHost({...boot.historyHeader,coreSha:boot.coreSha,diskSha:boot.diskSha,guestSha:boot.guestSha,checksum:boot.checksum},{record:$('history-record').checked,watch:$('history-enabled').checked,onChange:historyUI,onError:error=>{historyWarning='浏览器录像停止：'+error.message;historyUI();}});
+  historyHost?.dispose();historyHost=null;historyWarning='';historyCaptureDisabled=false;localCheatUsed=player.unlimited();
+  if(boot.historyHeader)historyHost=createHistoryHost({...boot.historyHeader,coreSha:boot.coreSha,diskSha:boot.diskSha,guestSha:boot.guestSha,checksum:boot.checksum},{record:$('history-record').checked,watch:$('history-enabled').checked,onChange:historyChanged,onError:error=>{historyWarning='浏览器录像停止：'+error.message;historyChanged();}});
   if(historyHost?.watch&&auth.role==='host'&&version?.historyAvailable)historyHost.connectNetwork(auth);
   historyUI();
   queue=new GameQueue(room.slots[auth.role],room.settings.rollback,room.settings.players,sessionPolicy);
@@ -326,7 +336,9 @@ function capture(){
   touchContext();
   const sampled=player.sample(buttons());
   if(sampled&128)controls|=128;
-  const control=controls,packet=queue.capture(player.pack((sampled&~128)|control));
+  if(player.unlimited())localCheatUsed=true;
+  if(localCheatUsed)historyHost?.invalidate();
+  const control=controls,packet=queue.capture(player.pack((sampled&~128)|control)+(localCheatUsed?CHEAT_USED:0));
   if(packet){controls&=~control;pendingPresses=0;player.consume();captureTimes.set(packet.frame,performance.now());send(packet);return true;}
   return false;
 }
@@ -598,8 +610,9 @@ async function connect(){
     if(current!==epoch){data.bitmap?.close();return;}
     try{
       if(data.type==='confirmed-history'){
-        if(historyHost&&!historyHost.history.end)try{historyHost.append(data.first,data.bytes);}catch(error){historyWarning='帧历史停止：'+error.message;historyHost.end(historyWarning);worker?.postMessage({type:'history-disable'});historyUI();}return;
+        if(historyHost&&!historyHost.history.end)try{historyHost.append(data.first,data.bytes,data.stageFrames);}catch(error){historyWarning='帧历史停止：'+error.message;historyHost.end(historyWarning);worker?.postMessage({type:'history-disable'});historyUI();}return;
       }
+      if(data.type==='stage-recording-stopped'){historyWarning='分面捷径停止：'+data.message+'；确认帧历史继续';historyUI();return;}
       if(data.type==='history-flushed'){historyFlushes.get(data.request)?.();historyFlushes.delete(data.request);return;}
       if(finishing){data.bitmap?.close();return;}
       if(data.control){liveControl=data.control;touchContext();}
@@ -768,7 +781,7 @@ async function finish(reason,notify=true,flush=true){
   endedReason=reason;status(reason);overlay(reason);render();diagnostics();finishing=false;historyUI();
   // Compression and user choice must not delay transport/room cleanup.
   if(endedHistory?.recordFrames)endedHistory.seal(reason).then(blob=>{
-    if(promptEpoch!==historyPromptEpoch||historyHost!==endedHistory||auth||worker||entering)return;
+    if(promptEpoch!==historyPromptEpoch||historyHost!==endedHistory||endedHistory.tainted||auth||worker||entering)return;
     pendingHistorySave=endedHistory;
     $('save-size').textContent=`${endedHistory.recordFrames} 帧 · ${(blob.size/1024).toFixed(1)} KiB\n${reason}`;
     $('save-dialog').showModal();
@@ -820,7 +833,7 @@ $('leave').onclick=()=>finish('已离开房间，可重新建房。');
 $('character').onchange=action(()=>change('character',{character:Number($('character').value)}));
 $('seat').onchange=action(()=>change('seat',{seat:Number($('seat').value)}));
 for(const key of ['rank','spares','bombs','language','rollback','players'])$(key).onchange=action(()=>change('settings',{
-  [key]:key==='language'?$(key).value:key==='rollback'?$(key).value==='true':Number($(key).value)}));
+  [key]:key==='language'?$(key).value:['rollback','stageWatch'].includes(key)?$(key).value==='true':Number($(key).value)}));
 $('ready').onclick=action(async()=>{const identity=auth;await ensureAudio();if(auth===identity)await change('ready',{ready:!room.ready[auth.role]});});
 $('start').onclick=action(async()=>{const identity=auth;await ensureAudio();if(auth===identity)await change('start');});
 $('pause').onclick=pauseControl;$('sound').onclick=action(ensureAudio);

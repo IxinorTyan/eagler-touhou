@@ -14,7 +14,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
  });
  const read=()=>page.evaluate(()=>th05ReplayQA.read());
  async function tap(code){await page.evaluate(code=>th05ReplayQA.key(code,true),code);await page.waitForTimeout(110);await page.evaluate(code=>th05ReplayQA.key(code,false),code);}
- async function enter(){for(let i=0;i<30;i++){if((await read()).run)return;await tap(90);await page.waitForTimeout(300);}throw Error('native game did not enter a stage');}
+ async function enter(){for(let i=0;i<60;i++){if((await read()).run)return;await tap(90);await page.waitForTimeout(300);}throw Error('native game did not enter a stage');}
  async function boot(){await page.selectOption('#language',language);await page.click('#record');await page.waitForFunction(()=>th05ReplayQA.read().state,null,{timeout:60000});await enter();}
  try{
   await page.goto('http://127.0.0.1:9877/solo.html?qa=1');await boot();

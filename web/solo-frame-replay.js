@@ -1,3 +1,5 @@
+import {mountPlayer} from './player-ui.js';
+import {unpackTouch} from './touch-input.js';
 import {createFastCore} from './dosbox-runtime.js';
 import {loadVerifiedBytes,loadCompiledCore} from './startup-assets.js';
 import {sha256} from './netplay/sha256.js';
@@ -7,23 +9,30 @@ const $=id=>document.getElementById(id),held=new Set(),controls=new Set(),sentKe
 let fastTimer=null,fastPulse=false;
 const keys={ArrowUp:265,ArrowDown:264,ArrowLeft:263,ArrowRight:262,KeyX:88,KeyZ:90,ShiftLeft:340,ShiftRight:340,Escape:256,Enter:257};
 let core=null,mode=null,busy=false,store=null,bytes=0,metadata=null,result=null,loaded=null,recording=null,paused=false,run=null,dialog=false,ending=false;
-let tainted=false,session=0,recordEpoch=0;
-const cheat=()=>$('invincible')?.checked||false;
-function invalidateReplay(){
+let tainted=false,session=0,recordEpoch=0,recordError=null;
+const touchHost=document.createElement('div');touchHost.id='replay-player';
+$('canvas').parentNode.insertBefore(touchHost,$('canvas'));
+const player=mountPlayer(touchHost,{solo:true,onGesture:()=>core?.audio?.resume(),onChange:()=>queueMicrotask(()=>{const value=player.unlimited();if(value!==unlimitedPreference){unlimitedPreference=value;if(mode==='record')setCheat();}})});
+player.stage.append($('canvas'));player.setLabel('单人 Replay');
+let unlimitedPreference=player.unlimited();
+const touchKeys=new Set(),touchCodes=[[1,265],[2,264],[4,263],[8,262],[16,88],[32,90],[64,340],[128,256],[256,257]];
+const cheat=()=>!!$('invincible')?.checked||player.unlimited();
+const cheatSettings=()=>({invincible:!!$('invincible')?.checked,unlimited:player.unlimited()});
+function invalidateReplay(notifyCore=true){
   recordEpoch++;tainted=true;store?.dispose();store=null;recording=null;loaded=null;result=null;bytes=0;
-  $('save-dialog').close();core?.setReplayCheat(cheat());
+  $('save-dialog').close();if(notifyCore)core?.setReplayCheat(cheatSettings());
   if(core?.state==='paused'&&mode==='record')core.pauseReplay(false);
   status('已启用作弊，本局不保存 Replay。关闭作弊后，新的一局恢复录制。');update();
 }
 function setCheat(){
   if(mode==='playback'){if($('invincible'))$('invincible').checked=false;return;}
-  if(cheat())invalidateReplay();else{core?.setReplayCheat(false);update();}
+  if(cheat())invalidateReplay();else{core?.setReplayCheat(cheatSettings());update();}
 }
 const status=text=>{$('status').textContent=text;};
 async function resources(language,testProfile){
   const names=['solo-disks.json','frame-replay.json','frame-replay-core.json','vendor/dosbox-x/runtime.json','music-patch.json'];
   const [diskManifest,replayManifest,replayCore,runtime,music]=await Promise.all(names.map(async name=>{const r=await fetch(name,{cache:'no-store'});if(!r.ok)throw Error('Replay 资源清单读取失败');return r.json();}));
-  const sourceNames=['frame-replay-bridge.js','frame-replay-codec.js','dosbox-worker.js','dosbox-runtime.js'];
+  const sourceNames=['frame-replay-bridge.js','frame-replay-codec.js','dosbox-worker.js','dosbox-runtime.js','solo-input.js'];
   const sources=await Promise.all(sourceNames.map(async name=>[name,await sha256(new Uint8Array(await (await fetch(name,{cache:'no-store'})).arrayBuffer()))]));
   const item=diskManifest.languages[language],normal=replayManifest.languages[language],overlay=testProfile?normal.tests[testProfile]:normal,endingOverlay=replayManifest.ending;
   const identity=await sha256(new TextEncoder().encode(JSON.stringify({item,overlay,endingOverlay,replayCore,runtime,music,sources})));
@@ -36,29 +45,38 @@ async function resources(language,testProfile){
   return {disk,exe,endingExe,patch:overlay.patch,compiled,identity};
 }
 function update(){
-  $('record').disabled=busy||!!core;$('finish').disabled=busy||mode!=='record'||!run||!!result||ending||tainted;
+  $('record').disabled=true;$('finish').disabled=true;
   $('download').disabled=busy||!recording||tainted||cheat();$('play').disabled=busy||!(loaded||recording)||cheat();
   $('hold').disabled=busy||mode!=='playback'||!!result;$('stop').disabled=busy||!core;
   $('file').disabled=busy||!!core;$('language').disabled=busy||!!core;
-  $('test-case').disabled=busy||!!core;
+  $('test-case').disabled=true;
   if($('invincible'))$('invincible').disabled=busy||mode==='playback';
-  if($('restart'))$('restart').disabled=busy;
+  player.lockCheats(busy||mode==='playback');
+  if($('restart'))$('restart').disabled=true;
   for(const id of ['pause','capture','sound'])if($(id))$(id).disabled=busy||!core;
   if($('pause'))$('pause').textContent=mode==='playback'?'暂停 / 继续回放':'暂停游戏';
-  if($('replay-state'))$('replay-state').textContent=mode==='playback'?'REPLAY PLAYBACK':cheat()||tainted?'REPLAY OFF · 本局作弊':run&&!result?'REPLAY REC':'REPLAY AUTO · 进入关卡后录制';
+  if($('replay-state'))$('replay-state').textContent=mode==='playback'?'REPLAY PLAYBACK':cheat()||tainted?'REPLAY OFF · 本局作弊':recordError?'REPLAY OFF · 录制存储失败':run&&!result?'REPLAY REC':'REPLAY AUTO · 进入关卡后录制';
 }
 function close(){session++;recordEpoch++;release();core?.stop();core=null;store?.dispose();store=null;held.clear();mode=null;paused=false;run=null;dialog=false;ending=false;$('save-dialog').close();$('end-dialog').close();$('hold').textContent='暂停播放';update();}
 function failure(error){close();busy=false;status('实验停止：'+error.message);update();}
+function recordingFailure(error){
+  if(mode!=='record')return;
+  recordError=error;recordEpoch++;store?.dispose();store=null;recording=null;bytes=0;
+  $('save-dialog').close();core?.stopReplayRecording();
+  if(core?.state==='paused')continueGame();
+  status('本局录像已停止：'+error.message+'；游戏继续，下一局重试录制。');update();
+}
 function key(code,down){
   if(!core)return;
   if(down&&((result&&mode==='playback')||busy||$('save-dialog').open||(mode!=='record'&&!(dialog&&!paused&&[90,88,257].includes(code)))))return;
-  const pressed=code===90?(down||fastPulse):down;
+  const pressed=down||touchKeys.has(code)||(code===90&&fastPulse);
   if(pressed)sentKeys.add(code);else sentKeys.delete(code);core.key(code,pressed);
 }
 async function start(playback=null){
+  if(!playback){status('此入口只播放旧格式录像；录制请返回单人游戏。');return;}
   if(playback&&cheat()){status('请先关闭作弊，再播放 Replay。');return;}
   if(busy)return;busy=true;close();result=null;if(!playback)recording=null;bytes=0;
-  tainted=!playback&&cheat();const owner=session;
+  recordError=null;tainted=!playback&&cheat();const owner=session;
   mode=playback?'playback':'record';const language=playback?.header.language||$('language').value;
   const testProfile=playback?playback.header.testProfile:$('test-case').value||undefined;
   $('test-case').value=testProfile||'';
@@ -70,13 +88,14 @@ async function start(playback=null){
     const canvas=document.createElement('canvas');canvas.id='canvas';canvas.width=640;canvas.height=400;canvas.tabIndex=0;canvas.style.cssText=$('canvas').style.cssText;canvas.setAttribute('aria-label','TH05 单人 Replay 画面');$('canvas').replaceWith(canvas);
     core=await createFastCore({canvas,disk,patch,solo:true,independentMusic:true,coreTask:Promise.resolve(compiled),frameReplay:{
       mode,exe,endingExe,header:playback?.header,inputs:playback?.inputs.slice(),
-      onRun:started=>{ending=false;recordEpoch++;tainted=!!started.tainted||cheat();if(mode==='record'){store?.dispose();store=tainted?null:createReplayStore(failure);recording=null;result=null;bytes=0;}run=started;status(tainted?'本局已启用作弊，不保存 Replay。':mode==='record'?'正在记录游戏帧输入 · 暂停菜单与等待时间不写入录像。':'游戏正在播放 Replay · Esc / 空格暂停，剧情可按 Z 或 Enter 推进。');update();},
+      onRun:started=>{ending=false;recordEpoch++;recordError=null;tainted=!!started.tainted||cheat();if(mode==='record'){store?.dispose();store=tainted?null:createReplayStore(recordingFailure);recording=null;result=null;bytes=0;}run=started;status(tainted?'本局已启用作弊，不保存 Replay。':mode==='record'?'正在记录游戏帧输入 · 暂停菜单与等待时间不写入录像。':'游戏正在播放 Replay · Esc / 空格暂停，剧情可按 Z 或 Enter 推进。');update();},
+      onTaint:()=>{if(mode==='record')invalidateReplay(false);},
       onDialog:active=>{releaseKeys();dialog=active;updateFast();if(mode==='playback')status(active?'剧情中 · Z / Enter 推进，按住 Ctrl 连续对话，Esc / 空格暂停。':'游戏正在播放 Replay · Esc / 空格暂停。');},
       onPhase:()=>{ending=true;status('已通关 · 正在跳过结局动画并生成成绩／评价画面…');update();},
-      onChunk:inputs=>{if(!tainted){bytes+=inputs.length;store?.add(inputs);}},
+      onChunk:inputs=>{if(!tainted&&!recordError){bytes+=inputs.length;store?.add(inputs);}},
       onEnd:async ended=>{
         if(owner!==session)return;
-        if(mode==='record'&&(tainted||ended.discarded)){result=null;continueGame();status('本局使用过作弊，不保存 Replay；可继续游玩。');return;}
+        if(mode==='record'&&(tainted||recordError||ended.discarded)){result=null;continueGame();status(tainted?'本局使用过作弊，不保存 Replay；可继续游玩。':'本局录制存储失败，不保存 Replay；可继续游玩，下一局重试。');return;}
         release();result=ended;busy=true;update();
         const sealing=recordEpoch;
         try{
@@ -100,7 +119,7 @@ async function start(playback=null){
       },
     }});
     core.onError=failure;core.onExit=()=>{close();status('游戏核心已退出。');};
-    if(cheat())core.setReplayCheat(true);
+    if(cheat())core.setReplayCheat(cheatSettings());
     if($('bgm-volume'))core.bgm?.setVolume(Number($('bgm-volume').value)/100);
     status(playback?'正在载入关卡，随后由游戏播放 Replay…':'等待进入关卡 · 菜单和演示不记录，音乐由浏览器独立播放。');canvas.focus();
   }catch(e){failure(e);}finally{busy=false;update();}
@@ -127,7 +146,7 @@ for(const type of ['keydown','keyup'])window.addEventListener(type,event=>{
   if(before!==(type==='keydown'))key(keys[event.code],type==='keydown');
 });
 function releaseKeys(){for(const code of new Set([...held].map(name=>keys[name])))key(code,false);held.clear();}
-function release(){controls.clear();updateFast();releaseKeys();for(const code of sentKeys)core?.key(code,false);sentKeys.clear();}
+function release(){player.reset();touchKeys.clear();core?.inputs({generation:core.readState()?.generation,touch:null});controls.clear();updateFast();releaseKeys();for(const code of sentKeys)core?.key(code,false);sentKeys.clear();}
 window.addEventListener('blur',release);document.addEventListener('visibilitychange',()=>{if(document.hidden)release();});window.addEventListener('pagehide',close);
 $('record').onclick=()=>{loaded=null;start();};$('finish').onclick=()=>core?.finishReplay();
 $('play').onclick=async()=>{try{await start(loaded||await decodeFrameReplay(recording));}catch(e){failure(e);}};
@@ -159,9 +178,20 @@ for(const button of document.querySelectorAll('[data-native-key]')){
   for(const type of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(type,()=>key(code,false));
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&core){release();if(mode==='playback'&&!paused&&!result)togglePause();else if(mode==='record')core.gamePause({onlyPause:true});}});
+function touchTick(){
+  const s=core?.readState(),active=!!core&&core.state==='running'&&!busy&&!$('save-dialog').open&&!document.hidden&&mode==='record';
+  player.setActive(active);player.setContext({key:`${s?.generation||0}:${s?.mode===1?'game':'menu'}`,play:active&&s?.mode===1&&!s.flags&&!dialog});
+  if(active){
+    const bits=player.sample(0);
+    for(const [bit,code]of touchCodes){const down=!!(bits&bit);if(down!==touchKeys.has(code)){if(down)touchKeys.add(code);else touchKeys.delete(code);key(code,down||[...held].some(name=>keys[name]===code));}}
+    core.inputs({generation:s?.generation,points:1|(player.alwaysPoint()?8:0),touch:unpackTouch(player.pack(bits))});player.consume();
+  }
+  requestAnimationFrame(touchTick);
+}
+requestAnimationFrame(touchTick);
 setInterval(()=>{if(core&&(mode==='record'||!result))$('diagnostics').textContent=JSON.stringify({mode,bytes,state:core.readState(),music:core.bgm?.status,musicError:core.musicError},null,2);},500);
 if(new URLSearchParams(location.search).get('qa')==='1')window.th05ReplayQA={
-  start:()=>start(),key,finish:()=>core?.finishReplay(),read:()=>({mode,bytes,result,run,tainted,hasRecording:!!recording,hasStore:!!store,savePrompt:$('save-dialog').open,state:core?.readState(),music:core?.bgm?.status,musicError:core?.musicError}),
+  start:()=>start(),key,finish:()=>core?.finishReplay(),read:()=>({mode,bytes,result,run,tainted,recordError:recordError?.message,hasRecording:!!recording,hasStore:!!store,savePrompt:$('save-dialog').open,state:core?.readState(),music:core?.bgm?.status,musicError:core?.musicError}),
   exportBase64:async()=>{const data=new Uint8Array(await recording.arrayBuffer());let text='';for(let i=0;i<data.length;i+=32768)text+=String.fromCharCode(...data.subarray(i,i+32768));return btoa(text);},
   play:async()=>start(await decodeFrameReplay(recording)),close,
 };

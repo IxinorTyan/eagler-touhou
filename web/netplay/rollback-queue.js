@@ -1,5 +1,5 @@
 import {MAX_INPUT} from '../touch-input.js';
-export const PROTOCOL='th05-netplay/8';
+export const PROTOCOL='th05-netplay/9';
 export const TICK_MS=1000/60;
 export const BOOT_DELAY=2;
 export const MAX_ROLLBACK=12;

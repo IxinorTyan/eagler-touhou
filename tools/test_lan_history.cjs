@@ -13,6 +13,11 @@ const info=p=>p.evaluate(()=>th05Lan.info);
 (async()=>{
  const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
  const context=await browser.newContext({acceptDownloads:true});
+ const storageFailure=process.env.TH05_STORAGE_FAILURE==='1';
+ if(storageFailure)await context.addInitScript(()=>{
+  const RealWorker=Worker;globalThis.storageWorkers=[];
+  globalThis.Worker=class extends RealWorker{constructor(url,options){super(url,options);if(String(url).includes('external-replay-store-worker'))storageWorkers.push(this);}};
+ });
  try{
   await context.route(origin+'/**',async route=>{
    const url=new URL(route.request().url());
@@ -67,15 +72,27 @@ const info=p=>p.evaluate(()=>th05Lan.info);
   // Saving must not end the game or stop the independent spectator stream.
   await host.waitForFunction(n=>th05Lan.info.history.frames>=n+120,report.export.history.frames,{timeout:60000});
   report.afterExport=await info(host);assert(report.afterExport.frame>report.export.frame);
+  if(storageFailure){
+   await guest.evaluate(()=>storageWorkers.at(-1).dispatchEvent(new ErrorEvent('error',{message:'injected multiplayer compression failure'})));
+   await guest.waitForFunction(()=>!th05Lan.info.history.recording&&document.getElementById('history-status').textContent.includes('录像停止'));
+   const failed=await info(guest);
+   await guest.waitForFunction(n=>th05Lan.info.frame>=n+18,failed.frame,{timeout:30000});const settled=await info(guest);
+   await guest.waitForFunction(n=>th05Lan.info.frame>=n+60,settled.frame,{timeout:30000});const continued=await info(guest);
+   assert(continued.running&&continued.frame>settled.frame,'compression failure must preserve live player simulation');
+   assert.equal(continued.history.frames,settled.history.frames,'no consumer means history probes and packaging stop');
+   assert.equal(await guest.isDisabled('#history-save'),true);
+   report.storageFailure={failed,settled,continued};console.log('PASS real multiplayer storage failure preserves confirmed play and stops unused history capture');
+  }
   await host.click('#leave');await host.waitForFunction(()=>!th05Lan.info.room);
   await host.waitForFunction(()=>document.getElementById('save-dialog').open);
   await host.screenshot({path:path.join(reports,'lan-save-menu.png'),fullPage:true});
   const finalDownload=host.waitForEvent('download');await host.click('#save-replay');
   const finalFile=path.join(reports,'lan-history-full.th05m');await (await finalDownload).saveAs(finalFile);
-  await guest.waitForFunction(()=>document.getElementById('save-dialog').open,null,{timeout:30000});
-  await guest.click('#discard-replay');assert.equal(await guest.isDisabled('#history-save'),true);
+  if(storageFailure){assert.equal(await guest.evaluate(()=>document.getElementById('save-dialog').open),false);}
+  else {await guest.waitForFunction(()=>document.getElementById('save-dialog').open,null,{timeout:30000});await guest.click('#discard-replay');}
+  assert.equal(await guest.isDisabled('#history-save'),true);
   assert.equal(await guest.isVisible('#history-watch'),false);
-  report.endPrompt={hostSaved:true,guestDiscarded:true};
+  report.endPrompt={hostSaved:true,guestDiscarded:!storageFailure,guestStorageFailed:storageFailure};
   await viewer.waitForFunction(()=>th05CoopReplayQA.read().completed||th05CoopReplayQA.read().error,null,{timeout:90000});
   report.live=await viewer.evaluate(()=>th05CoopReplayQA.read());assert.equal(report.live.error,null);assert.equal(report.live.cursor,report.live.frames);
   await viewer.click('#end-close');await viewer.click('#stop');await viewer.setInputFiles('#file',file);await viewer.click('#play');
@@ -89,5 +106,5 @@ const info=p=>p.evaluate(()=>th05Lan.info);
   await host.click('#create');await host.waitForFunction(()=>!!th05Lan.info.room);await host.click('#leave');await host.waitForFunction(()=>!th05Lan.info.room);
   await host.waitForTimeout(500);assert.equal(await host.evaluate(()=>document.getElementById('save-dialog').open),false);
   assert.deepEqual(errors,[]);console.log('PASS actual LAN UI, delayed input, swapped seats, export while running, independent live tail and fresh-core file replay');
- }finally{report.errors=errors;fs.writeFileSync(path.join(reports,'lan-history.json'),JSON.stringify(report,null,2));await browser.close();}
+ }finally{report.errors=errors;fs.writeFileSync(path.join(reports,storageFailure?'lan-history-storage-failure.json':'lan-history.json'),JSON.stringify(report,null,2));await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

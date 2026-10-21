@@ -1,5 +1,6 @@
 """In-process HTTP-handler and archive tests; no listening socket or server."""
 import base64
+import hashlib
 import copy
 import io
 import json
@@ -38,21 +39,79 @@ def request(method, url, data=None):
 
 
 def header(players=2):
-    # The persisted input format remains /7; HTTP authorization uses the live
-    # server protocol independently (now /8 with startup timing negotiation).
-    return {'version': 'th05-confirmed-input/1', 'protocol': 'th05-netplay/7', 'identity': 'a'*64, 'language': 'cn', 'players': players,
+    # HTTP and persisted history both use /9, including the sticky cheat bit.
+    return {'version': 'th05-confirmed-input/1', 'protocol': 'th05-netplay/9', 'identity': 'a'*64, 'language': 'cn', 'players': players,
             'config': {'rank': 1, 'players': [{'character': n, 'spares': 2, 'bombs': 3} for n in range(players)]},
             'coreSha': 'b'*64, 'diskSha': 'c'*64, 'guestSha': 'd'*64, 'checksum': '12345678'}
 
 
 class Tests(unittest.TestCase):
+    def test_portable_checkpoints(self):
+        service = HistoryService()
+        owner = ('checkpoint', 'run', 'publisher')
+        watch = service.open(owner, header())['watch']
+        raw = bytes(range(256)) * 200
+        sha = hashlib.sha256(raw).hexdigest()
+        entry = {'frame': 0, 'stage': 0, 'sha': sha, 'size': len(raw)}
+        first = {**entry, 'offset': 0, 'payload': base64.b64encode(raw[:32768]).decode()}
+        last = {**entry, 'offset': 32768, 'payload': base64.b64encode(raw[32768:]).decode()}
+        self.assertRaises(PermissionError, service.checkpoint_push, ('x', 'x', 'x'), watch, first)
+        self.assertRaises(ValueError, service.checkpoint_push, owner, watch, last)
+        self.assertEqual(service.checkpoint_push(owner, watch, first)['offset'], 32768)
+        self.assertEqual(service.checkpoint_push(owner, watch, first)['offset'], 32768)
+        self.assertEqual(service.read(watch, 0)['checkpoints'], [])
+        self.assertRaises(ValueError, service.checkpoint_read, watch, 0, 0)
+        self.assertRaises(ValueError, service.checkpoint_push, owner, watch, {**first, 'payload': base64.b64encode(b'wrong').decode()})
+        self.assertTrue(service.checkpoint_push(owner, watch, last)['complete'])
+        self.assertTrue(service.checkpoint_push(owner, watch, last)['complete'])
+        self.assertEqual(service.read(watch, 0)['checkpoints'], [entry])
+        received = b''.join(base64.b64decode(service.checkpoint_read(watch, 0, at)['payload']) for at in (0, 32768))
+        self.assertEqual(received, raw)
+        self.assertRaises(ValueError, service.checkpoint_read, watch, True, 0)
+        self.assertRaises(ValueError, service.checkpoint_read, watch, 0, len(raw))
+        self.assertRaises(ValueError, service.checkpoint_push, owner, watch, {**first, 'frame': 1})
+        service.checkpoint_push(owner, watch, {'done': True})
+        self.assertTrue(service.read(watch, 0)['checkpointsDone'])
+        other = service.open(('other', 'run', 'publisher'), header())['watch']
+        self.assertRaises(ValueError, service.checkpoint_push, ('other', 'run', 'publisher'), other, {**entry, 'size': 1, 'offset': 0, 'payload': 'AA=='})
+        self.assertEqual(service.read(other, 0)['checkpoints'], [])
+
+    def test_stage_sidecar(self):
+        from unittest.mock import patch
+        service = HistoryService()
+        owner = ('stage', 'run', 'publisher')
+        h = header()
+        h['stageObservation'] = 1
+        watch = service.open(owner, h)['watch']
+        initial = [2, {'version': 'th05-stage-initial/1', 'diskSha': h['diskSha'], 'stage': 1, 'players': 2,
+                       'config': [1, 1, 0, 3, 3, 1, 3, 3, 2, 3, 3, 2], 'bytes': [0]*490, 'checksum': '00000000'}]
+        poll = [0, 32, 1, 0]
+        encoded = base64.b64encode(struct.pack('<ddBIII', 32, 0, 0, 1, 2, 0)).decode()
+        stages = [[initial, poll]]
+        self.assertEqual(service.push(owner, watch, 0, encoded, stages)['frames'], 1)
+        self.assertEqual(service.read(watch, 0)['stageFrames'], stages)
+        self.assertEqual(service.push(owner, watch, 0, encoded, stages)['frames'], 1)
+        bad = copy.deepcopy(stages)
+        bad[0][-1][1] = 33
+        self.assertRaises(ValueError, service.push, owner, watch, 0, encoded, bad)
+        for events in [[[0, 32, 2, 0]], [[1, 0, 0, [0], [0]*23, 0, 0, 0]], [[True]], [[2, {}]]]:
+            self.assertRaises(ValueError, service.push, owner, watch, 1, encoded, [events])
+        self.assertEqual(service.read(watch, 0)['frames'], 1, 'malformed optional observations never mutate a confirmed prefix')
+        # Even if an accepted batch retires its oversized segment, a lost ACK
+        # retries against the fixed last-upload digest, not the pruned cache.
+        with patch('lan_stage_history.STAGE_BYTES', 1):
+            self.assertEqual(service.push(owner, watch, 1, encoded, stages)['frames'], 2)
+            self.assertEqual(service.push(owner, watch, 1, encoded, stages)['frames'], 2)
+        self.assertEqual(service.read(watch, 1)['stageFrames'], [None])
+        self.assertRaises(ValueError, service.push, owner, watch, 1, encoded, bad)
+
     def test_full_length_archive(self):
         service = HistoryService()
         owner = ('capacity', 'generation', 'publisher')
         watch = service.open(owner, header(3))['watch']
         # Exercise the complete supported capacity, including late-reader
         # pagination and retries near the bound, without running an emulator.
-        raw = struct.pack('<dddBIII', 2**43-1, 0, 32, 2, 123, 456, 0) * 60
+        raw = struct.pack('<dddBIII', 2**44-1, 0, 32, 2, 123, 456, 0) * 60
         encoded = base64.b64encode(raw).decode()
         for first in range(0, MAX_FRAMES, 60):
             self.assertEqual(service.push(owner, watch, first, encoded)['frames'], first+60)
@@ -81,14 +140,14 @@ class Tests(unittest.TestCase):
         h['config']['rank'] = 4
         self.assertEqual(service.read(watch, 0)['header']['config']['rank'], 1)
         self.assertRaises(ValueError, service.open, owner, h)
-        raw = struct.pack('<dddBIII', 2**43-1, 0, 32, 2, 1, 123, 0)
+        raw = struct.pack('<dddBIII', 2**44-1, 0, 32, 2, 1, 123, 0)
         encoded = base64.b64encode(raw).decode()
         self.assertEqual(service.push(owner, watch, 0, encoded)['frames'], 1)
         self.assertEqual(service.push(owner, watch, 0, encoded)['frames'], 1)
         self.assertRaises(PermissionError, service.push, ('room', 'run', 'wrong'), watch, 1, '')
         self.assertRaises(ValueError, service.push, owner, watch, 2, encoded)
         self.assertRaises(ValueError, service.push, owner, watch, 0, base64.b64encode(bytes(len(raw))).decode())
-        for pair, mask, native in [([float('nan'),0,0],0,0), ([0,1,0],2,0), ([0,0,0],0,1), ([2**43,0,0],0,0)]:
+        for pair, mask, native in [([float('nan'),0,0],0,0), ([0,1,0],2,0), ([0,0,0],0,1), ([2**44,0,0],0,0)]:
             bad = base64.b64encode(struct.pack('<dddBIII', *pair, mask, 1, 2, native)).decode()
             self.assertRaises(ValueError, service.push, owner, watch, 1, bad)
         self.assertRaises(ValueError, service.push, owner, watch, 1, '!')
@@ -124,6 +183,9 @@ class Tests(unittest.TestCase):
         guest = post('join', {'room': host['room']})['body']
         auth = {'room': host['room'], 'generation': host['state']['generation'], 'token': host['token']}
         other = {**auth, 'token': guest['token']}
+        settings = dict(server.ROOMS[host['room']]['settings'])
+        self.assertEqual(post('settings', {**auth, **settings, 'stageWatch': True})['status'], 400)
+        self.assertFalse(server.ROOMS[host['room']]['settings']['stageWatch'])
         before = copy.deepcopy(server.ROOMS[host['room']])
         self.assertEqual(post('watch', {'room': host['room']})['status'], 409)
         self.assertEqual(server.ROOMS[host['room']], before)

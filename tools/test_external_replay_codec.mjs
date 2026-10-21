@@ -13,6 +13,9 @@ await assert.rejects(()=>encodeReplay({...header,events:[...header.events,...hea
 await assert.rejects(()=>encodeReplay({...header,result:{...header.result,clockCount:3}},{chunks:[compressed],rawBytes:18}),/长度/);
 await assert.rejects(()=>encodeReplay({...header,events:[{boundary:1,commands:[{type:'qa',action:'stage'}]}]},{chunks:[compressed],rawBytes:18}),/命令/);
 const host=createExternalReplayHost({mode:'playback',clocks,events:[],endBoundary:1});
+const touchHeader={...header,events:[{boundary:1,commands:[{type:'input',input:{generation:1,points:9,touch:{active:true,unlimited:false,x:80,y:-32}}}]}]};
+const touchReplay=await decodeReplay(await encodeReplay(touchHeader,{chunks:[compressed],rawBytes:18}));assert.deepEqual(touchReplay.header.events,touchHeader.events);
+await assert.rejects(()=>encodeReplay({...header,events:[{boundary:1,commands:[{type:'input',input:{generation:1,points:1,touch:{active:true,unlimited:false,x:Infinity,y:0}}}]}]},{chunks:[compressed],rawBytes:18}),/触控命令/);
 assert.equal(host.Date.now(),123456);assert.equal(host.performance.now(),123);assert.throws(()=>host.Date.now(),/时钟失步/);
 const wrong=createExternalReplayHost({mode:'playback',clocks,events:[],endBoundary:1});assert.throws(()=>wrong.performance.now(),/时钟失步/);
 v.setFloat64(1,NaN,true);const invalid=createExternalReplayHost({mode:'playback',clocks,events:[],endBoundary:1});assert.throws(()=>invalid.Date.now(),/无效/);

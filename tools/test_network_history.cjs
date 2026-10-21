@@ -4,6 +4,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const {spawn}=require('node:child_process'),readline=require('node:readline');
 const root=path.resolve(__dirname,'..'),web=path.join(root,'web'),reports=path.join(root,'reports'),origin='http://127.0.0.1:9877';
 const protocol=fs.readFileSync(path.join(web,'netplay/rollback-queue.js'),'utf8').match(/PROTOCOL='([^']+)'/)[1];
+const stages=process.env.TH05_STAGE_WATCH==='1';
 const stress=process.env.TH05_STRESS==='1',began=Date.now();
 const bridge=spawn('python',['tools/test_history_service.py','--bridge'],{cwd:root,stdio:['pipe','pipe','pipe']});
 let serial=0;const pending=new Map(),sockets=new Map(),errors=[],report={};
@@ -12,9 +13,11 @@ readline.createInterface({input:bridge.stdout}).on('line',line=>{const value=JSO
 function request(method,url,data){return new Promise(resolve=>{const id=++serial;pending.set(id,resolve);bridge.stdin.write(JSON.stringify({id,method,url,data})+'\n');});}
 let lostUpload=false,failedRead=false,uploadRetry=false,lostFirst=null;
 let outageUntil=0,outageReads=0,outagePushes=0,htmlFailure=false;
+const specialAssetRequests=[];
 async function routes(context){
  await context.route(origin+'/**',async route=>{
   const req=route.request(),url=new URL(req.url());
+  if(/(?:patch-stage-|th05-stage-|stage-runtime|wdosbox-x-stage|frame-replay-(?:core|ending|cn|jp))/.test(url.pathname))specialAssetRequests.push(url.pathname);
   if(url.pathname.startsWith('/api/')){
    const data=req.method()==='POST'?req.postDataJSON():null;
    if(stress&&Date.now()<outageUntil&&['/api/history','/api/history-push'].includes(url.pathname)){
@@ -58,9 +61,10 @@ async function routes(context){
   for(const page of [host,guest]){page.on('pageerror',e=>errors.push(e.message));await page.goto(origin+'/lan.html');await page.waitForFunction(()=>!document.getElementById('create').disabled);}
   console.log('lobby ready');await host.click('#create');await host.waitForFunction(()=>!!th05Lan.info.room);const room=(await host.evaluate(()=>th05Lan.info)).room;
   await guest.fill('#room-code',room);await guest.click('#join');await guest.waitForFunction(()=>!!th05Lan.info.room);
+  if(stages){assert(await host.locator('#stageWatch').isDisabled());assert.equal(await host.locator('#stageWatch option[value="true"]').count(),0);report.instrumentedStageEntryDisabled=true;}
   await host.click('#ready');await guest.click('#ready');await host.waitForFunction(()=>!document.getElementById('start').disabled);await host.click('#start');
   for(const page of [host,guest])await page.waitForFunction(()=>th05Lan.info.running||!!th05Lan.info.endedReason,null,{timeout:120000});
-  console.log('players booted');report.boot=await Promise.all([host,guest].map(p=>p.evaluate(()=>th05Lan.info)));assert(report.boot.every(x=>x.running),JSON.stringify(report.boot));
+  console.log('players booted');report.boot=await Promise.all([host,guest].map(p=>p.evaluate(()=>th05Lan.info)));assert(report.boot.every(x=>x.running),JSON.stringify(report.boot));assert.deepEqual(specialAssetRequests,[],'players must keep the ordinary disks and cores');
   await host.locator('#history-network-watch').waitFor({state:'visible',timeout:30000});const link=await host.getAttribute('#history-network-watch','href');assert(link.includes('#watch='));assert(!link.includes(report.boot[0].token||'TOKEN-NEVER-PRESENT'));
   viewer=await spectators.newPage();viewer.on('pageerror',e=>errors.push(e.message));
   await viewer.goto(origin+'/lan.html');await viewer.waitForFunction(()=>!document.getElementById('watch').disabled);
@@ -90,7 +94,11 @@ async function routes(context){
    // New independent session joins a substantial archive; close the old reader.
    await viewer.close();viewer=await spectators.newPage();viewer.on('pageerror',e=>errors.push(e.message));await viewer.goto(url.href);
    await viewer.waitForFunction(()=>th05CoopReplayQA.read().ready||th05CoopReplayQA.read().error,null,{timeout:60000});assert.equal((await read()).error,null);
-   await viewer.click('#live-edge');await viewer.waitForFunction(()=>{const s=th05CoopReplayQA.read();return s.error||s.following&&s.target===null;},null,{timeout:90000});report.rejoined=await read();assert.equal(report.rejoined.error,null);
+   const catchupBegan=Date.now();
+   report.rejoinTarget=await viewer.evaluate(()=>{document.getElementById('live-edge').click();return th05CoopReplayQA.read().target;});
+   console.log('long-history target',report.rejoinTarget);
+   await viewer.waitForFunction(()=>{const s=th05CoopReplayQA.read();return s.error||s.following&&s.target===null;},null,{timeout:90000});report.rejoined=await read();report.rejoinMs=Date.now()-catchupBegan;assert.equal(report.rejoined.error,null);
+   console.log('long-history caught up',report.rejoined.cursor,'in',report.rejoinMs,'ms');
    assert(outageReads&&outagePushes&&htmlFailure);report.outages={outageReads,outagePushes,htmlFailure};
   }
   const download=host.waitForEvent('download');await host.click('#history-save');await (await download).saveAs(path.join(reports,'network-prefix.th05m'));
@@ -102,6 +110,6 @@ async function routes(context){
   console.log('PASS isolated spectator context, real HTTP handlers, lost upload ACK, read retry, paused buffering, live catch-up, export and verified EOF');
  }finally{
   report.players=await Promise.all([host,guest].filter(Boolean).map(p=>p.evaluate(()=>({info:th05Lan.info,status:document.getElementById('status').textContent})).catch(()=>null)));if(viewer)report.final=await viewer.evaluate(()=>({qa:th05CoopReplayQA.read(),status:document.getElementById('status').textContent})).catch(()=>null);
-  report.elapsedSeconds=(Date.now()-began)/1000;report.errors=errors;fs.writeFileSync(path.join(reports,stress?'network-stress.json':'network-history.json'),JSON.stringify(report,null,2));await browser.close();bridge.stdin.end();
+  report.elapsedSeconds=(Date.now()-began)/1000;report.errors=errors;fs.writeFileSync(path.join(reports,stress?'network-stress.json':stages?'network-stage-history.json':'network-history.json'),JSON.stringify(report,null,2));await browser.close();bridge.stdin.end();
  }
 })().catch(error=>{console.error(error);bridge.kill();process.exitCode=1;});

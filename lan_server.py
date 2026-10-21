@@ -13,7 +13,7 @@ from urllib.parse import parse_qs, urlparse
 from lan_relay import available as relay_available, handle as relay_handle
 from lan_history import HistoryService
 
-PROTOCOL = 'th05-netplay/8'
+PROTOCOL = 'th05-netplay/9'
 ROOT = Path(__file__).resolve().parent / 'web'
 ROOMS = {}
 LOCK = threading.Lock()
@@ -34,14 +34,15 @@ def build_id():
              'lan-music.com', 'lan-music-patch.json', 'sfx/manifest.json',
              'frame-display.js', 'sidebar-background.js', 'launch-config.js', 'disk-files.js']
     files += [str(p.relative_to(ROOT)).replace('\\', '/') for p in (ROOT / 'netplay').glob('*.js')]
-    files += ['patch-cn.json', 'patch-jp.json', 'vendor/dosbox-net/runtime.json',
+    files += ['patch-cn.json', 'patch-jp.json', 'patch-stage-cn.json', 'patch-stage-jp.json',
+              'vendor/dosbox-net/stage-runtime.json', 'vendor/dosbox-net/runtime.json',
               'vendor/dosbox-net/dosbox-rollback.mjs', 'vendor/dosbox-net/emulators.js',
               'vendor/dosbox-net/dosbox-rollback-tracked.mjs']
     digest = hashlib.sha256()
     for name in sorted(files):
         digest.update(name.encode())
         digest.update((ROOT / name).read_bytes())
-    for name in ('lan_server.py', 'lan_relay.py', 'lan_history.py'):
+    for name in ('lan_server.py', 'lan_relay.py', 'lan_history.py', 'lan_stage_history.py'):
         digest.update(name.encode())
         digest.update((ROOT.parent / name).read_bytes())
     return digest.hexdigest()
@@ -103,10 +104,10 @@ class Handler(SimpleHTTPRequestHandler):
             if not relay_available():
                 return self.reply({'error': '房主服务缺少 websockets，请安装 requirements-lan.txt'}, 503)
             relay_handle(self, ROOMS, LOCK)
-        elif url.path == '/api/history':
+        elif url.path in ('/api/history', '/api/history-checkpoint'):
             try:
                 data = {k: v[0] for k, v in parse_qs(url.query).items()}
-                self.reply(HISTORY.read(data.get('watch'), int(data.get('from', '0'))))
+                self.reply(HISTORY.checkpoint_read(data.get('watch'), int(data.get('frame', '-1')), int(data.get('offset', '0'))) if url.path == '/api/history-checkpoint' else HISTORY.read(data.get('watch'), int(data.get('from', '0'))))
             except PermissionError as error:
                 self.reply({'error': str(error)}, 403)
             except (ValueError, TypeError) as error:
@@ -170,7 +171,7 @@ class Handler(SimpleHTTPRequestHandler):
                         'network': network, 'transport': 'relay' if network == 'public-ws' else 'rtc',
                         'slots': {'host': 0, 'guest': 1, 'guest2': 2}, 'characters': {'host': 0, 'guest': 1, 'guest2': 2},
                         'ready': dict.fromkeys(ROLES, False), 'offline': dict.fromkeys(ROLES, False), 'queues': {r: [] for r in ROLES},
-                        'settings': {'rank': 1, 'spares': 2, 'bombs': 3, 'language': 'cn', 'rollback': False, 'players': 2}}
+                        'settings': {'rank': 1, 'spares': 2, 'bombs': 3, 'language': 'cn', 'rollback': False, 'players': 2, 'stageWatch': False}}
                 ROOMS[code] = room
                 return self.reply({'room': code, 'token': token, 'role': 'host', 'state': snapshot(room)})
             code = str(data.get('room', ''))
@@ -230,7 +231,9 @@ class Handler(SimpleHTTPRequestHandler):
                         result = HISTORY.open(owner, header)
                         room['history_watch'] = result['watch']
                     elif action == 'history-push':
-                        result = HISTORY.push(owner, data.get('watch'), data.get('first'), data.get('payload'))
+                        result = HISTORY.push(owner, data.get('watch'), data.get('first'), data.get('payload'), data.get('stageFrames'))
+                    elif action == 'history-checkpoint':
+                        result = HISTORY.checkpoint_push(owner, data.get('watch'), data)
                     elif action == 'history-end':
                         result = HISTORY.end(owner, data.get('watch'), data.get('frames'), data.get('reason'))
                     elif action == 'history-interrupt':
@@ -310,6 +313,12 @@ class Handler(SimpleHTTPRequestHandler):
                     if type(rollback) is not bool:
                         raise ValueError('回滚选项无效')
                     settings['rollback'] = rollback
+                    stage_watch = data.get('stageWatch', room['settings'].get('stageWatch', False))
+                    if type(stage_watch) is not bool:
+                        raise ValueError('分面观战设置无效')
+                    if stage_watch:
+                        raise ValueError('分面观战暂未开放，请使用完整历史观看')
+                    settings['stageWatch'] = False
                     players=data.get('players',room['settings']['players'])
                     if type(players) is not int or players not in (2,3):
                         raise ValueError('玩家人数无效')

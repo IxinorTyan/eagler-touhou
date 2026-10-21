@@ -1,5 +1,7 @@
-import {MAX_INPUT} from '../touch-input.js';
+import {MAX_INPUT,usesCheat} from '../touch-input.js';
 import {encodeConfig} from '../launch-config.js';
+import {StageHistory} from './stage-history.js';
+import {CheckpointArchive} from './checkpoint-archive.js';
 export const HISTORY_VERSION='th05-confirmed-input/1';
 export const HISTORY_MAX_FRAMES=216000;
 export const HISTORY_BATCH_FRAMES=60;
@@ -10,7 +12,8 @@ export function historySessionId(){
 }
 export const historyStride=players=>players*8+13;
 export function validateHistoryHeader(h){
-  if(h?.version!==HISTORY_VERSION||h.protocol!=='th05-netplay/7'||!['cn','jp'].includes(h.language)||
+  if(h?.stageObservation!==undefined&&h.stageObservation!==1)throw Error('分面资源版本无效');
+  if(h?.version!==HISTORY_VERSION||h.protocol!=='th05-netplay/9'||!['cn','jp'].includes(h.language)||
     ![2,3].includes(h.players)||h.config?.players?.length!==h.players)throw Error('多人帧历史身份无效');
   encodeConfig(h.config);
   for(const k of ['identity','coreSha','diskSha','guestSha'])if(!hex(h[k],64))throw Error('多人帧历史资源身份缺失');
@@ -36,8 +39,8 @@ export function historyRow(bytes,index,players){
 // No wall-clock field. A batch is a contiguous, immutable prefix of executed
 // and reconciled logical frames. Callers own network and compression separately.
 export class ConfirmedHistory {
-  constructor(header){validateHistoryHeader(header);this.header=structuredClone(header);this.batches=[];this.frames=0;this.end=null;}
-  append(first,bytes){
+  constructor(header){validateHistoryHeader(header);this.header=structuredClone(header);this.batches=[];this.frames=0;this.end=null;this.tainted=false;this.stages=new StageHistory(this.header);this.checkpoints=new CheckpointArchive();this.checkpointsDone=false;}
+  append(first,bytes,stageFrames){
     if(this.end||first!==this.frames||!(bytes instanceof Uint8Array)||!bytes.length||bytes.length%historyStride(this.header.players))throw Error('多人帧历史缺帧或顺序错误');
     const count=bytes.length/historyStride(this.header.players);
     if(count>HISTORY_BATCH_FRAMES||this.frames+count>HISTORY_MAX_FRAMES)throw Error('多人帧历史超过容量');
@@ -47,7 +50,8 @@ export class ConfirmedHistory {
         r.pair.some((x,slot)=>(r.offlineMask&(1<<slot))&&x!==0)||
         ((first+n+1)%120!==0&&r.nativeHash!==0))throw Error('多人帧历史输入无效');
     }
-    const batch={first,bytes:bytes.slice()};this.batches.push(batch);this.frames+=count;return batch;
+    for(let n=0;n<count;n++)if(historyRow(bytes,n,this.header.players).pair.some(usesCheat))this.tainted=true;
+    const batch={first,bytes:bytes.slice()};this.batches.push(batch);this.stages.append(first,count,stageFrames);this.frames+=count;return batch;
   }
   finish(reason='prefix'){
     if(!this.end)this.end={frames:this.frames,reason:String(reason).slice(0,250)};

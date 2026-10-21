@@ -34,7 +34,7 @@ window.capture={
    const pair=Array.from({length:players},(_,slot)=>{
     if(offlineMask&(1<<slot))return 0;
     const direction=(Math.floor(frame/40)+slot)%2?4:8;
-    return slot===0?(frame===120?512:frame===165?1024:32|direction):
+    return slot===0?(32|direction):
       slot===2?packTouch(32|64,{active:frame%50<25,x:16,y:-8}):32|direction;
    });
    if(rollback&&frame===204){
@@ -49,6 +49,10 @@ window.capture={
   return {frame,recorded:host?.history.frames,failure,tail:host?.history.row(frame-1),lastHash,stepMeanMs:lastState.costs.reduce((a,b)=>a+b,0)/lastState.costs.length};
  },
  async seal(){const file=await host.seal('自动化帧前缀');return Array.from(new Uint8Array(await file.arrayBuffer()));},
+ async rejectSpectatorSlice(){
+  try{await send('history-slice',{frame,rows:[{pair:Array(playerCount).fill(0),offlineMask:0,ticks:0,gameHash:0,nativeHash:0}]},'history-sliced');return null;}
+  catch(error){return error.message;}
+ },
  end(){host?.end('自动化片段结束');worker.terminate();worker=null;},
  read(){return {frame,recorded:host?.history.frames,failure};}
 };
@@ -77,6 +81,7 @@ window.capture={
   await viewer.waitForFunction(()=>window.th05CoopReplayQA?.read().frames===180,null,{timeout:30000});
   report.final=await capture.evaluate(r=>window.capture.batch(180,r),rollback);
   assert.equal(report.final.recorded,360);
+  assert(report.final.tail.ticks>report.first.tail.ticks+60,'native battle must advance while touch input is recorded');
   const bytes=await capture.evaluate(()=>window.capture.seal()),file=path.join(reports,'multiplayer-history-'+language+'-'+players+'.th05m');
   fs.writeFileSync(file,Buffer.from(bytes));report.bytes=bytes.length;
   await capture.evaluate(()=>window.capture.end());
@@ -101,7 +106,9 @@ window.capture={
   const baselineBoot=await baseline.evaluate(args=>window.capture.boot(...args),[language,players,rollback,false]);
   assert.equal(baselineBoot.boot.checksum,report.boot.boot.checksum);assert.equal(baselineBoot.boot.historyHeader,null);
   report.baseline=await baseline.evaluate(r=>window.capture.batch(360,r),rollback);
-  assert.equal(report.baseline.lastHash,report.final.lastHash);await baseline.evaluate(()=>window.capture.end());
+  assert.equal(report.baseline.lastHash,report.final.lastHash);
+  report.playerSliceRejected=await baseline.evaluate(()=>window.capture.rejectSpectatorSlice());
+  assert.equal(report.playerSliceRejected,'旁观推进批次无效','player core must reject the spectator-only path');await baseline.evaluate(()=>window.capture.end());
   assert.deepEqual(errors,[]);console.log('PASS live tail, viewer pause, file import and exact confirmed EOF',language,players,report.bytes,'bytes');
  }finally{report.errors=errors;fs.writeFileSync(path.join(reports,'multiplayer-history-'+language+'-'+players+'.json'),JSON.stringify(report,null,2));await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

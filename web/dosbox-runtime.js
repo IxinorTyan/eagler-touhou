@@ -12,6 +12,8 @@ export async function prepareFastCore(){
   return loadCompiledCore(new URL('wdosbox-x-fast.wasm',vendor),manifest.files['wdosbox-x-fast.wasm']);
 }
 export async function createFastCore({canvas,disk,patch,qa=false,core='simple',cycles='max 100%',presentation='bitmap',viewSlot=0,solo=false,independentMusic=true,coreTask,externalReplay,frameReplay}){
+  if(frameReplay&&frameReplay.mode!=='playback'&&!qa)throw Error('旧单人 Replay 仅允许播放，录制请使用浏览器方案');
+  if(externalReplay&&!['record','playback'].includes(externalReplay.mode))throw Error('无效的浏览器 Replay 模式');
   if(typeof WebAssembly.Suspending!=='function'||typeof WebAssembly.promising!=='function')throw Error('此性能版需要支持 JSPI 的新版 Chrome / Edge 浏览器。');
   if(typeof OffscreenCanvas!=='function')throw Error('此性能版需要支持后台画布的浏览器。');
   const mode=qa&&['direct','upstream'].includes(presentation)?presentation:'bitmap';
@@ -26,7 +28,9 @@ export async function createFastCore({canvas,disk,patch,qa=false,core='simple',c
     viewSlot:slot=>worker.postMessage({type:'view-slot',slot}),
     gamePause:({onlyPause=false}={})=>worker.postMessage({type:'game-pause',onlyPause}),
     finishReplay:()=>worker.postMessage({type:'external-replay-finish'}),
+    stopBrowserRecording:()=>worker.postMessage({type:'external-replay-disable'}),
     setReplayCheat:value=>worker.postMessage({type:'frame-replay-cheat',value}),
+    stopReplayRecording:()=>worker.postMessage({type:'frame-replay-stop-recording'}),
     pauseReplay:value=>{worker.postMessage({type:'external-replay-pause',value});api.state=value?'paused':'running';api.bgm?.setPaused(value);if(value){api.audioOutput?.flush();api.audio?.suspend();}else api.audio?.resume();},
     pause(){api.state='paused';worker.postMessage({type:'pause'});api.audioOutput?.flush();api.audio?.suspend();},
     run(){api.state='running';worker.postMessage({type:'resume'});api.audio?.resume();},
@@ -52,6 +56,8 @@ export async function createFastCore({canvas,disk,patch,qa=false,core='simple',c
     if(data.type==='external-replay-chunk')externalReplay?.onChunk?.(data);
     if(data.type==='external-replay-run')externalReplay?.onRun?.(data.run);
     if(data.type==='external-replay-end')externalReplay?.onEnd?.(data.result);
+    if(data.type==='external-replay-recording-error')externalReplay?.onRecordingError?.(Error(data.message));
+    if(data.type==='frame-replay-taint')frameReplay?.onTaint?.();
     if(data.type==='frame-replay-run')frameReplay?.onRun?.(data.run);
     if(data.type==='frame-replay-dialog')frameReplay?.onDialog?.(data.active);
     if(data.type==='frame-replay-phase')frameReplay?.onPhase?.(data);

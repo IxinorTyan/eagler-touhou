@@ -13,7 +13,7 @@ export class SoloInput {
     return ds>0&&base>=0&&base+0x100000<=heap.length;
   }
   clear(heap,at=this.at){if(this.valid(heap,at))heap.fill(0,at+28,at+36);}
-  read(heap,now=performance.now()){
+  read(heap,now=performance.now(),{observeOnly=false}={}){
     const v=new DataView(heap.buffer,heap.byteOffset,heap.byteLength),previous=this.at;
     this.at=-1;
     for(const [at,candidate]of this.seen){
@@ -33,20 +33,20 @@ export class SoloInput {
       }
       this.cursor=end;
     }
-    if(previous!==this.at)this.clear(heap,previous);
+    if(!observeOnly&&previous!==this.at)this.clear(heap,previous);
     if(this.at<0){this.snapshot=null;return null;}
     const at=this.at,data=at-this.patch.mailbox_cs_offset+(this.patch.data_segment-this.patch.code_segment)*16;
-    if(now-this.lastInput>750||heap[at+22]!==1||heap[at+23])this.clear(heap);
+    if(!observeOnly&&(now-this.lastInput>750||heap[at+22]!==1||heap[at+23]))this.clear(heap);
     return this.snapshot={at,mode:heap[at+22],flags:heap[at+23],ticks:v.getUint32(at+16,true),
       generation:v.getUint16(at+24,true),pointOptions:heap[at+26],touchFlags:v.getUint16(at+28,true),
       x:v.getInt16(data+0x36d2,true)/16,y:v.getInt16(data+0x36d4,true)/16,
       focus:heap[data+0x3066],stage:heap[data+0x576e],character:heap[data+0x5773]};
   }
-  write(heap,input,paused=false){
+  write(heap,input,paused=false,now=performance.now()){
     const at=this.at;if(!this.valid(heap,at))return;
     const v=new DataView(heap.buffer,heap.byteOffset,heap.byteLength);
     if(input.generation!==v.getUint16(at+24,true))return;
-    this.lastInput=performance.now();heap[at+26]=(input.points??1)&9;
+    this.lastInput=now;heap[at+26]=(input.points??1)&9;
     const t=input.touch;
     if(paused||heap[at+22]!==1||heap[at+23]||!t?.active){this.clear(heap);return;}
     v.setUint16(at+28,t.unlimited?3:1,true);

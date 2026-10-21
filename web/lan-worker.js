@@ -19,12 +19,38 @@ import {makeMemoryDiff} from './dosbox-memory-diff.js';
 import {historyProof} from './netplay/history-proof.js';
 import {packHistoryRows,HISTORY_VERSION} from './netplay/confirmed-history.js';
 import {historyIdentity} from './netplay/history-identity.js';
+import {recordStageSignal,applyStageEvent,validateStageEvents,STAGE_MAX_BYTES} from './netplay/stage-stream.js';
 let captureHistory=false,verifyHistory=false,historyRows=[],historyFirst=0;
+let stageObservation=false,captureStages=false,stageFrames=[],stagePlayer=null,stageDiffSha=null;
+// Set only by the isolated test adapter appended by test_stage_watch.cjs.
+let allowStageProbeAssets=false;
+let portable=null,checkpointIdentity=null,checkpointBase=null;
+let checkpointMusic=[];
+function observeNativeStage(port,packed){
+  if(warming||port===0x7fe1||port===0x7fe3)return;
+  if(stagePlayer){
+    if(!stagePlayer.started){
+      const data=mod.nativeExports().thCoreState(0)+(packed>>>16)*16;
+      if(port!==0x7fe0||mod.HEAPU8[data+0x576e]!==stagePlayer.stage)return;
+      stagePlayer.started=true;
+    }
+    if(stagePlayer.underflow)return;
+    if(stagePlayer.cursor===stagePlayer.events.length){stagePlayer.underflow=true;return;}
+    applyStageEvent(mod,patch,port,packed,stagePlayer.events[stagePlayer.cursor]);stagePlayer.cursor++;return;
+  }
+  if(!captureStages||!effect)return;
+  try{recordStageSignal(mod,patch,port,packed,effect.stageEvents);}
+  catch(error){
+    // Optional browser observations never escape into the player's CPU stack.
+    captureStages=false;effect.stageEvents=[];
+    send('stage-recording-stopped',{message:error.message});
+  }
+}
 function flushHistory(){
   if(!historyRows.length)return;
   const bytes=packHistoryRows(historyRows,historyRows[0].pair.length);
-  send('confirmed-history',{first:historyFirst,bytes},[bytes.buffer]);
-  historyFirst+=historyRows.length;historyRows=[];
+  send('confirmed-history',{first:historyFirst,bytes,...(stageObservation?{stageFrames}: {})},[bytes.buffer]);
+  historyFirst+=historyRows.length;historyRows=[];stageFrames=[];
 }
 let snapshots=null,shim=null,music=null,effect=null,confirmed=0,replaying=false,rollbackCount=0;
 let restoredBoundary=null;
@@ -128,22 +154,26 @@ function input(pair){
   v.setUint16(mailbox+22,pair[1]&63,true);h[mailbox+24]=pair[1]&64?1:0;v.setUint16(mailbox+patch.mailbox_offsets.p3_input,(pair[2]||0)&63,true);h[mailbox+patch.mailbox_offsets.p3_focus]=(pair[2]||0)&64?1:0;h[mailbox+patch.mailbox_offsets.invincible]=0;writeNativeTouch(h,mailbox,patch,pair,paused);
 }
 async function boot(data){
+  if(data.stageObservation===true&&!allowStageProbeAssets)throw Error('分面实验使用专用游戏核心，正式入口已停用；请使用完整历史录像');
   const bootStarted=performance.now(),timings={};
   captureHistory=!!data.captureHistory;verifyHistory=!!data.verifyHistory;
+  // Instrumented assets remain available only to the isolated test adapter.
+  stageObservation=data.stageObservation===true;captureStages=stageObservation&&captureHistory&&data.captureStages===true;
   const progress=(stage,message)=>send('boot-progress',{stage,message});
   const viewSlot=data.viewSlot;
   progress('resources','正在并行加载游戏与核心…');
   const vendor=new URL('vendor/dosbox-net/',import.meta.url);
-  const [patchResponse,manifestResponse]=await Promise.all([fetch(`patch-${data.settings.language}.json`,{cache:'no-store'}),fetch(new URL('runtime.json',vendor),{cache:'no-store'})]);
+  const [patchResponse,manifestResponse]=await Promise.all([fetch(`patch-${stageObservation?'stage-':''}${data.settings.language}.json`,{cache:'no-store'}),fetch(new URL(stageObservation?'stage-runtime.json':'runtime.json',vendor),{cache:'no-store'})]);
   if(!patchResponse.ok||!manifestResponse.ok)throw Error('游戏或核心清单读取失败');
   const manifest=await manifestResponse.json();patch=await patchResponse.json();
   if(!Number.isInteger(patch.native_pause_cs_offset))throw Error('请更新原生暂停资源并刷新页面');
-  const tracked=!!data.settings.rollback&&WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,5,2,0,1,0,1]));
-  const core=tracked?'wdosbox-x-rollback-tracked.wasm':'wdosbox-x-rollback.wasm';
+  const tracked=(!!data.settings.rollback||(stageObservation&&verifyHistory))&&WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,5,2,0,1,0,1]));
+  stageDiffSha=manifest.files[tracked?'snapshot-diff-tracked.wasm':'snapshot-diff.wasm'];
+  const core=`wdosbox-x-${stageObservation?'stage':'rollback'}${tracked?'-tracked':''}.wasm`;
   const glue=tracked?'dosbox-rollback-tracked.mjs':'dosbox-rollback.mjs';
   const dispatch=onmessage;
   const [disk,compiledCore,musicAssets,factory,afterimageBytes]=await Promise.all([
-    loadVerifiedBytes(new URL(`th05-local-${data.settings.language}.hdi.gz`,import.meta.url),patch.sha256,{gzip:true,size:patch.size,
+    loadVerifiedBytes(new URL(`th05-${stageObservation?'stage':'local'}-${data.settings.language}.hdi.gz`,import.meta.url),patch.sha256,{gzip:true,size:patch.size,
       report:phase=>progress('disk',phase==='cache'?'已读取已校验磁盘缓存':phase==='verify'?'正在校验游戏磁盘…':'正在下载并解压游戏磁盘…')}),
     loadCompiledCore(new URL(core,vendor),manifest.files[core],phase=>progress('core',phase==='compiled-cache'?'已读取编译核心缓存':phase==='compile'?'正在编译联机核心…':phase==='verify'?'正在校验联机核心…':phase==='cache'?'已读取核心资源缓存':'正在下载联机核心…')),
     loadMusicAssets({effects:true}),
@@ -167,7 +197,7 @@ async function boot(data){
     getMinutes(){return this.getUTCMinutes();}getSeconds(){return this.getUTCSeconds();}
   }
   const messages=[];let receiver;
-  mod={canvas:new OffscreenCanvas(640,400),instantiateWasm:(imports,receive)=>receive(new WebAssembly.Instance(compiledCore,imports),compiledCore),virtualDate:VirtualDate,virtualNow:0,targetNow:0,deterministic:true,nativeScheduling:true,nativeCpu:true,nativeFramePresentation:false,
+  mod={canvas:new OffscreenCanvas(640,400),instantiateWasm:(imports,receive)=>receive((stageObservation?new WebAssembly.Instance(compiledCore,{...imports,env:{...imports.env,th05_stage:observeNativeStage}}):new WebAssembly.Instance(compiledCore,imports)),compiledCore),virtualDate:VirtualDate,virtualNow:0,targetNow:0,deterministic:true,nativeScheduling:true,nativeCpu:true,nativeFramePresentation:false,
     deferPresentation:true,
     SDL2:{audioContext:{sampleRate:44100}},locateFile:name=>new URL(name==='wdosbox-x-jspi.wasm'?core:name,vendor).href,
     postMessage:(name,props)=>{if(receiver)receiver(name,props);else messages.push([name,props]);},onAbort:fail};
@@ -225,7 +255,12 @@ async function boot(data){
   timings.nativeBootMs=performance.now()-started;
   timings.locator={...gameLocator.metrics};
   const identity=(captureHistory||verifyHistory)?await historyIdentity(manifest,patch,musicPatch):null;
-  send('ready',{historyHeader:identity?{version:HISTORY_VERSION,protocol:'th05-netplay/7',identity,language:data.settings.language,players:data.config.players.length,config:data.config}:null,state:state(),bootMs:performance.now()-bootStarted,bootTimings:timings,checksum:checksum(),guestSha:await sha256(mod.HEAPU8.slice(guestBase,guestBase+0xa0000)),diskSha:patch.sha256,
+  checkpointIdentity=identity;
+  if(verifyHistory&&!stageObservation){
+    const {createPortableCheckpoint}=await import('./portable-checkpoint.js');
+    portable=createPortableCheckpoint(mod,ci);
+  }
+  send('ready',{historyHeader:identity?{version:HISTORY_VERSION,protocol:'th05-netplay/9',identity,language:data.settings.language,players:data.config.players.length,config:data.config,...(stageObservation?{stageObservation:1}:{})}:null,state:state(),bootMs:performance.now()-bootStarted,bootTimings:timings,checksum:checksum(),guestSha:await sha256(mod.HEAPU8.slice(guestBase,guestBase+0xa0000)),diskSha:patch.sha256,
     coreSha:manifest.files['wdosbox-x-rollback.wasm'],executionCoreSha:manifest.files[core]});
 }
 function advance(pair,predicted=true,offlineMask=0){
@@ -242,19 +277,23 @@ function advance(pair,predicted=true,offlineMask=0){
   }
   restoredBoundary=null;
   const simulateAt=performance.now();
-  effect={sfx:[],music:[],paused,transition:false,exit:false,hash:null};
+  effect={sfx:[],music:[],paused,transition:false,exit:false,hash:null,stageEvents:captureStages?[]:null};
   const before=paused;
   scan();
   // Cover direct DataView, touch and mailbox writes in the guest window.
   if(guestBase>=0)mod.thDirtyMark?.(guestBase,1048576);
   if(!Number.isInteger(offlineMask)||offlineMask<0||offlineMask>7)throw Error('离线席位掩码无效');
-  if(mailbox>=0){
+  if(captureStages&&offlineMask){
+    captureStages=false;effect.stageEvents=null;
+    send('stage-recording-stopped',{message:'队友离线后使用完整确认帧历史观看'});
+  }
+  if(mailbox>=0&&!stagePlayer){
     const c=mailbox-patch.mailbox_cs_offset,h=mod.HEAPU8;
     h[c+patch.entry_map.offline_mask]=offlineMask;
     // Also apply at the suspended menu boundary, before the next native tick.
     for(let slot=0;slot<3;slot++)if(offlineMask&(1<<slot))h[c+patch.entry_map.out_flags+slot]=2;
   }
-  input(pair);step();
+  if(!stagePlayer)input(pair);step();
   paused=nativePause()!==0;
   if(!before&&paused)pauseHeld=pair.map(value=>value&(127|256));
   else if(before&&!paused)pauseHeld=[];
@@ -265,8 +304,8 @@ function advance(pair,predicted=true,offlineMask=0){
     else effect.music.push(event);
   }
   effect.paused=paused;effect.transition=before!==paused;
-  effects.set(frame,effect);frame++;effect.hash=frame%120===0?checksum():null;
-  if(captureHistory||verifyHistory)effect.proof={...historyProof(mod.HEAPU8,mailbox,patch,{frame,oldP1,paused,escapeTicks,lastPauseRequests,pauseHeld}),nativeHash:effect.hash?Number.parseInt(effect.hash,16):0};
+  effects.set(frame,effect);frame++;effect.hash=!stagePlayer&&frame%120===0?checksum():null;
+  if((captureHistory||verifyHistory)&&!stagePlayer)effect.proof={...historyProof(mod.HEAPU8,mailbox,patch,{frame,oldP1,paused,escapeTicks,lastPauseRequests,pauseHeld}),nativeHash:effect.hash?Number.parseInt(effect.hash,16):0};
   if(captureHistory)effect.history={pair:pair.slice(),offlineMask,...effect.proof};
   if(predicted)snapshots?.seal();effect=null;
   rollbackMetrics.simulateMs+=performance.now()-simulateAt;
@@ -281,9 +320,12 @@ function confirm(prefix){
     if(e.transition){if(sfx.length){send('sfx',{events:sfx});sfx=[];}send('pause-state',{paused:e.paused});}
     exit||=e.exit;
     sfx.push(...e.sfx);sfxEvents+=e.sfx.length;
-    if(e.music.length)send('music',{events:e.music});
+    if(e.music.length){
+      if(portable)for(const event of e.music){if((event[0]>>>8)<=1)checkpointMusic=[];checkpointMusic.push(event);if(checkpointMusic.length>64)checkpointMusic.splice(1,1);}
+      send('music',{events:e.music});
+    }
     if(e.hash)send('hash',{frame:n+1,hash:e.hash,boot:syncPolicy().ready});
-    if(captureHistory&&e.history){historyRows.push(e.history);if(historyRows.length===6)flushHistory();}
+    if(captureHistory&&e.history){historyRows.push(e.history);if(stageObservation)stageFrames.push(captureStages?e.stageEvents:null);if(historyRows.length===6)flushHistory();}
     effects.delete(n);
   }
   if(sfx.length)send('sfx',{events:sfx});
@@ -297,13 +339,101 @@ function confirm(prefix){
   if(exit){flushHistory();fatal=true;send('session-exit',{frame:prefix});}
 }
 onmessage=async({data})=>{try{
+  if(data.type==='checkpoint-save'){
+    if(!portable||!verifyHistory||captureHistory||snapshots||frame!==confirmed||effects.size)throw Error('检查点仅允许在已确认旁观边界生成');
+    const {encodeCheckpoint}=await import('./portable-checkpoint.js');
+    const host={identity:checkpointIdentity,frame,tick,oldP1,paused,escapeTicks,lastPauseRequests,pauseHeld:pauseHeld.slice(),mailbox,guestBase,pointInputs:pointInputs.slice(),music:music.capture(),musicCommands:checkpointMusic.slice(),frames,audioPackets,sfxEvents,
+      proof:frame?{...historyProof(mod.HEAPU8,mailbox,patch,{frame,oldP1,paused,escapeTicks,lastPauseRequests,pauseHeld}),nativeHash:frame%120===0?Number.parseInt(checksum(),16):0}:null};
+    const stage=mod.HEAPU8[mailbox-patch.mailbox_cs_offset+(patch.data_segment-patch.code_segment)*16+0x576e];
+    const captured=portable.capture(host);
+    const bytes=await encodeCheckpoint(captured,frame?checkpointBase:null);
+    if(frame===0)checkpointBase=captured;
+    send('checkpoint-saved',{request:data.request,frame,stage,identity:checkpointIdentity,proof:host.proof,bytes},[bytes.buffer]);return;
+  }
+  if(data.type==='checkpoint-load'){
+    if(!portable||!verifyHistory||captureHistory||snapshots||frame!==confirmed||effects.size)throw Error('检查点仅允许在旁观实例恢复');
+    const {decodeCheckpoint}=await import('./portable-checkpoint.js');
+    const base=data.baseBytes?await decodeCheckpoint(data.baseBytes):null,s=await decodeCheckpoint(data.bytes,base);
+    if(s.host?.identity!==checkpointIdentity||!Number.isSafeInteger(s.host.frame)||s.host.frame<0||s.host.frame>216000)throw Error('检查点历史身份无效');
+    const host=portable.restore(s);
+    ({frame,tick,oldP1,paused,escapeTicks,lastPauseRequests,pauseHeld,mailbox,guestBase,pointInputs,frames,audioPackets,sfxEvents}=host);
+    confirmed=frame;fatal=false;music.restore(host.music);checkpointMusic=host.musicCommands||[];effects.clear();saved.clear();
+    const proof=frame?{...historyProof(mod.HEAPU8,mailbox,patch,{frame,oldP1,paused,escapeTicks,lastPauseRequests,pauseHeld}),nativeHash:frame%120===0?Number.parseInt(checksum(),16):0}:null;
+    for(const key of ['ticks','gameHash','nativeHash'])if(frame&&proof[key]!==host.proof?.[key])throw Error('检查点恢复状态校验不一致');
+    send('checkpoint-loaded',{request:data.request,frame,proof,music:checkpointMusic,state:state()});return;
+  }
   if(data.type==='history-present'){mod?.framePresenter?.flush({redraw:true});return;}
   if(fatal)return;
   if(data.type==='boot'){await boot(data);return;}
   if(data.type==='frame-ack'){transfers.delete(data.seq);return;}
   if(data.type==='confirm'){confirm(data.prefix);if(data.notify)send('history-confirmed',{frame:confirmed});return;}
-  if(data.type==='history-disable'){captureHistory=false;historyRows=[];return;}
+  if(data.type==='history-disable'){captureHistory=captureStages=false;historyRows=[];stageFrames=[];return;}
+  if(data.type==='stage-load'){
+    if(!stageObservation||!verifyHistory||captureHistory||snapshots||stagePlayer||frame!==0)throw Error('分面播放器启动条件无效');
+    validateStageEvents(data.events,mod.HEAPU8[mailbox-patch.mailbox_cs_offset+patch.entry_map.player_count]);
+    const initial=data.events[0]?.[1],c=mailbox-patch.mailbox_cs_offset,h=mod.HEAPU8;
+    if(data.events[0]?.[0]!==2||initial.stage<1||initial.stage>5||initial.diskSha!==patch.sha256||
+      initial.config.some((byte,i)=>byte!==h[c+patch.entry_map.run_config+i]))throw Error('分面开局与本局资源不符');
+    if(JSON.stringify(data.events).length>STAGE_MAX_BYTES)throw Error('分面播放队列超过容量');
+    mod.memoryDiff=await makeMemoryDiff(mod,stageDiffSha);
+    stagePlayer={stage:initial.stage,events:structuredClone(data.events),offset:0,cursor:0,started:false,underflow:false,backup:createDosboxSnapshots(shim)};
+    const v=new DataView(h.buffer),d=c+(patch.data_segment-patch.code_segment)*16;
+    const resident=guestBase+v.getUint16(d+0x41fe,true)*16+v.getUint16(d+0x41fc,true);
+    // Run the native cleanup/load path. The marker restores the fixed scalar
+    // conditions immediately before the original stage initialization.
+    h[resident+0x13]=initial.stage;h[d+0x576c]=2;
+    send('stage-loaded',{stage:initial.stage,events:stagePlayer.events.length});return;
+  }
+  if(data.type==='stage-append'){
+    if(!stagePlayer||data.first!==stagePlayer.offset+stagePlayer.events.length)throw Error('分面输入序号不连续');
+    validateStageEvents(data.events,mod.HEAPU8[mailbox-patch.mailbox_cs_offset+patch.entry_map.player_count]);
+    const queued=stagePlayer.events.slice(stagePlayer.cursor).concat(structuredClone(data.events));
+    if(JSON.stringify(queued).length>STAGE_MAX_BYTES)throw Error('分面播放队列超过容量');
+    stagePlayer.offset+=stagePlayer.cursor;stagePlayer.cursor=0;stagePlayer.events=queued;
+    send('stage-appended',{events:stagePlayer.offset+queued.length});return;
+  }
+  if(data.type==='stage-slice'){
+    if(!stagePlayer||!Number.isInteger(data.steps)||data.steps<1||data.steps>32)throw Error('分面播放步数无效');
+    const started=performance.now();let applied=0,waiting=false;
+    mod.suppressPresentation=true;
+    try{
+      for(let n=0;n<data.steps;n++){
+        if(applied&&performance.now()-started>=16)break;
+        if(stagePlayer.cursor===stagePlayer.events.length){waiting=true;break;}
+        const saved={frame,oldP1,paused,escapeTicks,lastPauseRequests,pauseHeld:pauseHeld.slice(),cursor:stagePlayer.cursor,started:stagePlayer.started,music:music.capture()};
+        stagePlayer.backup.capture(frame);
+        advance(Array(mod.HEAPU8[mailbox-patch.mailbox_cs_offset+patch.entry_map.player_count]).fill(0),false,0);
+        stagePlayer.backup.seal();
+        if(stagePlayer.underflow){
+          stagePlayer.backup.restore(saved.frame);effects.delete(saved.frame);
+          ({frame,oldP1,paused,escapeTicks,lastPauseRequests,pauseHeld}=saved);music.restore(saved.music);
+          stagePlayer.cursor=saved.cursor;stagePlayer.started=saved.started;stagePlayer.underflow=false;waiting=true;break;
+        }
+        stagePlayer.backup.confirm(frame);confirm(frame);applied++;
+      }
+    }finally{mod.suppressPresentation=false;}
+    if(!data.quiet)mod.framePresenter.flush();
+    send('stage-sliced',{frame,applied,waiting,event:stagePlayer.offset+stagePlayer.cursor,received:stagePlayer.offset+stagePlayer.events.length,state:state()});return;
+  }
   if(data.type==='history-flush'){flushHistory();send('history-flushed',{request:data.request,prefix:historyFirst});return;}
+  if(data.type==='history-slice'){
+    // Only a read-only spectator may amortize host messages. Execute and verify
+    // every native step, then commit effects before acknowledging the slice.
+    if(!verifyHistory||captureHistory||snapshots||data.frame!==frame||!Array.isArray(data.rows)||!data.rows.length||data.rows.length>32)throw Error('旁观推进批次无效');
+    const started=performance.now();let applied=0,proof=null;
+    mod.suppressPresentation=true;
+    try{
+      for(const row of data.rows){
+        if(applied&&performance.now()-started>=16)break;
+        advance(row.pair,false,row.offlineMask);proof=effects.get(frame-1)?.proof;
+        for(const key of ['ticks','gameHash','nativeHash'])if(proof?.[key]!==row[key])throw Error(`第 ${frame} 同步帧校验不一致：${key}`);
+        applied++;
+        if(effects.get(frame-1)?.exit)break;
+      }
+      confirm(frame);
+    }finally{mod.suppressPresentation=false;}
+    send('history-sliced',{frame,applied,proof,stage:mod.HEAPU8[mailbox-patch.mailbox_cs_offset+(patch.data_segment-patch.code_segment)*16+0x576e],sliceMs:performance.now()-started});return;
+  }
   if(data.type==='restore'){
     const started=performance.now();
     if(!snapshots||!saved.has(data.frame)||data.frame<confirmed)throw Error('回滚状态已过期');

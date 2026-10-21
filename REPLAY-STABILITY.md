@@ -1,4 +1,146 @@
-# TH05 Replay／旁观稳定性验证（2026-10-19）
+# TH05 Replay／旁观稳定性验证（更新：2026-10-21）
+
+## 当前验收状态
+
+本轮完整结论、修复及证据见 [2026-10-21 验收交接](REPLAY-ACCEPTANCE-2026-10-21.md)，供其他作品开发的接口与状态清单见 [TH01–04 移植交接](REPLAY-PORTING-TH01-04.md)。后文历史插桩与长历史失败记录不作为当前接入模板。
+
+### 浏览器方案验收（2026-10-21，当前）
+
+单人已改为普通磁盘／普通 WASM 上的浏览器时钟与输入轨迹，旧游戏帧方案只开放播放。多人新增独立浏览器旁观 Worker 生成的可移植检查点；正式玩家使用普通磁盘与 WASM，旧插桩分面实验保持关闭。
+
+- `test_portable_checkpoint.cjs`：中文第 720、6000 帧及日文第 1800 帧，保存共用基准和差分点，由另一普通核心恢复，后续 360 同步步逐帧 ticks／gameHash／nativeHash 一致。基准约 4.4 MB，样本差分约 0.23–0.25 MB；缺基准拒绝。报告 `portable-checkpoint-cn-6000.json`、`portable-checkpoint-jp-1800.json`。不是此前插桩换面失败夹具的修复声明。
+- 追加中文第 12000 帧恢复后 360 步一致；该样本尾部原生 ticks 不再增长，只验证这一非战斗推进状态的恢复，不作为 12000 帧持续战斗压力通过。报告 `portable-checkpoint-cn-12000.json`。
+- `test_checkpoint_history.cjs`：普通玩家 Worker → 独立检查点生成器 → `T05MP003` 导出 → 新 context 导入。3720 同步帧含 0／1800／3600／3720 点；1900 从 1800、3650 从 3600 恢复，往回 100 从开局恢复，状态校验、暂停到达和启动中取消通过。本机晚加入及另一 context 经真实 Python HTTP Handler 取得检查点，均使用 3600 点；远端尾帧与来源一致。故意丢检查点上传 ACK 和注入下载 503 后恢复通过。报告 `checkpoint-history.json`。
+- 同测试破坏实际发给 Worker 的检查点 gzip：播放器退回完整确认历史，仍正确到达 1900 帧、检查点使用值为空，补执行 1900 步；没有跳过证明检查。
+- 本轮新增 `TH05_CHECKPOINT_STAGE=1`：6000 帧前史后由测试路由请求原生第 2 面加载，6002 帧采点；文件选面后补 360 步到 6362，原生计数实际前进且逐步证明一致。本机与独立 HTTP 观众使用同一 6002 点恢复。此为原生换面 QA，不是自然击破 Boss 的全程通关。报告 `checkpoint-stage-history.json`，夹具文件需同一测试路由身份。
+- 修复暂停直接恢复最终检查点后不触发结束提示的问题；新增最终点零步恢复、保持暂停及启用声音后的后退恢复回归。普通与换面报告均记录该边界结果。
+- `test_checkpoint_builder.mjs`：模拟 Worker 回复验证换面观测后采点、不打断固定 1800／3600 点、最终尾点和后台失败退役；这是调度单元测试，不冒充自然跨面模拟器验收。
+- `test_confirmed_history.mjs`：新增三代多人容器分区、点摘要、非法偏移／帧／首点拒绝；通过。`test_history_service.py` 5 项：新增分块上传／重试幂等、半点不可见、发布身份隔离、摘要错误及只读范围拒绝；通过。
+- `test_replay_seek.cjs`、`test_network_history.cjs`、`test_multiplayer_history.cjs`：原有准确定位／取消／EOF、实际多人页面及独立网络观看、录制开关的原生模拟校验一致回归通过。
+
+检查点恢复跳过执行前缀，输入历史仍完整下载；首次生成和上传有等待，途中导出可能只有部分点。容量或后台失败后的区间仍使用完整历史。没有重建普通磁盘／WASM、部署、重启或监听服务。完整自然主线／EX、连续自然跨面、真实异地及手机长局、跨浏览器和长期内存尚未验收；宿主共享 CPU 调度仍可能影响墙钟 FPS，不能将“没有新增 DOS 指令”写成所有设备零 FPS 影响。
+
+- `node tools/test_browser_replay.cjs`：中文真实单人启动、按键、通过普通输入 API 注入的限速触控增量、原生暂停、提前封存、封存后继续移动、导出、新 context 导入、播放器暂停／真人输入隔离、时钟／输入完整消费、最终 640 KiB 客体 SHA 一致；通过。请求中无分面或游戏帧专用资源。
+- `TH05_LANGUAGE=jp TH05_RECORD_QUIT=1` 同测试：日文原生暂停菜单退出，自动封存，独立 context 完整重演与最终 SHA 一致；通过。报告分别为 `reports/browser-replay-cn.json` 和 `browser-replay-jp.json`。
+- `TH05_RECORD_FAULT=1` 同测试：真实压缩器故障只停止录制，玩家 ticks 继续且仍可向右移动，不能导出无效文件；通过，报告 `reports/browser-replay-cn-fault.json`。
+- `test_browser_replay_host.mjs`：故意悬挂最终 inspect Promise，来源 continuation 仍能继续；时钟容量耗尽后仍接受输入，不生成伪完整文件。`test_external_replay_codec.mjs`：新容器、压缩输入、触控、损坏／越界／非法命令和时钟失步校验；通过。
+- `test_replay_browser_policy.cjs`：不录制入口用普通资源真实启动；正式 runtime／Worker 拒绝旧 DOS 插桩录制，分面启动仍被拒绝；通过。不是拒绝所有 externalReplay 请求，浏览器方案已正式开放。
+- `test_legacy_browser_playback.cjs`：仅在测试路由中生成当前身份的旧游戏帧夹具，再由另一 context 的未修改正式“仅播放”页面导入、重演并通过终点校验；通过，报告 `reports/legacy-browser-playback.json`。生成夹具的 QA 录制不属于正式入口，不证明任意旧身份文件兼容。
+- `test_network_history.cjs`：普通磁盘／核心启动两位玩家；独立旁观 context、真实 HTTP Handler、丢上传 ACK／读重试、暂停缓存、Live、导出和准确 EOF；通过。没有观众专用工作进入玩家的 DOS 实例。
+
+第一次中文暂停恢复夹具的确认未生效，第一次日文退出夹具没有生成结束结果；两次均未形成有效回放样本。加入菜单出现后的按键释放等待后，中日文重跑通过；尚未单独定位这两次未响应的精确原因。没有跳过时钟或内存校验。
+
+浏览器测试采用既有 buffer 音频 fallback（资源路由无法拦截 AudioWorklet 独立请求），不声称覆盖 AudioWorklet 网络加载或实体声卡。触控使用普通 API 的确定增量夹具，不声称实体手机触摸已全测。短样本不等于完整主线／EX、自然连续跨面、长时浏览器时钟轨迹、跨浏览器／跨机器已验收；也不证明共享宿主调度绝不影响墙钟 FPS。此处确认的是无需给玩家的 DOS／WASM 加录像专用指令或回调。
+
+### 核心不介入约束：临时撤下记录（2026-10-21，历史）
+
+用户允许浏览器宿主 CPU 成本，但禁止为 Replay／观战改变 DOS 游戏指令或核心热路径。已停用依赖专用磁盘／核心的分面入口和替换 MAIN／MAINE 的旧单人 Replay；普通单人恢复既有 `solo.js`，多人保留浏览器完整确认历史录制、导出与观看。服务器拒绝开启分面，Worker 在读取专用资源前拒绝分面或非 QA 单人实验启动。以下失败和耗时记录保留历史意义，不代表现在仍开放这些入口。
+
+`test_replay_browser_policy.cjs` 通过：真实普通单人启动并输出帧，不传 frameReplay／externalReplay；访问旧单人入口只显示暂停说明；runtime 与 Worker 拒绝旧实验启动，整个测试没有请求 Replay／分面专用资源。音频使用原有 buffer fallback，因为无监听服务的 Playwright 资源路由不能截获 AudioWorklet 请求；不宣称该测试验收了 AudioWorklet 网络加载。
+
+`TH05_STAGE_WATCH=1 node tools/test_network_history.cjs` 已改为检验分面入口保持禁用，并用普通资源完成玩家启动、独立观众、上传 ACK 丢失／读取重试、暂停缓存、Live、导出和 EOF；通过且玩家没有请求实验资源。`test_history_service.py` 4 项通过，新增房间拒绝 `stageWatch:true` 且不修改设置的断言。宿主 ms 采样不作为 DOS 虚拟 CPU 性能证据。
+
+### 10 月 21 日扩展实测：长前史分面失败
+
+**分面功能已接入，但尚不能判定长历史优化合格，应保留默认关闭。** 新增 6000 同步步来源前缀（5653 原生 ticks）后，通过相同的测试原生退场／加载进入第 2 面；独立观众在第 1077 号事件、从零计数第 358 次原生更新前报“分面游戏状态校验不一致”。重复测试可复现。来源和观众的标量状态对照显示 RNG 环游标为 183／182，火花游标低字节为 16／0；来源 gameHash 为 4129648133，观众为 2952007846。没有修改状态掩盖差异，尚未确认造成随机数消耗分歧的具体原因。
+
+诊断报告：`reports/stage-long-prefix-failure-20261021.json`，完整失败样本另存为 `reports/stage-watch-cn-2-1-prefix6000-failed.json`，避免被短前缀复验覆盖。复验：在新 PowerShell 设置 `TH05_STAGE_PREFIX=6000`、`TH05_STAGE_BENCH=1`、`TH05_STAGE_PATTERN=1`、`TH05_STAGE_DIAGNOSTICS=1` 后运行 `node tools/test_stage_watch.cjs`。这是测试触发的换面，不冒充自然连续通关；它足以否定“此前 617 步前缀的通过已覆盖较长前史”。因分面失败，没有有效的长前史成功追赶时间或加速倍数。后续修复需在相同样本上复验，不得只重复短前缀测试。
+
+另一次 10000 步前缀尝试中来源已在结束状态，未生成目标面初始化，因此该次属于夹具未进入目标面的无效样本，不记作分面正确性通过或失败。下表的短样本通过结果继续保留，其结论必须受本失败样本限制。
+
+### 分面正式链路（2026-10-21）
+
+分面数据已接入 LAN 房间设置、确认发布、本机／HTTP 旁观、`.th05m` 文件与观看页选面。房主开局前开启“分面观战”，默认关闭；有效记录支持第 2–6 面独立重建，观众剧情／菜单自动播放。普通资源保留，可选资源加入原生标记，录像与缓存由浏览器管理；玩家不采集整机快照。以下通过本地资源路由、独立真实模拟器与 Python Handler 执行，没有启动监听服务、部署或重启既有服务。
+
+| 本轮验证 | 结果与实际边界 |
+| --- | --- |
+| 中文双人，第 2 面，真实原生剧情 | 3600 来源同步步，10460 条事件全部重演；来源与观众都离开对话，观众没有输入。报告 `stage-watch-cn-2-1-dialog.json` |
+| 日文三人，第 4 面，预测回滚 | 错误预测恢复后只发布确认事件；2939／2941 事件重演，最后不完整原生步安全留在队列。报告 `stage-watch-jp-3-3-pattern-rollback.json` |
+| 中文双人触控与原生暂停 | 移动／射击／低速／Bomb 加入普通限速触控；暂停和继续均在来源发生且由观众自动重演；3021／3023 事件验证，尾部不足一步安全等待。报告 `stage-watch-cn-2-1-pattern.json` 的 `controls:true` |
+| HTTP 独立上下文分面观看 | 实际 history host → HTTP 发布器 → Python Handler → 新上下文观看，跳过 617 步前缀，2942 条事件与结束验证通过。报告 `stage-watch-cn-2-1-pattern-http.json` |
+| 新文件及实际选面页面 | `createHistoryHost.snapshot()` 导出 26940 字节 `T05MP002`，新页面导入，按面启动，暂停后重新选面仍暂停，恢复及定位结束，无分面降级。报告 `stage-watch-cn-2-1-pattern-file.json` |
+| 玩家采集开关一致与采样故障隔离 | 同一分面资源下启用／关闭采集，最终 640 KiB 状态一致；故意触发 512 事件上限，采集停止后玩家仍执行 60 步。属于状态与故障断言，不证明设备零性能开销 |
+| 离线降级 | 第 400 步队友离线后停止分面采集，来源仍完成 1200 步，既有 683 条事件可播放。尚未用该强制换面夹具证明离线后的完整历史页面重建 |
+| 房间入口 | `TH05_STAGE_WATCH=1` 的实际 LAN 页面选择公共开关、双方启动及网络观看／导出通过；默认关闭路径的网络测试再次通过 |
+| 普通完整历史回归 | `test_replay_seek.cjs` 前后定位、点击、暂停到达、替换／取消目标、边界与 EOF 通过；普通 `test_network_history.cjs` 独立观看、丢失上传 ACK、读取重试、暂停积压、追赶、导出与 EOF 通过 |
+| 模块与服务 | `test_stage_stream.mjs` 的 v1/v2 往返、固定前缀、分面空洞／淘汰、坏载荷与索引拒绝通过；`test_confirmed_history.mjs` 通过；`test_history_service.py` 4 项通过，含完整 216000 帧归档和旁观授权 |
+
+复验命令（PowerShell；每条测试的环境变量应在新 shell 单独设置，避免组合夹具）：
+
+```powershell
+$env:TH05_STAGE_FILE='1'; $env:TH05_STAGE_PATTERN='1'; node tools/test_stage_watch.cjs
+$env:TH05_STAGE_CONTROLS='1'; $env:TH05_STAGE_PATTERN='1'; node tools/test_stage_watch.cjs
+$env:TH05_STAGE_DIALOG='1'; $env:TH05_STAGE_STEPS='3600'; node tools/test_stage_watch.cjs
+$env:TH05_STAGE_HTTP='1'; $env:TH05_STAGE_PATTERN='1'; node tools/test_stage_watch.cjs
+$env:TH05_STAGE_ROLLBACK='1'; $env:TH05_STAGE_PATTERN='1'; $env:TH05_PLAYERS='3'; $env:TH05_LANGUAGE='jp'; $env:TH05_STAGE='3'; $env:TH05_STAGE_UI='1'; node tools/test_stage_watch.cjs
+$env:TH05_STAGE_PARITY='1'; $env:TH05_STAGE_PATTERN='1'; $env:TH05_STAGE_UI='1'; node tools/test_stage_watch.cjs
+$env:TH05_STAGE_OFFLINE='1'; $env:TH05_STAGE_PATTERN='1'; node tools/test_stage_watch.cjs
+$env:TH05_STAGE_WATCH='1'; node tools/test_network_history.cjs
+```
+
+来源进入目标面使用测试触发的原生退场／加载，剧情测试在双方相同测试资源中调用真实原生剧情。没有把这些测试标成自然通关：连续自然跨面、任意资源继承组合、完整主线／EX、续关、实体手机与物理跨设备公网长局仍需验收。当前新观众仍下载完整同步历史，分面主要减少执行早期关卡的等待；单面特别长时仍可能需要长时间执行。旧的一万余同步步从开局追赶压力测试仍为失败，以下保留原始结果，不用分面样本替代。
+
+下方 10 月 20 日段落是历史状态，其中“尚未交付／仍从开局重建”已由上面的可选分面链路更新。
+
+当前单人格式为 `th05-game-input/3`，多人文件与网络要求 `th05-netplay/9`。下方按日期保留的“通过”对应当时资源身份；更新格式或适配器后不能自动沿用为新版全项通过。文档整理后，已继续实现并复验下述玩家优先隔离逻辑。测试通过本地资源路由和进程内 Handler 执行，没有启动监听服务。未完成的实体触屏全项、跨设备和长局验收仍保留，不以隔离测试替代。
+
+### 观众分批推进回归（2026-10-20，隔离之后）
+
+已经实现观众专用 `history-slice`，最多 32 步，约 16 毫秒后不再开始下一步。逐帧执行、逐帧验证、批尾确认效果；正常跟播速度保持不变。暂停允许在途批次完成。后退仍从开局重建，未实现便携 checkpoint。本轮 `lan-worker.js` 进入多人身份，以下结果对应新身份；此前文件需重录。
+
+- `node tools/test_replay_seek.cjs`：前进／后退／进度条／替换目标／取消／边界与准确 EOF 通过，确认使用有界批次；批次首帧证明被篡改时 Worker 立即报错；突发历史到达时正常跟播不静默加速，声音继续。报告 `reports/seek-test.json`。
+- `node tools/test_confirmed_history.mjs` 与相关脚本语法检查通过。
+- `node tools/test_multiplayer_history.cjs`：新身份中文双人录制、本机观看、暂停、新核心文件导入、准确 EOF 与采集关闭对照通过；新增实际玩家核心拒绝观众批次的断言，报告 `reports/multiplayer-history-cn-2.json`。
+- `node tools/test_network_history.cjs` 普通长度复验通过：独立观众 context、实际 HTTP Handler、丢上传 ACK／读失败重试、暂停缓存、Live、途中导出和准确 EOF。报告 `reports/network-history.json`，这不抵消下列长历史失败。
+- `TH05_STRESS=1 node tools/test_network_history.cjs` **仍未通过**。16 毫秒版本完成 12 个十秒窗口和两次历史接口断网，玩家确认帧持续增长；新观众目标 10398 步，90 秒到 9567 步，未报状态不一致或页面异常。累计 Worker 批次执行／校验约 87803 毫秒，说明瓶颈主要仍是模拟器执行；不能继续把减少页面往返当成完整解决方案。未执行到该长历史的导出和 EOF。报告 `reports/network-stress-slices-16ms-failed.json`（并保留 `network-stress.json`）。
+- 初次 8 毫秒批次也未通过：目标 10590 步，90 秒到 9737 步。报告 `reports/network-stress-slices-8ms-failed.json`。两次目标和机器负载不同，不能把它们换算成严格的性能百分比。
+
+这些结果只证明分批执行与控制功能已经实现，没有把长历史压力测试改记为通过。DOS／WASM 未改，也没有新增玩家端快照、额外模拟器或观众确认屏障。
+
+### 玩家优先隔离回归（2026-10-20）
+
+分面重建另有隔离原型验证，见本文末节；它没有接入正式页面，不改变本节生产状态或前述长历史失败结论。
+
+- `node tools/test_replay_isolation.cjs`：压缩不消费时积压上限与超时释放、压缩 Worker 创建失败、真实 gzip 40000 字节无损还原；观战关闭不创建通道；本机观众不确认时只收到一批，恢复确认后按固定 bootstrap=600 和实际 EOF=660 完整交付；HTTP 上传阻塞后超限只退役发布器。真实单人核心压缩失败后仍接受移动，能原生退出并在下一局重新创建录制器，未设置作弊或无敌。报告 `reports/replay-isolation.json`。
+- `node tools/test_frame_replay_bridge.mjs`：新增存储失败不再写输入／累积校验、不改变无敌计时器、正常结束后下一原生局恢复、播放端拒绝停用校验；原有触控、作弊和结算单元回归通过。
+- `node tools/test_replay_cheat_policy.cjs`：改为本机订阅／接收确认协议，远端作弊标记、导出竞态、持续观战和新局录制回归通过。
+- `node tools/test_frame_replay_codec.mjs`、`node tools/test_confirmed_history.mjs`、`python tools/test_history_service.py` 均通过。
+- `node tools/test_network_history.cjs`：隔离观众 context、实际 HTTP Handler、丢上传回执、读失败重试、观看暂停缓存、Live、途中导出与准确 EOF 通过。
+- `node tools/test_multiplayer_history.cjs`：中文双人本机加入、实时尾帧、观看暂停、文件导入及准确 EOF 通过；关闭采集的相同输入对照最终原生校验一致。
+- `TH05_STORAGE_FAILURE=1 node tools/test_lan_history.cjs`：真实联机页两台核心、交换座位和延迟输入；关闭观战的客机在压缩失败后继续推进，专用历史帧停止增加且不能导出；房主录制、旁观尾帧和新核心导入仍通过。报告 `reports/lan-history-storage-failure.json`。
+- `node tools/test_replay_seek.cjs`：前进、后退、进度点击、暂停抵达、替换目标、取消、范围与准确 EOF 回归通过。
+- `TH05_LANGUAGE=cn/jp node tools/test_replay_touch.cjs` 分别通过：普通限速拖动、真实 6 字节输入文件、新核心准确重放、现场触控隔离、不限速粘性作废与下一局恢复；中日文各 362 战斗输入帧，其中触控活动分别为 44／42 帧。报告 `reports/solo-replay-touch-{cn,jp}.json`。这是桌面 pointer 驱动的真实单人页测试，未冒充物理手机触摸验收。
+
+这些隔离结果验证故障隔离和指定短样本正确性；没有得到“所有设备零开销”的性能结论，也没有解决此前长历史追赶超时。后续观众分批推进的实际结果见上节，不能从队列隔离推断追赶性能已经解决。
+
+| 项目 | 已有证据 | 当前结论 |
+| --- | --- | --- |
+| 单人录制、保存、连续开局、剧情、暂停、文件导入与 EOF | 中日文短样本、UI 和桥接器历史回归；最新 `/3` 中日文拖动录制／新核心重放及下一局恢复 | 当前短样本已通过；最新身份下所有剧情／成绩组合仍需分别复验 |
+| 单人成绩终点 | 中日文 Good／Bad／EX 的同身份结算夹具 | 已验证流程；未证明正常规则下主线／EX 全程确定性 |
+| 多人录制与会话结束保存 | `test_lan_history.cjs`，2026-10-20：默认录制、关闭观战仍录制、途中导出继续、保存／放弃及新核心 EOF | 已有通过记录；自然通关／EX 结束保存未验收 |
+| 多人剧情、暂停、续关和跨关 | 中日文同身份确定性流程夹具，新核心逐步校验 | 已验证测试触发流程；未覆盖自然击破 Boss 及全程继承 |
+| 定位、声音恢复、网络重试 | 3600 步定位压力样本；实际 HTTP Handler 的丢 ACK、502／503、断网与普通长度 EOF | 有通过记录；真实设备／公网／代理仍待验收 |
+| 长历史新观众加入 | 原补测目标 9066，90 秒到 6942；新观众批次版本目标 10398，90 秒到 9567，未报校验错 | 分批推进已实现；长历史追赶仍超时，未通过，未执行到长历史导出和最终 EOF |
+| 最新单人限速拖动、6 字节输入与现场触控隔离 | `tools/test_replay_touch.cjs` 中日文均通过，报告 `reports/solo-replay-touch-{cn,jp}.json` | 实际录制、新核心播放、现场触控隔离及下一局恢复通过；物理手机仍待验收 |
+| 最新作弊标记、导出竞态与多人观战继续 | `tools/test_replay_cheat_policy.cjs` 已通过，含远端席位标记、作废、导出竞态与导入拒绝断言 | 专项模块回归通过；不等于所有席位实际触控 UI 全项验收 |
+| 实体跨设备、手机、真实公网代理、完整长局与内存 | 尚无完整验收证据 | 待验收；旁观也未接入主项目大厅 |
+
+长历史超时原始证据保存在本机 `reports/netplay-supplement-20261020.md` 和同名目录的 `summary.json`／失败日志；普通长度网络回归另行通过，不能抵消长历史失败。该补测针对 10 月 19 日优化版本，不是 `/9` 新格式全项复验。报告不随发行提供，因此关键失败与边界在本文件保留。
+
+最新触控与作弊专项复验命令如下，本轮结果已记于上方；后续资源身份变化需重新执行并保留结果，测试脚本存在本身不算通过：
+
+```powershell
+node tools/test_replay_cheat_policy.cjs
+$env:TH05_LANGUAGE='cn'
+node tools/test_replay_touch.cjs
+$env:TH05_LANGUAGE='jp'
+node tools/test_replay_touch.cjs
+Remove-Item Env:TH05_LANGUAGE
+```
+
+以上命令适用于保留完整 `tools/` 与本机浏览器测试依赖的开发工作区；通过 Playwright routes 提供资源，不启动监听服务。后续还应按 `/9` 身份重跑确认历史、HTTP 存档、多人录制与网络观看回归。测试耗时和长历史追赶性能问题需单独跟踪，不能通过放宽超时改记为产品通过。
+
+## 历史验收记录
 
 范围：本项目多人确认帧 Replay、浏览器观看端定位、当前联机 HTTP 旁观通道。使用真实 DOSBox-X Worker；房间与旁观 API 调用实际 Python Handler，通过 Playwright 路由和进程标准输入输出连接，不启动监听服务器。独立浏览器 context 用于隔离玩家与网络观众。
 
@@ -84,10 +226,32 @@ foreach ($scenario in @('pause', 'dialog', 'continue', 'stages')) {
 
 默认单人页使用同一游戏输入录制器；真实核心的中日文 UI 回归覆盖：进入关卡录制、实际文件下载、按住 Z 弹出菜单时 Enter 不误保存、左右选择／下划线、保存后继续运行、启用无敌销毁已封装文件和当前压缩 store、关闭后同局禁录、原生暂停菜单退回标题并在同 Worker 开启新局恢复、独立导入播放结束状态一致、回放禁止作弊、开局前无敌不创建 recorder。保存和结束菜单检查了桌面及 390px 画面，中文像素字体随本地资源加载。
 
-另通过 frame bridge／codec 单元回归、原有中文剧情＋Ctrl＋暂停＋新页面导入测试、中文 EX 与日文 Good Ending 成绩页重演。测试使用资源路由，不启动服务器。旧单人输入适配器身份变化，需要重录实验 .th05r；多人身份与帧数据未改变。任意拖动坐标未纳入单人格式，原版触控入口不录制；普通录制可使用键盘和屏幕按键。
+另通过 frame bridge／codec 单元回归、原有中文剧情＋Ctrl＋暂停＋新页面导入测试、中文 EX 与日文 Good Ending 成绩页重演。测试使用资源路由，不启动服务器。此处为单人集成时的历史结果，当时尚未录制拖动。后续 `/3` 已加入普通限速拖动的活动状态与待消费位移，单人及多人 `/9` 身份也已更新；最新专项验收状态见开头表格。原版触控入口仍不录制。
 
 ## 多人自动录制／保存菜单回归（2026-10-20）
 
 - `node tools/test_lan_history.cjs`：真实 LAN 页面与两台实际核心，交换席位、延迟输入；双方默认录制，客机关闭观战仍录制；途中导出后录制继续，房主结束保存、客机放弃，随后大厅未开局离房不重复弹窗。前缀和完整文件均以新核心播放并通过逐帧校验，完整录像 EOF 与直播一致。报告 `reports/lan-history.json`。
 - `node tools/test_network_history.cjs`：隔离浏览器上下文、实际 Python HTTP 处理器，丢失上传确认、读取重试、暂停积压、回到直播、途中导出和精确 EOF 均通过。未启动监听服务器。
 - 以上覆盖会话结束／离房路径；自然普通／EX 通关及真实跨设备长时间运行仍未验收。
+
+## 分面重建隔离原型（2026-10-20）
+
+新增 `tools/test_stage_replay.cjs` 与批量入口 `tools/test_stage_replay_matrix.cjs`。来源先运行 617 同步步，观看实例不执行这个前缀；两端独立启动，执行原生目标面的清理／加载与初始化。观看实例恢复固定的 490 字节状态载荷，并使用来源记录的本面原生更新输入。没有监听服务器，生产文件不受实验路由影响。
+
+| 场景 | 比较的本面原生更新 | 最多活动子弹／敌人 | 结果 |
+| --- | ---: | ---: | --- |
+| 中文双人，第 2 面 | 979 | 42／13 | 一致 |
+| 日文双人，第 3 面，3600 同步步 | 2757 | 81／19 | 一致，覆盖阵亡后的幽灵位置 |
+| 中文双人，第 4 面 | 1544 | 66／7 | 一致 |
+| 日文三人，第 4 面，角色 3／0／2 | 2110 | 40／5 | 一致 |
+| 日文双人，第 5 面 | 1545 | 118／18 | 一致 |
+| 中文三人，第 6 面 | 2105 | 164／16 | 一致 |
+| 中文双人第 2 面，故意改坏观看输入 | 979 | 42／13 | 第一组输入即检出差异，按预期通过故障断言 |
+
+上述样本包括左右移动、射击、Bomb 与低速，每次比较 RNG 环／游标、火花、子弹、敌人、物品、原生和扩展自机弹池散列，以及玩家／资源／个人统计与位置。活动世界非空，未把静止初始画面作为唯一证据。`node tools/test_stage_replay_state.mjs` 另外通过固定写入范围、资源／配置绑定、错误载荷／越界／空洞数组／错误目标面／resident 及全量验证失败前不写内存的断言。
+
+早期失败没有忽略：中文 Bomb 后随机数游标失配定位到原版火花游标的高字节遗留，补入 DS:41DC 两字节后通过；较长日文样本在退场后位置不同，定位到合作补丁以累计 ticks 驱动幽灵，补入 ticks／generation 后通过。另修正了夹具在原生更新跨同步步时清零输入的问题。旧报告属于迭代记录；最终 `stage-replay-probe-v2-*.json` 含资源和脚本指纹，不能直接拿旧身份报告认定任意新版本通过。
+
+构建器还验证实验与生产二／三人 sprite heap 相等，并复查生产补丁、磁盘、核心、清单指纹未变。状态载荷 490 字节不包含 JSON 元数据或逐更新输入，不是整份录像体积。测试池散列属于 QA 成本，不是发布版玩家路径的性能证据。
+
+**10 月 20 日历史结论（由文首 10 月 21 日接入结果更新）**：当时仅有分面重建与本面输入重放原型，正式观战尚未交付。现已增加正式选面、文件段索引和网络发布，剧情、暂停、触控和预测回滚确认有新增样本；自然通关、连续多面、EX 等未测项与原长历史压力失败仍保留。当前操作和复验范围以文首为准。

@@ -42,7 +42,7 @@ const emitError=e=>{if(fatal)return;fatal=true;send('error',{message:e?.stack||e
 addEventListener('error',e=>emitError(e.error||e.message));
 addEventListener('unhandledrejection',e=>emitError(e.reason));
 function scan(){
-  if(soloMode){soloInput?.read(mod.HEAPU8,externalHost?externalHost.boundary*24:performance.now());releaseConsumedKeys();return;}
+  if(soloMode){soloInput?.read(mod.HEAPU8,externalHost?externalHost.boundary*24:performance.now(),{observeOnly:!!frameBridge});releaseConsumedKeys();return;}
   if(!mod)return;const h=mod.HEAPU8,v=new DataView(h.buffer);
   if(mailbox>=0&&signature.every((b,i)=>h[mailbox+i]===b)&&h[mailbox+25]===1)return;
   mailbox=-1;guestBase=-1;
@@ -83,6 +83,7 @@ function state(){
 function publish(){if(fatal||exited||!ci)return;scan();if(nativeStatus().exit){exitSession();return;}inputs();if(musicReader&&(soloMode||mailbox>=0)){if(!soloMode&&musicReader.at<0){const v=new DataView(mod.HEAPU8.buffer),segment=v.getUint16(guestBase+0x60*4+2,true);musicReader.at=guestBase+segment*16+musicReader.patch.mailbox_com_offset;}const events=musicReader.read(mod.HEAPU8);if(events.length)send('music',{events});}if(statePending)return;const s=state();if(s){statePending=true;send('state',{state:s});}}
 const config=(cycles,core)=>`[dosbox]\nmachine=pc98\nmemsize=16\n[cpu]\ncore=${core}\ncputype=386\ncycles=${cycles}\n[render]\nframeskip=0\nscaler=none\naspect=false\n[sblaster]\nsbtype=none\n[pc98]\npc-98 fm board=board86\n[mixer]\nrate=44100\nblocksize=512\nprebuffer=20\n[autoexec]\n@echo off\nmount a /home/web_user/game\na:\ncd KAIKI\nFAST.BAT\n`;
 async function boot(data){
+  if(data.frameReplay&&data.frameReplay.mode!=='playback'&&!data.qa)throw Error('旧单人 Replay 仅允许播放，录制请使用浏览器方案');
   soloMode=!!data.solo;
   const dependency=name=>import(new URL(name,data.base).href);
   const [locator,{writeNativeTouch,nativeHitPoints},{NativeMusic},players,{createPersonalHud,compositePersonalHudRgb},solo,art]=await Promise.all([
@@ -105,7 +106,7 @@ async function boot(data){
   importScripts(new URL('sidebar-background.js',data.base).href,new URL('frame-presenter.js',data.base).href,new URL('emulators.js',vendor).href);
   let factory;
   if(data.externalReplay){
-    if(!soloMode||data.musicPatch)throw Error('外部 Replay 实验目前仅支持单人原版模拟音源');
+    if(!soloMode||data.musicPatch)throw Error('浏览器 Replay 使用单人原版模拟音源');
     const [{createExternalReplayHost},{loadVerifiedBytes},response]=await Promise.all([dependency('external-replay-host.js'),dependency('startup-assets.js'),fetch(new URL('runtime.json',vendor),{cache:'no-store'})]);
     if(!response.ok)throw Error('Replay 核心清单读取失败');
     const manifest=await response.json();
@@ -117,14 +118,16 @@ async function boot(data){
         // The DOS memory allocation survives MAIN returning to OP, while
         // SoloInput deliberately drops inactive game mailboxes.
         const base=replayGuestBase>=0&&replayGuestBase+0xa0000<=h.length?replayGuestBase:-1;
+        const bytes=base>=0?h.slice(base,base+0xa0000):null,snapshot=state();
         let hash=2166136261;
-        if(base>=0)for(let i=base;i<base+0xa0000;i++)hash=Math.imul(hash^h[i],16777619);
+        if(bytes)for(const byte of bytes)hash=Math.imul(hash^byte,16777619);
         const {sha256}=await dependency('netplay/sha256.js');
-        const guestSha256=base>=0?await sha256(h.subarray(base,base+0xa0000)):null;
-        return {guestHash:base>=0?(hash>>>0).toString(16).padStart(8,'0'):'unavailable',guestSha256,run:replayRun,state:state(),heapBytes:h.length};
+        const guestSha256=bytes?await sha256(bytes):null;
+        return {guestHash:base>=0?(hash>>>0).toString(16).padStart(8,'0'):'unavailable',guestSha256,run:replayRun,state:snapshot,heapBytes:h.length};
       },
       onChunk:chunk=>{const transfers=chunk.clocks?[chunk.clocks.buffer]:[];postMessage({type:'external-replay-chunk',...chunk},transfers);},
       onEnd:result=>send('external-replay-end',{result}),onError:emitError,
+      onRecordingError:error=>send('external-replay-recording-error',{message:error.message}),
     });
     const source=new TextDecoder().decode(await loadVerifiedBytes(new URL('wdosbox-x-jspi.js',vendor),manifest.files['wdosbox-x-jspi.js']));
     // Lexically scope clocks to this loader only; the rest of the browser keeps
@@ -152,6 +155,7 @@ async function boot(data){
     const {createFrameReplayBridge}=await dependency('frame-replay-bridge.js');
     frameBridge=createFrameReplayBridge({mod,patch,config:data.frameReplay,
       onRun:run=>send('frame-replay-run',{run}),
+      onTaint:()=>send('frame-replay-taint'),
       onPhase:phase=>send('frame-replay-phase',phase),
       onDialog:active=>{
         if(!active&&data.frameReplay.mode==='playback')for(const code of [90,88,257])ci.sendKeyEvent(code,false);
@@ -217,16 +221,25 @@ async function boot(data){
 onmessage=async({data})=>{try{
   if(data.type==='boot'){await boot(data);return;}
   if(data.type==='external-replay-finish'){if(frameBridge)frameBridge.finish();else if(replayRun)externalHost?.finish();return;}
-  if(data.type==='external-replay-pause'){if(frameBridge){paused=!!data.value;if(paused)ci.pause();else ci.resume();}else externalHost?.pause(data.value);return;}
-  if(externalHost&&data.type==='key'&&!data.externalSource){externalHost.queue({type:'key',code:data.code,down:!!data.down});return;}
-  if(externalHost&&['input','game-pause','pause','resume','qa'].includes(data.type))throw Error('外部 Replay 实验仅通过记录的键盘输入控制游戏');
+  if(data.type==='external-replay-disable'){externalHost?.disable();return;}
+  if(data.type==='external-replay-pause'){if(frameBridge){paused=!!data.value;if(paused){soloInput?.clear(mod.HEAPU8);ci.pause();}else ci.resume();}else externalHost?.pause(data.value);return;}
+  if(externalHost&&!data.externalSource){
+    if(data.type==='key'){externalHost.queue({type:'key',code:data.code,down:!!data.down});return;}
+    if(data.type==='input'){externalHost.queue({type:'input',input:data.input});return;}
+    if(data.type==='game-pause'){
+      if(data.onlyPause&&nativeStatus().paused)return;
+      externalHost.queue({type:'key',code:256,down:true});setTimeout(()=>externalHost.queue({type:'key',code:256,down:false}),110);return;
+    }
+    if(['pause','resume','qa'].includes(data.type))return;
+  }
   if(data.type==='ack'){statePending=false;return;}
   if(data.type==='frame-ack'){frameTransfers.delete(data.seq);return;}
   if(data.type==='view-slot'&&Number.isInteger(data.slot)&&data.slot>=0&&data.slot<3){viewSlot=data.slot;mod.framePresenter?.flush();return;}
   if(data.type==='presentation-active'){presentationActive=!!data.value;return;}
   if(data.type==='frame-replay-cheat'){frameBridge?.setCheat(data.value);return;}
+  if(data.type==='frame-replay-stop-recording'){frameBridge?.stopRecording();return;}
   if(data.type==='input'){
-    if(soloMode){soloInput.write(mod.HEAPU8,data.input,paused);return;}
+    if(soloMode){if(frameBridge){if(frameBridge.status.mode==='record')frameBridge.touchInput(data.input,paused);return;}soloInput.write(mod.HEAPU8,data.input,paused,externalHost?externalHost.boundary*24:performance.now());return;}
     input=data.input;if(input.p2&16){p2Pulse|=16;p2PulseTick=nativeInputTick();}if(input.p3&16){p3Pulse|=16;p3PulseTick=nativeInputTick();}inputs();nativeTouch?.(mod?.HEAPU8,mailbox,patch,input.touch||[0,0],paused||nativeStatus().paused);return;
   }
   if(data.type==='key'){

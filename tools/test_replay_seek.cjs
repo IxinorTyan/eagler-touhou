@@ -61,12 +61,14 @@ if(stress)harness=harness.replace('frame===120?512:frame===165?1024:32|direction
   }
   // A paused seek still rebuilds, then stops at the exact requested frame.
   await viewer.fill('#seek-frame','600');await viewer.click('#seek');report.forward=await at(600);assert.equal(report.forward.paused,true);
+  assert(report.forward.sliceStats.count>0,'explicit seek must use spectator slices');
+  assert(report.forward.sliceStats.maxSteps<=32,'slice step bound must hold');
   await viewer.fill('#seek-frame','120');await viewer.click('#seek');report.backward=await at(120);assert.equal(report.backward.paused,true);
   await viewer.locator('#timeline').evaluate(element=>{element.value='240';element.dispatchEvent(new Event('change'));});report.timeline=await at(240);
   // A changed target replaces the pending request. No old Worker may update it.
   await viewer.fill('#seek-frame','120');await viewer.click('#seek');await viewer.fill('#seek-frame','360');await viewer.click('#seek');report.replaced=await at(360);
   await viewer.fill('#seek-frame','720');await viewer.click('#seek');await viewer.click('#cancel-seek');
-  const cancelled=await read();await viewer.waitForTimeout(400);report.cancelled=await read();assert.equal(report.cancelled.target,null);assert.equal(report.cancelled.paused,true);assert(report.cancelled.cursor<=cancelled.cursor+1);
+  const cancelled=await read();await viewer.waitForTimeout(400);report.cancelled=await read();assert.equal(report.cancelled.target,null);assert.equal(report.cancelled.paused,true);assert(report.cancelled.cursor<=cancelled.cursor+32);
   // Invalid targets do not reset the current core or advance its cursor.
   const before=(await read()).cursor;await viewer.fill('#seek-frame','999999');await viewer.click('#seek');assert.equal((await read()).cursor,before);
   await viewer.fill('#seek-frame',String(length));await viewer.click('#seek');
@@ -79,6 +81,24 @@ if(stress)harness=harness.replace('frame===120?512:frame===165?1024:32|direction
   }else await viewer.waitForFunction(()=>th05CoopReplayQA.read().completed||th05CoopReplayQA.read().error,null,{timeout:60000});
   report.eof=await read();assert.equal(report.eof.error,null);assert.equal(report.eof.cursor,length);assert.equal(await viewer.isVisible('#completed'),true);
   if(!stress){
+   // Corrupt the first proof inside a slice: checking only its final proof
+   // would miss this. Production Worker must reject before acknowledging it.
+   const corrupt=await context.newPage();
+   await corrupt.addInitScript(()=>{
+    const post=Worker.prototype.postMessage;
+    Worker.prototype.postMessage=function(data,...args){
+     if(data?.type==='history-slice'){data.rows[0].gameHash^=1;window.corruptedFrame=data.frame+1;}
+     return post.call(this,data,...args);
+    };
+   });
+   await corrupt.goto(base+'/coop-replay.html?qa=1');await corrupt.setInputFiles('#file',file);
+   await corrupt.click('#play');await corrupt.click('#pause');
+   await corrupt.waitForFunction(()=>th05CoopReplayQA.read().ready,null,{timeout:60000});
+   await corrupt.fill('#seek-frame','600');await corrupt.click('#seek');
+   await corrupt.waitForFunction(()=>!!th05CoopReplayQA.read().error,null,{timeout:60000});
+   report.corruptSlice=await corrupt.evaluate(()=>({state:th05CoopReplayQA.read(),frame:corruptedFrame}));
+   assert.match(report.corruptSlice.state.error,new RegExp('第 '+report.corruptSlice.frame+' 同步帧校验不一致：gameHash'));
+   await corrupt.close();
    // Real playback, but deliberately deliver already verified inputs in a
    // burst: passive following must keep audio and 1x pacing until Live is clicked.
    const id=await source.evaluate(async bytes=>{
