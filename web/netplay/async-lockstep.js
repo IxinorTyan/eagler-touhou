@@ -4,7 +4,18 @@ const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 // Page owns the queue and transport; a single awaited transaction owns guest
 // execution. Never commit audio/hash/history from a branch invalidated in flight.
 export class AsyncLockstep extends Lockstep {
-  constructor(options){super(options);this.execute=options.execute;}
+  constructor(options){super(options);this.execute=options.execute;this.replaySlice=options.replaySlice;}
+  planReplay(){
+    const cursor=Object.create(this.queue),plans=[];
+    let previous=[...this.checkpoints].at(-1);
+    for(;cursor.frame<this.replayUntil&&plans.length<4;cursor.frame++){
+      const inputs=cursor.peek();if(!inputs)break;
+      const frame=cursor.frame,capture=cursor.active&&frame>=cursor.confirmed&&(previous===undefined||frame-previous>=this.snapshotStride);
+      plans.push({frame,inputs,capture,hash:(frame+1)%120===0,end:frame+1===this.replayUntil});
+      if(capture)previous=frame;
+    }
+    return plans;
+  }
   reconcile(){
     const q=this.queue,remote=q.slot^1;q.dirty=null;
     for(const [at,pair]of q.used)if(!same(pair[remote],q.predicted(remote,at)))q.dirty=q.dirty===null?at:Math.min(q.dirty,at);
@@ -29,6 +40,7 @@ export class AsyncLockstep extends Lockstep {
   }
   async pump(now=performance.now()){
     if(!this.running||this.pumping)return;this.pumping=true;
+    let replayProgress=false,replayWaiting=false;
     try{
       now=Math.max(now,this.last);this.budget+=now-this.last;this.last=now;
       this.budget=this.budget>=TICK_MS*4?TICK_MS:Math.min(this.budget,TICK_MS*2);
@@ -63,7 +75,25 @@ export class AsyncLockstep extends Lockstep {
       if(this.queue.dirty!==null)return;
       if(!await confirm()||!this.running)return;
       while(this.replayUntil!==null&&this.queue.frame<this.replayUntil&&steps<4&&(steps===0||performance.now()-started<6)){
-        if(!await simulate(this.queue.frame+1<this.replayUntil,true))break;this.costs.replays++;
+        if(this.replaySlice){
+          const plans=this.planReplay();
+          if(!plans.length){this.nextInputs(true);replayWaiting=true;break;}
+          const at=performance.now(),outcome=await this.replaySlice(this.queue.frame,plans);if(!this.running)return;
+          if(!Number.isInteger(outcome?.applied)||outcome.applied<1||outcome.applied>plans.length||!Array.isArray(outcome.records)||outcome.records.length!==outcome.applied)throw Error('TH03 回滚补算返回边界异常');
+          for(let index=0;index<outcome.applied;index++){
+            const plan=plans[index],record=outcome.records[index];
+            if(record.frame!==plan.frame)throw Error('TH03 回滚补算记录帧异常');
+            if(plan.capture){this.checkpoints.add(plan.frame);this.costs.captures++;this.costs.capture+=record.captureMs||0;}
+            this.queue.commit(plan.inputs);steps++;this.costs.steps++;this.costs.replays++;
+            if(plan.hash){this.pendingHashes.set(plan.frame+1,record.hash);this.costs.hash+=record.hashMs||0;}
+            this.recorder?.stage(plan.frame,{inputs:plan.inputs,offlineMask:0,proof:record.proof,hash:plan.hash?record.hash:null});
+          }
+          this.costs.simulate+=performance.now()-at;this.lastProgress=performance.now();this.reconcile();replayProgress=true;
+          if(this.queue.dirty!==null||!await confirm()||!this.running)return;
+          if(outcome.applied<plans.length)break;
+          continue;
+        }
+        if(!await simulate(this.queue.frame+1<this.replayUntil,true)){replayWaiting=true;break;}this.costs.replays++;replayProgress=true;
         if(this.queue.dirty!==null||!await confirm()||!this.running)return;
       }
       if(this.replayUntil!==null&&this.queue.frame>=this.replayUntil)this.replayUntil=null;
@@ -79,7 +109,7 @@ export class AsyncLockstep extends Lockstep {
       if(this.replayUntil===null)this.present?.();
     }catch(error){this.fail(error);}finally{
       this.pumping=false;
-      if(this.running){this.schedule();this.wake(this.queue.dirty!==null?0:this.replayUntil!==null?16:Math.max(1,TICK_MS-this.budget-(performance.now()-this.last)));}
+      if(this.running){this.schedule();this.wake(this.queue.dirty!==null?0:this.replayUntil!==null?(replayProgress&&!replayWaiting?0:16):Math.max(1,TICK_MS-this.budget-(performance.now()-this.last)));}
     }
   }
 }

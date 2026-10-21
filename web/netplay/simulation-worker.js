@@ -36,6 +36,19 @@ async function dispatch(method,args){
     if(options.hash){const at=performance.now();hash=simulation.hash();hashMs=performance.now()-at;}
     return {hash,captureMs,hashMs,simulateMs,proof:simulation.proof()};
   }
+  if(method==='replay-slice'){
+    const [frame,plans]=args;
+    if(!Number.isSafeInteger(frame)||frame<0||!Array.isArray(plans)||!plans.length||plans.length>4||plans.some((plan,index)=>!plan||plan.frame!==frame+index||!Array.isArray(plan.inputs)))throw Error('TH03 回滚补算批次无效');
+    const started=performance.now(),records=[];let exited=false;
+    for(const plan of plans){
+      if(records.length&&performance.now()-started>=6)break;
+      // Reuse the ordinary atomic capture/step/hash path and retain the proof
+      // at each boundary, even when a slice crosses a checksum interval.
+      records.push({frame:plan.frame,...await dispatch('execute',[plan.inputs,{...plan,replay:!plan.end}])});
+      if(emulator.state==='exited'){exited=true;break;}
+    }
+    return {applied:records.length,records,exited,sliceMs:performance.now()-started};
+  }
   if(method==='restore')return simulation.restore(...args);
   if(method==='confirm'){simulation.confirm(...args);return;}
   if(method==='hash')return simulation.hash();

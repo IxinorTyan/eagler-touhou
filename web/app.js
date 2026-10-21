@@ -568,9 +568,9 @@ $('start').addEventListener('click', async () => {
         nativePause.reset(); reflectState(); save();
       }};
     const useWorker=!online&&netQuery.get('runtime')!=='main'&&supportsSoloWorker();
-    // Opt in until the owner completes real-game/device validation. Both
-    // backends retain the same resource identity and accepted input policy.
-    const useNetworkWorker=online&&netQuery.get('netWorker')==='1'&&supportsNetworkWorker();
+    // Keep simulation off the page by default, with an explicit main-thread
+    // compatibility option using the same resources and input policy.
+    const useNetworkWorker=online&&netQuery.get('netWorker')!=='0'&&supportsNetworkWorker();
     emulator=useNetworkWorker?await WorkerNetworkSimulation.create(config,{patch:nativePause.meta,music:networkAudio,
       focusEnabled:roomFocusEnabled,touchUnlimitedAllowed:roomTouchUnlimitedAllowed,fullHash:netQuery.get('fullHash')==='1'})
       :useWorker?await WorkerNP21.create(config,{game:'03local',patch:nativePause.meta,music:(await nativeAssets()).meta.startup.music,onError:report}):await DOSBoxPC98.create(config);
@@ -627,7 +627,7 @@ $('start').addEventListener('click', async () => {
       await replayRecorder.boot({settings:{language:activeLang,difficulty:$('difficulty').value,clock:$('clock').value,rollback:rollbackEnabled,focusEnabled:roomFocusEnabled,touchUnlimitedAllowed:roomTouchUnlimitedAllowed,hostSeat:roomHostSeat},players:2,hostSlot:roomHostSeat,opening:syncIdentity});
       if(netQuery.get('role')==='host')replayRecorder.connectNetwork({room:netQuery.get('room'),token:netQuery.get('token')});
       const options={recorder:replayRecorder,proof:()=>battleProof(emulator,nativePause,controls,nativeMusic,pauseSeat,pauseSelection,hiddenSeats),network:netplay,rollbackEnabled,inputDelay:inputPolicy.inputDelay,snapshotStride:2,onError:report,onState:message=>status(message)};
-      sync=emulator.isNetworkWorker?new AsyncLockstep({...options,execute:(inputs,frame)=>emulator.execute(inputs,frame),restore:frame=>emulator.restore(frame),
+      sync=emulator.isNetworkWorker?new AsyncLockstep({...options,execute:(inputs,frame)=>emulator.execute(inputs,frame),replaySlice:(frame,plans)=>emulator.replaySlice(frame,plans),restore:frame=>emulator.restore(frame),
         confirm:(prefix,retain)=>emulator.confirm(prefix,retain),present:()=>emulator.present(presentationDue)})
         :new Lockstep({...options,step:stepSynchronized,present:()=>{if(presentationDue(performance.now()))presentFrame();},hash:syncHash,capture:captureSynchronized,restore:restoreSynchronized,confirm:confirmSynchronized});
     }

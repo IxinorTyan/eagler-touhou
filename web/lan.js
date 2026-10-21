@@ -12,7 +12,7 @@ let preloadKey='',preloadPromise=null,preloadGeneration=0,preloadRetryAt=0;
 onBgmVersion(()=>{if(session&&state&&!state.started)prepareRoomAssets(state).catch(()=>{});});
 const query = new URLSearchParams(location.search);
 const networkRuntime=$('network-runtime');
-try{networkRuntime.value=query.has('netWorker')?(query.get('netWorker')==='1'?'worker':'main'):(localStorage.getItem('th03-network-runtime')||'main');}catch{}
+try{networkRuntime.value=query.has('netWorker')?(query.get('netWorker')==='0'?'main':'worker'):(localStorage.getItem('th03-network-runtime')||'worker');}catch{networkRuntime.value='worker';}
 if(networkRuntime.value!=='worker')networkRuntime.value='main';
 if(!supportsNetworkWorker()){networkRuntime.value='main';networkRuntime.querySelector('[value="worker"]').disabled=true;}
 networkRuntime.onchange=()=>{try{localStorage.setItem('th03-network-runtime',networkRuntime.value);}catch{}};
@@ -106,7 +106,7 @@ async function launch() {
   runtime={stop(){globalThis.th03RoomHost.stopped=true;globalThis.th03RoomHost.runtime?.stop();}};
   const params=new URLSearchParams({net:state.mode,room:session.room,token:session.token,role:session.role,
     language:state.settings.language,difficulty:state.settings.difficulty,clock:state.settings.clock,rollback:state.settings.rollback?'1':'0'});
-  if(networkRuntime.value==='worker')params.set('netWorker','1');
+  params.set('netWorker',networkRuntime.value==='worker'?'1':'0');
   const response=await fetch(new URL('local.html',import.meta.url),{cache:'no-store'});
   if(globalThis.th03RoomHost.stopped)return;
   if(!response.ok)throw Error('游戏界面加载失败');

@@ -69,6 +69,7 @@ export class WorkerNetworkSimulation {
     this.call('present').then(drawn=>{if(drawn)this.presentedKey=key;}).catch(error=>{if(!this.closed)this.fail(error);}).finally(()=>{this.presentPending=false;});
   }
   execute(inputs,options){return this.call('execute',[inputs,options]);}
+  replaySlice(frame,plans){return this.call('replay-slice',[frame,plans]);}
   restore(frame){return this.call('restore',[frame]);}
   confirm(prefix,retainFrom){return this.call('confirm',[prefix,retainFrom]);}
   hash(){return this.call('hash');}
