@@ -14,15 +14,17 @@
     "replay/tape.js": "41a13da39fdf885f6a2e464394c855b6ca032239dcf2615ea98561bdac5dbf68",
     "replay/profile.js": "ce49377d7289a1fb53fd3202fd991c33b4c061867c7c3f36ad67347912415a43",
     "replay/sha256.js": "9cb7be2bc039bcea2a4d727ef98bcd9047a78dfd4c11950355723147423e1f43",
-    "netplay/session.js": "5ac3986b19eb0e556c4609682aa9e702d9ac2b3b45bbb6a08dcb68bd8e17bc6c",
+    "netplay/session.js": "20cf2950c0e353e10216db5ba4a9f6626f5b8cf30821e93bd7546d88193d4963",
     "netplay/queue.js": "5a488cd5c1b11fb9cd094408465b6a85d0a1091a07d76596f6f3371a8247c26b",
     "netplay/connection.js": "1e5fd3ebc19aee23175cc5531df65f6ac19e2e6ef5455214792f822458965a44",
     "netplay/udp-config.js": "6a04c0244c0912b8c6235dbca15d0943eda0218a5f281be688dec41191af0a5f",
     "netplay/network-mode.js": "b20d401de873b0930dff3c971fdb7b7f13f3969879976e4bfd6cc2c50fd5c533",
     "netplay/relay.js": "967e09da2690df2a733ce2e7f8393a16620cb263a447fa4df192657927a12d50",
     "netplay/sha256.js": "9cb7be2bc039bcea2a4d727ef98bcd9047a78dfd4c11950355723147423e1f43",
-    "netplay/app.js": "93f2bc4abbc20e360ba27db830b9ce8c5b887be2fce9a37e80602c2631a4f6a3",
+    "netplay/app.js": "2ecc03aa43021a18a469d666d825dc986c556df58b58b8aecdbbef01271114d0",
     "netplay/audio.js": "a308a202d78f749dc2249d2b77ef8314514a883db15aacc4364db37d5b73259c",
-    "netplay/renderer.js": "c168aa8ac078b9144b57ef4323cb3cebc5ab091120ba99cc807bf9ec41427ea2"
+    "netplay/renderer.js": "c168aa8ac078b9144b57ef4323cb3cebc5ab091120ba99cc807bf9ec41427ea2",
+    "netplay/simulation-worker.js": "353897a1f799600f2b71b59860ffb4cf2141ab186edf782c082b48d4330b83ac",
+    "netplay/runtime-worker-client.js": "4a0c4da6380d1a70634d0bbb1ab309f4d51e44cb4dc5d611d6637cced0ad30c2"
   }
 }

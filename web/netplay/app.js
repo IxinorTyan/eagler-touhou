@@ -136,7 +136,7 @@ async function leave(mode=room?.settings||config()){
 $('leave').onclick=$('retry').onclick=()=>action(()=>leave());
 $('retry-ws').onclick=()=>action(()=>leave({...room.settings,transport:'ws',ice:'all'}));
 $('pause-game').onclick=()=>tap(128);$('continue-game').onclick=()=>{commands|=256;wake();};
-$('sound').onclick=()=>action(async()=>{if(!session?.game.core)throw Error('游戏尚未加载');await session.game.unlockAudio();$('canvas').focus();});
+$('sound').onclick=()=>action(async()=>{if(!session?.game.state())throw Error('游戏尚未加载');await session.game.unlockAudio();$('canvas').focus();});
 $('music-volume').oninput=()=>session?.game.setMusicVolume(Number($('music-volume').value)/100);
 $('canvas').onpointerdown=()=>{$('canvas').focus();void session?.game.unlockAudio().catch(()=>{});};
 $('fullscreen').onclick=()=>action(async()=>{if(document.fullscreenElement)await document.exitFullscreen();else await $('screen').requestFullscreen();});

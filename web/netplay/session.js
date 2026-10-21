@@ -1,6 +1,7 @@
 import {PROTOCOL,FrameQueue} from './queue.js';
 import {createRecorder} from '../replay/recorder.js';
 import {GameRuntime} from './runtime.js';
+import {WorkerGameRuntime,supportsSimulationWorker} from './runtime-worker-client.js';
 import {createRelay} from './relay.js';
 import {loadRtcConfiguration,refreshRtcPath,countIceCandidate,describeIceCandidates,recordIceServerError,describeRtcConfiguration} from './connection.js';
 import {deploymentIceConfiguration} from './udp-config.js';
@@ -16,7 +17,8 @@ export class NetSession{
     this.remotes=this.roles.filter(r=>r!==identity.role);this.links=identity.role==='host'?this.remotes:['host'];
     this.slot=room.seats[identity.role];this.peers=new Map();
     this.hellos=new Map();this.acks=new Set();this.sentHello=new Set();this.sentAck=new Set();
-    this.game=new GameRuntime(canvas,room.seats.host,this.slot);
+    const worker=new URLSearchParams(location.search).get('netWorker')!=='0'&&supportsSimulationWorker();
+    this.game=new (worker?WorkerGameRuntime:GameRuntime)(canvas,room.seats.host,this.slot);
     this.recorder=createRecorder(document.querySelector('.toolbar'));globalThis.th01Replay=this.recorder;
     this.game.onFailure=e=>this.fail(e);
     this.autoBuffer=room.settings.delay===0;
@@ -257,7 +259,7 @@ export class NetSession{
     this.performanceSample={at:this.lastAdvance,frame:this.game.frame,draws:this.game.displayFrames||0,visible:!document.hidden};
     this.timer=setInterval(()=>this.pump(),4);
   }
-  pump(){
+  async pump(){
     if(this.closed||!this.running||this.pumping)return;
     this.pumping=true;
     try{
@@ -266,8 +268,8 @@ export class NetSession{
       this.recordWait(now);
       if(document.hidden)return;
       this.waitKind=null;
-      let budget=4;
-      while(now>=this.nextTick&&budget-->0){
+      let budget=4;const started=performance.now();
+      while(now>=this.nextTick&&budget-->0&&(budget===3||performance.now()-started<6)){
         // Do not consume short taps while this immutable frame is already sampled.
         if(!this.queue.lanes[this.slot].has(this.queue.frame+this.queue.delay)){
           const packet=this.queue.capture(this.buttons());if(packet)this.send(packet);
@@ -278,7 +280,9 @@ export class NetSession{
         if(this.waitHash){this.waitKind='hash';this.nextTick=Math.max(this.nextTick,now-TICK);break;}
         const inputs=this.queue.peek();
         if(!inputs){this.waitKind='input';this.nextTick=Math.max(this.nextTick,now-TICK);break;}
-        const recordedFrame=this.queue.frame;this.game.step(inputs);
+        const recordedFrame=this.queue.frame;
+        if(this.game.asyncExecution)await this.game.execute(inputs,recordedFrame);else this.game.step(inputs);
+        if(this.closed)return;
         this.recorder.stage(recordedFrame,{inputs,offlineMask:0,proof:this.game.replayProof(),hash:(recordedFrame+1)%120===0?this.game.checksum():null});
         this.recorder.confirm(recordedFrame+1,false);this.queue.commit();this.lastAdvance=performance.now();this.nextTick+=TICK;
         if(this.nextTick<now-4*TICK)this.nextTick=now;
