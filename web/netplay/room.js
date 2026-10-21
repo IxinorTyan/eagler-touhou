@@ -47,6 +47,7 @@ function completeNativeBoundary(){nativeBusy=false;for(const action of boundaryA
 let pumping=false,lastNow=0,accumulator=0,lastUi=0,lastMeasure=0,measureFrame=0;
 let stepCost=0,stepCount=0,maxCost=0,hz=0,averageCost=0,peakCost=0,inputAge=0,lastApplied=0,receivedInputs=0;
 const newCosts=()=>({capture:0,captures:0,simulate:0,steps:0,present:0,presentations:0,hash:0,restore:0,restores:0,confirm:0,replay:0,replays:0,lead:0});
+const REPLAY_MAX_STEPS=4;
 let costs=newCosts(),measuredCosts=newCosts(),waitDetail='',earlyInputs=0;
 // Local observations only; never read by the deterministic input queue.
 const stalls={events:[],waits:0,waitMs:0,maxWaitMs:0,maxPumpGapMs:0};
@@ -808,23 +809,36 @@ function captureLocalInput(){
   player.consume();inputLatch.consume();
   pendingAction=0;captureTimes.set(captured.frame,performance.now());broadcast(captured);return true;
 }
-function nextInputs(){
+function nextInputs(source=queue,report=source===queue){
   // Do not let the faster peer speculate beyond the direction predictor's
   // useful horizon. Otherwise a held direction expires and every arriving
   // input invalidates a long tail. Keep the full rollback history unchanged.
-  const leadLimit=Math.max(1,queue.directionPrediction);
-  if(queue.active&&queue.frame>=queue.confirmed+leadLimit){
-    waitDetail=`等待对端输入 · 预测领先 ${queue.frame-queue.confirmed}/${leadLimit} 步`;
+  const leadLimit=Math.max(1,source.directionPrediction);
+  if(source.active&&source.frame>=source.confirmed+leadLimit){
+    if(report)waitDetail=`等待对端输入 · 预测领先 ${source.frame-source.confirmed}/${leadLimit} 步`;
     return null;
   }
-  const allowed=runtime.canPredict(),pair=queue.peek(allowed);
+  const allowed=runtime.canPredict(),pair=source.peek(allowed);
   // Close before clearing the reason, so the recovered event keeps its lane.
-  if(pair){endInputWait();waitDetail='';return pair;}
+  if(pair){if(report){endInputWait();waitDetail='';}return pair;}
+  if(!report)return null;
   const missing=queue.inputs.flatMap((lane,slot)=>queue.isOffline(slot,queue.frame)||lane.has(queue.frame)?[]:[`P${slot+1}${[...peers.values()].some(p=>state.slots[p.role]===slot&&p.hidden)?'（页面在后台）':''}`]);
   const reasons={window:`预测窗口已满（${MAX_ROLLBACK} 步）`,boot:'启动阶段等待真实输入',
     'prediction-disabled':`禁止预测：${runtime.predictionBlockReason()}`,'local-input':'本步本机输入尚未采样'};
   waitDetail=`${reasons[queue.waitReason]||'等待真实输入'} · 当前步缺 ${missing.join('、')||'无'} · 连续输入确认到 ${queue.confirmed}`;
   return null;
+}
+function planReplay(target){
+  // Planning must leave the live history untouched while authority arrives.
+  const cursor=Object.create(queue),plans=[];
+  for(;cursor.frame<target&&plans.length<REPLAY_MAX_STEPS;cursor.frame++){
+    const pair=nextInputs(cursor,false);if(!pair)break;
+    const frame=cursor.frame;
+    plans.push({frame,inputs:pair,authoritative:cursor.inputs.every((lane,slot)=>cursor.isOffline(slot,frame)||lane.has(frame)),
+      offlineMask:cursor.offlineMask(frame),capture:cursor.active&&frame>=cursor.confirmed,
+      hash:(frame+1)%120===0,end:frame+1===target});
+  }
+  return plans;
 }
 function updateMetrics(now,waiting){
   const span=now-lastMeasure;
@@ -885,10 +899,32 @@ async function pump(now){
     }
     if(queue.dirty!==null||membership){wake();return;}
     while(queue.frame<replayUntil&&count<4&&(count===0||performance.now()-budgetStart<6)){
-      const pair=nextInputs();if(!pair){waiting=true;break;}
-      endInputWait();const replayAt=performance.now();
-      await simulate(pair,queue.frame+1<replayUntil);if(stopped)return;resimulated++;count++;
-      costs.replay+=performance.now()-replayAt;costs.replays++;
+      if(runtime.asyncExecution){
+        const plans=planReplay(replayUntil);
+        if(!plans.length){waiting=true;nextInputs();break;}
+        const replayAt=performance.now();nativeBusy=true;
+        const outcome=await runtime.replaySlice(queue.frame,plans);if(stopped)return;
+        if(!Number.isInteger(outcome?.applied)||outcome.applied<0||outcome.applied>plans.length||!Array.isArray(outcome.records)||outcome.records.length!==outcome.applied)throw Error('Worker 回滚补算返回边界异常');
+        for(let index=0;index<outcome.applied;index++){
+          const plan=plans[index],record=outcome.records[index];
+          if(record.frame!==plan.frame)throw Error('Worker 回滚补算记录帧异常');
+          replayRecorder.stage(plan.frame,{inputs:plan.inputs,offlineMask:plan.offlineMask,proof:record.proof,hash:record.hash});
+          queue.commit(plan.inputs);resimulated++;count++;
+          if(record.hash)pendingHashes.set(plan.frame+1,{...record.hash,boot:record.ready});
+          maxCost=Math.max(maxCost,record.stepMs);
+        }
+        if(outcome.applied)endInputWait();
+        if(queue.active)queue.refreshCorrection(true);
+        completeNativeBoundary();
+        const elapsed=performance.now()-replayAt;costs.simulate+=elapsed;costs.steps+=outcome.applied;costs.replay+=elapsed;costs.replays+=outcome.applied;
+        stepCost+=elapsed;stepCount+=outcome.applied;costs.lead=Math.max(costs.lead,queue.frame-queue.confirmed);
+        if(outcome.applied<plans.length){waiting=outcome.blocked;break;}
+      }else{
+        const pair=nextInputs();if(!pair){waiting=true;break;}
+        endInputWait();const replayAt=performance.now();
+        await simulate(pair,queue.frame+1<replayUntil);if(stopped)return;resimulated++;count++;
+        costs.replay+=performance.now()-replayAt;costs.replays++;
+      }
       if(queue.dirty!==null||membership)break;
     }
     // Never confirm or present a branch that changed while the worker ran.

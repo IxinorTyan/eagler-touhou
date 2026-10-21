@@ -6,7 +6,7 @@ export function installFramePresenter(mod,{deferred=false,isReplaying=()=>false}
   if(!gl||mod.glfx)throw Error('TH04 画面呈现需要 PC-98 2D WebGL 上下文');
   const metrics={mode:deferred?'batch':'direct',submitted:0,uploaded:0,drawn:0,repeated:0,replaySubmitted:0,coalesced:0,restores:0};
   const gaps=new Float64Array(512);
-  let gapCount=0,gapCursor=0,lastDraw=null,latest=null,dirty=false,disposed=false;
+  let gapCount=0,gapCursor=0,lastDraw=null,latest=null,dirty=false,disposed=false,intervalStats=null;
   let width=0,height=0;
   function shader(type,source){
     const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);
@@ -60,7 +60,7 @@ export function installFramePresenter(mod,{deferred=false,isReplaying=()=>false}
     // changes, redraw the retained texture before drawImage in this same task.
     gl.drawArrays(gl.TRIANGLES,0,6);dirty=false;metrics.drawn++;
     const now=performance.now();
-    if(lastDraw!==null){gaps[gapCursor]=now-lastDraw;gapCursor=(gapCursor+1)%gaps.length;gapCount=Math.min(gapCount+1,gaps.length);}
+    if(lastDraw!==null){gaps[gapCursor]=now-lastDraw;gapCursor=(gapCursor+1)%gaps.length;gapCount=Math.min(gapCount+1,gaps.length);intervalStats=null;}
     lastDraw=now;mod.observeFrameDraw?.(now);
     return true;
   }
@@ -76,11 +76,14 @@ export function installFramePresenter(mod,{deferred=false,isReplaying=()=>false}
     flush,
     capture:()=>latest?{...latest}:null,
     restore(saved){latest=saved?{...saved}:null;dirty=!!latest;metrics.restores++;},
-    resetTiming(){lastDraw=null;gapCount=gapCursor=0;},
+    resetTiming(){lastDraw=null;gapCount=gapCursor=0;intervalStats=null;},
     info(){
-      const sorted=Array.from(gaps.subarray(0,gapCount)).sort((a,b)=>a-b);
-      const percentile=p=>sorted.length?sorted[Math.ceil(sorted.length*p)-1]:null;
-      return {...metrics,pending:dirty,intervals:{count:gapCount,p95Ms:percentile(.95),p99Ms:percentile(.99),maxMs:sorted.at(-1)??null},
+      if(!intervalStats){
+        const sorted=Array.from(gaps.subarray(0,gapCount)).sort((a,b)=>a-b);
+        const percentile=p=>sorted.length?sorted[Math.ceil(sorted.length*p)-1]:null;
+        intervalStats={count:gapCount,p95Ms:percentile(.95),p99Ms:percentile(.99),maxMs:sorted.at(-1)??null};
+      }
+      return {...metrics,pending:dirty,intervals:{...intervalStats},
         intervalScope:'last 512 WebGL draw intervals; not physical screen refresh'};
     },
     dispose(){if(disposed)return;disposed=true;gl.deleteTexture(texture);gl.deleteBuffer(buffer);gl.deleteProgram(program);},

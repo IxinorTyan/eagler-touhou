@@ -49,6 +49,14 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    console.log('PASS room HTTP outage > 5 s while player channels keep running; recovery',players);
   }
   for(const page of pages)await page.evaluate(()=>window.qaDelay=65);
+  // Observe movement while the key remains held. Comparing only after five
+  // alternating holds can legitimately land back at the starting position.
+  for(const page of pages)await page.keyboard.down('ArrowRight');
+  let movement;
+  try{
+   await host.waitForFunction(start=>window.roomQA.read().s?.players.some((xy,i)=>Math.abs(xy[0]-start.players[i][0])>4),before.s,{timeout:20000});
+   movement=await host.evaluate(()=>window.roomQA.read());
+  }finally{for(const page of pages)await page.keyboard.up('ArrowRight');}
   for(let k=0;k<5;k++){
    for(let i=0;i<players;i++)await pages[i].keyboard.down(k%2?'ArrowLeft':'ArrowRight');
    await host.waitForTimeout(180);
@@ -60,14 +68,15 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
   // Save one common protocol checksum by observing the peers' confirmed hashes.
   for(const page of pages)await page.evaluate(()=>window.qaDelay=0);await host.waitForTimeout(3000);
   const final=await Promise.all(pages.map(p=>p.evaluate(()=>window.roomQA.read())));
+  console.log('rooms final',players,final.map(s=>({frame:s.frame,active:s.active,rollbacks:s.rollbacks,info:s.info})));
   for(const s of final){assert(s.running&&!s.stopped,s.stopReason);assert(s.frame>before.frame+50);assert(s.details.includes('相同状态步'));if(rollback)assert.equal(s.info.storage,'page undo');else assert(s.details.includes('回滚已关闭'));}
   const common=final[0].hashes.filter(h=>final.every(s=>s.hashes.some(other=>other.tick===h.tick)));assert(common.length,'common confirmed state');for(const h of common)for(const s of final)assert.equal(s.hashes.find(other=>other.tick===h.tick).hash,h.hash);
-  assert(moved[0].s.players.some((xy,i)=>Math.abs(xy[0]-before.s.players[i][0])>4),'native movement through room');
+  assert(movement.s.players.some((xy,i)=>Math.abs(xy[0]-before.s.players[i][0])>4),'native movement through room');
   await pages[1].keyboard.press('Escape',{delay:120});for(const page of pages)await page.waitForFunction(()=>window.roomQA.read().reason==='同步暂停菜单',{},{timeout:15000});
   await host.waitForTimeout(500);const paused=await host.evaluate(()=>window.roomQA.read());await host.waitForTimeout(300);assert.equal((await host.evaluate(()=>window.roomQA.read())).s.gameFrame,paused.s.gameFrame);
   await pages[1].keyboard.press('Escape',{delay:120});for(const page of pages)await page.waitForFunction(()=>window.roomQA.read().reason===''&&window.roomQA.read().s.gameFrame>100,{},{timeout:15000});await host.waitForTimeout(600);assert((await host.evaluate(()=>window.roomQA.read())).s.gameFrame>paused.s.gameFrame);
   let departed=null;if(players===3){await pages[2].close();const beforeDeparture=await host.evaluate(()=>window.roomQA.read());await host.waitForFunction(()=>!!(window.roomQA.read().offlineMask&1),{},{timeout:20000});await host.waitForTimeout(600);departed=await host.evaluate(()=>window.roomQA.read());assert(departed.running&&!departed.stopped);assert(departed.frame>beforeDeparture.frame);}
-  assert.deepEqual(errors,[]);reports.push({players,seats,before,outage,moved,final,commonHashes:common,paused,departed,errors});
+  assert.deepEqual(errors,[]);reports.push({players,seats,before,outage,movement,moved,final,commonHashes:common,paused,departed,errors});
   const downloadPromise=host.waitForEvent('download');await host.locator('[data-fault-download]').evaluate(b=>b.click());const download=await downloadPromise;
   const faultFile=path.resolve(__dirname,`../reports/room-fault-download-${players}p.json`);await download.saveAs(faultFile);const fault=JSON.parse(fs.readFileSync(faultFile));
   assert.equal(fault.schema,'touhou-network-fault/1');assert.equal(fault.runtime.cpu.nativeWarning.kind,'idle');assert(fault.runtime.game.gameFrame>100);

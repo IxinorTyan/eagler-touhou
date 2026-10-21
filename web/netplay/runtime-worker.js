@@ -4,6 +4,7 @@ const audioContext={sampleRate:44100,state:'running',currentTime:0,
  addEventListener(){},removeEventListener(){},resume:async()=>{},close:async()=>{}};
 let ready,stopped=false,loaded=false,frameSequence=0,sequence=0,played=0,replayMusic;
 const transfers=new Set();
+const REPLAY_MAX_STEPS=4,REPLAY_BUDGET_MS=6;
 globalThis.th04WorkerHost={canvas:new OffscreenCanvas(640,400),audioContext,
  captureAudioState:()=>({sequence,played,music:replayMusic.capture()}),restoreAudioState(saved){const events=replayMusic.restore(saved?.music);sequence=saved.sequence;played=saved.played;send({type:'replay-audio-reset',events,sequence});},
  notify:message=>{
@@ -18,8 +19,18 @@ globalThis.th04WorkerHost={canvas:new OffscreenCanvas(640,400),audioContext,
  },stop:()=>send({type:'se-stop'}),dispose(){},
  info:()=>({sequence,played,status:'浏览器音效：确认事件交给页面',loaded:17})}
 };
-function status(){const r=th04WorkerHost.runtime;return {game:r.snapshot(),proof:r.replayProof(),ready:r.readyForRollback(),reason:r.predictionBlockReason(),
- touch:r.touchContext(),rollback:r.rollbackInfo(),render:r.renderInfo(),diagnostics:r.diagnosticText(),fault:r.faultReport({cpu:false})};}
+let lastDiagnostics=-Infinity;
+function status(force=false){
+ const r=th04WorkerHost.runtime,now=performance.now();
+ // Control, prediction and replay proof must follow every completed command.
+ // UI-only diagnostics match the room's 250 ms refresh, including during replay.
+ const state={game:r.snapshot(),proof:r.replayProof(),ready:r.readyForRollback(),reason:r.predictionBlockReason(),touch:r.touchContext()};
+ if(force||now-lastDiagnostics>=250){
+  Object.assign(state,{rollback:r.rollbackInfo(),render:r.renderInfo(),diagnostics:r.diagnosticText(),fault:r.faultReport({cpu:false})});
+  lastDiagnostics=now;
+ }
+ return state;
+}
 function present(){
  if(transfers.size>=2)return false;
  if(!th04WorkerHost.runtime.present())return false;
@@ -38,10 +49,25 @@ onmessage=({data})=>{
    if(data.capture)r.capture(data.frame);
    r.step(data.inputs,{frame:data.frame,replay:data.replay,offlineMask:data.offlineMask});
    if(data.hash)result=r.checksum();
+  }else if(data.type==='replay-slice'){
+   if(!Array.isArray(data.plans)||!data.plans.length||data.plans.length>REPLAY_MAX_STEPS)throw Error('TH04 回滚补算批次无效');
+   if(!Number.isSafeInteger(data.frame)||data.frame<0||data.plans.some((plan,index)=>!plan||plan.frame!==data.frame+index||!Array.isArray(plan.inputs)||!Number.isInteger(plan.offlineMask)))throw Error('TH04 回滚补算帧顺序无效');
+   const sliceStarted=performance.now(),records=[];let applied=0,blocked=false,exited=false;
+   for(const plan of data.plans){
+    if(applied&&performance.now()-sliceStarted>=REPLAY_BUDGET_MS)break;
+    if(!plan.authoritative&&!r.canPredict()){blocked=true;break;}
+    const stepStarted=performance.now();
+    if(plan.capture)r.capture(plan.frame);
+    const outcome=r.step(plan.inputs,{frame:plan.frame,replay:!plan.end,offlineMask:plan.offlineMask});
+    const hash=plan.hash?r.checksum():null;
+    records.push({frame:plan.frame,proof:r.replayProof(),hash,ready:hash?r.readyForRollback():undefined,stepMs:performance.now()-stepStarted});applied++;
+    if(outcome==='exit'){exited=true;break;}
+   }
+   result={applied,records,blocked,exited,sliceMs:performance.now()-sliceStarted};
   }else if(data.type==='present')result=present();
   else if(data.type==='stop'){stopped=true;r.stop();return;}
   else {if(typeof r[data.type]!=='function')throw Error('Unknown TH04 worker command');result=await r[data.type](...data.args);}
-  send({type:'result',id:data.id,result,status:status(),executionMs:performance.now()-started});
+  send({type:'result',id:data.id,result,status:status(['load','start','replayLoad','faultReport'].includes(data.type)),executionMs:performance.now()-started});
  }).catch(error=>{
   stopped=true;let fault;try{fault=th04WorkerHost.runtime?.faultReport();}catch{/* Preserve the command failure. */}
   send({type:'error',id:data.id,message:error.stack||String(error),fault});

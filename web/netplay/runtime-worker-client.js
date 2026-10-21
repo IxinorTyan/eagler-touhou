@@ -60,7 +60,7 @@ async function load(config){
    const pending=requests.get(data.id);requests.delete(data.id);pending?.reject(Error(data.message));fatal(data.message);return;
   }
   if(data.type!=='result')return;
-  cache=data.status;executionMs=data.executionMs;const pending=requests.get(data.id);requests.delete(data.id);pending?.resolve(data.result);
+  Object.assign(cache,data.status);executionMs=data.executionMs;const pending=requests.get(data.id);requests.delete(data.id);pending?.resolve(data.result);
  };
  const result=await request('load',[],{settings:config,configure:configuration});
  await request('setRawPresentation',[raw]);await request('setPointPreferences',[points]);return result;
@@ -79,6 +79,11 @@ const sync={
   const result=await request('execute',[],{inputs,frame,replay,offlineMask,capture,hash});if(hash)check=result;return result;
  },
  capture:frame=>request('capture',[frame]),step:(inputs,options)=>request('step',[inputs,options]),restore:frame=>request('restore',[frame]),
+ async replaySlice(frame,plans){
+  const result=await request('replay-slice',[],{frame,plans});
+  for(const record of result.records||[])if(record.hash)check=record.hash;
+  return result;
+ },
  async confirm(prefix){if(prefix<=acknowledgedPrefix)return;const result=await request('confirm',[prefix]);acknowledgedPrefix=Math.max(acknowledgedPrefix,prefix);return result;},
  replayProof:()=>cache.proof,checksum:()=>check,snapshot:()=>cache.game??null,
  present(){if(presentPending||stopped||!worker)return false;presentPending=true;request('present').catch(e=>{if(!stopped)fatal(e.message);}).finally(()=>{presentPending=false;});return true;},
