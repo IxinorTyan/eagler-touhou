@@ -43,9 +43,9 @@
     "netplay/network-mode.js": "dda8c24274cb84bf50aa50ca9405ffa8d707f9567137cb80cb2133ea45fb019b",
     "netplay/relay.js": "8189520a9dd4b8900bfb76065787056234ad1a4331b021d99cafe2652251aacf",
     "netplay/rollback-queue.js": "628ff59b0ecad48fffd57021c50307a7d15b054496c03a3eda765a8409508ab7",
-    "netplay/room.js": "915d3d2e2305c9183936c462a58b7e6ea47d8be8ca37e06bdefbe892022bc34a",
-    "netplay/runtime-worker-client.js": "346cd33e1292567d93acd2012f5b693b4a1d9f26e89236adce31858c4953f83d",
-    "netplay/runtime-worker.js": "61132cd0551d17c4ccd3c9ca683df47a95bc1b019182ae875ab4fb7cf2c8ee60",
+    "netplay/room.js": "b14f1a61b1e222a6f002144162e534ef70b41709c0b7a9698c45372ba14a7be6",
+    "netplay/runtime-worker-client.js": "a4203f3ddc6f3fb7ef1b097871197e9fd49a8886d2b007dd4bc080ee4c3a744d",
+    "netplay/runtime-worker.js": "2bf997177c62ec47170b1eeb7d27d50633a4a84687fca714aff03bbf4733c292",
     "netplay/runtime.html": "e2c5a129ac58cfc4824fc14e8b33fe036f548ec3621249734f06ab2568f70028",
     "netplay/runtime.js": "daeeb200e46d667551e7f05e4b9f28084b0689c22f285a83a6cb1c0a37f0ad91",
     "netplay/sha256.js": "9cb7be2bc039bcea2a4d727ef98bcd9047a78dfd4c11950355723147423e1f43",
@@ -119,5 +119,5 @@
       "sha256": "271ca7dbe31ef4f7bd8657c91332d534f634b4e0b52f536f940fa21f3fcc5ef7"
     }
   },
-  "build": "a8895b6c35b9fff2aca1f2808163e0fb4582659c944b6ee8a4285b1a50ca16dd"
+  "build": "eaa94aa1a026c6d280a72422247e51f8520eb494c03a8d56f6c559d86920c00e"
 }
