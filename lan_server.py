@@ -1,3 +1,4 @@
+import replay_history
 """TH01 two/three-seat rooms, trickle ICE signaling and authenticated WS relay."""
 import argparse
 import json
@@ -141,6 +142,7 @@ class Handler(AssetHandler):
         return code, room, role
 
     def do_GET(self):
+        if replay_history.handle_get(self): return
         url = urlsplit(self.path)
         if url.path == '/relay':
             relay_server.handle(self, ROOMS, LOCK, ROLES, TTL)
@@ -165,6 +167,7 @@ class Handler(AssetHandler):
             super().do_GET()
 
     def do_POST(self):
+        if replay_history.handle_post(self, ROOMS, LOCK, '01', lambda r: time.monotonic()-r['seen']['host']>TTL): return
         origin = urlsplit(self.headers.get('Origin', ''))
         if origin.scheme not in ('http', 'https') or origin.netloc != self.headers.get('Host'):
             self.close_connection = True

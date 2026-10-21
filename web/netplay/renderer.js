@@ -24,7 +24,7 @@ self.onmessage=async({data})=>{
     const offset=snapshotBefore.length;
     if(offset)snapshotBefore.set(new Uint8Array(data.snapshot,0,offset));
     snapshotAfter.set(new Uint8Array(data.snapshot,offset));
-    core.th_render();context.putImageData(image,0,0);
+    core.th_render_for_slot(Number.isInteger(data.localSlot)?data.localSlot:-1);context.putImageData(image,0,0);
     const bitmap=context.canvas.transferToImageBitmap(),cost=performance.now()-started;
     self.postMessage({type:'frame',frame:data.frame,snapshot:data.snapshot,bitmap,cost},[data.snapshot,bitmap]);
   }catch(error){self.postMessage({type:'error',message:error.message||String(error)});}

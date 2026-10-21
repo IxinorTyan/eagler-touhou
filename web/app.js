@@ -2,6 +2,8 @@ import {loadMusicTrack} from './bgm-track.js';
 import {onBgmVersion} from './bgm-version.js';
 import {populateStages,stageLabel,stageSelection,applyStage} from './stage-select.js';
 import {musicRoomTracks} from './music-room.js';
+import {createRecorder} from './replay/recorder.js';
+import {NativeLocalSimulation,nativeLocalOpening,localExportFacade} from './replay/native-local-core.js';
 const $=id=>document.getElementById(id);
 const solo=document.body.dataset.page==='solo';
 populateStages($('startStage'));
@@ -25,6 +27,14 @@ let core,paused=false,last=0,accumulator=0,steps=0,logicMs=0,drawMs=0,draws=0,st
 let musicContext,musicBuffer,musicSource,musicGain,musicEnabled=false,musicWanted=true,musicRequest,musicLoop;
 let musicTrack=null;
 let scoreRevision=0,scoreSaveFailed=false,formalScores;
+let nativeRecorder,nativeRecording,nativeRaw,starting=false;
+function recordNativeCommand(command){
+  if(!nativeRecording)return;
+  try{
+    nativeRecording.consumed();const frame=nativeRecording.frame-1;
+    nativeRecorder.stage(frame,{inputs:[command],offlineMask:0,proof:JSON.stringify(nativeRecording.checksum()),hash:(frame+1)%120===0?nativeRecording.checksum():null});nativeRecorder.confirm(frame+1,false);
+  }catch(error){nativeRecorder?.finish('原生录像停止：'+error.message);nativeRecording=null;}
+}
 function restoreFormalScores(){if(formalScores){new Uint8Array(core.memory.buffer,core.th_score_data(),formalScores.length).set(formalScores);core.th_score_load(formalScores.length);}}
 function loadScores(){
   try{const saved=localStorage.getItem('th01-native-scores-v1');if(saved){const data=Uint8Array.from(atob(saved),c=>c.charCodeAt(0));
@@ -258,11 +268,20 @@ $('elisPreview').onclick=()=>{previewBoss(15,0);$('game').focus({preventScroll:t
 $('kikuriPreview').onclick=()=>{previewBoss(15,1);$('game').focus({preventScroll:true});};
 $('yuugenPreview').onclick=()=>{previewBoss(10,0);$('game').focus({preventScroll:true});};
 if(matchMedia('(pointer:coarse)').matches)$('touch').classList.add('visible');
-function begin(){
-  if(!core)return;
+async function begin(){
+  if(!core||starting)return;starting=true;
+    try{
   const saved={};for(const id of ['players','orbs','difficulty','startStage'])saved[id]=$(id).value;
   for(const id of ['compensation','reducedFlash'])saved[id]=$(id).checked;
   sessionConfig=saved;
+  if(!nativeRecorder){
+      try{
+    nativeRecorder=createRecorder(document.querySelector('#player .toolbar'));globalThis.th01LocalReplay=nativeRecorder;
+    const settings={players:players(),count:Number(saved.orbs),rank:Number(saved.difficulty),lifeCompensation:!!saved.compensation,startStage:saved.startStage};
+    await nativeRecorder.boot({adapter:'native-local/1',settings,players:settings.players,hostSlot:0,tickMs:tick,opening:nativeLocalOpening(nativeRaw)});
+    if(!nativeRecorder.error)nativeRecording=new NativeLocalSimulation(nativeRaw,settings,0);
+      }catch(error){nativeRecording=null;try{nativeRecorder?.finish('原生录像未启动：'+error.message);}catch{}console.warn('原生录像未启动',error);}
+  }
   try{localStorage.setItem(preferenceKey,JSON.stringify(saved));}catch{}
   started=true;configuring=false;$('setup').hidden=true;$('player').hidden=false;
   document.querySelector('.diagnostics').hidden=false;
@@ -270,6 +289,7 @@ function begin(){
   if(solo&&!stageSelection(saved.startStage).practice){core.th_menu_open(1,$('compensation').checked?1:0);setPaused(true);}
   $('sessionSettings').textContent=$('setupSummary').textContent;
   updatePhase();present();$('game').focus({preventScroll:true});void unlockEffects();void startMusic();
+    }finally{starting=false;}
 }
 $('start').onclick=begin;
 $('settings').onclick=()=>{setPaused(true);configuring=true;$('player').hidden=true;document.querySelector('.diagnostics').hidden=true;$('setup').hidden=false;$('cancelSetup').hidden=false;setupSummary();$('start').focus();};
@@ -282,8 +302,9 @@ try{
   const response=await fetch('game.wasm',{cache:'no-store'});if(!response.ok)throw Error('缺少 game.wasm，请先运行构建脚本');
   const binary=await response.arrayBuffer();const module=await WebAssembly.compile(binary);
   if(WebAssembly.Module.imports(module).length)throw Error('核心不应依赖外部导入');
-  const instance=await WebAssembly.instantiate(module,{});core=instance.exports;loadScores();
+  const instance=await WebAssembly.instantiate(module,{});nativeRaw=instance.exports;core=nativeRaw;loadScores();core=localExportFacade(nativeRaw,recordNativeCommand);
   // Read-only diagnostics and deterministic commands for local QA.
   window.th01Native={core,buttons,reset,pause:setPaused,audio:()=>({ready:sfxReady,enabled:sfxEnabled,buffers:sfxBuffers.size,cursor:soundCursor,musicWanted,musicTrack,musicPlaying:musicEnabled&&musicContext?.state==='running',musicLoop:musicSource?[musicSource.loopStart,musicSource.loopEnd]:null})};
   $('start').disabled=false;$('start').textContent=solo?'开始单人游戏 →':'开始本地合作 →';requestAnimationFrame(loop);
 }catch(error){$('setupSummary').textContent=`加载失败：${error.message}`;$('start').textContent='游戏资源加载失败';console.error(error);}
+addEventListener('pagehide',()=>{nativeRecorder?.finish('原生本地页面关闭');nativeRecorder?.close();});

@@ -1,4 +1,5 @@
 import {PROTOCOL,FrameQueue} from './queue.js';
+import {createRecorder} from '../replay/recorder.js';
 import {GameRuntime} from './runtime.js';
 import {createRelay} from './relay.js';
 import {loadRtcConfiguration,refreshRtcPath,countIceCandidate,describeIceCandidates,recordIceServerError,describeRtcConfiguration} from './connection.js';
@@ -15,7 +16,8 @@ export class NetSession{
     this.remotes=this.roles.filter(r=>r!==identity.role);this.links=identity.role==='host'?this.remotes:['host'];
     this.slot=room.seats[identity.role];this.peers=new Map();
     this.hellos=new Map();this.acks=new Set();this.sentHello=new Set();this.sentAck=new Set();
-    this.game=new GameRuntime(canvas,room.seats.host);
+    this.game=new GameRuntime(canvas,room.seats.host,this.slot);
+    this.recorder=createRecorder(document.querySelector('.toolbar'));globalThis.th01Replay=this.recorder;
     this.game.onFailure=e=>this.fail(e);
     this.autoBuffer=room.settings.delay===0;
     this.queue=new FrameQueue(this.slot,this.autoBuffer?(room.settings.network==='public'?6:3):room.settings.delay,this.roles.length);
@@ -36,8 +38,10 @@ export class NetSession{
     this.signalChain.catch(e=>this.fail(e));return this.signalChain;
   }
   async prepare(){
-    this.loadTask=this.game.load(this.room.settings,this.status).then(hash=>{
+    this.loadTask=this.game.load(this.room.settings,this.status).then(async hash=>{
       if(this.closed){this.game.stop();return;}
+      await this.recorder.boot({settings:this.room.settings,players:this.roles.length,hostSlot:this.room.seats.host,opening:hash,tickMs:TICK});
+      if(this.identity.role==='host')this.recorder.connectNetwork({...this.identity,generation:this.room.generation});
       this.loadedHash=hash;this.maybeHello();
     }).catch(e=>this.fail(e));
     if(this.room.transport==='ws'){
@@ -274,7 +278,9 @@ export class NetSession{
         if(this.waitHash){this.waitKind='hash';this.nextTick=Math.max(this.nextTick,now-TICK);break;}
         const inputs=this.queue.peek();
         if(!inputs){this.waitKind='input';this.nextTick=Math.max(this.nextTick,now-TICK);break;}
-        this.game.step(inputs);this.queue.commit();this.lastAdvance=performance.now();this.nextTick+=TICK;
+        const recordedFrame=this.queue.frame;this.game.step(inputs);
+        this.recorder.stage(recordedFrame,{inputs,offlineMask:0,proof:this.game.replayProof(),hash:(recordedFrame+1)%120===0?this.game.checksum():null});
+        this.recorder.confirm(recordedFrame+1,false);this.queue.commit();this.lastAdvance=performance.now();this.nextTick+=TICK;
         if(this.nextTick<now-4*TICK)this.nextTick=now;
         if(this.queue.frame%HASH_INTERVAL===0){
           const checksum=this.game.checksum();this.hashes.set(checksum.frame,checksum);
@@ -370,6 +376,6 @@ export class NetSession{
     if(this.closed)return;this.closed=true;this.running=false;
     for(const timer of [this.timer,this.heartbeat,this.bufferTimer])clearInterval(timer);
     for(const timer of [this.connectTimer,this.loadTimer,this.bufferTimeout])clearTimeout(timer);
-    this.game.stop();this.relay?.close();for(const peer of this.peers.values()){clearTimeout(peer.disconnectTimer);peer.disconnectTimer=null;peer.channel?.close();peer.pc?.close();}
+    this.recorder.finish('联机会话结束');this.game.stop();this.relay?.close();for(const peer of this.peers.values()){clearTimeout(peer.disconnectTimer);peer.disconnectTimer=null;peer.channel?.close();peer.pc?.close();}
   }
 }
