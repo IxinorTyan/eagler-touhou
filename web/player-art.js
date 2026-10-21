@@ -13,13 +13,16 @@ export async function loadPlayerArt(patch){
 }
 export function installPlayerArt(mod,patch,bytes){
   const api=mod.nativeExports();
-  if(!api.thArtBind||!api.thArtState)throw Error('TH02 多人配色核心版本不匹配');
-  const control=api.malloc(16),table=api.malloc(bytes.length),tags=api.malloc(2*262144*2);
-  if(!control||!table||!tags)throw Error('TH02 多人配色内存分配失败');
+  if(!api.thArtBind||!api.thArtState||!api.thLayerSetView)throw Error('TH02 多人配色核心版本不匹配');
+  const control=api.malloc(32),table=api.malloc(bytes.length),tags=api.malloc(2*262144*2);
+  const records=api.malloc(3*524288*4),coverage=api.malloc(524288);
+  if(!control||!table||!tags||!records||!coverage)throw Error('TH02 多人配色内存分配失败');
   mod.HEAPU8.set(bytes,table);mod.HEAPU8.fill(0,tags,tags+1048576);
+  mod.HEAPU8.fill(0,control,control+32);mod.HEAPU8.fill(0,coverage,coverage+524288);
   const view=()=>new DataView(mod.HEAPU8.buffer);
   view().setUint32(control,0,true);view().setUint32(control+4,table,true);
   view().setUint32(control+8,tags,true);view().setUint32(control+12,0,true);
+  view().setUint32(control+16,records,true);view().setUint32(control+20,coverage,true);
   api.thArtBind(control);
   let mailbox=-1,checks=0;
   const valid=at=>at>=0&&signature.every((value,i)=>mod.HEAPU8[at+i]===value);
@@ -31,12 +34,12 @@ export function installPlayerArt(mod,patch,bytes){
     for(let at=ram.indexOf(signature[0]);at>=0;at=ram.indexOf(signature[0],at+1)){
       if(!valid(base+at)||mod.HEAPU8[base+at+22]!==1)continue;
       mailbox=base+at;
-      mod.thDirtyMark?.(control,16);
+      mod.thDirtyMark?.(control,32);
       view().setUint32(control,mailbox-patch.entries.mailbox+patch.entries.art_context,true);
       view().setUint32(control+12,mailbox+22,true);
       break;
     }
   }
-  return {bind,info:()=>({enabled:true,bound:valid(mailbox),source:patch.playerArt.bodySource,
+  return {bind,view:slot=>api.thLayerSetView(Number.isInteger(slot)&&slot>=0&&slot<3?slot:-1),info:()=>({enabled:true,bound:valid(mailbox),source:patch.playerArt.bodySource,
     variants:patch.playerArt.variants,originalGenjiiPreserved:true}),control,table,tags};
 }

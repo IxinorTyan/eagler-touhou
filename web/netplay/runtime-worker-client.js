@@ -50,7 +50,7 @@ const sync={
  async execute(inputs,{frame,replay=false,offlineMask=0,capture=false,hash=false}){const result=await request('execute',[],{inputs,frame,replay,offlineMask,capture,hash});if(hash)check=result;return result;},
  capture:frame=>request('capture',[frame]),step:(inputs,options)=>request('step',[inputs,options]),restore:frame=>request('restore',[frame]),
  async confirm(prefix){if(prefix<=acknowledgedPrefix)return;const result=await request('confirm',[prefix]);acknowledgedPrefix=Math.max(acknowledgedPrefix,prefix);return result;},
- checksum:()=>check,snapshot:()=>cache.game??null,
+ replayProof:()=>cache.proof,checksum:()=>check,snapshot:()=>cache.game??null,
  present(){if(presentPending||stopped)return false;presentPending=true;request('present').catch(e=>{if(!stopped)fatal(e.message);}).finally(()=>{presentPending=false;});return true;},
  onInput(callback){listener=callback;},onMenuAction(){},
  setMusicVolume(value){volume=Math.max(0,Math.min(1,Number(value)||0));bgm?.setVolume(volume);},

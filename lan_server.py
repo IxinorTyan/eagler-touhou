@@ -1,3 +1,4 @@
+import replay_history
 """LAN lobby/signaling only. Each browser runs its own deterministic DOSBox-X."""
 import argparse
 import json
@@ -69,6 +70,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if replay_history.handle_get(self): return
         url=urlparse(self.path)
         if url.path=='/api/health':
             self.reply({'game':'th02','protocol':PROTOCOL,'connectionFallback':1})
@@ -85,6 +87,7 @@ class Handler(SimpleHTTPRequestHandler):
             super().do_GET()
 
     def do_POST(self):
+        if replay_history.handle_post(self, ROOMS, LOCK, '02', lambda r: room_expired(r,time.monotonic())): return
         try:
             origin=self.headers.get('Origin')
             if origin and urlparse(origin).netloc!=self.headers.get('Host'):
@@ -214,13 +217,14 @@ class Handler(SimpleHTTPRequestHandler):
                     if role!='host':
                         return self.reply({'error':'只有房主可以修改本局设置'},403)
                     value=data.get('settings',{})
-                    bounds={'players':(2,3),'stage':(0,5),'difficulty':(0,3),'lives':(0,5),'bombs':(0,5),'focusPercent':(50,50)}
+                    bounds={'players':(2,3),'difficulty':(0,4),'lives':(0,5),'bombs':(0,5),'focusPercent':(50,50)}
                     flags={'rollback','focusEnabled','teamTargeting'}
                     if not isinstance(value,dict) or set(value)!=(set(bounds)|flags|{'language'}) or value.get('language') not in ('cn','jp') or any(type(value.get(k)) is not bool for k in flags) or any(type(value[k]) is not int or not lo<=value[k]<=hi for k,(lo,hi) in bounds.items()) or value['focusPercent']%5:
                         return self.reply({'error':'开局设置无效'},400)
                     if value['players']==2 and (room['guest2'] or 2 in room['slots'].values()):
                         return self.reply({'error':'请先让第三位加入者离开，并腾出 P3 座位，再关闭 3P'},409)
                     room['settings'].update(value)
+                    room['settings']['stage']=5 if value['difficulty']==4 else 0
                     room['ready']={r:False for r in ROLES}
                 else:
                     if room['slots'][role] is None:

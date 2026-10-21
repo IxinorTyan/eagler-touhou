@@ -1,18 +1,20 @@
 // Same native runtime and complete checkpoints, with page-owned input/audio.
 const send=(message,transfer=[])=>postMessage(message,transfer);
 const audioContext={sampleRate:44100,state:'running',currentTime:0,addEventListener(){},removeEventListener(){},resume:async()=>{},close:async()=>{}};
-let ready,stopped=false,frameSequence=0;
+let ready,stopped=false,loaded=false,frameSequence=0,replayMusic;
 const transfers=new Set();
 const metrics={captureMs:0,captures:0,stepMs:0,steps:0,replaySteps:0,restoreMs:0,restores:0,confirmMs:0,confirmations:0,hashMs:0,hashes:0,presentMs:0,presentations:0,bitmapMs:0,bitmaps:0,nativeMs:0,nativeSteps:0,nativeMaxMs:0,statusMs:0,queueMs:0,commands:0};
 const slowSteps=[];let detailAt=-Infinity;
 function timed(kind,count,action){const at=performance.now();try{return action();}finally{metrics[kind]+=performance.now()-at;metrics[count]++;}}
 globalThis.th02WorkerHost={canvas:new OffscreenCanvas(640,400),audioContext,
+ captureAudioState:()=>({music:replayMusic.capture()}),
+ restoreAudioState(saved){const events=replayMusic.restore(saved?.music);send({type:'replay-audio-reset',events});},
  recordNative(costMs,frame,replay){metrics.nativeMs+=costMs;metrics.nativeSteps++;metrics.nativeMaxMs=Math.max(metrics.nativeMaxMs,costMs);if(costMs>30){slowSteps.push({frame,replay,costMs});if(slowSteps.length>120)slowSteps.shift();}},
- notify:message=>send({type:'notify',message}),music:event=>send({type:'music',event}),
+ notify:message=>send({type:'notify',message}),music:event=>{replayMusic?.observe(event);send({type:'music',event});},
  sfx:{load:async()=>{},play:id=>send({type:'sfx',id}),stop(){},dispose(){},info:()=>({ready:true,mode:'confirmed-worker-events'})}
 };
 function status(){const at=performance.now(),r=th02WorkerHost.runtime;
- const value={game:r.snapshot(),ready:r.readyForRollback(),reason:r.predictionBlockReason(),touch:r.touchContext(),rollback:r.rollbackInfo()};
+ const value={game:r.snapshot(),proof:r.replayProof(),ready:r.readyForRollback(),reason:r.predictionBlockReason(),touch:r.touchContext(),rollback:r.rollbackInfo()};
  // Expensive display percentile sorting and fault detail are observational;
  // keep them out of every step/confirm RPC, while game policy stays current.
  if(at-detailAt>=250){detailAt=at;Object.assign(value,{render:r.renderInfo(),diagnostics:r.diagnosticText(),fault:r.faultReport(),slowSteps:slowSteps.slice()});}
@@ -32,7 +34,7 @@ onmessage=({data})=>{
   if(stopped)return;
   if(!ready)ready=import('./runtime.js');await ready;
   const r=th02WorkerHost.runtime,started=performance.now();metrics.queueMs+=started-receivedAt;metrics.commands++;let result;
-  if(data.type==='load'){r.configure(...data.configure);result=await r.load(data.settings);}
+  if(data.type==='load'){if(loaded)throw Error('运行实例不能重新加载或更改旁观身份');loaded=true;th02WorkerHost.replayOnly=data.spectator===true;if(th02WorkerHost.replayOnly)replayMusic=(await import('../replay/music-state.js')).createMusicState();r.configure(...data.configure);result=await r.load(data.settings);}
   else if(data.type==='execute'){
    if(data.capture)timed('captureMs','captures',()=>r.capture(data.frame));
    timed('stepMs','steps',()=>r.step(data.inputs,{frame:data.frame,replay:data.replay,offlineMask:data.offlineMask}));if(data.replay)metrics.replaySteps++;

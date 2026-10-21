@@ -2,7 +2,7 @@
 <title>东方封魔录 · 输入同步联机</title><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="room.css"><link rel="stylesheet" href="control-settings.css"><link rel="stylesheet" href="player-ui.css">
 <body class="shell"><header class="masthead"><a class="brand" href="index.html">TOUHOU / 02</a><small>東方封魔録 · STORY OF EASTERN WONDERLAND</small></header>
 <nav class="mode-nav" aria-label="游戏模式"><a data-mode="solo" href="solo.html">单人游戏</a><a data-mode="local" href="local.html">本机合作</a><a data-mode="lan" href="lan.html?network=lan">局域网联机</a><a data-mode="public" href="lan.html?network=public">公网联机</a></nav>
-<p class="muted">多人默认启用满火力支援：已满火力者拾取大小 Power 时，将火力收益给予火力最低的存活队友；同火力优先离道具最近者，再按席位顺序。分数仍归拾取者。</p>
+<p class="muted">多人默认启用满火力支援：已满火力者拾取大小 Power 时，将火力收益给予火力最低的存活队友；同火力优先离道具最近者，再按席位顺序。分数计入全队。</p>
 <header class="intro"><div><span class="eyebrow">STORY OF EASTERN WONDERLAND / MULTIPLAYER</span><h1 id="page-title">局域网联机</h1></div><p id="mode-description">与伙伴一起进入封魔录。</p></header>
 <section class="panel local-music-settings" aria-label="本机音乐">
 <label class="bgm-version">本机音乐 <select data-bgm-version-control aria-label="本机音乐版本"><option value="old">游戏原版</option><option value="new">幺乐团专辑版</option></select><small data-bgm-restart-note></small></label>
@@ -17,8 +17,7 @@
 <section id="loadout-panel" class="loadout-panel" hidden><span class="section-kicker">YOUR AIRCRAFT</span><h2>选择你的机体</h2><p>每位玩家落座后选择自己的灵梦射击类型，包括 P1。</p><div class="loadout-grid"><button type="button" class="loadout-card" data-loadout="0"><img src="assets/option-0.png" alt=""><strong>高速机体</strong><small>高速移动</small></button><button type="button" class="loadout-card" data-loadout="1"><img src="assets/option-1.png" alt=""><strong>平衡机体</strong><small>标准配置</small></button><button type="button" class="loadout-card" data-loadout="2"><img src="assets/option-2.png" alt=""><strong>低速机体</strong><small>低速移动</small></button></div><p id="loadout-status"></p></section>
 <fieldset id="settings"><legend>本局设置 · 房主修改</legend><div class="settings-grid">
 <label>语言 <select id="language"><option value="cn">汉化版</option><option value="jp">日文版</option></select></label><label>人数 <select id="players"><option value="2">双人</option><option value="3">三人</option></select></label>
-<label>起始关卡 <select id="stage"><option value="0">第 1 关</option><option value="1">第 2 关</option><option value="2">第 3 关</option><option value="3">第 4 关</option><option value="4">第 5 关</option><option value="5">Extra</option></select></label>
-<label>难度 <select id="difficulty"><option value="0">Easy</option><option value="1">Normal</option><option value="2">Hard</option><option value="3">Lunatic</option></select></label>
+<label>难度 <select id="difficulty"><option value="0">Easy</option><option value="1">Normal</option><option value="2">Hard</option><option value="3">Lunatic</option><option value="4">EX</option></select></label>
 <label>每人备用残机 <select id="lives"><option value="0">0</option><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label>
 <label>每人起始 Bomb <select id="bombs"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></label>
 </div><p class="muted">Extra 固定使用原生 Extra 难度。残机不含当前自机；每位玩家独立持有资源。</p>
@@ -26,8 +25,8 @@
 <p class="muted">房主统一设置，低速固定为各机体正常移动速度的 50%。关闭低速后，低速键仍可停火救援；判定点显示由各自浏览器设置。</p>
 <label class="rollback-option"><input id="teamTargeting" type="checkbox" checked> 敌人瞄准所有存活队友（关闭时仅瞄准 P1）</label>
 <label class="rollback-option"><input id="rollback" type="checkbox" role="switch"> 启用预测回滚</label><p class="muted">默认开启，零步本地输入缓冲。性能较弱时可关闭回滚，使用按单程延迟协商的锁步；修改设置后全员重新准备。</p></fieldset>
-<p id="launch-summary" role="status"></p><p>全员准备后直接进入所选关卡，跳过开场和选机菜单。键盘方向键移动、Z 射击、X Bomb、Shift 低速／停火救援；各端操作自己选择的座位。</p>
-<details><summary>合作规则与断线</summary><p>保留本机版的独立生命、Bomb、火力、个人分数、幽灵与救援。BGM 和原作音效由各端浏览器独立播放，可单独调节音乐音量；网络等待不再截断已开始的声音。Boss、得分与道具倍率沿用本机双人／三人规则。</p><p>暂停菜单由 P1 操作；任何人可请求暂停或确认。短断线可恢复；客机超过宽限期会变为本局永久离线幽灵，其余玩家继续，房主离线超时则结束本局。</p></details>
+<p id="launch-summary" role="status"></p><p>全员准备后，普通难度从第 1 关开始，EX 进入 Extra 关，跳过开场和选机菜单。键盘方向键移动、Z 射击、X Bomb、Shift 低速／停火救援；各端操作自己选择的座位。</p>
+<details><summary>合作规则与断线</summary><p>保留本机版的独立生命、Bomb、火力、幽灵与救援，全队共用分数。BGM 和原作音效由各端浏览器独立播放，可单独调节音乐音量；网络等待不再截断已开始的声音。得分保持原版倍率，Extend 像 1UP 一样给全队加命并复活幽灵，离线队员除外。Boss 与火力倍率沿用本机双人／三人规则。</p><p>暂停菜单由 P1 操作；任何人可请求暂停或确认。短断线可恢复；客机超过宽限期会变为本局永久离线幽灵，其余玩家继续，房主离线超时则结束本局。</p></details>
 <div class="row"><button id="ready">准备</button><button id="start" class="primary">房主开始游戏</button><button id="leave">结束并返回</button></div></section>
 <section id="startup-progress" hidden aria-label="各玩家加载进度"></section><details><summary>连接与运行详情</summary><pre id="diagnostics">尚未开始游戏。</pre></details><div id="game"></div>
 <footer class="footer"><a href="index.html">← 返回启动器</a><span>TH02 CO-OP</span></footer><script type="module" src="lan.js"></script><script type="module" src="bgm-version.js"></script></body></html>

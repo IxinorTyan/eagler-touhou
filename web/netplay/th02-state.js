@@ -49,7 +49,7 @@ export function readState(heap,mailbox,patch){
  if(![2,3].includes(count)||v.getUint32(mailbox+16,true)===0)return null;
  return {gameFrame:v.getUint32(mailbox+16,true),generation:v.getUint16(mailbox+28,true),stage:heap[mailbox+30],
   score:v.getUint32(cb+patch.entries.team_score,true),players:patch.players.stateOffsets.slice(0,count).map((offset,i)=>{
-   const p=mailbox+offset,stats=cb+patch.entries[b.statsEntry]+i*b.statsStride;
+   const p=mailbox+offset,stats=cb+patch.entries[b.statsEntry];
    return {id:i+1,x:v.getInt16(p,true),y:v.getInt16(p+2,true),lives:heap[p+4],bombs:heap[p+5],power:heap[p+6],
     hit:heap[p+7],invincibility:heap[p+8],shot:heap[p+9],out:!!(heap[mailbox+23]&(1<<i)),offline:!!(heap[cb+patch.entries.offline_mask]&(1<<i)),
     score:v.getUint32(stats+b.scoreOffset,true),nextExtend:v.getUint32(stats+b.nextExtendOffset,true)||null};

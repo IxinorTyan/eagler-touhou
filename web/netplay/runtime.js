@@ -129,6 +129,7 @@ async function boot(settings){
   launchFiles:[{path:'game/HUMAROKU/WEBSTART.COM',contents:configureLauncher(launcher,config)}],
   onError:error=>notifyParent({protocol:PROTOCOL,event:'boot-error',message:error.message}),
   onExit:()=>notifyParent({protocol:PROTOCOL,event:'runtime-exit'})});
+ emulator.module.playerArt.view(localSlot);
  if(closed){emulator.dispose();return;}
  if(emulator.audio.context.sampleRate!==44100)throw Error('浏览器未提供统一的 44100 Hz 音频，请使用新版 Chrome / Edge');
  sfx=workerHost?workerHost.sfx:new LocalSfx(emulator.audio.context);await sfx.load();
@@ -301,9 +302,36 @@ function present(){
  pending=false;presentationCount++;return true;
 }
 function predictionBlockReason(){return !state()?'原版菜单或关卡加载':nativePaused(emulator.module.HEAPU8,mailbox,patch)?'原生暂停菜单':'';}
-function diagnosticText(){const s=state(),info=sfx?.info();return `TH02 · 同步步 ${ticks} · 游戏帧 ${s?.gameFrame??'菜单'} · 画面提交 ${presentationCount}\n个人分数 ${s?.players.map(p=>`P${p.id} ${p.score}`).join(' / ')||'等待入关'}\n本地完整音效 ${info?.played??0} 次 · 核心固定 30000 cycles · ${version?.th02IdleOptimization?'TH02 等价忙等优化':'通用核心'}\n浏览器 BGM：${musicError||bgm?.status||'等待确认关卡'} · 浏览器独立音效：${info?.ready?'就绪':'加载中'}`;}
+function diagnosticText(){const s=state(),info=sfx?.info();return `TH02 · 同步步 ${ticks} · 游戏帧 ${s?.gameFrame??'菜单'} · 画面提交 ${presentationCount}\n团队分数 ${s?.players.map(p=>`P${p.id} ${p.score}`).join(' / ')||'等待入关'}\n本地完整音效 ${info?.played??0} 次 · 核心固定 30000 cycles · ${version?.th02IdleOptimization?'TH02 等价忙等优化':'通用核心'}\n浏览器 BGM：${musicError||bgm?.status||'等待确认关卡'} · 浏览器独立音效：${info?.ready?'就绪':'加载中'}`;}
+
+// Portable captures belong exclusively to a verified replay Worker, never a player.
+let portableReplay,portableBase;
+function portableBoundary(){
+ if(!workerHost?.replayOnly||effects.size||confirmedPrefix!==ticks||emulator.snapshots)throw Error('完整检查点仅允许在独立旁观实例的确认边界');
+}
+async function replaySave(identity){
+ portableBoundary();const {createPortableCheckpoint,encodeCheckpoint}=await import('../replay/portable.js');
+ portableReplay??=createPortableCheckpoint(emulator.module,emulator.ci);
+ const host={identity,frame:ticks,ticks,emulatedTicks,oldP1,mailbox,guestMemoryBase,residentAddress,gameplaySeen,previousInputs,pendingNative,consumedNative,musicSequence,musicName,sfxSequence,playedName,pendingMusic,musicError,emulator:{tick:emulator.tick,keys:[...emulator.keys],state:emulator.state},audio:workerHost.captureAudioState?.(),proof:sync.replayProof(),check:checksum()};
+ const state=portableReplay.capture(host),bytes=await encodeCheckpoint(state,ticks?portableBase:null);
+ if(!ticks)portableBase=state;
+ return {frame:ticks,bytes,proof:host.proof,check:host.check};
+}
+async function replayLoad(bytes,baseBytes,identity){
+ portableBoundary();const {createPortableCheckpoint,decodeCheckpoint}=await import('../replay/portable.js');
+ portableReplay??=createPortableCheckpoint(emulator.module,emulator.ci);
+ const base=baseBytes?await decodeCheckpoint(baseBytes):null,state=await decodeCheckpoint(bytes,base),h=state.host;
+ if(h?.identity!==identity||!Number.isSafeInteger(h.frame)||h.frame<0||h.frame>216000||h.frame!==h.ticks)throw Error('完整检查点身份或帧号无效');
+ portableReplay.restore(state);({ticks,emulatedTicks,oldP1,mailbox,guestMemoryBase,residentAddress,gameplaySeen,previousInputs,pendingNative,consumedNative,musicSequence,musicName,sfxSequence,playedName,pendingMusic,musicError}=h);
+ emulator.tick=h.emulator.tick;emulator.keys=new Set(h.emulator.keys);emulator.state=h.emulator.state;emulator.outputs.clear();
+  confirmedPrefix=ticks;states.clear();effects.clear();pending=true;
+ if(sync.replayProof()!==h.proof||JSON.stringify(checksum())!==JSON.stringify(h.check))throw Error('完整检查点恢复校验不一致');
+  workerHost.restoreAudioState?.(h.audio);
+ return {frame:ticks,proof:h.proof,check:h.check};
+}
+
 const sync={
- configure(host,local,count=2){if(![2,3].includes(count)||![host,local].every(n=>Number.isInteger(n)&&n>=0&&n<count))throw Error('无效联机座位');localSlot=local;players=count;},
+ configure(host,local,count=2){if(![2,3].includes(count)||![host,local].every(n=>Number.isInteger(n)&&n>=0&&n<count))throw Error('无效联机座位');localSlot=local;players=count;emulator?.module.playerArt?.view(localSlot);},
  load(settings){return bootPromise??=boot(settings);},
  start(){if(closed)return;emulator.run();enabled=true;canvas.focus?.();},
  stop(){enabled=false;closed=true;clearKeys();bgm?.dispose();sfx?.dispose();emulator?.module.netFlushAudio();emulator?.pause();},
@@ -312,6 +340,8 @@ const sync={
  setPointPreferences(value){points={...value};},setRawPresentation(value){raw=!!value;pending=true;},
  async unlockAudio(){const context=emulator?.audio.context;if(context?.state!=='running')await context?.resume();return context?.state==='running';},
  touchContext(){const s=state(),p=s?.players[localSlot],paused=emulator&&nativePaused(emulator.module.HEAPU8,mailbox,patch);return {key:`${s?.generation??0}:${!s||paused?'menu':'game'}`,play:!!p&&!p.hit&&!p.out&&!paused};},
+ replayProof:()=>JSON.stringify([ticks,emulatedTicks,oldP1,mailbox,guestMemoryBase,residentAddress,gameplaySeen,previousInputs,pendingNative,consumedNative,musicSequence,musicName,sfxSequence,state()]),
+ replaySave,replayLoad,
  snapshot:state,checksum,step,present,capture,restore,confirm,
  readyForRollback:()=>gameplaySeen&&!!emulator?.module.netCapture,
  canPredict:()=>!predictionBlockReason(),predictionBlockReason,

@@ -6,6 +6,7 @@ import {isBound,keyboardBits,gamepadBits,gamepadStatus,normalize} from './contro
 import {mountFocusSettings} from './focus-display.js';
 import {mountControlSettings,controlSnapshot,isFormTarget} from '../control-settings.js';
 import {InputLatch} from './input-latch.js';
+import {createRecorder} from '../replay/recorder.js';
 const downloadFaultReport=(value,name)=>{const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 import {createRelay} from './relay.js';
 import {mergeDeparture} from './membership.js';
@@ -15,7 +16,7 @@ import {bgmVersion,onBgmVersion} from '../bgm-version.js';
 const $=id=>document.getElementById(id),roles=['host','guest','guest2'];
 const label=role=>({host:'房主',guest:'客机 1',guest2:'客机 2'})[role];
 const status=text=>{$('status').textContent=text;player.note(text);};
-const settingNames=['players','stage','difficulty','lives','bombs'];
+const settingNames=['players','difficulty','lives','bombs'];
 const assistFlags=['focusEnabled','teamTargeting'];
 let session,state,iframe,runtime,queue,localReady;
 let preloadKey='',preloadPromise=null,preloadGeneration=0,preloadRetryAt=0;
@@ -90,6 +91,8 @@ faultDownload.onclick=()=>{
   }catch(error){player.note('读取故障信息失败：'+error.message);}
 };
 $('game').querySelector('.player-toolbar').append(faultDownload);
+const replayRecorder=createRecorder($('game').querySelector('.player-toolbar'));
+globalThis.th02Replay=replayRecorder;
 
 function startupFailure(reason){
   if(!preparing)return;
@@ -238,7 +241,7 @@ function clearTimers(){
 function disconnect(){relay?.close();for(const peer of peers.values()){peer.channel?.close();peer.pc.close();}}
 function fail(error){
   if(stopped)return;
-  stopReason=String(error.message||error);startupFailure(stopReason);
+  stopReason=String(error.message||error);startupFailure(stopReason);replayRecorder.finish(stopReason);
   stopped=true;running=false;clearInput();
   for(const peer of peers.values())if(peer.channel?.readyState==='open'){
     try{send(peer,{type:'fatal',reason:String(error.message||error).slice(0,600)});}catch{}
@@ -252,7 +255,7 @@ function closeFinishedRoom(){
 }
 function finishGame(){
   if(stopped)return;stopped=true;running=false;clearInput();
-  runtime?.stop();iframe?.remove();runtime=null;clearTimers();
+  replayRecorder.finish('房主结束本局');runtime?.stop();iframe?.remove();runtime=null;clearTimers();
   if(session.role==='host'){broadcast({type:'end'});closeFinishedRoom();}
   else send(peers.get('host'),{type:'end-ack'});
   status('房主已退出，本局游戏已关闭。');render();
@@ -274,7 +277,6 @@ function render(){
   }
   $('settings').disabled=!lobby||busy||session.role!=='host';
   for(const key of [...settingNames,'language'])$(key).value=state.settings[key];
-  $('difficulty').disabled=state.settings.stage===5;
   if(!busy)for(const key of assistFlags)$(key).checked=state.settings[key];
   $('launch-summary').textContent=`${state.settings.stage===5?'Extra（固定 Extra 难度）':`第 ${state.settings.stage+1} 关 · ${['Easy','Normal','Hard','Lunatic'][state.settings.difficulty]}`} · 每人 ${state.settings.lives} 残机 / ${state.settings.bombs} Bomb · 机体 ${Array.from({length:state.settings.players},(_,i)=>`P${i+1} ${['高速','平衡','低速'][state.settings[`p${i+1}`]]}`).join(' / ')} · 低速${state.settings.focusEnabled?` ${state.settings.focusPercent}%`:'关闭'} · ${state.settings.teamTargeting?'敌人瞄准全队':'敌人仅瞄准 P1'}`;
   if(!busy)$('rollback').checked=state.settings.rollback;
@@ -728,7 +730,10 @@ async function beginGame(){
   player.setLabel(`你操作 P${state.slots[session.role]+1}`);
   runtime.updateControls(controlSnapshot(),controlEditor.isEditing());
   runtime.onInput(value=>{childBits=value;observeInput();wake();});runtime.onMenuAction(value=>{pendingAction|=value;observeInput();wake();});
-  localReady=await runtime.load({...state.settings});if(stopped){runtime.stop();return;}
+  // Extra uses its native rank selected by stage; the launcher rank byte is 0–3.
+  localReady=await runtime.load({...state.settings,difficulty:state.settings.difficulty===4?1:state.settings.difficulty});if(stopped){runtime.stop();return;}
+  await replayRecorder.boot({settings:{...state.settings,difficulty:state.settings.difficulty===4?1:state.settings.difficulty},players:state.settings.players,hostSlot:state.slots.host,opening:localReady});
+  if(session.role==='host')replayRecorder.connectNetwork({room:session.room,token:session.token,generation:state.generation});
   for(const peer of peers.values())if(peer.channel?.readyState==='open')send(peer,{type:'ready',build:localReady});maybeRun();
 }
 function maybeRun(){
@@ -801,7 +806,9 @@ function armRollback(){
 async function confirmFrames(){
   const before=performance.now();
   const prefix=Math.min(queue.frame,queue.confirmed);
-  if(await runtime.confirm(prefix)==='exit'){finishGame();return;}
+  const outcome=await runtime.confirm(prefix);
+  replayRecorder.confirm(prefix,queue.dirty!==null);
+  if(outcome==='exit'){finishGame();return;}
   if(stopped)return;
   for(const [tick,sample]of pendingHashes)if(tick<=prefix){
     hashes.set(tick,sample);broadcast({type:'hash',...sample});
@@ -825,6 +832,7 @@ async function simulate(pair,replay){
   if(runtime.asyncExecution)await runtime.execute(pair,{frame,replay,offlineMask:queue.offlineMask(frame),capture,hash:(frame+1)%120===0});
   else runtime.step(pair,{frame,replay,offlineMask:queue.offlineMask(frame)});
   if(stopped){completeNativeBoundary();return;}
+  replayRecorder.stage(frame,{inputs:pair,offlineMask:queue.offlineMask(frame),proof:runtime.replayProof(),hash:(frame+1)%120===0?runtime.checksum():null});
   queue.commit(pair);
   // Inputs can arrive while a Worker owns this step. Include its actual
   // completed inputs in the history before checking every changed prediction.
@@ -885,7 +893,7 @@ function updateMetrics(now,waiting){
   if(now-lastUi<250)return;lastUi=now;
   const links=[...peers.values()].map(p=>p.offline?`${label(p.role)}：已离线`:`${label(p.role)}：往返 ${p.rtt==null?'—':p.rtt.toFixed(1)} ms · ${p.path||'路径待确认'} · 相同状态步 ${p.confirmed||'等待'}${p.hidden?' · 页面隐藏':''}`).join('\n');
   const c=measuredCosts,game=runtime.snapshot();
-  const own=game?.players?.[queue.slot];player.setLabel(`你操作 P${queue.slot+1}${own?' · 个人分数 '+own.score.toLocaleString('zh-CN'):''}`);
+  const own=game?.players?.[queue.slot];player.setLabel(`你操作 P${queue.slot+1}${own?' · 团队分数 '+own.score.toLocaleString('zh-CN'):''}`);
   $('diagnostics').textContent=`${label(session.role)} · P${queue.slot+1} · ${state.settings.players} 人 · 同步步 ${queue.frame}\n`
     +`本机 ${hz.toFixed(1)}/60 步每秒 · 执行平均 ${averageCost.toFixed(1)} / 最慢 ${peakCost.toFixed(1)} ms\n`
     +`游戏逻辑 ${gameHz===null?'待统计':gameHz.toFixed(1)} 帧/秒 · 等输入时间 ${waitPercent.toFixed(0)}%（最近周期）\n`
@@ -924,7 +932,7 @@ async function pump(now){
       const from=queue.dirty;replayUntil=Math.max(replayUntil,queue.frame);
       maxRewind=Math.max(maxRewind,replayUntil-from);rollbackCount++;
       const restoreAt=performance.now();
-      nativeBusy=true;await runtime.restore(from);if(stopped)return;queue.rewind(from);
+      nativeBusy=true;await runtime.restore(from);if(stopped)return;replayRecorder.rewind(from);queue.rewind(from);
       // A still earlier input can arrive during restore, before rewind clears
       // the old correction marker. Reconcile the retained completed history.
       if(runtime.asyncExecution&&queue.active)queue.refreshCorrection(true);
@@ -997,7 +1005,7 @@ window.addEventListener('message',event=>{
     if(event.data.externalScript)warning.textContent+='\n堆栈包含站外脚本。请暂停此站点上的相关用户脚本／扩展并刷新复测；尚不能据此认定它导致了网络连接失败。';
   }
 });
-window.addEventListener('pagehide',()=>{if(session)navigator.sendBeacon('/api/leave',new Blob([JSON.stringify(session)],{type:'application/json'}));});
+window.addEventListener('pagehide',()=>{replayRecorder.finish('录像来源页面关闭');replayRecorder.close();if(session)navigator.sendBeacon('/api/leave',new Blob([JSON.stringify(session)],{type:'application/json'}));});
 $('create').onclick=()=>enter('host');$('join').onclick=()=>enter('guest');
 for(let n=0;n<3;n++)$(`seat${n}`).onclick=()=>action('seat',{slot:n});
 for(const card of document.querySelectorAll('[data-loadout]'))card.onclick=()=>action('loadout',{loadout:Number(card.dataset.loadout)});
@@ -1010,5 +1018,5 @@ $('ready').onclick=()=>{
   action('ready');
 };
 $('start').onclick=()=>{action('start');};
-$('leave').onclick=async()=>{stopped=true;running=false;clearInput();runtime?.stop();clearTimers();disconnect();try{await request('leave');}finally{location.href=networkUrl(mode);}};
+$('leave').onclick=async()=>{replayRecorder.finish('玩家离开本局');stopped=true;running=false;clearInput();runtime?.stop();clearTimers();disconnect();try{await request('leave');}finally{location.href=networkUrl(mode);}};
 onBgmVersion(()=>{if(session&&state?.phase==='lobby'&&!stopped)prepareRoomResources(state).catch(()=>{});});

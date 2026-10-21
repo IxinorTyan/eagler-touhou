@@ -174,7 +174,7 @@ export function readPersonalStats(){
     bossMultiplier:v.getUint16(cb+metadata.entries.damage_denominator,true)/10,
     teamScore:v.getUint32(cb+metadata.entries[b.teamScoreEntry],true),
     players:Array.from({length:count},(_,index)=>{
-      const at=cb+metadata.entries[b.statsEntry]+index*b.statsStride,next=v.getUint32(at+b.nextExtendOffset,true);
+      const at=cb+metadata.entries[b.statsEntry],next=v.getUint32(at+b.nextExtendOffset,true);
       return {id:index+1,score:v.getUint32(at+b.scoreOffset,true),extends:v.getUint16(at+b.extendsOffset,true),nextExtend:next||null};
     })};
 }
