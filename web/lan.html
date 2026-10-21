@@ -5,7 +5,7 @@
 
 <link rel="stylesheet" href="site.css?v=20261007"><link rel="stylesheet" href="room.css?v=20261007"><body class="shell"><header class="masthead"><a class="brand" href="index.html">TOUHOU / 04</a><small>東方幻想郷 · LOTUS LAND STORY</small></header>
 <nav class="mode-nav" aria-label="游戏模式"><a data-mode="solo" href="solo.html">单机游戏</a><a data-mode="local" href="local.html">本地双人 · 测试</a><a data-mode="lan" href="lan.html?network=lan">局域网联机</a><a data-mode="public" href="lan.html?network=public">公网联机</a></nav>
-<p class="muted">多人默认启用满火力支援：已满火力者拾取大小 Power 时，将火力收益给予火力最低的存活队友；同火力优先离道具最近者，再按席位顺序。分数仍归拾取者。</p>
+<p class="muted">多人默认启用满火力支援：已满火力者拾取大小 Power 时，将火力收益给予火力最低的存活队友；同火力优先离道具最近者，再按席位顺序。分数计入全队。</p>
 <header class="intro"><span class="eyebrow">LOTUS LAND STORY / MULTIPLAYER</span><h1 id="page-title">局域网联机</h1><p id="mode-description">与伙伴一起，进入幻想乡。</p></header>
 <section class="panel local-music-settings" aria-label="本机音乐">
 <label class="bgm-version">本机音乐 <select data-bgm-version-control aria-label="本机音乐版本"><option value="old">游戏原版</option><option value="new">幺乐团专辑版</option></select><small data-bgm-restart-note></small></label>
@@ -26,7 +26,7 @@
 <label>生命 <select id="lives"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select></label>
 <label>炸弹 <select id="bombs"><option>0</option><option>1</option><option selected>2</option></select></label>
 </div><label class="rollback-option"><input id="rollback" type="checkbox" role="switch" aria-describedby="rollback-help"> 启用回滚</label><p id="rollback-help" class="muted">默认关闭。开启：操作响应更快，但占用更多性能；关闭：等待所有玩家输入，网络延迟会更明显。仅房主可在开局前修改，修改后需全员重新准备。</p></fieldset>
-<details><summary>合作玩法</summary><p>分数、点、梦、擦弹独立计算，游戏面板显示自己的数据。双人得分 ×1.5，三人 ×2.2。</p><p>Power 获取：双人 ×1.5，三人 ×2（半点收益累计）。Boss 每阶段耐久：双人 ×1.5，三人 ×2.2。倍率按开局人数固定。启用 3P 后需三人全员准备。</p></details>
+<details><summary>合作玩法</summary><p>分数、点、梦、擦弹全队共享，游戏面板显示团队数据，得分倍率保持原版。分数 Extend 像 1UP 一样给全队加命并复活幽灵，离线队员除外。</p><p>Power 获取：双人 ×1.5，三人 ×2（半点收益累计）。Boss 每阶段耐久：双人 ×1.5，三人 ×2.2。倍率按开局人数固定。启用 3P 后需三人全员准备。</p></details>
 <div class="row"><button id="ready">准备</button><button id="start" class="primary">房主开始游戏</button><button id="leave">结束并返回</button></div>
 </section>
 <section id="startup-progress" hidden aria-label="各玩家加载进度"></section>

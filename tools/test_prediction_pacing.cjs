@@ -7,9 +7,11 @@ const {pathToFileURL}=require('node:url');
  const {RollbackQueue}=await import(pathToFileURL(path.join(root,'web/netplay/rollback-queue.js')));
  const source=fs.readFileSync(path.join(root,'web/netplay/room.js'),'utf8');
  const body=source.slice(source.indexOf('function nextInputs(){'),source.indexOf('function updateMetrics('));
+ let waitClosures=0;
+ const makeNext=q=>Function('queue','runtime','MAX_ROLLBACK','endInputWait','peers','state',`let waitDetail='';${body};return nextInputs;`)(q,{canPredict:()=>true,predictionBlockReason:()=>''},12,()=>{waitClosures++;},new Map(),{slots:{}});
  for(const players of [2,3])for(const horizon of [3,6]){
   const q=new RollbackQueue(0,players,{directionPrediction:horizon});q.arm(0);
-  const next=Function('queue','runtime','MAX_ROLLBACK',`let waitDetail='';${body};return nextInputs;`)(q,{canPredict:()=>true,predictionBlockReason:()=>''},12);
+  const next=makeNext(q);
   while(q.frame<2+horizon){q.capture(8);const pair=next();assert(pair);q.commit(pair);}
   q.capture(4);assert.equal(next(),null,'fast peer must wait at useful prediction horizon');
   // Real inputs invalidate an earlier prediction. Replay must reach the old
@@ -22,7 +24,8 @@ const {pathToFileURL}=require('node:url');
   assert(next(),'authoritative input must release pacing');
  }
  const q=new RollbackQueue(0,2,{rollbackEnabled:false});
- const next=Function('queue','runtime','MAX_ROLLBACK',`let waitDetail='';${body};return nextInputs;`)(q,{canPredict:()=>true,predictionBlockReason:()=>''},12);
+ const next=makeNext(q);
  for(let i=0;i<30;i++){q.capture(32);q.receive(i+2,32,1);const pair=next();assert(pair);q.commit(pair);}
+ assert(waitClosures>0,'successful input delivery must close the wait telemetry interval');
  console.log('PASS prediction pacing: 2/3 players, LAN/relay, correction replay, input recovery, rollback off');
 })().catch(e=>{console.error(e);process.exitCode=1;});

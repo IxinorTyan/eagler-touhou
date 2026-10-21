@@ -1,3 +1,4 @@
+import replay_history
 """LAN lobby/signaling only. Each browser runs its own deterministic DOSBox-X."""
 import argparse
 import json
@@ -60,6 +61,7 @@ class Handler(AssetHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if replay_history.handle_get(self): return
         url=urlparse(self.path)
         if url.path=='/relay':
             from relay_server import handle
@@ -74,6 +76,7 @@ class Handler(AssetHandler):
             super().do_GET()
 
     def do_POST(self):
+        if replay_history.handle_post(self, ROOMS, LOCK, '04', lambda r: room_expired(r,time.monotonic())): return
         try:
             origin=self.headers.get('Origin')
             if origin and urlparse(origin).netloc!=self.headers.get('Host'):

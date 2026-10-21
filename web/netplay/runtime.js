@@ -141,6 +141,7 @@ async function boot(config){
     no_mouse:true,use_menu:false,fontfile:'font.bmp',
     onError:error=>reportRuntimeFailure('emulator-error',Error('模拟器异常：'+String(error?.message||error))),
     onExit:()=>reportRuntimeFailure('emulator-exit',Error('游戏模拟器已经退出'))});
+  emulator.module.projectileArt.view(localSlot);
   if(closed){emulator.pause();return;}
   localSe=workerHost?workerHost.se:new LocalSe(emulator.module.SDL2.audioContext);
   const seLoading=localSe.load().catch(error=>{if(!closed)seError='浏览器音效加载失败：'+error.message;});
@@ -419,6 +420,33 @@ function checksum(){
   for(let at=base;at<base+0xa0000;at++)h=Math.imul(h^heap[at],0x01000193);
   return {tick:ticks,hash:(h>>>0).toString(16).padStart(8,'0'),gameFrame:mailboxOwned(mailbox,guestMemoryBase,residentAddress)?v.getUint32(mailbox+16,true):0};
 }
+
+// Portable captures belong exclusively to a verified replay Worker, never a player.
+let portableReplay,portableBase;
+function portableBoundary(){
+ if(!workerHost?.replayOnly||effects.size||confirmedPrefix!==ticks||emulator.snapshots)throw Error('完整检查点仅允许在独立旁观实例的确认边界');
+}
+async function replaySave(identity){
+ portableBoundary();const {createPortableCheckpoint,encodeCheckpoint}=await import('../replay/portable.js');
+ portableReplay??=createPortableCheckpoint(emulator.module,emulator.ci);
+ const host={identity,frame:ticks,ticks,emulatedTicks,oldP1,mailbox,guestMemoryBase,residentAddress,gameplaySeen,blocked,pause:{previous:pauseMenu.previous,paused:pauseMenu.paused,selection:pauseMenu.selection,exited:pauseMenu.exited},lastMusicSequence,lastMusicName,pendingMusic,seError,musicError,musicStatus,emulator:{tick:emulator.tick,keys:[...emulator.keys],state:emulator.state},audio:workerHost.captureAudioState?.(),proof:sync.replayProof(),check:checksum()};
+ const state=portableReplay.capture(host),bytes=await encodeCheckpoint(state,ticks?portableBase:null);
+ if(!ticks)portableBase=state;
+ return {frame:ticks,bytes,proof:host.proof,check:host.check};
+}
+async function replayLoad(bytes,baseBytes,identity){
+ portableBoundary();const {createPortableCheckpoint,decodeCheckpoint}=await import('../replay/portable.js');
+ portableReplay??=createPortableCheckpoint(emulator.module,emulator.ci);
+ const base=baseBytes?await decodeCheckpoint(baseBytes):null,state=await decodeCheckpoint(bytes,base),h=state.host;
+ if(h?.identity!==identity||!Number.isSafeInteger(h.frame)||h.frame<0||h.frame>216000||h.frame!==h.ticks)throw Error('完整检查点身份或帧号无效');
+ portableReplay.restore(state);({ticks,emulatedTicks,oldP1,mailbox,guestMemoryBase,residentAddress,gameplaySeen,lastMusicSequence,lastMusicName,pendingMusic,seError,musicError,musicStatus}=h);blocked=h.blocked.slice();Object.assign(pauseMenu,h.pause,{previous:h.pause.previous.slice()});
+ emulator.tick=h.emulator.tick;emulator.keys=new Set(h.emulator.keys);emulator.state=h.emulator.state;emulator.outputs.clear();
+  confirmedPrefix=ticks;rollbackStates.clear();effects.clear();presentationPending=true;
+ if(sync.replayProof()!==h.proof||JSON.stringify(checksum())!==JSON.stringify(h.check))throw Error('完整检查点恢复校验不一致');
+  workerHost.restoreAudioState?.(h.audio);
+ return {frame:ticks,proof:h.proof,check:h.check};
+}
+
 const sync={
   faultReport({cpu=true}={}){return {settings:musicSettings,game:snapshot(),runtimeFailure,
     sound:{...localSe?.info(),error:seError},
@@ -450,12 +478,15 @@ const sync={
   configure(host,local,players=2){
     if(![2,3].includes(players)||![host,local].every(n=>Number.isInteger(n)&&n>=0&&n<players))throw Error('无效暂停菜单座位');
     playerCount=players;blocked=Array(players).fill(0);pauseMenu=new PauseMenu(host,players);localSlot=local;
+    emulator?.module.projectileArt?.view(localSlot);
   },
   onMenuAction(callback){menuAction=callback;},
   load(config){if(!bootPromise)bootPromise=boot(config);return bootPromise;},
   onInput(callback){inputListener=callback;},
   start(){emulator.run();enabled=true;details.textContent='启动进度：全员已同步开局，正在启动 DOS 和游戏。';canvas.focus?.();},
   stop(){enabled=false;closed=true;clearKeys();bgm?.dispose();localSe?.dispose();if(emulator){emulator.module.netFlushAudio();emulator.pause();}},
+  replayProof:()=>JSON.stringify([ticks,emulatedTicks,oldP1,mailbox,guestMemoryBase,residentAddress,gameplaySeen,blocked,pauseMenu.previous,pauseMenu.paused,pauseMenu.selection,pauseMenu.exited,snapshot()]),
+  replaySave,replayLoad,
   step,present,checksum,snapshot,capture,restore,confirm,
   readyForRollback:()=>gameplaySeen&&!!emulator?.module.netCapture,
   canPredict:()=>!predictionBlockReason(),predictionBlockReason,

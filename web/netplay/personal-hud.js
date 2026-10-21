@@ -51,7 +51,7 @@ export function createPersonalHud(canvas,nativeCanvas){
     if((cell&255)!==0x57||(cell>>>8)<0x20||(cell>>>8)>0x29)return;
     drawCollisionPoints(context,{heap,mailbox,patch,...points});
     const schema=patch.personal_stats;
-    const at=mailbox-patch.mailbox_cs_offset+schema.cs_offset+slot*schema.stride;
+    const at=mailbox-patch.mailbox_cs_offset+schema.cs_offset;
     number(view.getUint32(at+schema.high_score,true),448,64,8,true);
     number(view.getUint32(at+schema.score,true),448,96,8,true);
     number(heap[at+schema.point],496,240,5);
@@ -63,7 +63,7 @@ export function createPersonalHud(canvas,nativeCanvas){
     const clearTitle=view.getUint16(tram+4*160+19*2,true)===0x5c56;
     if(mode===1&&stageTitle||mode===2&&clearTitle){
       const data=mailbox-patch.mailbox_cs_offset+(patch.data_segment-patch.code_segment)*16;
-      const resource=mailbox+patch.resource_schema.offset+slot*patch.resource_schema.stride;
+      const resource=mailbox+patch.resource_schema.offset;
       const all=mode===2;
       number(all?10000:(heap[data+0x5394]+1)*1000,272,all?96:112,8);
       number(heap[resource]*50,272,all?128:144,8);
@@ -71,7 +71,7 @@ export function createPersonalHud(canvas,nativeCanvas){
       number(view.getUint16(at+schema.graze,true)*50,272,all?192:208,8);
       if(all)number(Math.max(0,heap[resource+4]-1)*(heap[data+0x4348]===4?30000:10000),272,224,8);
       number(heap[at+schema.point],320,all?272:256,5);
-      number(view.getUint32(bonus+1+slot*4,true),272,336,8);
+      number(view.getUint32(bonus+1,true),272,336,8);
     }
   };
 }

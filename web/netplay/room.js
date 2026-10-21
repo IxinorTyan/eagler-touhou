@@ -1,4 +1,5 @@
 import {InputLatch} from './input-latch.js';
+import {createRecorder} from '../replay/recorder.js';
 import {startFrameLoop} from '../frame-limit.js';
 import {readNetworkMode,networkUrl} from './network-mode.js';
 import {PROTOCOL,RollbackQueue,TICK_MS,MAX_ROLLBACK,BOOT_DELAY,MAX_INPUT_DELAY,MAX_ROLLBACK_INPUT_DELAY,lockstepDelayForRtt,rollbackInputDelayForRtt,rollbackRttForSamples} from './rollback-queue.js';
@@ -110,6 +111,8 @@ faultDownload.onclick=async()=>{
   }catch(error){player.note('读取故障信息失败：'+error.message);}
 };
 $('game').querySelector('.player-toolbar').append(faultDownload);
+const replayRecorder=createRecorder($('game').querySelector('.player-toolbar'));
+globalThis.th04Replay=replayRecorder;
 
 if(!useRelay){
   const relayLink=document.createElement('a');
@@ -265,7 +268,7 @@ function clearTimers(){
 function disconnect(){relay?.close();for(const peer of peers.values()){peer.channel?.close();peer.pc.close();}}
 function fail(error){
   if(stopped)return;
-  stopReason=String(error.message||error);startupFailure(stopReason);
+  stopReason=String(error.message||error);startupFailure(stopReason);replayRecorder.finish(stopReason);
   stopped=true;running=false;clearInput();
   for(const peer of peers.values())if(peer.channel?.readyState==='open'){
     try{send(peer,{type:'fatal',reason:String(error.message||error).slice(0,600)});}catch{}
@@ -279,7 +282,7 @@ function closeFinishedRoom(){
 }
 function finishGame(){
   if(stopped)return;stopped=true;running=false;clearInput();
-  stopReason='房主通过暂停菜单结束本局';
+  stopReason='房主通过暂停菜单结束本局';replayRecorder.finish(stopReason);
   runtime?.stop();clearTimers();
   if(session.role==='host'){broadcast({type:'end'});closeFinishedRoom();}
   else send(peers.get('host'),{type:'end-ack'});
@@ -627,6 +630,8 @@ async function beginDirectRuntime(){
   player.setLabel(`你操作 P${state.slots[session.role]+1}`);runtime.updateControls(controlSnapshot(),controlEditor.isEditing());
   runtime.onInput(value=>{childBits=value;observeInput();wake();});runtime.onMenuAction(value=>{pendingAction|=value;observeInput();wake();});
   localReady=await runtime.load({...state.settings});if(stopped){runtime.stop();return;}
+  await replayRecorder.boot({settings:{...state.settings},players:state.settings.players,hostSlot:state.slots.host,opening:localReady});
+  if(session.role==='host')replayRecorder.connectNetwork({room:session.room,token:session.token,generation:state.generation});
   runtime.setMusicVolume(musicVolume.querySelector('input').value);
   for(const peer of peers.values())if(peer.channel?.readyState==='open')send(peer,{type:'ready',build:localReady});maybeRun();
 }
@@ -745,7 +750,9 @@ function armRollback(){
 async function confirmFrames(){
   const before=performance.now();
   const prefix=Math.min(queue.frame,queue.confirmed);
-  if(await runtime.confirm(prefix)==='exit'){finishGame();return;}
+  const outcome=await runtime.confirm(prefix);
+  replayRecorder.confirm(prefix,queue.dirty!==null);
+  if(outcome==='exit'){finishGame();return;}
   if(stopped)return;
   for(const [tick,sample]of pendingHashes)if(tick<=prefix){
     hashes.set(tick,sample);broadcast({type:'hash',...sample});
@@ -767,6 +774,7 @@ async function simulate(pair,replay){
   if(runtime.asyncExecution)await runtime.execute(pair,{frame,replay,offlineMask:queue.offlineMask(frame),capture,hash:(frame+1)%120===0});
   else runtime.step(pair,{frame,replay,offlineMask:queue.offlineMask(frame)});
   if(stopped){completeNativeBoundary();return;}
+  replayRecorder.stage(frame,{inputs:pair,offlineMask:queue.offlineMask(frame),proof:runtime.replayProof(),hash:(frame+1)%120===0?runtime.checksum():null});
   queue.commit(pair);
   // Authority can arrive before this completed step enters used history.
   if(runtime.asyncExecution&&queue.active)queue.refreshCorrection(true);
@@ -866,7 +874,7 @@ async function pump(now){
       const from=queue.dirty;replayUntil=Math.max(replayUntil,queue.frame);
       maxRewind=Math.max(maxRewind,replayUntil-from);rollbackCount++;
       const restoreAt=performance.now();
-      nativeBusy=true;await runtime.restore(from);if(stopped)return;queue.rewind(from);
+      nativeBusy=true;await runtime.restore(from);if(stopped)return;replayRecorder.rewind(from);queue.rewind(from);
       // A still earlier input can arrive during restore, before rewind clears
       // the old correction marker. Reconcile the retained completed history.
       if(runtime.asyncExecution&&queue.active)queue.refreshCorrection(true);
@@ -930,7 +938,7 @@ document.addEventListener('visibilitychange',()=>{
     wake();
   }
 });
-window.addEventListener('pagehide',()=>{if(session)navigator.sendBeacon('/api/leave',new Blob([JSON.stringify(session)],{type:'application/json'}));});
+window.addEventListener('pagehide',()=>{replayRecorder.finish('录像来源页面关闭');replayRecorder.close();if(session)navigator.sendBeacon('/api/leave',new Blob([JSON.stringify(session)],{type:'application/json'}));});
 $('create').onclick=()=>enter('host');$('join').onclick=()=>enter('guest');
 for(let n=0;n<3;n++)$(`seat${n}`).onclick=()=>action('seat',{slot:n});
 for(const card of document.querySelectorAll('[data-loadout]'))card.onclick=()=>action('loadout',{loadout:Number(card.dataset.loadout)});
@@ -943,5 +951,5 @@ $('ready').onclick=()=>{
   action('ready');
 };
 $('start').onclick=()=>{action('start');};
-$('leave').onclick=async()=>{stopped=true;running=false;clearInput();runtime?.stop();clearTimers();disconnect();try{await request('leave');}finally{location.href=networkUrl(mode);}};
+$('leave').onclick=async()=>{replayRecorder.finish('玩家离开本局');stopped=true;running=false;clearInput();runtime?.stop();clearTimers();disconnect();try{await request('leave');}finally{location.href=networkUrl(mode);}};
 onBgmVersion(()=>{if(session&&state?.phase==='lobby'&&!stopped)prepareRoomAssets(state).catch(()=>{});});
