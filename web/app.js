@@ -628,7 +628,7 @@ $('start').addEventListener('click', async () => {
       if(netQuery.get('role')==='host')replayRecorder.connectNetwork({room:netQuery.get('room'),token:netQuery.get('token')});
       const options={recorder:replayRecorder,proof:()=>battleProof(emulator,nativePause,controls,nativeMusic,pauseSeat,pauseSelection,hiddenSeats),network:netplay,rollbackEnabled,inputDelay:inputPolicy.inputDelay,snapshotStride:2,onError:report,onState:message=>status(message)};
       sync=emulator.isNetworkWorker?new AsyncLockstep({...options,execute:(inputs,frame)=>emulator.execute(inputs,frame),replaySlice:(frame,plans)=>emulator.replaySlice(frame,plans),restore:frame=>emulator.restore(frame),
-        confirm:(prefix,retain)=>emulator.confirm(prefix,retain),present:()=>emulator.present(presentationDue)})
+        confirmQueued:(prefix,retain)=>emulator.confirmQueued(prefix,retain),present:()=>emulator.present(presentationDue)})
         :new Lockstep({...options,step:stepSynchronized,present:()=>{if(presentationDue(performance.now()))presentFrame();},hash:syncHash,capture:captureSynchronized,restore:restoreSynchronized,confirm:confirmSynchronized});
     }
     // Boot can contain menu SE while the other device is still loading.

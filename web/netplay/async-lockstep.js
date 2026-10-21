@@ -4,7 +4,7 @@ const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 // Page owns the queue and transport; a single awaited transaction owns guest
 // execution. Never commit audio/hash/history from a branch invalidated in flight.
 export class AsyncLockstep extends Lockstep {
-  constructor(options){super(options);this.execute=options.execute;this.replaySlice=options.replaySlice;}
+  constructor(options){super(options);this.execute=options.execute;this.replaySlice=options.replaySlice;this.confirmQueued=options.confirmQueued;}
   planReplay(){
     const cursor=Object.create(this.queue),plans=[];
     let previous=[...this.checkpoints].at(-1);
@@ -26,7 +26,11 @@ export class AsyncLockstep extends Lockstep {
     const prefix=Math.min(this.queue.frame,this.queue.confirmed),preceding=[...this.checkpoints].filter(frame=>frame<=prefix).at(-1);
     const retainFrom=this.snapshotStride===1?prefix:(preceding??prefix);
     if(this.lastConfirmation?.prefix!==prefix||this.lastConfirmation?.retainFrom!==retainFrom){
-      await this.confirm?.(prefix,retainFrom);if(!this.running)return false;
+      // The worker's serial queue applies this before the next execute/restore.
+      // Legacy callers can still require an acknowledged confirmation.
+      if(this.confirmQueued)this.confirmQueued(prefix,retainFrom);
+      else await this.confirm?.(prefix,retainFrom);
+      if(!this.running)return false;
       this.costs.confirmCallbacks++;this.lastConfirmation={prefix,retainFrom};
       this.recorder?.confirm(prefix,this.queue.dirty!==null);
     }else this.costs.skippedConfirmations++;

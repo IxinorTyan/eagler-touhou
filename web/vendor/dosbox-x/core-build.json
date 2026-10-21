@@ -70,17 +70,17 @@
     "controls.js": "1b0eeb3ffc542b189982015d7195a02d49d9ddc26770ee87c11e661b364754b3",
     "fire-control.js": "5a97f636996386694884cf110c20db9478df19e00b7ab79de0e3ac915f123c2f",
     "native-music.js": "fdbb791ca9e5b7c920ab1b4fd9cce6c18163ed5a4a676c1b8739d139a6d22b4e",
-    "lockstep.js": "a195a34de122e265751356861e7ba84f19988016fb9025f63e56be6ef5958cff",
+    "lockstep.js": "a27afe4d68d1ace9b150ebba2ae0193f261c5eb02585a86e5c551d7a1dc790a0",
     "dosbox-disk.js": "37ebddc4bfe02cfb3d53bfaee5cde69efbc1a63d8b1c4672332b18fdf0860694",
     "frame-queue.js": "f94860055c4e460b3324a1136f268aaf021e10330e40cf85a5fdbf3815297bec",
     "netplay.js": "1010278324b54b540c697577a430c35ff8c29cb4f6632b92ac8b08f50e2bc32c",
     "netplay/input-policy.js": "502fdd94b0d43b6ba633596d812c6b319f9d44f96c0508d30a97eecca88a234b",
     "native-pause.js": "76c91720c9358efd910382c2fabe0a7a0d454a9df106a64014adaf6a9101cf4f",
-    "netplay/async-lockstep.js": "6256be5db553470804d9793adde84ed4c290a18d398c5473e07a04ce3182dc7b",
+    "netplay/async-lockstep.js": "e2ecc4e81bc3e97d20ae487021b3b0a94b986189eb2f95ade4d029c1ba445e36",
     "netplay/frame-controls.js": "36ab58422ec4814c3002da3ea269bd68ce4cc433883fcd78d0eb5ca80f7c17c4",
-    "netplay/simulation.js": "6cefe168a47c02da545674c07bb0efbf6c09b95bf86990c812a0bdc7201dada4",
-    "netplay/simulation-worker.js": "7c6763011bd32a4c2245170a70ac1104b4d5b9ce5af1136c81a6b3aa7c766a06",
-    "netplay/simulation-client.js": "40d4db32b3935f46df26006496fa0b5c698d34a24a5e78448de8a019e234be33"
+    "netplay/simulation.js": "db1cde530a11784d90b3caa9b3b07ef851f2e7360ad83d438f0c4457c4ee9cb8",
+    "netplay/simulation-worker.js": "b8fb2d17719a5bbba7434e260beebce18a75da181bfebcfe4e0bfe69f6c70d05",
+    "netplay/simulation-client.js": "860d153dcd42d366d3deb6d4ef3b1a9abd3191c2b0c7e669d7e3195508a7c617"
   },
   "browserTextEol": "LF",
   "normalizedBrowserText": {

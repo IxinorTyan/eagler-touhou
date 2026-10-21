@@ -34,6 +34,9 @@ export class WorkerNetworkSimulation {
   receive(data){
     if(data.type==='frame'){
       if(this.closed){data.bitmap.close();return;}
+      if(data.staged){
+        this.discardPreparedFrame();this.preparedFrame=data;return;
+      }
       if(this.queuedFrame)this.releaseFrame(this.queuedFrame);
       this.queuedFrame=data;
       if(!this.drawHandle)this.drawHandle=requestAnimationFrame(()=>this.draw());return;
@@ -42,24 +45,40 @@ export class WorkerNetworkSimulation {
     if(data.type==='fatal'||data.type==='error'){this.fail(Error(data.message));return;}
     if(data.type==='progress'){this.onProgress?.(data.message);return;}
     if(data.type==='exit'){this.state='exited';this.config.onExit?.();this.onExit?.();return;}
+    if(data.type==='confirmed-audio'){for(const event of data.events||[])this.onAudio?.(...event);return;}
     if(data.type!=='reply')return;
     const pending=this.pending.get(data.id);if(!pending)return;
     if(data.status){
-      const previous=this.snapshot;this.snapshot={...previous,...data.status,stepMetrics:{...previous.stepMetrics,...data.status.stepMetrics}};
+      const previous=this.snapshot;this.snapshot={...previous,...data.status};
+      if(data.status.stepMetrics)this.snapshot.stepMetrics={...previous.stepMetrics,...data.status.stepMetrics};
       const s=this.snapshot;this.state=s.state;this.tick=s.tick;
-      Object.assign(this.module,{virtualNow:s.virtualNow,heapBytes:s.heapBytes,frameUploads:s.frameUploads,stepMetrics:s.stepMetrics,programReads:s.programReads||[]});
+      Object.assign(this.module,{virtualNow:s.virtualNow,heapBytes:s.heapBytes,frameUploads:s.frameUploads});
+      for(const key of ['stepMetrics','programReads','nativeCore','pauseSearch','render','snapshots'])
+        if(Object.hasOwn(data.status,key))this.module[key]=s[key];
     }
     for(const event of data.events||[])this.onAudio?.(...event);
     this.executionMs=(this.executionMs||0)+(data.executionMs||0);
     clearTimeout(pending.timer);this.pending.delete(data.id);pending.resolve(data.result);
   }
-  releaseFrame(frame){frame.bitmap.close();if(!this.closed)this.worker.postMessage({type:'frame-ack',sequence:frame.sequence});}
+  releaseFrame(frame){frame.bitmap.close();if(!this.closed)this.worker.postMessage({type:'frame-ack',sequence:frame.sequence,discarded:!!frame.staged});}
+  discardPreparedFrame(){if(this.preparedFrame){this.releaseFrame(this.preparedFrame);this.preparedFrame=null;}}
+  clearFrames(){
+    this.discardPreparedFrame();
+    if(this.drawHandle)cancelAnimationFrame(this.drawHandle);this.drawHandle=0;
+    if(this.queuedFrame){this.releaseFrame(this.queuedFrame);this.queuedFrame=null;}
+  }
   draw(){
     this.drawHandle=0;const frame=this.queuedFrame;this.queuedFrame=null;if(!frame)return;
     try{if(!this.closed){this.onDraw?.(frame.bitmap);this.drawn=(this.drawn||0)+1;}}catch(error){this.fail(error);}finally{this.releaseFrame(frame);}
   }
   present(due){
     if(this.closed)return;this.onSnapshot?.(this.snapshot);
+    if(this.preparedPresentation){
+      if(!this.preparedFrame||(due&&!due(performance.now())))return;
+      if(this.queuedFrame)this.releaseFrame(this.queuedFrame);
+      this.queuedFrame=this.preparedFrame;this.queuedFrame.staged=false;this.preparedFrame=null;
+      if(!this.drawHandle)this.drawHandle=requestAnimationFrame(()=>this.draw());return;
+    }
     const key=`${this.snapshot.frameUploads||0}:${this.snapshot.renderEpoch||0}`;
     if(this.presentPending||this.presentedKey===key)return;
     // Idle pumps and an in-flight transfer must not consume the display slot
@@ -68,9 +87,13 @@ export class WorkerNetworkSimulation {
     this.presentPending=true;
     this.call('present').then(drawn=>{if(drawn)this.presentedKey=key;}).catch(error=>{if(!this.closed)this.fail(error);}).finally(()=>{this.presentPending=false;});
   }
-  execute(inputs,options){return this.call('execute',[inputs,options]);}
-  replaySlice(frame,plans){return this.call('replay-slice',[frame,plans]);}
-  restore(frame){return this.call('restore',[frame]);}
+  execute(inputs,options){this.preparedPresentation=true;return this.call('execute',[inputs,{...options,prepareFrame:true}]);}
+  replaySlice(frame,plans){this.preparedPresentation=true;return this.call('replay-slice',[frame,plans,true]);}
+  restore(frame){this.clearFrames();return this.call('restore',[frame]);}
+  confirmQueued(prefix,retainFrom){
+    if(this.closed)throw Error('联机模拟线程已关闭');
+    this.worker.postMessage({id:++this.serial,method:'confirm',args:[prefix,retainFrom],notify:true});
+  }
   confirm(prefix,retainFrom){return this.call('confirm',[prefix,retainFrom]);}
   hash(){return this.call('hash');}
   async boot(progress){this.onProgress=progress;try{return await this.call('boot');}finally{this.onProgress=null;}}
@@ -85,8 +108,7 @@ export class WorkerNetworkSimulation {
   fail(error){if(this.closed)return;this.failure=error;this.dispose();this.config.onError?.(error);}
   dispose(){
     if(this.closed)return;this.closed=true;this.state='exited';
-    if(this.drawHandle)cancelAnimationFrame(this.drawHandle);this.drawHandle=0;
-    if(this.queuedFrame){this.releaseFrame(this.queuedFrame);this.queuedFrame=null;}
+    this.clearFrames();
     this.worker.terminate();for(const pending of this.pending.values()){clearTimeout(pending.timer);pending.reject(this.failure||Error('联机模拟线程已关闭'));}this.pending.clear();
     window.removeEventListener('pagehide',this.onPageHide);this.context.close().catch(()=>{});
   }

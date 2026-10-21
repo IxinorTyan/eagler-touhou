@@ -71,12 +71,13 @@ export class NetworkSimulation {
     let h=2166136261;if(m.netHash)h=m.netHash(start,end);else for(let i=start;i<end;i++)h=Math.imul(h^heap[i],16777619);
     return (h>>>0).toString(16).padStart(8,'0')+':'+m.netInfo().tick+':'+this.pauseSeat+':'+[...this.hidden].sort().join(',');
   }
-  describe({diagnostics=false}={}){
+  describe({diagnostics=false,compact=false}={}){
     const e=this.emulator,m=e.module;
     return {state:e.state,tick:e.tick,virtualNow:m.virtualNow,heapBytes:m.HEAPU8.length,frameUploads:m.frameUploads||0,
       nativeState:this.state,selecting:this.pause.selecting,pending:this.pause.pending,markers:this.pause.markers(),pauseSeat:this.pauseSeat,selection:this.selection,hidden:[...this.hidden],
-      snapshots:m.netSnapshotInfo(),renderEpoch:this.renderEpoch,
+      renderEpoch:this.renderEpoch,
+      ...(!compact?{snapshots:m.netSnapshotInfo(),
       stepMetrics:diagnostics?m.stepMetrics:{count:m.stepMetrics.count,totalMs:m.stepMetrics.totalMs,maxMs:m.stepMetrics.maxMs},
-      ...(diagnostics?{programReads:m.programReads,nativeCore:readNativeCoreDiagnostics(m),pauseSearch:this.pause.search?'wasm-simd':'javascript',render:m.framePresenter?.info()}:{} )};
+      ...(diagnostics?{programReads:m.programReads,nativeCore:readNativeCoreDiagnostics(m),pauseSearch:this.pause.search?'wasm-simd':'javascript',render:m.framePresenter?.info()}:{} )}:{} )};
   }
 }
