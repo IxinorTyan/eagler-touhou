@@ -95,7 +95,9 @@ function syncInput(motion=false){
   if(motion&&touch){
     const packed=touch.pack(toTouch(inputs[slot]));
     if(mailbox>=0)writeNativeTouch(emulator.module.HEAPU8,mailbox,metadata,touchSlot,packed,!enabled||!touchPlay);
-    touch.consume();
+    // Keep rescue presses/releases visible until a native frame has read them.
+    const frame=mailbox>=0?new DataView(emulator.module.HEAPU8.buffer).getUint32(mailbox+16,true):undefined;
+    touch.consume(frame);
   }
 }
 function release(){keyboard.clear();touch?.reset();syncInput();}
@@ -156,7 +158,7 @@ export function readState(){
     players:metadata.players.stateOffsets.slice(0,h[m+metadata.players.countOffset]).map((offset,index)=>({id:index+1,x:v.getInt16(m+offset,true),y:v.getInt16(m+offset+2,true),
       lives:h[m+offset+4],bombs:h[m+offset+5],power:h[m+offset+6],hit:h[m+offset+7],invincibility:h[m+offset+8],
       shot:h[m+offset+9],out:!!(out&(1<<index)),items:v.getUint32(m+metadata.players.itemOffsets[index],true),
-      rescueFrames:h[m+metadata.players.progressOffsets[index]],rescuePercent:Math.floor(h[m+metadata.players.progressOffsets[index]]*100/90),rescueLatched:!!h[m+metadata.players.latchOffsets[index]],
+      rescueTaps:h[m+metadata.players.progressOffsets[index]]>>5,rescueLatched:!!h[m+metadata.players.latchOffsets[index]],
       rescueTarget:h[m+metadata.players.recipientOffsets[index]]+1})),
     debugInvincible:!!h[m+89],focus:{percent:metadata.focus.percentOffsets.slice(0,h[m+110]).map(offset=>h[m+offset]),enabledMask:h[m+102],pointMask:h[m+103]},
     targets:[0,1,2].map(i=>v.getUint32(m-metadata.entries.mailbox+metadata.entries.target_counts+i*4,true)),
