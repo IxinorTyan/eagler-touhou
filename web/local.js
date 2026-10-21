@@ -145,6 +145,7 @@ function scan(){
     cursor=end;active=valid();
   }
   mailbox=active.length===1?active[0]:-1;
+  emulator.module.playerArt?.bind(mailbox);
 }
 export function readState(){
   if(!emulator||mailbox<0)return null;

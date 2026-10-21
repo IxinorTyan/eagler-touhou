@@ -48,6 +48,11 @@ const sync={
  start(){fire('start');canvas.focus();},
  stop(){if(stopped)return;stopped=true;clearKeys();cancelAnimationFrame(raf);if(queuedFrame){releaseFrame(queuedFrame);queuedFrame=null;}worker?.terminate();for(const p of requests.values())p.reject(Error('TH02 worker 已停止'));requests.clear();bgm?.dispose();sfx?.dispose();context?.close().catch(()=>{});},
  async execute(inputs,{frame,replay=false,offlineMask=0,capture=false,hash=false}){const result=await request('execute',[],{inputs,frame,replay,offlineMask,capture,hash});if(hash)check=result;return result;},
+ async replaySlice(frame,plans){
+  const result=await request('replay-slice',[],{frame,plans});
+  for(const record of result.records||[])if(record.hash)check=record.hash;
+  return result;
+ },
  capture:frame=>request('capture',[frame]),step:(inputs,options)=>request('step',[inputs,options]),restore:frame=>request('restore',[frame]),
  async confirm(prefix){if(prefix<=acknowledgedPrefix)return;const result=await request('confirm',[prefix]);acknowledgedPrefix=Math.max(acknowledgedPrefix,prefix);return result;},
  replayProof:()=>cache.proof,checksum:()=>check,snapshot:()=>cache.game??null,

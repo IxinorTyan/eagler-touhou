@@ -29,18 +29,24 @@ function refreshMailbox(scan=false){
  // publishes resident.stage=0x7f before executing the ending program.
  // A surviving signature alone does not mean MAIN still owns that memory.
  if(mailbox>=0&&(!mailboxActive(h,patch,mailbox)||!residentValid(residentAddress)))mailbox=-1;
- if(mailbox>=0||!scan)return;
- if(residentAddress>=0&&residentSignature.every((b,i)=>h[residentAddress+i]===b)&&h[residentAddress+11]>5)return;
- const candidate=locateMailbox(h,patch);
- if(candidate<0)return;
- const base=guestBase(h,candidate,patch),d=candidate-patch.entries.mailbox+(patch.dataSegment-patch.codeSegment)*16;
- if((guestMemoryBase>=0&&base!==guestMemoryBase)||d<base||d+0x2800>base+0xa0000)return;
- const resident=base+v.getUint16(d+0x27fc,true)+v.getUint16(d+0x27fe,true)*16;
- const previousBase=guestMemoryBase;guestMemoryBase=base;
- if(!residentValid(resident)){guestMemoryBase=previousBase;return;}
- mailbox=candidate;residentAddress=resident;gameplaySeen=true;
- pendingNative.fill(0);consumedNative=[0,1,2].map(i=>v.getUint16(mailbox+138+i*2,true));
- sfxSequence=readSfxSequence();musicSequence=-1;musicName='';
+ if(mailbox<0&&scan){
+  if(!(residentAddress>=0&&residentSignature.every((b,i)=>h[residentAddress+i]===b)&&h[residentAddress+11]>5)){
+   const candidate=locateMailbox(h,patch);
+   if(candidate>=0){
+    const base=guestBase(h,candidate,patch),d=candidate-patch.entries.mailbox+(patch.dataSegment-patch.codeSegment)*16;
+    if((guestMemoryBase<0||base===guestMemoryBase)&&d>=base&&d+0x2800<=base+0xa0000){
+     const resident=base+v.getUint16(d+0x27fc,true)+v.getUint16(d+0x27fe,true)*16;
+     const previousBase=guestMemoryBase;guestMemoryBase=base;
+     if(residentValid(resident)){
+      mailbox=candidate;residentAddress=resident;gameplaySeen=true;
+      pendingNative.fill(0);consumedNative=[0,1,2].map(i=>v.getUint16(mailbox+138+i*2,true));
+      sfxSequence=readSfxSequence();musicSequence=-1;musicName='';
+     }else guestMemoryBase=previousBase;
+    }
+   }
+  }
+ }
+ emulator.module.playerArt?.bind(mailbox);
 }
 const state=()=>emulator?readState(emulator.module.HEAPU8,mailbox,patch):null;
 function clearKeys(){keys.clear();inputListener(0);}
@@ -84,13 +90,14 @@ async function boot(settings){
  const swapBytes=hex=>Uint8Array.from(hex.match(/../g)||[],n=>parseInt(n,16));
  const swapEntry=swapBytes(swap.entryExpected),swapJump=swapBytes(swap.entryReplacement),swapCode=swapBytes(swap.replacement);
  if(swap.schema!==1||swap.codeSegment!==patch.codeSegment||swap.bankBytes!==62||swap.sourceMainSha256[config.language]!==entry.mainSha256||
-    swap.entry!==0x5016||swap.target!==0x8600||swapJump.length!==3||swapEntry.length!==3||swapCode.length!==swap.bytes||swap.target+swap.bytes>0x8960||
+    swap.entry<patch.entries.select_player||swap.entry+swapEntry.length>patch.entries.player_input||
+    swap.target!==0x8660||swapJump.length!==3||swapEntry.length!==3||swapCode.length!==swap.bytes||swap.target+swap.bytes>0x8960||
     !swapEntry.every((b,i)=>exe[swapBase+swap.entry+i]===b)||
     !exe.subarray(swapBase+swap.target,swapBase+swap.target+swap.bytes).every(b=>b===0))throw Error('TH02 玩家状态交换补丁版本不匹配');
  exe.set(swapJump,swapBase+swap.entry);exe.set(swapCode,swapBase+swap.target);
  const rowCopy=await get('./row-copy-patch.json'),rowEdits=rowCopy.edits?.[config.language];
  if(rowCopy.schema!==1||rowCopy.codeSegment!==patch.codeSegment||rowCopy.entryImageOffset!==0x442a||
-    rowCopy.targetCodeOffset!==0x8700||rowCopy.bytes!==169||rowCopy.targetCodeOffset+rowCopy.bytes>0x8960||
+    rowCopy.targetCodeOffset!==0x8760||rowCopy.bytes!==169||rowCopy.targetCodeOffset+rowCopy.bytes>0x8960||
     rowCopy.rows!==16||rowCopy.stride!==80||!rowCopy.wordAccessOrderPreserved||
     rowCopy.sourceMainSha256[config.language]!==entry.mainSha256||!Array.isArray(rowEdits)||rowEdits.length!==4)throw Error('TH02 图形复制补丁版本不匹配');
  for(const edit of rowEdits){
@@ -101,7 +108,7 @@ async function boot(settings){
  for(const edit of rowEdits)exe.set(swapBytes(edit.replacement),edit.fileOffset);
  const bulletBank=await get('./bullet-bank-patch.json');
  if(bulletBank.schema!==1||bulletBank.codeSegment!==patch.codeSegment||bulletBank.entry!==patch.entries.collision_0||
-    bulletBank.target!==0x87b0||bulletBank.bytes<=0||bulletBank.target+bulletBank.bytes>0x8960||
+    bulletBank.target!==0x8810||bulletBank.bytes<=0||bulletBank.target+bulletBank.bytes>0x8960||
     !bulletBank.ordinaryOnly||!bulletBank.activeNonzeroFallback||!bulletBank.mailboxInactiveFallback||
     bulletBank.sourceMainSha256[config.language]!==entry.mainSha256)throw Error('TH02 普通弹碰撞补丁版本不匹配');
  const bulletExpected=swapBytes(bulletBank.entryExpected),bulletBody=swapBytes(bulletBank.replacement),bulletJump=swapBytes(bulletBank.entryReplacement);

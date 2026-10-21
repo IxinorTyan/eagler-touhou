@@ -3,6 +3,9 @@ const send=(message,transfer=[])=>postMessage(message,transfer);
 const audioContext={sampleRate:44100,state:'running',currentTime:0,addEventListener(){},removeEventListener(){},resume:async()=>{},close:async()=>{}};
 let ready,stopped=false,loaded=false,frameSequence=0,replayMusic;
 const transfers=new Set();
+// Keep replay work bounded exactly like TH05. The page can keep receiving
+// authoritative inputs while this Worker owns a short native batch.
+const REPLAY_MAX_STEPS=4,REPLAY_BUDGET_MS=6;
 const metrics={captureMs:0,captures:0,stepMs:0,steps:0,replaySteps:0,restoreMs:0,restores:0,confirmMs:0,confirmations:0,hashMs:0,hashes:0,presentMs:0,presentations:0,bitmapMs:0,bitmaps:0,nativeMs:0,nativeSteps:0,nativeMaxMs:0,statusMs:0,queueMs:0,commands:0};
 const slowSteps=[];let detailAt=-Infinity;
 function timed(kind,count,action){const at=performance.now();try{return action();}finally{metrics[kind]+=performance.now()-at;metrics[count]++;}}
@@ -39,6 +42,24 @@ onmessage=({data})=>{
    if(data.capture)timed('captureMs','captures',()=>r.capture(data.frame));
    timed('stepMs','steps',()=>r.step(data.inputs,{frame:data.frame,replay:data.replay,offlineMask:data.offlineMask}));if(data.replay)metrics.replaySteps++;
    if(data.hash)result=timed('hashMs','hashes',()=>r.checksum());
+  }else if(data.type==='replay-slice'){
+   if(!Array.isArray(data.plans)||!data.plans.length||data.plans.length>REPLAY_MAX_STEPS)throw Error('TH02 回滚补算批次无效');
+   if(!Number.isSafeInteger(data.frame)||data.frame<0||data.plans.some((plan,index)=>!plan||plan.frame!==data.frame+index||!Array.isArray(plan.inputs)||!Number.isInteger(plan.offlineMask)))throw Error('TH02 回滚补算帧顺序无效');
+   const sliceStarted=performance.now(),records=[];let applied=0,blocked=false,exited=false;
+   for(const plan of data.plans){
+    if(applied&&performance.now()-sliceStarted>=REPLAY_BUDGET_MS)break;
+    // The page labels plans that were authoritative at dispatch time. A menu
+    // or stage transition can block prediction while this batch is running.
+    if(!plan.authoritative&&!r.canPredict()){blocked=true;break;}
+    const stepStarted=performance.now();
+    if(plan.capture)timed('captureMs','captures',()=>r.capture(plan.frame));
+    const outcome=timed('stepMs','steps',()=>r.step(plan.inputs,{frame:plan.frame,replay:!plan.end,offlineMask:plan.offlineMask}));
+    if(!plan.end)metrics.replaySteps++;
+    const hash=plan.hash?timed('hashMs','hashes',()=>r.checksum()):null;
+    records.push({frame:plan.frame,proof:r.replayProof(),hash,ready:hash?r.readyForRollback():undefined,stepMs:performance.now()-stepStarted});applied++;
+    if(outcome==='exit'){exited=true;break;}
+   }
+   result={applied,records,blocked,exited,sliceMs:performance.now()-sliceStarted};
   }else if(data.type==='present')result=present();
   else if(data.type==='stop'){stopped=true;r.stop();return;}
   else {if(typeof r[data.type]!=='function')throw Error('Unknown TH02 worker command');

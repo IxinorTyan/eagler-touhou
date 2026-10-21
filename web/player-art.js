@@ -23,21 +23,26 @@ export function installPlayerArt(mod,patch,bytes){
   view().setUint32(control,0,true);view().setUint32(control+4,table,true);
   view().setUint32(control+8,tags,true);view().setUint32(control+12,0,true);
   view().setUint32(control+16,records,true);view().setUint32(control+20,coverage,true);
-  api.thArtBind(control);
-  let mailbox=-1,checks=0;
+  api.thArtBind(control);api.thLayerSetView(0);
   const valid=at=>at>=0&&signature.every((value,i)=>mod.HEAPU8[at+i]===value);
-  function bind(){
-    if(valid(mailbox))return;
+  let mailbox=-1,checks=0;
+  function setMailbox(at){
+    const next=Number.isInteger(at)&&at>=0&&valid(at)&&mod.HEAPU8[at+22]===1?at:-1;
+    if(next===mailbox)return;
+    mailbox=next;mod.thDirtyMark?.(control,32);
+    view().setUint32(control,mailbox<0?0:mailbox-patch.entries.mailbox+patch.entries.art_context,true);
+    view().setUint32(control+12,mailbox<0?0:mailbox+22,true);
+  }
+  function bind(at){
+    if(arguments.length){setMailbox(at);return;}
+    if(valid(mailbox)&&mod.HEAPU8[mailbox+22]===1)return;
     if(checks++%8)return;
     const base=api.thCoreState?api.thCoreState(0):0;
     const ram=api.thCoreState?mod.HEAPU8.subarray(base,base+0xa0000):mod.HEAPU8;
-    for(let at=ram.indexOf(signature[0]);at>=0;at=ram.indexOf(signature[0],at+1)){
-      if(!valid(base+at)||mod.HEAPU8[base+at+22]!==1)continue;
-      mailbox=base+at;
-      mod.thDirtyMark?.(control,32);
-      view().setUint32(control,mailbox-patch.entries.mailbox+patch.entries.art_context,true);
-      view().setUint32(control+12,mailbox+22,true);
-      break;
+    for(let offset=ram.indexOf(signature[0]);offset>=0;offset=ram.indexOf(signature[0],offset+1)){
+      const candidate=base+offset;
+      if(!valid(candidate)||mod.HEAPU8[candidate+22]!==1)continue;
+      setMailbox(candidate);break;
     }
   }
   return {bind,view:slot=>api.thLayerSetView(Number.isInteger(slot)&&slot>=0&&slot<3?slot:-1),info:()=>({enabled:true,bound:valid(mailbox),source:patch.playerArt.bodySource,
