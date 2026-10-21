@@ -18,7 +18,7 @@ export function nativePlayers(heap,mailbox,patch){
   const positions=xy.slice(0,count).map(at=>[view.getInt16(at,true)/16,view.getInt16(at+2,true)/16]);
   const players=states.slice(0,count).map((at,i)=>{
     const n=mailbox+p.stats+i*4;
-    const schema=patch.personal_stats,s=schema?code+schema.cs_offset+i*schema.stride:-1;
+    const schema=patch.personal_stats,s=schema?code+schema.cs_offset:-1;
     const personal=s<0?{}:{score:view.getUint32(s,true),highScore:view.getUint32(s+4,true),stagePoint:view.getUint16(s+8,true),point:view.getUint16(s+10,true),dream:heap[s+12],dreamCount:heap[s+13],graze:view.getUint16(s+14,true),totalItems:view.getUint16(s+16,true),totalPoint:view.getUint16(s+18,true),maxPoint:view.getUint16(s+20,true),scoreExtends:heap[s+23]};
     return {lives:heap[n],bombs:heap[n+1],power:heap[n+2],miss:heap[n+3],entry:heap[liveStates[i]+31],ghost:!!heap[mailbox+p.out_flags+i],offline:heap[mailbox+p.out_flags+i]===2,rescue:heap[mailbox+p.rescue_progress+i],rescueTarget:heap[code+patch.entry_map.rescue_target+i],...personal};
   });

@@ -181,6 +181,7 @@ async function boot(data){
   if(externalHost)ci.sendKeyEvent=(code,down)=>ci.addKey(code,down,externalHost.keyTime());
   if(!soloMode){
     mod.afterimageArt=await art.installAfterimageArt(mod,patch,await afterimageTask);
+    mod.afterimageArt?.view(viewSlot);
   }
   presentationActive=data.presentationActive!==false;
   mod.getSidebarBackground=()=>{
@@ -234,7 +235,7 @@ onmessage=async({data})=>{try{
   }
   if(data.type==='ack'){statePending=false;return;}
   if(data.type==='frame-ack'){frameTransfers.delete(data.seq);return;}
-  if(data.type==='view-slot'&&Number.isInteger(data.slot)&&data.slot>=0&&data.slot<3){viewSlot=data.slot;mod.framePresenter?.flush();return;}
+  if(data.type==='view-slot'&&Number.isInteger(data.slot)&&data.slot>=0&&data.slot<3){viewSlot=data.slot;mod.afterimageArt?.view(viewSlot);mod.framePresenter?.flush();return;}
   if(data.type==='presentation-active'){presentationActive=!!data.value;return;}
   if(data.type==='frame-replay-cheat'){frameBridge?.setCheat(data.value);return;}
   if(data.type==='frame-replay-stop-recording'){frameBridge?.stopRecording();return;}

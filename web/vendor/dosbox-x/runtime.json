@@ -16,7 +16,7 @@
     "wdosbox-x-jspi.wasm": "c154235667747e613be00d0955f068b54cbf8e1fb8e5c34d34e5552292f4c72a",
     "audio-worklet.js": "e1e8912f986479b1926cca0d8342f6b504defca873d3a51aac1172e5fbbf4c5d",
     "LICENSE": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
-    "wdosbox-x-fast.wasm": "7833111cfbea4afd94bcd7e3271679dc02ac1ae057063b7d924b74f7f8c76fc1"
+    "wdosbox-x-fast.wasm": "ee92b10c2714f8a9359ae9a390b94c910f3cd7b5662d4970cfff50d29b86378a"
   },
   "keyboardFix": {
     "sourceSha256": "c154235667747e613be00d0955f068b54cbf8e1fb8e5c34d34e5552292f4c72a",

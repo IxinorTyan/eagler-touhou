@@ -223,6 +223,7 @@ async function boot(data){
   const config='[dosbox]\nmachine=pc98\nmemsize=16\n[cpu]\ncore=simple\ncputype=386\ncycles=1000\n[render]\nframeskip=0\nscaler=none\naspect=false\n[sblaster]\nsbtype=none\n[pc98]\npc-98 fm board=board86\n[mixer]\nrate=44100\nblocksize=512\nprebuffer=20\n[autoexec]\n@echo off\nmount a /home/web_user/game\na:\ncd KAIKI\nFASTBOOT.BAT\n';
   ci=await emulators.backend([...files,{dosboxConf:config,jsdosConf:{version:'8'}}],transport,{});
   mod.afterimageArt=await installAfterimageArt(mod,patch,afterimageBytes);
+  mod.afterimageArt?.view(viewSlot);
   // The native mixer still advances deterministically, but its silent PCM is
   // no longer copied, retained in rollback effects, or transferred per frame.
   ci.events().onSoundPush(()=>{if(!warming)audioPackets++;});

@@ -40,15 +40,15 @@ export function createPersonalHud(read,select){
       const cell=tram<0?0:view.getUint16(tram+6*160+56*2,true),slot=select();
       if(schema&&Number.isInteger(slot)&&slot>=0&&slot<heap[mailbox-patch.mailbox_cs_offset+patch.entry_map.player_count]&&
          (cell&255)===0x57&&(cell>>>8)>=0x20&&(cell>>>8)<=0x29){
-        const code=mailbox-patch.mailbox_cs_offset,at=code+schema.cs_offset+slot*schema.stride;
+        const code=mailbox-patch.mailbox_cs_offset,at=code+schema.cs_offset;
         const d=code+(patch.data_segment-patch.code_segment)*16,bonus=code+schema.bonus_cs_offset;
         const mode=heap[bonus],stageTitle=view.getUint16(tram+4*160+20*2,true)===0x4d56,
           clearTitle=view.getUint16(tram+4*160+19*2,true)===0x5c56;
         const settlement=(mode===1&&stageTitle)||(mode===2&&clearTitle)?mode:0;
         values={score:view.getUint32(at,true),high:view.getUint32(at+4,true),point:view.getUint16(at+8,true),
           total:view.getUint16(at+10,true),dream:heap[at+12],graze:view.getUint16(at+14,true),settlement,
-          bonus:view.getUint32(bonus+1+slot*4,true),stage:heap[d+0x576e],
-          lives:heap[mailbox+patch.mailbox_offsets.stats+slot*4],
+          bonus:view.getUint32(bonus+1,true),stage:heap[d+0x576e],
+          lives:heap[mailbox+patch.mailbox_offsets.stats],
           misses:view.getUint16(at+24,true),bombs:view.getUint16(at+26,true),
           stageMiss:view.getUint16(at+28,true),stageBomb:view.getUint16(at+30,true)};
       }
