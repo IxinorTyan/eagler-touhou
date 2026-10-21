@@ -751,7 +751,8 @@ function armRollback(){
 async function confirmFrames(){
   const before=performance.now();
   const prefix=Math.min(queue.frame,queue.confirmed);
-  const outcome=await runtime.confirm(prefix);
+  const outcome=runtime.confirmQueued?undefined:await runtime.confirm(prefix);
+  runtime.confirmQueued?.(prefix,finishGame);
   replayRecorder.confirm(prefix,queue.dirty!==null);
   if(outcome==='exit'){finishGame();return;}
   if(stopped)return;
