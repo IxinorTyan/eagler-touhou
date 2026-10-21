@@ -47,7 +47,7 @@ function inputs() {
   }else{
     const t=unpackTouch(touchValue);movement=packTouch(touchButtons,{...t,x:0,y:0,alwaysPoint:Math.floor(touchValue/ALWAYS_POINT)%2===1});
   }
-  const sampled=player.sample(bits(mappings[touchSlot])|touchButtons|(menu&&performance.now()<menuPulseUntil?menuPulse:0));
+  const sampled=player.sample(bits(mappings[touchSlot])|touchButtons|(menu&&performance.now()<menuPulseUntil?menuPulse:0),{rescueTap:touchButtons&64});
   movement=movement-movement%4096+sampled;
   const values=mappings.map((mapping,slot)=>slot===touchSlot?sampled:bits(mapping));
   const a=values[0];
@@ -90,7 +90,7 @@ function frame(now){
     $('diagnostics').textContent=s?JSON.stringify({...s,music:emulator.musicError||emulator.bgm?.status},null,2):'正在初始化关卡，请稍候。';
     player.diagnostics($('diagnostics').textContent);
     if(s?.nativePaused)status('游戏暂停菜单：方向键选择，Z / Enter 确认，Esc 继续；选择退出结束本局。');
-    else if(live&&emulator.state==='running')status(`本机 ${s.players.length} 人运行中 · ${runConfig.players.map((p,i)=>`P${i+1} ${names[p.character]}`).join(' / ')} · ${s.invincible?'测试无敌已开启':'正常受击'} · ${s.players.map((p,i)=>`P${i+1} ${p.ghost?'幽灵':`残机 ${Math.max(0,p.lives-1)}`} / Bomb ${p.bombs} / P ${p.power}/128${p.rescue?` / 救援 ${Math.floor(p.rescue/90*100)}%`:''}`).join(' · ')}`);
+    else if(live&&emulator.state==='running')status(`本机 ${s.players.length} 人运行中 · ${runConfig.players.map((p,i)=>`P${i+1} ${names[p.character]}`).join(' / ')} · ${s.invincible?'测试无敌已开启':'正常受击'} · ${s.players.map((p,i)=>`P${i+1} ${p.ghost?'幽灵':`残机 ${Math.max(0,p.lives-1)}`} / Bomb ${p.bombs} / P ${p.power}/128${p.rescue?` / 救援 ${p.rescue}/5`:''}`).join(' · ')}`);
   }
 }
 requestAnimationFrame(frame);

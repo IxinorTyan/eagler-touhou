@@ -1,15 +1,15 @@
 {
   "language": "cn",
-  "sha256": "7eda7287a74d51e7bf6e5a845464e1072d196c99a8f32a34c6b39c1c8035ec3e",
+  "sha256": "6ac7127a6a7293ac31fb49d3ade553b38ab984898a9bbfc3e00c8fcd4bea5f38",
   "size": 21415936,
   "source_main_md5": "553eee5ff79429f45284913870380549",
   "insert_offset": 84656,
-  "insert_size": 18224,
-  "payload_bytes": 18211,
-  "heap_bytes": 369920,
+  "insert_size": 18240,
+  "payload_bytes": 18240,
+  "heap_bytes": 369904,
   "heap_by_players": {
-    "2": 291344,
-    "3": 369920
+    "2": 291328,
+    "3": 369904
   },
   "code_segment": 2785,
   "shot_pool": {
@@ -36,16 +36,16 @@
     "rule": "complete native volleys; one shared allocation scan per world update"
   },
   "bomb_background": "one shared CDG loaded for the bound caster; dialog exit reloads P1; original EMS portraits preserved",
-  "data_segment": 9488,
-  "mailbox_cs_offset": 50952,
+  "data_segment": 9489,
+  "mailbox_cs_offset": 50912,
   "swap_cs_offset": 40733,
-  "native_pause_cs_offset": 57996,
+  "native_pause_cs_offset": 58025,
   "entries": [
     40401,
     41001,
     41272,
     41306,
-    50952,
+    50912,
     40733,
     40378,
     41094,
@@ -67,13 +67,13 @@
     42612,
     42584,
     43062,
-    51044,
-    51047,
-    51053,
-    51055,
-    51040,
-    51067,
-    51073,
+    51004,
+    51007,
+    51013,
+    51015,
+    51000,
+    51027,
+    51033,
     40563,
     41552,
     42313,
@@ -82,105 +82,105 @@
     41545,
     41295,
     42134,
-    53125,
-    53605,
-    53820,
-    53597,
-    53601,
-    54032,
-    54104,
-    54116,
-    54307,
-    54341,
-    54369,
-    54403,
-    54411,
+    53154,
+    53634,
+    53849,
+    53626,
+    53630,
+    54061,
+    54133,
+    54145,
+    54336,
+    54370,
+    54398,
     54432,
-    53143,
-    53137,
-    55404,
-    55492,
-    55620,
-    55691,
-    55353,
-    55341,
-    55642,
-    55808,
-    55832,
-    53136,
-    51903,
-    51904,
-    51906,
-    51907,
-    51911,
-    51953,
-    51955,
-    51959,
-    51961,
-    51966,
-    52062,
-    52418,
-    52105,
-    53461,
-    53541,
-    51964,
-    51962,
-    53142,
-    51881,
-    56234,
-    56330,
-    56343,
-    56349,
-    56355,
-    57214,
-    56532,
-    56642,
+    54440,
+    54461,
+    53172,
+    53166,
+    55433,
+    55521,
+    55649,
+    55720,
+    55382,
+    55370,
+    55671,
+    55837,
+    55861,
+    53165,
+    51863,
+    51864,
+    51866,
+    51867,
+    51871,
+    51913,
+    51915,
+    51919,
+    51921,
+    51926,
+    52022,
+    52378,
+    52065,
+    53490,
+    53570,
+    51924,
+    51922,
+    53171,
+    51841,
+    56263,
+    56359,
+    56372,
+    56378,
+    56384,
+    57243,
+    56561,
+    56671,
+    57050,
+    56885,
+    56897,
+    56909,
+    56924,
+    56939,
+    56954,
+    56969,
+    56988,
+    57385,
+    57391,
+    57010,
     57021,
-    56856,
-    56868,
-    56880,
-    56895,
-    56910,
-    56925,
-    56940,
-    56959,
-    57356,
-    57362,
-    56981,
-    56992,
-    57881,
-    57716,
-    57731,
-    57746,
+    57910,
+    57745,
+    57760,
+    57775,
     9062,
-    57165,
-    57188,
-    58027,
-    57996,
+    57194,
+    57217,
+    58056,
+    58025,
     48683,
     48686,
     48737,
-    50936,
-    50937,
-    50950,
+    50894,
+    50895,
+    50908,
     49149,
     49230,
-    57998,
-    57997,
-    54008,
-    58121,
-    58100,
-    58114,
-    58255,
-    58273,
-    58279
+    58027,
+    58026,
+    54037,
+    58150,
+    58129,
+    58143,
+    58284,
+    58302,
+    58308
   ],
   "entry_map": {
     "init_hook": 40401,
     "update_hook": 41001,
     "render_hook": 41272,
     "invalidate_hook": 41306,
-    "mailbox": 50952,
+    "mailbox": 50912,
     "swap_player": 40733,
     "run_stage": 40378,
     "retire_hook": 41094,
@@ -202,13 +202,13 @@
     "publish": 42612,
     "rescue_tick": 42584,
     "ghosts_render": 43062,
-    "out_flags": 51044,
-    "rescue_progress": 51047,
-    "invincible": 51053,
-    "stats": 51055,
-    "p2_overflow": 51040,
-    "hit_counts": 51067,
-    "target_counts": 51073,
+    "out_flags": 51004,
+    "rescue_progress": 51007,
+    "invincible": 51013,
+    "stats": 51015,
+    "p2_overflow": 51000,
+    "hit_counts": 51027,
+    "target_counts": 51033,
     "restart_players": 40563,
     "p2_check": 41552,
     "hit_wall_left": 42313,
@@ -217,98 +217,98 @@
     "aim_x_two": 41545,
     "hud_hook": 41295,
     "laser_test": 42134,
-    "run_config": 53125,
-    "configure_players": 53605,
-    "assets_load": 53820,
-    "bft_pointer": 53597,
-    "tiny_pointer": 53601,
-    "shot_tag": 54032,
-    "shot_draw": 54104,
-    "hit_draw": 54116,
-    "hit_tag": 54307,
-    "damage_begin": 54341,
-    "damage_add": 54369,
-    "damage_bomb": 54403,
-    "bomb_character": 54411,
-    "damage_finish": 54432,
-    "shot_owners": 53143,
-    "p2_character": 53137,
-    "item_hittest": 55404,
-    "item_award_leave": 55492,
-    "item_team_1up": 55620,
-    "item_aim": 55691,
-    "item_sound_pointer": 55353,
-    "item_pickups": 55341,
-    "item_team_bomb": 55642,
-    "touch_state": 55808,
-    "touch_move": 55832,
-    "player_count": 53136,
-    "guest_slot": 51903,
-    "p3_input": 51904,
-    "p3_focus": 51906,
-    "p3_xy": 51907,
-    "p3_state": 51911,
-    "p3_resources": 51953,
-    "p3_shots": 51955,
-    "p3_overflow": 51959,
-    "p3_character": 51961,
-    "p3_patterns": 51966,
-    "rescue_target": 52062,
-    "bind_player": 52418,
-    "guest_bank": 52105,
-    "guest_patterns": 53461,
-    "guest_cdg": 53541,
-    "p3_bb": 51964,
-    "p3_bomb_func": 51962,
-    "assets_ready": 53142,
-    "heap_config": 51881,
-    "personal_stats": 56234,
-    "personal_bonus": 56330,
-    "power_fraction": 56343,
-    "hit_weights": 56349,
-    "hit_owner": 56355,
-    "stats_frame": 57214,
-    "stats_restart": 56532,
-    "stats_stage_reset": 56642,
-    "stats_damage_award": 57021,
-    "stats_active_add": 56856,
-    "stats_kill_add": 56868,
-    "stats_kill_550": 56880,
-    "stats_kill_100": 56895,
-    "stats_clear_big": 56910,
-    "stats_clear_small": 56925,
-    "stats_clear_add": 56940,
-    "stats_world_add": 56959,
-    "stats_stage_bonus": 57356,
-    "stats_allclear_bonus": 57362,
-    "stats_damage_second_begin": 56981,
-    "stats_damage_second_add": 56992,
-    "power_pickup_bonus": 57881,
-    "boss_main_damage": 57716,
-    "boss_other_damage": 57731,
-    "boss_mid_damage": 57746,
+    "run_config": 53154,
+    "configure_players": 53634,
+    "assets_load": 53849,
+    "bft_pointer": 53626,
+    "tiny_pointer": 53630,
+    "shot_tag": 54061,
+    "shot_draw": 54133,
+    "hit_draw": 54145,
+    "hit_tag": 54336,
+    "damage_begin": 54370,
+    "damage_add": 54398,
+    "damage_bomb": 54432,
+    "bomb_character": 54440,
+    "damage_finish": 54461,
+    "shot_owners": 53172,
+    "p2_character": 53166,
+    "item_hittest": 55433,
+    "item_award_leave": 55521,
+    "item_team_1up": 55649,
+    "item_aim": 55720,
+    "item_sound_pointer": 55382,
+    "item_pickups": 55370,
+    "item_team_bomb": 55671,
+    "touch_state": 55837,
+    "touch_move": 55861,
+    "player_count": 53165,
+    "guest_slot": 51863,
+    "p3_input": 51864,
+    "p3_focus": 51866,
+    "p3_xy": 51867,
+    "p3_state": 51871,
+    "p3_resources": 51913,
+    "p3_shots": 51915,
+    "p3_overflow": 51919,
+    "p3_character": 51921,
+    "p3_patterns": 51926,
+    "rescue_target": 52022,
+    "bind_player": 52378,
+    "guest_bank": 52065,
+    "guest_patterns": 53490,
+    "guest_cdg": 53570,
+    "p3_bb": 51924,
+    "p3_bomb_func": 51922,
+    "assets_ready": 53171,
+    "heap_config": 51841,
+    "personal_stats": 56263,
+    "personal_bonus": 56359,
+    "power_fraction": 56372,
+    "hit_weights": 56378,
+    "hit_owner": 56384,
+    "stats_frame": 57243,
+    "stats_restart": 56561,
+    "stats_stage_reset": 56671,
+    "stats_damage_award": 57050,
+    "stats_active_add": 56885,
+    "stats_kill_add": 56897,
+    "stats_kill_550": 56909,
+    "stats_kill_100": 56924,
+    "stats_clear_big": 56939,
+    "stats_clear_small": 56954,
+    "stats_clear_add": 56969,
+    "stats_world_add": 56988,
+    "stats_stage_bonus": 57385,
+    "stats_allclear_bonus": 57391,
+    "stats_damage_second_begin": 57010,
+    "stats_damage_second_add": 57021,
+    "power_pickup_bonus": 57910,
+    "boss_main_damage": 57745,
+    "boss_other_damage": 57760,
+    "boss_mid_damage": 57775,
     "boss_balance": 9062,
-    "stats_world_dream_grow": 57165,
-    "stats_world_dream_drop": 57188,
-    "native_pause_hook": 58027,
-    "native_pause_state": 57996,
+    "stats_world_dream_grow": 57194,
+    "stats_world_dream_drop": 57217,
+    "native_pause_hook": 58056,
+    "native_pause_state": 58025,
     "art_variants": 48683,
     "select_art_variants": 48686,
     "recolor_guest_player": 48737,
-    "recolor_guest_shots": 50936,
-    "hud_scroll_capture": 50937,
-    "hud_scroll_line": 50950,
+    "recolor_guest_shots": 50894,
+    "hud_scroll_capture": 50895,
+    "hud_scroll_line": 50908,
     "afterimage_put": 49149,
     "afterimage_context": 49230,
-    "offline_apply": 57998,
-    "offline_mask": 57997,
-    "bomb_background_load": 54008,
-    "shots_allocate": 58121,
-    "shots_begin": 58100,
-    "shots_end": 58114,
-    "shots_next": 58255,
-    "shots_compare": 58273,
-    "shots_clear": 58279
+    "offline_apply": 58027,
+    "offline_mask": 58026,
+    "bomb_background_load": 54037,
+    "shots_allocate": 58150,
+    "shots_begin": 58129,
+    "shots_end": 58143,
+    "shots_next": 58284,
+    "shots_compare": 58302,
+    "shots_clear": 58308
   },
   "hooks": [
     {
@@ -321,7 +321,7 @@
       "name": "native_pause",
       "image_offset": 44747,
       "expected": "e86907",
-      "entry": 58027
+      "entry": 58056
     },
     {
       "name": "player_update",
@@ -369,13 +369,13 @@
       "name": "assets_load",
       "image_offset": 46028,
       "expected": "e8c009",
-      "entry": 53820
+      "entry": 53849
     },
     {
       "name": "bomb_background_load",
       "image_offset": 81660,
       "expected": "e80801",
-      "entry": 54008
+      "entry": 54037
     },
     {
       "name": "afterimage_put",
@@ -387,260 +387,260 @@
       "name": "heap_config",
       "image_offset": 44610,
       "expected": "c70624081847",
-      "entry": 51881
+      "entry": 51841
     },
     {
       "name": "touch_move",
       "image_offset": 52442,
       "expected": "e8f5fd",
-      "entry": 55832
+      "entry": 55861
     },
     {
       "name": "shots_allocate",
       "image_offset": 58252,
       "expected": "33c08b1e004281fb0ebf732a83c312803f0075f2c707010066a1d2366689470266c7470a000040ffc7470e14008bc383c312891e0042c3",
-      "entry": 58121,
+      "entry": 58150,
       "tail_jump": true
     },
     {
       "name": "shots_next",
       "image_offset": 78765,
       "expected": "83c612",
-      "entry": 58255
+      "entry": 58284
     },
     {
       "name": "shots_next",
       "image_offset": 79108,
       "expected": "83c612",
-      "entry": 58255
+      "entry": 58284
     },
     {
       "name": "shots_clear",
       "image_offset": 76601,
       "expected": "688eba682001e820a4",
-      "entry": 58279
+      "entry": 58308
     },
     {
       "name": "shot_draw",
       "image_offset": 79293,
       "expected": "e8bc8a",
-      "entry": 54104
+      "entry": 54133
     },
     {
       "name": "hit_draw",
       "image_offset": 79358,
       "expected": "e87b8a",
-      "entry": 54116
+      "entry": 54145
     },
     {
       "name": "hit_tag",
       "image_offset": 79429,
       "expected": "c60401",
-      "entry": 54307
+      "entry": 54336
     },
     {
       "name": "damage_begin",
       "image_offset": 79533,
       "expected": "33f6c646f500",
-      "entry": 54341
+      "entry": 54370
     },
     {
       "name": "damage_add",
       "image_offset": 79598,
       "expected": "03f0fe064ec6",
-      "entry": 54369
+      "entry": 54398
     },
     {
       "name": "damage_bomb",
       "image_offset": 79652,
       "expected": "803e064200",
-      "entry": 54403
+      "entry": 54432
     },
     {
       "name": "bomb_character",
       "image_offset": 79699,
       "expected": "803e735701",
-      "entry": 54411
+      "entry": 54440
     },
     {
       "name": "damage_finish",
       "image_offset": 79757,
       "expected": "803ec01d007436803e7357007607803e735703724f803e6e5706750eb80500f7ee8bf08bc6c1e802eb4a803e7357007545b80800f7ee8bf0bb0700eb31803e6e57067519803e7357007512b80400f7ee8bf0bb05008bc633d2f7f38bf0803e7357037512b80400f7ee8bf0bb05008bc633d2f7f38bf0",
-      "entry": 54432
+      "entry": 54461
     },
     {
       "name": "stats_damage_second_begin",
       "image_offset": 79932,
       "expected": "33ffc646f500",
-      "entry": 56981
+      "entry": 57010
     },
     {
       "name": "stats_damage_second_add",
       "image_offset": 79997,
       "expected": "03f8fe064ec6",
-      "entry": 56992
+      "entry": 57021
     },
     {
       "name": "stats_frame",
       "image_offset": 44906,
       "expected": "e80c16",
-      "entry": 57214
+      "entry": 57243
     },
     {
       "name": "stats_damage_award",
       "image_offset": 79879,
       "expected": "6601061237",
-      "entry": 57021
+      "entry": 57050
     },
     {
       "name": "stats_damage_award",
       "image_offset": 80089,
       "expected": "6601061237",
-      "entry": 57021
+      "entry": 57050
     },
     {
       "name": "stats_kill_add",
       "image_offset": 93442,
       "expected": "6601061237",
-      "entry": 56868
+      "entry": 56897
     },
     {
       "name": "stats_kill_550",
       "image_offset": 99614,
       "expected": "668106123726020000",
-      "entry": 56880
+      "entry": 56909
     },
     {
       "name": "stats_clear_big",
       "image_offset": 115014,
       "expected": "668306123764",
-      "entry": 56910
+      "entry": 56939
     },
     {
       "name": "stats_clear_small",
       "image_offset": 115022,
       "expected": "66830612370a",
-      "entry": 56925
+      "entry": 56954
     },
     {
       "name": "stats_active_add",
       "image_offset": 115479,
       "expected": "6601061237",
-      "entry": 56856
+      "entry": 56885
     },
     {
       "name": "stats_clear_add",
       "image_offset": 115734,
       "expected": "6601061237",
-      "entry": 56940
+      "entry": 56969
     },
     {
       "name": "stats_world_add",
       "image_offset": 116063,
       "expected": "6601061237",
-      "entry": 56959
+      "entry": 56988
     },
     {
       "name": "stats_world_add",
       "image_offset": 116170,
       "expected": "6601061237",
-      "entry": 56959
+      "entry": 56988
     },
     {
       "name": "stats_stage_bonus",
       "image_offset": 117187,
       "expected": "6601061237",
-      "entry": 57356
+      "entry": 57385
     },
     {
       "name": "stats_allclear_bonus",
       "image_offset": 117766,
       "expected": "6601061237",
-      "entry": 57362
+      "entry": 57391
     },
     {
       "name": "stats_active_add",
       "image_offset": 118807,
       "expected": "6601061237",
-      "entry": 56856
+      "entry": 56885
     },
     {
       "name": "stats_kill_100",
       "image_offset": 123284,
       "expected": "668306123764",
-      "entry": 56895
+      "entry": 56924
     },
     {
       "name": "stats_world_dream_grow",
       "image_offset": 93715,
       "expected": "803ef636807309fe06f6369abd23e10a",
-      "entry": 57165
+      "entry": 57194
     },
     {
       "name": "stats_world_dream_drop",
       "image_offset": 118916,
       "expected": "803ef636017618803ef636807311fe0ef636",
-      "entry": 57188
+      "entry": 57217
     },
     {
       "name": "power_pickup_bonus",
       "image_offset": 118280,
       "expected": "8a450eb4008bd8",
-      "entry": 57881
+      "entry": 57910
     },
     {
       "name": "boss_main_damage",
       "image_offset": 129763,
       "expected": "b4002906c65a",
-      "entry": 57716
+      "entry": 57745
     },
     {
       "name": "boss_mid_damage",
       "image_offset": 96328,
       "expected": "b4002906de5a",
-      "entry": 57746
+      "entry": 57775
     },
     {
       "name": "boss_other_damage",
       "image_offset": 89112,
       "expected": "b4002906b25a",
-      "entry": 57731
+      "entry": 57760
     },
     {
       "name": "boss_other_damage",
       "image_offset": 89711,
       "expected": "b4002906b25a",
-      "entry": 57731
+      "entry": 57760
     },
     {
       "name": "boss_other_damage",
       "image_offset": 89847,
       "expected": "b4002906b25a",
-      "entry": 57731
+      "entry": 57760
     },
     {
       "name": "boss_other_damage",
       "image_offset": 90852,
       "expected": "b4002906b25a",
-      "entry": 57731
+      "entry": 57760
     },
     {
       "name": "boss_other_damage",
       "image_offset": 91816,
       "expected": "b4002906b25a",
-      "entry": 57731
+      "entry": 57760
     },
     {
       "name": "boss_other_damage",
       "image_offset": 92603,
       "expected": "b4002906b25a",
-      "entry": 57731
+      "entry": 57760
     },
     {
       "name": "boss_other_damage",
       "image_offset": 114128,
       "expected": "b4002906b25a",
-      "entry": 57731
+      "entry": 57760
     },
     {
       "name": "bomb_start",
@@ -664,37 +664,37 @@
       "name": "hud_scroll_capture",
       "image_offset": 7909,
       "expected": "8b5e068b16c803",
-      "entry": 50937
+      "entry": 50895
     },
     {
       "name": "item_hittest",
       "image_offset": 119117,
       "expected": "803ef4360075308b1ed23681c3800129c381fb000377208b1ed43681c3800129d381fb60027710",
-      "entry": 55404
+      "entry": 55433
     },
     {
       "name": "item_award_leave",
       "image_offset": 119160,
       "expected": "6a0b9a3202ab14",
-      "entry": 55492
+      "entry": 55521
     },
     {
       "name": "item_team_1up",
       "image_offset": 118738,
       "expected": "fe06d44a9a2522e10a",
-      "entry": 55620
+      "entry": 55649
     },
     {
       "name": "item_team_bomb",
       "image_offset": 118717,
       "expected": "fe06d54abe6400",
-      "entry": 55642
+      "entry": 55671
     },
     {
       "name": "item_aim",
       "image_offset": 119006,
       "expected": "a1d4362b440450a1d2362b4402509a3a1f0000",
-      "entry": 55691
+      "entry": 55720
     },
     {
       "name": "bomb_x",
@@ -834,50 +834,50 @@
     {
       "image_offset": 48603,
       "original": "b90800268b0426890583c65083c750e2f281ef8002",
-      "replacement": "e9d2c5909090909090909090909090909090909090",
-      "target_cs_offset": 54688,
+      "replacement": "e9efc5909090909090909090909090909090909090",
+      "target_cs_offset": 54717,
       "name": "fixed eight-row EGC tile copy; original read/write order"
     },
     {
       "image_offset": 49396,
       "original": "add3c88af022c226890532c674042688450283c750fecd75e7",
-      "replacement": "e923c390909090909090909090909090909090909090909090",
-      "target_cs_offset": 54794,
+      "replacement": "e940c390909090909090909090909090909090909090909090",
+      "target_cs_offset": 54823,
       "name": "16x16 even four-row blit; equivalent SHRD rotation"
     },
     {
       "image_offset": 49500,
       "original": "add3c88af022c226880532c686e02689450183c750fecd75e7",
-      "replacement": "e93dc390909090909090909090909090909090909090909090",
-      "target_cs_offset": 54924,
+      "replacement": "e95ac390909090909090909090909090909090909090909090",
+      "target_cs_offset": 54953,
       "name": "16x16 odd four-row blit; equivalent SHRD rotation"
     },
     {
       "image_offset": 49080,
       "original": "e8550075fb",
-      "replacement": "e963c59090",
-      "target_cs_offset": 55054,
+      "replacement": "e980c59090",
+      "target_cs_offset": 55083,
       "name": "32x32 even inline cloud rows"
     },
     {
       "image_offset": 49126,
       "original": "e8590075fb",
-      "replacement": "e96ac59090",
-      "target_cs_offset": 55107,
+      "replacement": "e987c59090",
+      "target_cs_offset": 55136,
       "name": "32x32 odd inline cloud rows"
     },
     {
       "image_offset": 48762,
       "original": "ad0ae47405268905eb070ac0740326880583c750e2ea",
-      "replacement": "e914c790909090909090909090909090909090909090",
-      "target_cs_offset": 55169,
+      "replacement": "e931c790909090909090909090909090909090909090",
+      "target_cs_offset": 55198,
       "name": "spark four-row blit"
     },
     {
       "image_offset": 50033,
       "original": "a583c74ee2fa",
-      "replacement": "e993c2909090",
-      "target_cs_offset": 55287,
+      "replacement": "e9b0c2909090",
+      "target_cs_offset": 55316,
       "name": "point-bullet full six-row blit"
     }
   ],
@@ -901,7 +901,7 @@
     "p3_resources": 1001,
     "p3_shots": 1003,
     "p3_overflow": 1007,
-    "player_count": 2184,
+    "player_count": 2253,
     "rescue_target": 1110
   },
   "launch_config": {
@@ -935,18 +935,18 @@
         334876
       ],
       [
-        10668517,
-        10668518,
-        10668519,
-        10668520,
-        10668521,
-        10668522,
-        10668523,
-        10668524,
-        10668525,
-        10668526,
-        10668527,
-        10668528
+        10668546,
+        10668547,
+        10668548,
+        10668549,
+        10668550,
+        10668551,
+        10668552,
+        10668553,
+        10668554,
+        10668555,
+        10668556,
+        10668557
       ]
     ]
   },
@@ -992,7 +992,7 @@
     "palette": "shared native 16 colors; costume hue ramps, original mounts, unchanged stage palette"
   },
   "personal_stats": {
-    "cs_offset": 56234,
+    "cs_offset": 56263,
     "stride": 32,
     "score": 0,
     "high_score": 4,
@@ -1010,7 +1010,7 @@
     "bombs": 26,
     "stage_miss_start": 28,
     "stage_bomb_start": 30,
-    "bonus_cs_offset": 56330,
+    "bonus_cs_offset": 56359,
     "extends": [
       3000000,
       8000000,
@@ -1040,7 +1040,7 @@
   },
   "items": {
     "player_count": 3,
-    "pickup_counts": 55341,
+    "pickup_counts": 55370,
     "owner_priority": "first eligible canonical seat, one award per item",
     "power": "collector; at full Power, small/large P supports lowest living teammate, nearest item then seat",
     "power_support": {
