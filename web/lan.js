@@ -14,7 +14,7 @@ import {loadVerifiedBytes,loadCompiledCore} from './startup-assets.js';
 import {loadMusicAssets} from './music-files.js';
 import {loadAfterimageArt} from './afterimage-art.js';
 import {assetBytes,freshJSON} from './preload-cache.js';
-import {bgmVersion,onBgmVersion} from './bgm-version.js';
+import {bgmVersion,onBgmVersion,resolveBgmTrack} from './bgm-version.js';
 const GRACE_MS=5000;
 let localCheatUsed=false;
 let historyHost=null,historyWarning='',finishing=false,historyRequest=0;
@@ -195,13 +195,12 @@ async function prepareRoomResources(value){
     const tracked=!!value.settings.rollback&&WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,5,2,0,1,0,1]));
     const core=`wdosbox-x-rollback${tracked?'-tracked':''}.wasm`;
     const [sfxManifest,bgmManifest,alternate]=await Promise.all([freshJSON('sfx/manifest.json'),freshJSON('bgm/manifest.json'),freshJSON('bgm/akyu/manifest.json')]);
-    const tracks=(bgmVersion()==='new'?alternate:bgmManifest).tracks;
     const opening=Number(value.settings.rank)===4?'st06':'st00';
     await Promise.all([
       loadVerifiedBytes(new URL(`th05-local-${value.settings.language}.hdi.gz`,import.meta.url),patch.sha256,{gzip:true,size:patch.size}),
       loadCompiledCore(new URL(core,vendor),manifest.files[core]),loadMusicAssets({effects:true}),loadAfterimageArt(patch),
       loadVerifiedBytes(new URL('sfx/'+sfxManifest.url,import.meta.url),sfxManifest.sha256,{size:sfxManifest.bytes}),
-      ...['m26','m86'].map(type=>tracks[`${opening}-${type}`]).filter(Boolean).map(track=>assetBytes('bgm/'+track.url,{hash:track.audioSha256,size:track.bytes}))
+      ...['m26','m86'].map(type=>resolveBgmTrack(`${opening}-${type}`,bgmManifest.tracks,alternate.tracks)).filter(Boolean).map(track=>assetBytes('bgm/'+track.url,{hash:track.audioSha256,size:track.bytes}))
     ]);
     if(generation===preloadGeneration)report('游戏磁盘、核心和音乐／音效资源已校验并预载');
   })();
