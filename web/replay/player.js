@@ -8,7 +8,7 @@ const $=id=>document.getElementById(id),ctx=$('canvas').getContext('2d',{alpha:f
 let header=null,rows=[],end=null,replica=null,paused=false,target=null,epoch=0,channel=null,poll=null,available=0,loading=false,failed=false,latest=false;
 const viewer=randomId();let expectedHeader='',lastReply=performance.now(),receivedBytes=0;
 let audio,soundEnabled=false;
-let points=[],bootAbort,fileEpoch=0,network,joinStarted=false;
+let points=[],bootAbort,network,joinStarted=false;
 function status(text){$('status').textContent=text;}
 function update(){const frame=replica?.frame||0;$('seek').max=rows.length;$('seek').value=frame;$('position').textContent=`${frame} / ${rows.length}${end?' · 片段结束':''}`;$('pause').textContent=paused?'继续':'暂停';}
 function cancel(){epoch++;bootAbort?.abort();replica?.stop();replica=null;loading=false;audio?.stop();audio=null;}
@@ -37,7 +37,11 @@ async function boot(token){
   }catch(e){if(token===epoch)fail(e);}
 }
 async function load(data){cancel();clearInterval(poll);channel?.close();network?.stop();channel=null;expectedHeader='';receivedBytes=0;header=data.header;rows=data.rows;points=data.points||[];end=data.end;available=rows.length;paused=false;target=null;failed=false;latest=false;await boot(epoch);update();}
-$('file').onchange=async event=>{const request=++fileEpoch;try{const file=event.target.files[0];if(!file)return;const data=await decodeTape(file);if(request!==fileEpoch)return;if(data.header.game!==GAME)throw Error('请在对应作品的播放器打开录像');await load(data);}catch(e){if(request===fileEpoch)fail(e);}};
+if(GAME==='01'&&$('file'))$('file').onchange=async event=>{try{
+  const file=event.target.files[0];if(!file)return;const data=await decodeTape(file);
+  if(data.header.game!==GAME||data.header.adapter!=='native-local/1'||data.header.players!==1)throw Error('TH01 仅支持单人 Replay 文件；多人历史只能通过旁观链接观看');
+  await load(data);
+}catch(e){fail(e);}};
 $('pause').onclick=()=>{paused=!paused;if(paused){latest=false;target=null;}update();};
 $('seek').onchange=()=>{target=Number($('seek').value);latest=false;const point=points.filter(p=>p.frame<=target).at(-1);if(replica&&(target<replica.frame||point&&point.frame>replica.frame)){cancel();void boot(epoch);}update();};
 $('live').onclick=()=>{target=rows.length;latest=true;paused=false;const point=points.filter(p=>p.frame<=target).at(-1);if(replica&&point?.frame>replica.frame){cancel();void boot(epoch);}update();};
