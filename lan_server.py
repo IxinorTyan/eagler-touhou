@@ -142,7 +142,7 @@ class Handler(AssetHandler):
         return code, room, role
 
     def do_GET(self):
-        if replay_history.handle_get(self): return
+        if replay_history.handle_get(self, ROOMS, LOCK, '01', lambda r: time.monotonic()-r['seen']['host']>TTL): return
         url = urlsplit(self.path)
         if url.path == '/relay':
             relay_server.handle(self, ROOMS, LOCK, ROLES, TTL)

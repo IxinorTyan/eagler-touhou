@@ -131,7 +131,7 @@ $('settings').onclick=()=>{editing=!editing;$('entry').hidden=!editing;$('entry-
   for(const id of ['startStage','players','rank','count','network','transport','ice','delay'])$(id).value=String(room.settings[id]);$('life-compensation').checked=room.settings.lifeCompensation;help();};
 $('save-settings').onclick=()=>action(async()=>{const value=await post('settings',{settings:config()});editing=false;await accept(value);});
 async function leave(mode=room?.settings||config()){
-  leaving=true;session?.close();try{if(identity)await post('leave');}finally{identity=null;location.href='lan.html?'+networkParams(mode);}
+  leaving=true;session?.close();try{await session?.recorder.seal();if(identity)await post('leave');}finally{identity=null;location.href='lan.html?'+networkParams(mode);}
 }
 $('leave').onclick=$('retry').onclick=()=>action(()=>leave());
 $('retry-ws').onclick=()=>action(()=>leave({...room.settings,transport:'ws',ice:'all'}));

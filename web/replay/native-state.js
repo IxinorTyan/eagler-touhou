@@ -5,7 +5,7 @@ export const NATIVE_LAYOUT='th01-native-state/1';
 // The element segment initializes that table; there are no table write/grow
 // instructions. The isolated replica exports the existing global; code/data
 // sections and the player's original module remain byte-for-byte unchanged.
-export const AUDITED_CORE='d47618d99e17c65f8a52ec4a651a94c731c9882527a4130325b3509ef72e4986';
+export const AUDITED_CORE='a75686945d3bc99e18363d6f8b56ce0316ca1136f1b97489dba1e31579607fba';
 const HEAP=4194304,MAX_JSON=16384;
 const leb=n=>{const bytes=[];do{let b=n&127;n>>>=7;bytes.push(b|(n?128:0));}while(n);return bytes;};
 function uint(bytes,cursor){let value=0,shift=0;for(let n=0;n<5;n++){const b=bytes[cursor.at++];if(b===undefined)throw Error('原生模块截断');value|=(b&127)<<shift;if(!(b&128))return value>>>0;shift+=7;}throw Error('原生模块长度无效');}

@@ -32,5 +32,8 @@ onmessage=({data})=>{if(data.type==='frame-ack')return;chain=chain.then(async()=
     const e=simulation.core,end=e.th_get(11,0)>>>0;postMessage({type:'replay-audio-reset',nativeEnd:end,events:[{type:'native-audio',event:{cue:e.th_get(79,0),end,ids:[]}}]});
   }
   else if(!['start','confirm','setRawPresentation'].includes(data.type))throw Error('未知原生回放命令');
-  postMessage({type:'result',id:data.id,result,status:{proof:JSON.stringify(simulation.checksum()),game:simulation.state()}});
+  const game=simulation.state();
+  const scene=headerScene(game);
+  postMessage({type:'result',id:data.id,result,status:{proof:JSON.stringify(simulation.checksum()),game,scene}});
  }).catch(error=>{closed=true;postMessage({type:'error',id:data.id,message:error.stack||String(error)});});};
+function headerScene(game){return game?.stage>=1&&game.stage<=20?{kind:'stage',stage:game.stage,route:game.route}:null;}

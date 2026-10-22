@@ -1,7 +1,7 @@
 import {pointBytes,digest} from './tape.js';
 export const LOCAL_CHUNK=24576;
 export const pointSize=p=>p.data.length/4*3-(p.data.endsWith('==')?2:p.data.endsWith('=')?1:0);
-export const pointIndex=points=>points.map(p=>({frame:p.frame,sha:p.sha,size:pointSize(p)}));
+export const pointIndex=points=>points.map(p=>({frame:p.frame,sha:p.sha,size:pointSize(p),...(p.scene?{scene:p.scene}:{})}));
 
 export async function readLocalPoint(channel,viewer,point,signal){
   const bytes=new Uint8Array(point.size);let offset=0;
