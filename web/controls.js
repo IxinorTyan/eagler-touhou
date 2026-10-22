@@ -173,11 +173,17 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
       document.getElementById(`summary-${slot}`).textContent = actions.map(action => keyName(bindings[slot][action])).join(' · ');
     }
   }
+  function sampleChangedInput(){
+    // Preserve physical edges immediately; the accepted network frame still
+    // owns consumption. Offline fire timing stays on its existing clock.
+    const network=getNetwork?.();if(!network?.isLockstep)return;
+    sampleLocal();network.onLocalInput?.();
+  }
   for (const type of ['keydown', 'keyup']) window.addEventListener(type, event => {
     if (synthetic.has(event)) return;
     // Register before SDL: physical keys never leak into the native second seat.
     event.stopImmediatePropagation();
-    if (type === 'keyup') { keys.delete(event.code); return; }
+    if (type === 'keyup') { if(keys.delete(event.code))sampleChangedInput(); return; }
     if (pending) {
       event.preventDefault();
       if (event.code === 'Escape') { pending = null; render(); return; }
@@ -211,7 +217,7 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
     }
     if (event.target.closest?.('button')) return;
     if (event.code === 'Enter' || bindings.some((row, slot) => actions.some(action => matches(slot, action, event.code)))) {
-      event.preventDefault(); if (!event.repeat) {keys.add(event.code);tapped.add(event.code);}
+      event.preventDefault(); if (!event.repeat) {keys.add(event.code);tapped.add(event.code);sampleChangedInput();}
     }
   }, true);
   window.addEventListener('blur', () => { focused = false; release(); });

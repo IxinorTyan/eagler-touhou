@@ -1,5 +1,9 @@
 # TH03 DOSBox-X 开发交接
 
+2026-10-22 输入响应：联机物理 keydown／keyup 立即调用现有采样锁存并唤醒 pump，短按保留至 accepted frame；同步与异步 pump 在历史补算未完成时均可采样尚未发布的 live frontier。保留 RTT 缓冲、默认 page／可选 Worker、单机射击时钟、可靠通道、六步领先和十二步恢复。队列／pacing／Worker／RTT 回归、真实 Worker 双人 RTC 与主线程／Worker 原生恢复对照通过；72 模块静态审计通过。四项 behaviorFiles、inputSampling 元数据及发行清单已更新，核心／盘／美术音频不变；全员刷新重建房。完整证据及边界见根目录 `reports/pc98-input-latency-fixes-20261022.md`。未实测物理输入到显示延迟，不能从本机吞吐宣称公网提速。
+
+2026-10-22 输入响应：联机物理 keydown／keyup 立即调用现有采样锁存并唤醒 pump，短按保留至 accepted frame；同步与异步 pump 在历史补算未完成时均可采样尚未发布的 live frontier。保留 RTT 缓冲、默认 page／可选 Worker、单机射击时钟、可靠通道、六步领先和十二步恢复。队列／pacing／Worker／RTT 回归、真实 Worker 双人 RTC 与主线程／Worker 原生恢复对照通过；72 模块静态审计通过。四项 behaviorFiles、inputSampling 元数据及发行清单已更新，核心／盘／美术音频不变；全员刷新重建房。完整证据及边界见根目录 `reports/pc98-input-latency-fixes-20261022.md`。未实测物理输入到显示延迟，不能从本机吞吐宣称公网提速。
+
 2026-10-19 参照 TH02 ending-freeze：NativePause 低速／触控仅 phase=1 才写，拒绝签名完整但 phase>3 的桥，保留 phase=0 的退出认输 ack 回执；TH03 无 TH02 enable／stage 退出语义，不移植其地址。NativeMusic 原有签名＋INT60向量检查保持，新增 ramBase 随 capture／restore 保存，reset 清空；丢失 TSR 后继续完整640 KiB DOS校验和限定暂停扫描，未绑定时普通 syncHash 明确报错。没有修改原生桥／核心／磁盘／音频或 RTT。30项生命周期合成检查、两helper完整heap恢复、原BGM／22SE／64 journal／20960暂停搜索和280状态机检查通过；84资源中79项不变，50模块静态审计通过。本轮没有运行游戏／浏览器／服务或真实结局，不能宣称复现或修复全部TH03结局卡死。详见 reports/bridge-lifecycle-20261019.md，备份 build/bridge-lifecycle-20261019/，仍由用户试玩。
 
 2026-10-18 后续：用户同意继续，正式接入全房 RTT 固定输入缓冲。回滚开启时，原生加载与资源／开局校验后，通过实际通道各取三次新 ping/pong，中位数向上取整后取两端较大值；≤20 ms 为零，否则 ceil(RTT/2/16.667ms)+1，上限6帧，房主提出、客机重算核对并确认，局内固定。关闭回滚不采样，保留原2帧确认锁步。队列启动预填 max(2,inputDelay)，避免从2帧启动切到4～6帧时缺输入；Netplay 缓存接收器安装前最多256条帧消息，避免快端先启动丢包。协议升 th03-rollback/6，更新 relay 校验、输入策略元数据和双清单；要重启服务、所有客户端刷新并重新建房。日志包含实际缓冲、开局样本和双方报告。42队列／8协商／24 pump合成状态场景、78有效／677无效relay向量、原同步／音频／journal检查通过；49模块与82资源审计，8冻结核心文件和上轮两份快照实现完全不变。没有启动游戏、浏览器、服务、真实连接或音频设备；不能把虚拟链路少补算当成实际FPS收益。报告 reports/th03-rtt-fixed-input-20261018.md，备份 build/rtt-input-20261018/。旧段落的零输入延迟描述是本轮之前的历史策略。

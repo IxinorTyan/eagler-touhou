@@ -67,16 +67,16 @@
     "native/main.exe": "70e1b6ccb6b0d4491117ff16e794a31d99c8ddf07dbdcf5fca3bc44e2f57ac90",
     "native/start.com": "56936478df4a99bc5c80e87b88243d607d52d4845f21e0d5a76b49b7fa8b51e4",
     "native/music.com": "46ecae8ab9e22a4d99f847cdbd019d724925134a80d821981c6b8195721cfe56",
-    "controls.js": "1b0eeb3ffc542b189982015d7195a02d49d9ddc26770ee87c11e661b364754b3",
+    "controls.js": "ab98a2e219bcc6cb76aac6cabce326cf58ecd03a6cee05a9b2370565b5b510ca",
     "fire-control.js": "5a97f636996386694884cf110c20db9478df19e00b7ab79de0e3ac915f123c2f",
     "native-music.js": "fdbb791ca9e5b7c920ab1b4fd9cce6c18163ed5a4a676c1b8739d139a6d22b4e",
-    "lockstep.js": "a27afe4d68d1ace9b150ebba2ae0193f261c5eb02585a86e5c551d7a1dc790a0",
+    "lockstep.js": "33c2c95d791b8e574416df513608bc8987601d558130b9df4d8034949e1bca0d",
     "dosbox-disk.js": "37ebddc4bfe02cfb3d53bfaee5cde69efbc1a63d8b1c4672332b18fdf0860694",
-    "frame-queue.js": "f94860055c4e460b3324a1136f268aaf021e10330e40cf85a5fdbf3815297bec",
+    "frame-queue.js": "d43ce95ddad787c0f61e829b972b06d51c11a017c3ef24a3c1b904fa00bea962",
     "netplay.js": "1010278324b54b540c697577a430c35ff8c29cb4f6632b92ac8b08f50e2bc32c",
     "netplay/input-policy.js": "502fdd94b0d43b6ba633596d812c6b319f9d44f96c0508d30a97eecca88a234b",
     "native-pause.js": "76c91720c9358efd910382c2fabe0a7a0d454a9df106a64014adaf6a9101cf4f",
-    "netplay/async-lockstep.js": "e2ecc4e81bc3e97d20ae487021b3b0a94b986189eb2f95ade4d029c1ba445e36",
+    "netplay/async-lockstep.js": "2afb38800e11ffaddbdc39f272a0e8b24649347cd07d6a9fb1e4f9b296289fb7",
     "netplay/frame-controls.js": "36ab58422ec4814c3002da3ea269bd68ce4cc433883fcd78d0eb5ca80f7c17c4",
     "netplay/simulation.js": "db1cde530a11784d90b3caa9b3b07ef851f2e7360ad83d438f0c4457c4ee9cb8",
     "netplay/simulation-worker.js": "b8fb2d17719a5bbba7434e260beebce18a75da181bfebcfe4e0bfe69f6c70d05",
@@ -177,6 +177,11 @@
       "snapshot-retention"
     ],
     "invalidateOnRestore": true
+  },
+  "inputSampling": {
+    "version": 1,
+    "keyboardEventSampling": true,
+    "liveFrontierCapture": true
   },
   "networkWorker": {
     "version": 1,

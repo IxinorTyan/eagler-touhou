@@ -9,6 +9,7 @@ export class Lockstep {
     this.running=false;this.applying=false;this.last=0;this.budget=0;this.lastProgress=performance.now();this.replayUntil=null;
     this.timer=null;this.wakeTimer=null;this.wakePending=false;this.wakeToken=0;this.frameHandle=null;this.pumping=false;
     this.wakeChannel=typeof MessageChannel==='function'?new MessageChannel():null;
+    this.onLocalInput=()=>this.wake();network.onLocalInput=this.onLocalInput;
     if(this.wakeChannel)this.wakeChannel.port1.onmessage=event=>{
       if(event.data!==this.wakeToken||!this.wakePending||!this.running)return;
       this.wakePending=false;this.wakeTimer=null;this.pump(performance.now());
@@ -114,6 +115,9 @@ export class Lockstep {
         timed('confirm',()=>this.confirmFrames());this.queue.prune();
         steps++;this.lastProgress=performance.now();return true;
       };
+      if(this.replayUntil!==null&&this.queue.frame<this.replayUntil&&this.budget>=TICK_MS&&this.queue.needsCapture(this.replayUntil)){
+        const packet=this.queue.capture(this.network.capture(),this.replayUntil);if(packet)this.network.sendPacket(packet);
+      }
       if(this.queue.dirty!==null){
         // Send the frontier input before restoring history, as in TH04.
         if(this.budget>=TICK_MS&&(this.replayUntil===null||this.queue.frame>=this.replayUntil)&&this.queue.needsCapture()){
@@ -154,5 +158,5 @@ export class Lockstep {
     }catch(error){this.fail(error);}finally{this.pumping=false;}
   }
   fail(error){if(this.failed)return;this.failed=true;this.stop();this.onError(error);}
-  stop(){this.recorder?.finish('对战同步结束');this.running=false;clearTimeout(this.timer);clearTimeout(this.wakeTimer);this.timer=null;this.wakeTimer=null;this.wakePending=false;this.wakeToken++;if(this.frameHandle!==null&&typeof cancelAnimationFrame==='function')cancelAnimationFrame(this.frameHandle);this.frameHandle=null;}
+  stop(){this.recorder?.finish('对战同步结束');this.running=false;if(this.network.onLocalInput===this.onLocalInput)this.network.onLocalInput=null;clearTimeout(this.timer);clearTimeout(this.wakeTimer);this.timer=null;this.wakeTimer=null;this.wakePending=false;this.wakeToken++;if(this.frameHandle!==null&&typeof cancelAnimationFrame==='function')cancelAnimationFrame(this.frameHandle);this.frameHandle=null;}
 }

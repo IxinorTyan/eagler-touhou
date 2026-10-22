@@ -26,6 +26,7 @@ if(build){
   assert.deepEqual(build.networkWorker,{version:1,default:'page',selection:'per-device-opt-in',maxImageTransfers:2,serializedGuestTransactions:true});
   for(const name of ['async-lockstep.js','frame-controls.js','simulation.js','simulation-worker.js','simulation-client.js'])assert(build.behaviorFiles['netplay/'+name]);
  }
+ if(build.inputSampling)assert.deepEqual(build.inputSampling,{version:1,keyboardEventSampling:true,liveFrontierCapture:true});
  assert(read('dosbox-adapter.js').includes(Buffer.from('deterministic:net,nativeScheduling:true,nativeCpu:true,nativePlanar:false,nativeFramePresentation:false,')));
 }else{
  const before=JSON.parse(fs.readFileSync(path.join(root,'build/before-dirty-pages-20261014/web/vendor/dosbox-x/runtime.json')));
@@ -35,7 +36,7 @@ for(const name of ['disks/manifest.json','native-patch.json','native/main.exe','
  const old=spawnSync('git',['show','HEAD:web/'+name],{cwd:root,maxBuffer:64*1024*1024});assert.equal(old.status,0);
  // Intentional host changes are frozen separately. Native music lifecycle
  // now retains the DOS base across TSR removal; all DOS binaries stay fixed.
- if((name==='lockstep.js'&&build?.inputPolicy)||(name==='native-music.js'&&build?.bridgeLifecycle)){
+ if((name==='controls.js'&&build?.inputSampling)||(name==='lockstep.js'&&build?.inputPolicy)||(name==='native-music.js'&&build?.bridgeLifecycle)){
   assert(build.behaviorFiles[name]);continue;
  }
  if(/\.(js|json)$/.test(name))assert.equal(read(name).toString().replace(/\r\n/g,'\n'),old.stdout.toString().replace(/\r\n/g,'\n'),'Behavior resource changed '+name);

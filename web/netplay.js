@@ -1,5 +1,6 @@
 import {packTouch, unpackTouch, ALWAYS_POINT, MAX_INPUT} from './touch-input.js';
 import {neutral} from './frame-queue.js';
+import {createInputChannel,acceptInputChannel} from './netplay/input-transport.js';
 import {loadRtcConfiguration,hasTurn,describeRtcPath} from './netplay/udp-config.js';
 import {SYNC_PROTOCOL,RTT_SAMPLES,validInputReport,validInputPolicy,chooseInputPolicy} from './netplay/input-policy.js';
 const ACTIONS=['up','down','left','right','shot','rapid','attack','focus'], protocol='th03-lan/1';
@@ -26,6 +27,7 @@ export class Netplay {
   async waitForPlayers(){const response=await fetch('/api/progress',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({protocol,room:this.room,token:this.token,message:'本机资源已就绪',loaded:true})});if(!response.ok)throw Error('房间准备确认失败');const deadline=performance.now()+600000;while(!this.closed){const state=await this.state();if(state.startup.host?.error||state.startup.guest?.error)throw Error('另一端加载失败，请结束后重新建房');if(state.startup.host?.loaded&&state.startup.guest?.loaded)return;if(performance.now()>deadline)throw Error('等待另一端加载超时');await new Promise(resolve=>setTimeout(resolve,200));}throw Error('连接已关闭');}
   fail(error){if(this.closed)return;this.rtcReject?.(error);this.relayReject?.(error);this.rtcResolve=this.rtcReject=this.relayReject=null;this.close();this.onState(error.message);this.onError(error);}
   get isLockstep(){return true;}
+  get inputTransportStats(){return this.channel?.transportStats??null;}
   clearLocal(){this.localActions=[];this.localTaps=new Set();this.localTouch=null;}
   setLocal(actions,touch=0,options={}){
     // Retain short presses observed between accepted network frames. A fresh
@@ -215,15 +217,15 @@ export class Netplay {
         clearTimeout(this.disconnectTimer);this.disconnectTimer=null;this.refreshPath();
       }
     };
-    this.pc.ondatachannel=e=>this.attach(e.channel);
+    this.pc.ondatachannel=e=>{try{acceptInputChannel(this.pc,e.channel,'th03-inputs',channel=>this.attach(channel));}catch(error){this.fail(error);}};
     const connected=new Promise((resolve,reject)=>{this.rtcResolve=resolve;this.rtcReject=reject;});
     this.rtcTimer=setTimeout(()=>this.fail(Error(this.rtcFailure())),45000);
     this.readSignals();
     if(this.role==='host'){
-      // Frame packets include incremental touch movement and commands. Retain
-      // reliable delivery; dropping frames needs an explicit resend protocol.
+      // The transport retains immutable frame packets, including touch deltas
+      // and commands, until acknowledged; duplicate arrivals execute once.
       Promise.resolve().then(async()=>{
-        this.attach(this.pc.createDataChannel('th03-inputs',{ordered:true}));
+        this.attach(createInputChannel(this.pc,'th03-inputs'));
         await this.pc.setLocalDescription(await this.pc.createOffer());
         await this.signal('guest',{type:'offer',description:this.pc.localDescription});
       }).catch(error=>this.fail(error));

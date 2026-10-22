@@ -51,7 +51,7 @@ export class AsyncLockstep extends Lockstep {
       if(this.queue.waitReason)this.budget=Math.min(this.budget,TICK_MS);
       const started=performance.now();let steps=0;
       const confirm=async()=>{const at=performance.now();const result=await this.confirmFrames();this.costs.confirm+=performance.now()-at;return result;};
-      const captureLocal=()=>{if(this.queue.needsCapture()){const packet=this.queue.capture(this.network.capture());if(packet)this.network.sendPacket(packet);}};
+      const captureLocal=(frontier=this.queue.frame)=>{if(this.queue.needsCapture(frontier)){const packet=this.queue.capture(this.network.capture(),frontier);if(packet)this.network.sendPacket(packet);}};
       const simulate=async(replay,repairing=false)=>{
         const pair=this.nextInputs(repairing);if(!pair)return false;
         const q=this.queue,frame=q.frame,previous=[...this.checkpoints].at(-1);
@@ -65,6 +65,7 @@ export class AsyncLockstep extends Lockstep {
         this.recorder?.stage(frame,{inputs:pair,offlineMask:0,proof:result.proof,hash:hash?result.hash:null});
         steps++;this.lastProgress=performance.now();return true;
       };
+      if(this.replayUntil!==null&&this.queue.frame<this.replayUntil&&this.budget>=TICK_MS)captureLocal(this.replayUntil);
       if(this.queue.dirty!==null)this.reconcile();
       if(this.queue.dirty!==null){
         if(this.budget>=TICK_MS&&(this.replayUntil===null||this.queue.frame>=this.replayUntil))captureLocal();

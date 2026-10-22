@@ -26,9 +26,11 @@ export class FrameQueue {
     if(!this.rollbackEnabled||this.activation!==null||!Number.isSafeInteger(frame)||frame<this.frame||frame>this.frame+240)throw Error('无效回滚启用帧');
     this.activation=frame;
   }
-  needsCapture(){const frame=this.frame+(this.active?this.inputDelay:this.bootDelay);return !this.inputs[this.slot].has(frame);}
-  capture(input){
-    const frame=this.frame+(this.active?this.inputDelay:this.bootDelay),lane=this.inputs[this.slot];
+  needsCapture(frontier=this.frame){const frame=frontier+(this.active?this.inputDelay:this.bootDelay);return !this.inputs[this.slot].has(frame);}
+  capture(input,frontier=this.frame){
+    if(!Number.isSafeInteger(frontier)||frontier<this.frame||frontier>this.frame+MAX_ROLLBACK||
+       (frontier!==this.frame&&!this.active))throw Error('无效输入采样前沿');
+    const frame=frontier+(this.active?this.inputDelay:this.bootDelay),lane=this.inputs[this.slot];
     if(lane.has(frame))return null;
     if(!validInput(input))throw Error('本机帧输入无效');
     lane.set(frame,structuredClone(input));this.updateConfirmed();return {type:'frame',frame,input:structuredClone(input)};

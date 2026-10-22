@@ -30,7 +30,7 @@ function write() {
     'lan.html','lan.js','preload-cache.js','room-runtime.css',
     'replay/recorder.js','replay/tape.js','replay/profile.js','replay/sha256.js','replay/battle-proof.js',
     'app.js','site-adapter.css','fonts/th03-pause-pixel.woff2','fonts/OFL-Unifont.txt','network-performance.js','netplay.js','netplay/udp-config.js','netplay/input-policy.js','lockstep.js','frame-queue.js','controls.js',
-    'netplay/async-lockstep.js','netplay/frame-controls.js','netplay/simulation.js','netplay/simulation-worker.js','netplay/simulation-client.js',
+    'netplay/input-transport.js','netplay/async-lockstep.js','netplay/frame-controls.js','netplay/simulation.js','netplay/simulation-worker.js','netplay/simulation-client.js',
     'native-pause.js','pause-search.js','native-patch.json','native/main.exe','native/start.com','native/music.com',
     'local-sfx.js','network-audio.js','network-audio.json','native/network-audio.com','sfx/manifest.json',
     ...fs.readdirSync(path.join(web,'sfx')).filter(name=>name.endsWith('.wav')).map(name=>'sfx/'+name),
