@@ -348,6 +348,7 @@ const sync={
  async unlockAudio(){const context=emulator?.audio.context;if(context?.state!=='running')await context?.resume();return context?.state==='running';},
  touchContext(){const s=state(),p=s?.players[localSlot],paused=emulator&&nativePaused(emulator.module.HEAPU8,mailbox,patch);return {key:`${s?.generation??0}:${!s||paused?'menu':'game'}`,play:!!p&&!p.hit&&!p.out&&!paused};},
  replayProof:()=>JSON.stringify([ticks,emulatedTicks,oldP1,mailbox,guestMemoryBase,residentAddress,gameplaySeen,previousInputs,pendingNative,consumedNative,musicSequence,musicName,sfxSequence,state()]),
+ replayScene(){const s=state();return s?{kind:'stage',stage:s.stage}:null;},
  replaySave,replayLoad,
  snapshot:state,checksum,step,present,capture,restore,confirm,
  readyForRollback:()=>gameplaySeen&&!!emulator?.module.netCapture,

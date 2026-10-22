@@ -18,6 +18,7 @@ globalThis.th02WorkerHost={canvas:new OffscreenCanvas(640,400),audioContext,
 };
 function status(force=false){const at=performance.now(),r=th02WorkerHost.runtime;
  const value={proof:r.replayProof(),ready:r.readyForRollback(),reason:r.predictionBlockReason(),touch:r.touchContext()};
+ if(th02WorkerHost.replayOnly)value.scene=r.replayScene();
  if(force||metrics.steps-lastGameStep>=30||at-lastGameAt>=1000){value.game=r.snapshot();lastGameStep=metrics.steps;lastGameAt=at;}
  // Expensive display percentile sorting and fault detail are observational;
  // keep them out of every step/confirm RPC, while game policy stays current.

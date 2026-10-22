@@ -146,6 +146,7 @@ function showStartup(){
   }
 }
 function closeDisconnected(reason){
+  replayRecorder.finish(reason);
   if(stopped)return;
   stopReason=String(reason);startupFailure(stopReason);
   stopped=true;running=false;clearInput();runtime?.stop();iframe?.remove();runtime=null;
@@ -255,7 +256,7 @@ function fail(error){
 }
 function closeFinishedRoom(){
   if(session.role!=='host'||!stopped||!onlinePeers().every(peer=>peer.ended))return;
-  disconnect();request('leave').catch(()=>{});
+  disconnect();void replayRecorder.seal().then(()=>request('leave')).catch(()=>{});
 }
 function finishGame(){
   if(stopped)return;stopped=true;running=false;clearInput();
@@ -342,6 +343,8 @@ function update(value){
   if(running)for(const peer of onlinePeers())if(!state.present[peer.role])suspect(peer);
   if(state.phase==='loading'&&!preparing){
     preparing=true;
+    // The same poll may include offers before asynchronous preloading resumes.
+    connectionConfigPending=true;
     // Every browser enters the same TH06-style immersive layout. Only the
     // host can usually satisfy the browser's user-activation requirement for
     // native fullscreen; guests still lose the old top/bottom chrome.
@@ -568,8 +571,9 @@ async function requestRelayFallback(reason){
   finally{fallbackPending=false;}
 }
 async function setupConnections(){
+  if(connectionAttempt)pendingConnectionSignals=[];
   const attempt=++connectionAttempt,relayMode=useRelay;
-  connectionReadySent=false;runRequested=false;timingSent=false;runDelay=null;runInputDelay=null;connectionConfigPending=true;pendingConnectionSignals=[];
+  connectionReadySent=false;runRequested=false;timingSent=false;runDelay=null;runInputDelay=null;connectionConfigPending=true;
   const oldPeers=[...peers.values()];peers.clear();
   for(const peer of oldPeers){clearTimeout(peer.connectTimer);peer.channel?.close();peer.pc.close();}
   relay?.close();relay=null;
@@ -1074,5 +1078,5 @@ $('ready').onclick=()=>{
   action('ready');
 };
 $('start').onclick=()=>{action('start');};
-$('leave').onclick=async()=>{replayRecorder.finish('玩家离开本局');stopped=true;running=false;clearInput();runtime?.stop();clearTimers();disconnect();try{await request('leave');}finally{location.href=networkUrl(mode);}};
+$('leave').onclick=async()=>{replayRecorder.finish('玩家离开本局');stopped=true;running=false;clearInput();runtime?.stop();clearTimers();disconnect();try{await replayRecorder.seal();await request('leave');}finally{location.href=networkUrl(mode);}};
 onBgmVersion(()=>{if(session&&state?.phase==='lobby'&&!stopped)prepareRoomResources(state).catch(()=>{});});

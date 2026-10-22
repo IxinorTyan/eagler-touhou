@@ -1,12 +1,14 @@
-import {MAX_FRAMES,MAX_RAW,stable,pointBytes,toBase64,digest,MAX_POINT_BYTES} from './tape.js';
+import {MAX_FRAMES,MAX_RAW,stable,pointBytes,toBase64,digest,MAX_POINT_BYTES,MAX_POINT_TOTAL} from './tape.js';
+import {validScene} from './scenes.js';
 // HTTP only stores confirmed rows. Neither retries nor a slow reader block the game.
 export function publishNetwork(header,getRows,getEnd,identity,{onLink=()=>{},onStatus=()=>{},getPoints=()=>({points:[],done:true})}={}){
   let watch='',cursor=0,busy=false,stopped=false,ended=false,pointsEnded=false,timer=null,lastProgress=performance.now(),pointIndex=0,pointOffset=0,pointData;
+  const controller=new AbortController();
   async function request(action,body){
-    const response=await fetch('/api/replay/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...identity,...body}),signal:AbortSignal.timeout(5000)});
+    const response=await fetch('/api/replay/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...identity,...body}),signal:AbortSignal.any([controller.signal,AbortSignal.timeout(5000)])});
     const value=await response.json();if(!response.ok)throw Error(value.error||'观战服务不可用');return value;
   }
-  function stop(){stopped=true;clearTimeout(timer);timer=null;}
+  function stop(){stopped=true;clearTimeout(timer);timer=null;controller.abort();}
   async function pump(){
     if(stopped||busy||pointsEnded)return;busy=true;
     try{
@@ -23,17 +25,19 @@ export function publishNetwork(header,getRows,getEnd,identity,{onLink=()=>{},onS
       while(!stopped&&cursor===getRows().length&&pointIndex<state.points.length&&chunks++<4){
         const point=state.points[pointIndex];if(point.frame>cursor)break;
         pointData??=pointBytes(point);const chunk=pointData.subarray(pointOffset,pointOffset+32768);
-        const r=await request('point',{watch,frame:point.frame,sha:point.sha,size:pointData.length,offset:pointOffset,payload:toBase64(chunk)});
+        const r=await request('point',{watch,frame:point.frame,sha:point.sha,size:pointData.length,offset:pointOffset,payload:toBase64(chunk),scene:point.scene??null});
         if(r.offset!==pointOffset+chunk.length)throw Error('检查点上传确认范围不一致');pointOffset=r.offset;lastProgress=performance.now();
         if(pointOffset===pointData.length){pointData=null;pointOffset=0;pointIndex++;}
       }
       if(ended&&state.done&&pointIndex===state.points.length){await request('points-end',{watch});pointsEnded=true;onStatus('网络观战历史与定位点已封存');}
     }catch(e){
+      if(stopped)return;
       if(getRows().length-cursor>3600||performance.now()-lastProgress>15000){stop();onStatus('网络观战停止：'+e.message);}
       else onStatus('网络观战重试中：'+e.message);
     }finally{busy=false;if(!stopped&&!pointsEnded){timer=setTimeout(()=>{timer=null;pump();},cursor<getRows().length||pointIndex<getPoints().points.length?20:500);}}
   }
-  void pump();return {kick(){if(!timer)void pump();},stop};
+  void pump();return {kick(){clearTimeout(timer);timer=null;void pump();},stop,get done(){return pointsEnded;},get stopped(){return stopped;},
+    async seal(timeout=30000){const deadline=performance.now()+timeout;this.kick();while(!pointsEnded&&!stopped&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,50));return pointsEnded;}};
 }
 
 export function subscribeNetwork(watch,onSlice,onStatus,onError){
@@ -80,6 +84,6 @@ export async function readNetworkPoint(watch,point,signal){
 
 export function validatePointIndex(index,available){
   if(!Array.isArray(index)||index.length>128)throw Error('观战检查点索引无效');let previous=-1,total=0;
-  for(const p of index){if(!Number.isInteger(p.frame)||p.frame<0||p.frame>available||p.frame<=previous||previous===-1&&p.frame!==0||!Number.isInteger(p.size)||p.size<1||p.size>MAX_POINT_BYTES||!/^[a-f0-9]{64}$/.test(p.sha))throw Error('观战检查点范围无效');previous=p.frame;total+=p.size;}
-  if(total>MAX_POINT_BYTES)throw Error('观战检查点超过容量');return index;
+  for(const p of index){if(!Number.isInteger(p.frame)||p.frame<0||p.frame>available||p.frame<=previous||previous===-1&&p.frame!==0||!Number.isInteger(p.size)||p.size<1||p.size>MAX_POINT_BYTES||!/^[a-f0-9]{64}$/.test(p.sha)||!validScene(p.scene))throw Error('观战检查点范围无效');previous=p.frame;total+=p.size;}
+  if(total>MAX_POINT_TOTAL)throw Error('观战检查点超过容量');return index;
 }
