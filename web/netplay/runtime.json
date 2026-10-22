@@ -18,12 +18,12 @@
   "generated_js_sha256": "b86ffabafe90b43c0e12745ebd2d03e0da3353a53f765ad50a2008d12e291e8e",
   "mobile_wasm_sha256": "8ffae60df479b5df896233466520f4a3cfb3eb5564082823b652658e19f85048",
   "presentation_sha256": "8bbff90c5c799a7d845d76d51fbce8cebee6716e0e4bcf294189b3713ddf733a",
-  "clock_sha256": "97b9d7b4c14e7d7133b480f4821b5ceecb7160e82e5e2d435667ec0f7dc65f9f",
+  "clock_sha256": "7b1b33fb6ed1c661592725b2dedf106584e069d8fab3f80eafe3b838fb46def5",
   "audio_output_sha256": "18760a612db5dfff8a8dd63bef48f12df51c62474a7cd465084ffbe0fc90a214",
   "rollback_queue_sha256": "3ca47c6aa554626de7f34865107b2d6b5a0cab686075a7ff41ebf04ae682f050",
   "native_snapshots_sha256": "3177a64596787f223909473751ae55e3853fb07d9826fa54a5c2085819f81c34",
   "game_adapter_sha256": "057f02ad0703a056e0a21a593ae9f45f5f1540fecd867ba63e85926f3bbb122b",
-  "room_sha256": "83d195bf901fca675ba9952fa321f6ff2ffe92cc332acb2a1a291588ae0f01b7",
+  "room_sha256": "8dd2fa126890f905dbdfecb8c942c0050446c04734c1d7ec60c9d34643b39ee0",
   "membership_sha256": "a84a5b38066e29a876db2c900e2411f3d4168f329bcb83fb44a81226a88e6fca",
   "startup_sha256": "8f2aa760e7f1aeb74faf3808af64eba158c536b1721c5ea3b6a9dc2dff15b0aa",
   "controls_sha256": "45488e160ccd0025de6861b70a661e923c773aac55f3eade39d4ea86c2bbd879",
@@ -357,7 +357,7 @@
       }
     }
   },
-  "dosbox_adapter_sha256": "97b9d7b4c14e7d7133b480f4821b5ceecb7160e82e5e2d435667ec0f7dc65f9f",
+  "dosbox_adapter_sha256": "7b1b33fb6ed1c661592725b2dedf106584e069d8fab3f80eafe3b838fb46def5",
   "dosbox_disk_sha256": "057458da79f66cc6e05c81ef7d64c42efae474fd9a3c496eee65193481399431",
   "dosbox_memory_diff_sha256": "6535b9a4fc957af4112ca9bccec0da4341acc0d0c8c945a2c366b46c95ff0724",
   "snapshot_diff_wasm_sha256": "20235d6360a49d633f2db03832ef5ad3fbe6daffd4f44e4d7f8e790875a4662f",

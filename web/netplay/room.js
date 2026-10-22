@@ -13,7 +13,7 @@ import {createRelay} from './relay.js';
 import {loadRtcConfiguration,refreshRtcPath,describeRtcConfiguration,countIceCandidate,describeIceCandidates,recordIceServerError} from './connection.js';
 import {assetBytes,freshJSON} from '../preload-cache.js';
 import {gameVersion} from '../game-version.js';
-import {bgmVersion,onBgmVersion} from '../bgm-version.js';
+import {bgmVersion,onBgmVersion,resolveBgmTrack} from '../bgm-version.js';
 const $=id=>document.getElementById(id),roles=['host','guest','guest2'];
 const label=role=>({host:'房主',guest:'客机 1',guest2:'客机 2'})[role];
 const status=text=>{$('status').textContent=text;player.note(text);};
@@ -339,9 +339,8 @@ async function prepareRoomAssets(value){
     const core=tracked?'wdosbox-x-rollback-tracked.wasm':'wdosbox-x-rollback.wasm';
     const coreHash=tracked?version.write_journal?.wasm_sha256:version.rollback_wasm?.sha256;
     if(!coreHash)throw Error('DOSBox-X 版本清单缺少所选联机核心');
-    const trackManifest=bgmVersion()==='new'&&alternate.tracks?alternate:bgmManifest;
     const opening=Number(value.settings.difficulty)===4?'st06':'st00';
-    const tracks=[`${opening}-m26`,`${opening}-m86`].map(id=>trackManifest.tracks[id]).filter(Boolean);
+    const tracks=[`${opening}-m26`,`${opening}-m86`].map(id=>resolveBgmTrack(id,bgmManifest.tracks,alternate.tracks)).filter(Boolean);
     const assets=[
       assetBytes(selected.coopDisk,{hash:meta.sha256,size:meta.size,gzip:true}),
       assetBytes(`vendor/dosbox-x/${core}`,{hash:coreHash}),
