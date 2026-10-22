@@ -64,8 +64,12 @@ export class RollbackQueue {
     if(this.inputDelay>this.lockstepDelay)throw Error('回滚输入缓冲尚未预填');
     this.activation=frame;
   }
-  capture(buttons){
-    const frame=this.frame+(this.active?this.inputDelay:this.lockstepDelay),lane=this.inputs[this.slot];
+  capture(buttons,frontier=this.frame){
+    // A repair can sample its old live frontier without assigning today's
+    // physical input to a historical frame or changing a published packet.
+    if(!Number.isSafeInteger(frontier)||frontier<this.frame||frontier>this.frame+MAX_ROLLBACK||
+       (frontier!==this.frame&&!this.active))throw Error('无效输入采样前沿');
+    const frame=frontier+(this.active?this.inputDelay:this.lockstepDelay),lane=this.inputs[this.slot];
     if(lane.has(frame))return null;
     if(!Number.isSafeInteger(buttons)||buttons<0||buttons>VALID_INPUT)throw Error('无效本机输入');
     const packet={type:'input',frame,slot:this.slot,buttons};

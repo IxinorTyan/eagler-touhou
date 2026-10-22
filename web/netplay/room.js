@@ -42,6 +42,7 @@ wakeChannel.port1.onmessage=event=>{
   wakePending=false;wakeTimer=null;pump(performance.now());
 };
 let waitingSince=0,replayUntil=0,rollbackCount=0,resimulated=0,maxRewind=0;
+let replayTouchContext=null;
 let waitedMs=0,measuredWaitMs=0,waitPercent=0,measuredGame=null,gameHz=null;
 const performanceHistory=[];
 function endWait(){if(waitingSince){waitedMs+=performance.now()-waitingSince;waitingSince=0;}}
@@ -782,7 +783,7 @@ function cancelWake(){
   clearTimeout(wakeTimer);wakeTimer=null;wakePending=false;wakeToken++;
 }
 function wake(delay=0){
-  if(!running||stopped||document.hidden)return;
+  if(!running||stopped)return;
   delay=Math.max(0,delay);
   const deadline=performance.now()+delay;if(wakePending&&wakeAt<=deadline)return;
   cancelWake();wakeAt=deadline;wakePending=true;
@@ -847,15 +848,21 @@ async function simulate(pair,replay){
   const cost=performance.now()-before;stepCost+=cost;stepCount++;maxCost=Math.max(maxCost,cost);
 }
 function observeInput(){
-  if(!running)return;
+  if(!running||document.hidden)return;
   inputLatch.observe(controlEditor.isEditing()?0:normalize(player.sample(keyboardBits(keys)|childBits|gamepadBits())|pendingAction));
 }
-function captureLocalInput(){
-  player.setContext(runtime.touchContext());
-  runtime.setPointPreferences({focus:!!focusSettings(),always:player.alwaysPoint()});
-  observeInput();const value=normalize(inputLatch.sample());
-  if(value!==bits){bits=value;inputChangedAt=performance.now();}
-  const captured=queue.capture(player.pack(bits|pendingAction,{includePointPreference:false}));
+function captureLocalInput(frontier=queue.frame,context=null){
+  // Continue authoritative synchronization while hidden, with neutral input.
+  // Do not poll held gamepads, touch auto-fire or menu pulses in the background.
+  let packed=0;
+  if(!document.hidden){
+    player.setContext(context??runtime.touchContext());
+    runtime.setPointPreferences({focus:!!focusSettings(),always:player.alwaysPoint()});
+    observeInput();const value=normalize(inputLatch.sample());
+    if(value!==bits){bits=value;inputChangedAt=performance.now();}
+    packed=player.pack(bits|pendingAction,{includePointPreference:false});
+  }else if(bits){bits=0;inputChangedAt=performance.now();}
+  const captured=queue.capture(packed,frontier);
   if(!captured)return false;
   player.consume();inputLatch.consume();
   pendingAction=0;captureTimes.set(captured.frame,performance.now());broadcast(captured);return true;
@@ -906,7 +913,7 @@ function updateMetrics(now,waiting){
     if(performanceHistory.length>120)performanceHistory.shift();
     costs=newCosts();lastMeasure=now;measureFrame=queue.frame;stepCost=stepCount=maxCost=0;
   }
-  if(now-lastUi<250)return;lastUi=now;
+  if(document.hidden||now-lastUi<250)return;lastUi=now;
   const links=[...peers.values()].map(p=>p.offline?`${label(p.role)}：已离线`:`${label(p.role)}：往返 ${p.rtt==null?'—':p.rtt.toFixed(1)} ms · ${p.path||'路径待确认'} · 相同状态步 ${p.confirmed||'等待'}${p.hidden?' · 页面隐藏':''}`).join('\n');
   const c=measuredCosts,game=runtime.snapshot();
   const own=game?.players?.[queue.slot];player.setLabel(`你操作 P${queue.slot+1}${own?' · 团队分数 '+own.score.toLocaleString('zh-CN'):''}`);
@@ -936,15 +943,20 @@ async function pump(now){
     if(!waitingSince)waitingSince=now;
     updateMetrics(now,true);return;
   }
-  if(document.hidden){lastNow=now;accumulator=0;return;}pumping=true;
+  pumping=true;
   try{
     accumulator=Math.min(accumulator+Math.max(0,now-lastNow),TICK_MS*4);lastNow=now;
     let count=0,waiting=false;const budgetStart=performance.now();
+    // A new live tick can become due while old history is still replaying.
+    // Send it before more repair work, without sampling the historical cursor.
+    if(queue.frame<replayUntil&&accumulator>=TICK_MS&&captureLocalInput(replayUntil,replayTouchContext))earlyInputs++;
     if(queue.dirty!==null)queue.refreshCorrection();
     if(queue.dirty!==null){
       // Publish the due frontier input before costly replay. Never sample a
       // historical replay frame, and never resample an already captured frame.
       if(queue.frame>=replayUntil&&accumulator>=TICK_MS&&captureLocalInput())earlyInputs++;
+      // Keep touch/menu generation at the live boundary throughout repair.
+      if(queue.frame>=replayUntil)replayTouchContext=runtime.touchContext();
       const from=queue.dirty;replayUntil=Math.max(replayUntil,queue.frame);
       maxRewind=Math.max(maxRewind,replayUntil-from);rollbackCount++;
       const restoreAt=performance.now();
@@ -1009,7 +1021,7 @@ async function pump(now){
     }
     if(queue.dirty!==null||membership){wake();return;}
     const presentAt=performance.now();
-    if(runtime.present()){costs.present+=performance.now()-presentAt;costs.presentations++;}
+    if(!document.hidden&&runtime.present()){costs.present+=performance.now()-presentAt;costs.presentations++;}
     const after=performance.now();
     if(waiting&&!waitingSince)waitingSince=after;
     updateMetrics(after,waiting);
@@ -1026,7 +1038,10 @@ const controlEditor=mountControlSettings($('control-settings'),{
 window.addEventListener('keydown',event=>{if(!running||controlEditor.isEditing()||isFormTarget(event.target)||event.metaKey||event.ctrlKey||event.altKey||!isBound(event.code))return;event.preventDefault();keys.add(event.code);observeInput();wake();});
 document.addEventListener('focusin',event=>{if(isFormTarget(event.target))clearInput();});
 window.addEventListener('keyup',event=>{keys.delete(event.code);observeInput();wake();});window.addEventListener('blur',clearInput);
-document.addEventListener('visibilitychange',()=>{if(document.hidden)clearInput();else wake();});
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden)clearInput();
+  if(running&&!stopped){broadcast({type:'heartbeat',hidden:document.hidden});wake();}
+});
 window.addEventListener('message',event=>{if(event.origin===location.origin&&event.source===iframe?.contentWindow&&event.data?.protocol===PROTOCOL&&event.data?.event==='runtime-exit')fail(Error('游戏模拟器已经退出'));});
 window.addEventListener('message',event=>{
   if(event.origin!==location.origin||event.source!==iframe?.contentWindow||event.data?.protocol!==PROTOCOL||stopped)return;
