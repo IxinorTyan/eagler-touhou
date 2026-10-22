@@ -50,7 +50,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_response(status); self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
     def do_GET(self):
-        if replay_history.handle_get(self): return
+        if replay_history.handle_get(self, ROOMS, LOCK, '03', lambda r: time.monotonic()-r['seen']['host']>TTL): return
         url = urlparse(self.path)
         if url.path == '/relay':
             from relay_server import handle

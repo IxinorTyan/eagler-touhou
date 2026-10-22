@@ -576,7 +576,7 @@ $('start').addEventListener('click', async () => {
       :useWorker?await WorkerNP21.create(config,{game:'03local',patch:nativePause.meta,music:(await nativeAssets()).meta.startup.music,onError:report}):await DOSBoxPC98.create(config);
     if(emulator.isWorker)nativePause=emulator.isNetworkWorker?workerNetworkPause(emulator):workerLocalPause(emulator);
     if(emulator.isNetworkWorker){
-      emulator.onSnapshot=reflectNetworkSnapshot;emulator.onExit=()=>sync?.stop();
+      emulator.onSnapshot=reflectNetworkSnapshot;emulator.onExit=()=>{replayRecorder?.finish('游戏已退出');sync?.stop();};
       emulator.onDraw=bitmap=>{const began=performance.now();visibleContext.imageSmoothingEnabled=false;visibleContext.drawImage(bitmap,0,0,640,400);presentationCount++;presentationMs+=performance.now()-began;};
     }
     localBgm = new LocalBgm(emulator.module.SDL2.audioContext, () => {});

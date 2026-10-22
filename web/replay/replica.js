@@ -24,13 +24,13 @@ export async function createReplica(header,{onFrame=()=>{},onEvent=()=>{},onProg
     const loaded=await request('load',[],{configure:[header.hostSlot,0,header.players],settings:header.settings,header,spectator:true});
     if(stable(loaded.value)!==stable(header.opening))throw Error('录像开局资源校验不一致');
     await request('setRawPresentation',[true]);await request('start');
-    let frame=0,executed=0;
+    let frame=0,executed=0,scene=null;
     return {
-      get frame(){return frame;},get executed(){return executed;},stop,
+      get frame(){return frame;},get executed(){return executed;},get scene(){return scene;},stop,
       async advance(row){
         const r=await request('execute',[],{frame,inputs:row.inputs,offlineMask:row.offlineMask,replay:false,capture:false,hash:row.hash!==null});
         if(r.status.proof!==row.proof||(row.hash!==null&&stable(r.value)!==stable(row.hash)))throw Error('录像模拟校验不一致：第 '+frame+' 步');
-        await request('confirm',[frame+1]);frame++;executed++;return r;
+        await request('confirm',[frame+1]);scene=r.status.scene??null;frame++;executed++;return r;
       },
       present:()=>request('present'),
       async save(){const r=await request('replaySave',[header.identity]);return r.value;},

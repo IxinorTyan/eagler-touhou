@@ -46,6 +46,7 @@ onmessage=({data})=>{
     else if(data.type==='setRawPresentation'){}
     else if(data.type==='present'){if(emulator.module.netPresent()){const bitmap=canvas.transferToImageBitmap();postMessage({type:'frame',sequence:++sequence,bitmap},[bitmap]);}}
     else throw Error('未知对战回放命令');
-    postMessage({type:'result',id:data.id,result,status:{proof:simulation.proof(),game:simulation.state}});
+    const s=simulation.state,scene=simulation.pause.selecting?{kind:'selection'}:s?.phase===1?{kind:'round',round:s.generation}:null;
+    postMessage({type:'result',id:data.id,result,status:{proof:simulation.proof(),game:s,scene}});
   }).catch(error=>{closed=true;postMessage({type:'error',id:data.id,message:error.stack||String(error)});});
 };

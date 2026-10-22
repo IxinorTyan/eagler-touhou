@@ -103,7 +103,7 @@ async function launch() {
   for(const [source,target]of Object.entries(roomIds)){const node=document.getElementById(source);if(node)node.id=target;}
   $('controls-dialog').close();$('controls-dialog').querySelector('iframe').removeAttribute('src');
   globalThis.th03RoomHost??={};
-  runtime={stop(){globalThis.th03RoomHost.stopped=true;globalThis.th03RoomHost.runtime?.stop();}};
+  runtime={stop(){globalThis.th03Replay?.finish('联机会话结束');globalThis.th03RoomHost.stopped=true;globalThis.th03RoomHost.runtime?.stop();}};
   const params=new URLSearchParams({net:state.mode,room:session.room,token:session.token,role:session.role,
     language:state.settings.language,difficulty:state.settings.difficulty,clock:state.settings.clock,rollback:state.settings.rollback?'1':'0'});
   params.set('netWorker',networkRuntime.value==='worker'?'1':'0');
@@ -199,7 +199,7 @@ for (const id of ['language', 'difficulty', 'clock', 'rollback', 'focus-enabled'
   hostSeat: Number($('host-seat-choice').value), language: $('language').value, difficulty: Number($('difficulty').value), clock: Number($('clock').value), rollback: $('rollback').checked, focusEnabled: $('focus-enabled').checked, touchUnlimitedAllowed: $('touch-unlimited-allowed').checked}});
 $('leave').onclick = async () => {
   clearTimeout(timer); runtime?.stop();
-  try { await api('leave'); } catch {}
+  try { globalThis.th03Replay?.finish('玩家离开本局'); await globalThis.th03Replay?.seal(); await api('leave'); } catch {}
   location.href = `lan.html?${networkParams(connection)}`;
 };
 async function handleRuntimeMessage(value){
@@ -215,5 +215,6 @@ async function handleRuntimeMessage(value){
   if(value.error)status(value.message,true);else if(value.loaded)status('本机游戏已启动');
 }
 window.addEventListener('pagehide', () => {
+  globalThis.th03Replay?.finish('观战来源页面关闭');globalThis.th03Replay?.close();
   if (session) navigator.sendBeacon('/api/leave', new Blob([JSON.stringify({protocol, ...session})], {type: 'application/json'}));
 });
