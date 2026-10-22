@@ -1,9 +1,9 @@
-import {bgmVersion,onBgmVersion} from './bgm-version.js';
+import {bgmVersion,onBgmVersion,resolveBgmTrack,loadMidiTracks} from './bgm-version.js';
 import {assetBytes,freshJSON} from './preload-cache.js';
 export async function preloadOpeningMusic(){
   const [manifest,alternate]=await Promise.all([freshJSON('bgm/manifest.json'),freshJSON('bgm/akyu/manifest.json')]);
   await Promise.all(['select-m26','select-m86'].map(async id=>{
-    const track=bgmVersion()==='new'&&alternate.tracks[id]?alternate.tracks[id]:manifest.tracks[id];
+    const track=resolveBgmTrack(id,manifest.tracks,alternate.tracks);
     if(track)await assetBytes('bgm/'+track.url,{hash:track.audioSha256,size:track.bytes});
   }));
 }
@@ -33,6 +33,7 @@ export class LocalBgm {
     const alternate=await fetch(new URL('./bgm/akyu/manifest.json',import.meta.url),{signal:this.abort.signal});
     if(!alternate.ok)throw Error('新版音乐清单读取失败');
     this.newTracks=(await alternate.json()).tracks;
+    this.midiTracks=await loadMidiTracks(this.abort.signal);
     this.manifest=manifest;
     if(this.closed)return;
     this.status='本地音乐：按需加载';
@@ -43,7 +44,7 @@ export class LocalBgm {
     // two full decoded waveforms before the driver selects its music mode.
     if(!commands.length&&config.warmOpening!==false)for(const type of ['m26','m86'])this.prefetch(`${first}-${type}`);
   }
-  track(id){return bgmVersion()==='new'&&this.newTracks[id]?this.newTracks[id]:this.manifest.tracks[id];}
+  track(id){return resolveBgmTrack(id,this.manifest.tracks,this.newTracks,this.midiTracks);}
   download(id,track=this.track(id)){
     const cacheKey=track?.url;
     if(this.encoded.has(cacheKey))return Promise.resolve(this.encoded.get(cacheKey));
