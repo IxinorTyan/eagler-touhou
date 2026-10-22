@@ -30,10 +30,14 @@ export class WorkerNP21 {
   }
   async initialize(){
     if(!supportsSoloWorker())throw Error('浏览器不支持后台模拟，请选择兼容模式');
-    const {canvas,onDiskChange,onExit,...config}=this.config;
+    const {canvas,onDiskChange,onExit,applyReplayInput,...config}=this.config;
+    const replay=config.externalReplay;this.externalReplayCallbacks=replay||null;
+    if(replay)config.externalReplay={mode:replay.mode,boundaryMode:replay.boundaryMode,endReason:replay.endReason,endPhase:replay.endPhase,timeline:replay.timeline,lifecycle:replay.lifecycle,
+      ...(replay.clocks?{clocks:replay.clocks.slice()}:{}),...(replay.events?{events:replay.events}:{}),...(replay.endBoundary!==undefined?{endBoundary:replay.endBoundary}:{})};
     const offscreen=canvas.transferControlToOffscreen();
     const {onError,...setup}=this.setup;
-    const result=await this.call('init',[{...setup,config,canvas:offscreen,sampleRate:this.context.sampleRate}],[offscreen]);
+    const transfer=[offscreen];if(config.externalReplay?.clocks)transfer.push(config.externalReplay.clocks.buffer);
+    const result=await this.call('init',[{...setup,config,canvas:offscreen,sampleRate:this.context.sampleRate}],transfer);
     this.module.heapBytes=result.heapBytes;this.module.mobileRuntime=result.runtime;this.state='ready';
   }
   call(method,args=[],transfer=[]){
@@ -48,6 +52,9 @@ export class WorkerNP21 {
   send(method,args=[]){if(!this.closed)this.worker.postMessage({method,args});}
   receive(data){
     if(this.closed)return;
+    if(data.type==='external-replay-chunk'){this.externalReplayCallbacks?.onChunk?.(data.chunk);return;}
+    if(data.type==='external-replay-end'){this.externalReplayCallbacks?.onEnd?.(data.result);return;}
+    if(data.type==='external-replay-error'){(this.externalReplayCallbacks?.onError||this.externalReplayCallbacks?.onRecordingError)?.(Error(data.message));return;}
     if(data.name==='ws-sync-sleep'){this.worker.postMessage({name:'wc-sync-sleep',props:data.props});return;}
     if(data.type==='error'){
       if(data.diagnostics)this.lastDiagnostics=data.diagnostics;
@@ -108,6 +115,10 @@ export class WorkerNP21 {
     finally{this.inputPending=false;if(!this.closed)this.flushInput();}
   }
   clearInput(){this.queuedInput=null;this.send('clear');}
+  finishReplay(){this.send('externalReplayFinish');}
+  fastForwardReplay(value){this.send('externalReplayFast',[!!value]);}
+  stopBrowserRecording(){this.send('externalReplayDisable');}
+  pauseReplay(value){this.state=value?'paused':'running';this.send('externalReplayPause',[!!value]);if(value){this.flushAudio();this.context.suspend().catch(()=>{});}else this.context.resume().catch(()=>{});}
   fail(error){if(this.closed)return;console.error(error);this.failedError=error;this.dispose();this.setup.onError?.(error);}
   dispose(){
     if(this.closed)return;this.closed=true;this.state='exited';clearInterval(this.audioTimer);this.flushAudio();this.worker.terminate();

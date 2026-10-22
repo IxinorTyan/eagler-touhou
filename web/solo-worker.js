@@ -7,6 +7,29 @@ const seen=new Map(),signature=new TextEncoder().encode('TH04SOLOINPUTv1!');
 let awaitingSnapshot=false,pendingMusic=[],lastPublish=0,costs=[],lastInput=performance.now(),held=new Map();
 let input={focus:0,points:0,touch:[0,0]},timer;
 let drawTimes=[],lastRenderPublish=-Infinity;
+function postReplay(type,value){
+  if(type==='chunk'&&value.clocks)postMessage({type:'external-replay-chunk',chunk:value},[value.clocks.buffer]);
+  else postMessage({type:'external-replay-'+type,...(type==='chunk'?{chunk:value}:type==='end'?{result:value}:{message:value?.message||String(value)})});
+}
+function applyAssist(value){
+  if(coop){coop.input(value);return;}
+  if(bridge){
+    const h=emulator.module.HEAPU8;
+    if(!bridge.valid(h,bridge.live)||value.generation!==new DataView(h.buffer).getUint16(bridge.live+patch.fields.generation,true))return;
+    bridge.setFocus(value.focus,0);bridge.setTouch(value.touch||[0,0]);return;
+  }
+  const at=Number.isInteger(value.address)?value.address:mailbox;
+  const h=emulator.module.HEAPU8,v=new DataView(h.buffer);
+  if(at<0||at+36>h.length||!signature.every((b,i)=>h[at+i]===b))return;
+  if(value.generation!==v.getUint16(at+24,true))return;
+  h[at+26]=value.points||0;
+  const t=value.touch;
+  if(emulator.state==='running'&&h[at+22]===1&&!h[at+23]&&t?.active){
+    v.setUint16(at+28,t.unlimited?3:1,true);
+    for(const [offset,delta]of [[30,t.x],[32,t.y]])v.setInt16(at+offset,Math.max(-8192,Math.min(8191,v.getInt16(at+offset,true)+delta)),true);
+  }else h.fill(0,at+28,at+36);
+}
+function queueAssist(value){if(emulator?.assist)emulator.assist(value);else applyAssist(value);}
 function observeFrames(){
   emulator.module.observeLocalFrame=cost=>{if(costs.length<120)costs.push(cost);};
   emulator.module.observeFrameDraw=now=>{if(drawTimes.length<120)drawTimes.push(now);};
@@ -37,8 +60,9 @@ function scan04(now){
 function clear(){
   for(const event of held.values())if(emulator?.key)emulator.key(event.code,false);else environment.key({...event,type:'keyup'});
   held.clear();input={focus:0,points:0,touch:[0,0]};
-  if(bridge){bridge.setFocus(0,0);bridge.setTouch([0,0]);}
-  if(coop)coop.clear();else if(mailbox>=0)emulator.module.HEAPU8.fill(0,mailbox+28,mailbox+36);
+  if(bridge)queueAssist({generation:bridge.update()?.generation,focus:0,touch:[0,0]});
+  else if(coop)coop.clear();
+  else if(mailbox>=0)queueAssist({address:mailbox,generation:new DataView(emulator.module.HEAPU8.buffer).getUint16(mailbox+24,true),points:0,touch:null});
 }
 function update(){
   if(!emulator)return;
@@ -64,7 +88,10 @@ async function dispatch(message){
     const setup=args[0];game=setup.game;patch=setup.patch;
     environment=workerEnvironment(setup.canvas,setup.sampleRate);
     const {NP21}=await import(game==='03'?'./vendor/np2/np2-original.js':'./dosbox-adapter.js');
+    const externalReplay=setup.config.externalReplay;
     emulator=await NP21.create({...setup.config,artPatch:game==='04coop'?patch:null,canvas:setup.canvas,workerRuntime:true,nativeSoloAudio:false,
+      applyReplayInput:applyAssist,
+      ...(externalReplay?{externalReplay:{...externalReplay,onChunk:value=>postReplay('chunk',value),onEnd:value=>postReplay('end',value),onError:error=>postReplay('error',error),onRecordingError:error=>postReplay('error',error)}}:{}),
       onDiskChange:()=>postMessage({type:'diskChange'}),onExit:()=>{clear();postMessage({type:'exit'});}});
     if(game==='03'){
       const {NativePause}=await import('./native-pause.js');bridge=new NativePause(()=>emulator,patch);
@@ -83,23 +110,7 @@ async function dispatch(message){
     if(emulator.key)emulator.key(event.code,event.type==='keydown');else environment.key(event);return;
   }
   if(method==='input'){
-    lastInput=performance.now();input=args[0];
-    if(coop){coop.input(input);return;}
-    if(bridge){
-      const h=emulator.module.HEAPU8;
-      if(!bridge.valid(h,bridge.live)||input.generation!==new DataView(h.buffer).getUint16(bridge.live+patch.fields.generation,true))return;
-      bridge.setFocus(input.focus,0);bridge.setTouch(input.touch||[0,0]);
-    }else if(mailbox>=0){
-      const h=emulator.module.HEAPU8,v=new DataView(h.buffer),at=mailbox;
-      if(input.generation!==v.getUint16(at+24,true))return;
-      h[at+26]=input.points||0;
-      const t=input.touch;
-      if(emulator.state==='running'&&h[at+22]===1&&!h[at+23]&&t?.active){
-        v.setUint16(at+28,t.unlimited?3:1,true);
-        for(const [offset,delta]of [[30,t.x],[32,t.y]])v.setInt16(at+offset,Math.max(-8192,Math.min(8191,v.getInt16(at+offset,true)+delta)),true);
-      }else h.fill(0,at+28,at+36);
-    }
-    return;
+    lastInput=performance.now();input=args[0];queueAssist(input);return;
   }
   if(method==='clear'){clear();return;}
   if(method==='coopHit'){if(!coop)throw Error('本地合作尚未启动');coop.hit();return;}
@@ -110,6 +121,10 @@ async function dispatch(message){
   if(method==='pause'){clear();emulator.pause();return;}
   if(method==='reset'){pendingMusic=[];clear();bridge?.reset();music?.reset();seen.clear();mailbox=-1;cursor=0;await emulator.reset();costs=[];drawTimes=[];lastRenderPublish=-Infinity;observeFrames();return;}
   if(method==='run'){lastInput=performance.now();emulator.run();return;}
+  if(method==='externalReplayFinish'){emulator?.finishReplay();return;}
+  if(method==='externalReplayFast'){emulator?.fastForwardReplay(args[0]);return;}
+  if(method==='externalReplayDisable'){emulator?.stopBrowserRecording();return;}
+  if(method==='externalReplayPause'){const paused=!!args[0];if(paused)emulator?.pause();else emulator?.run();return;}
   if(method==='getDiskImage')return emulator.getDiskImage(...args);
   if(method==='addDiskImage'){emulator.addDiskImage(...args);return;}
   if(method==='setHdd'){await emulator.setHdd(...args);return;}

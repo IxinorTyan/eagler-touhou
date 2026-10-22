@@ -5,10 +5,13 @@ import {createDosboxSnapshots} from './dosbox-snapshots.js';
 import {makeMemoryDiff} from './dosbox-memory-diff.js';
 import {installFramePresenter} from './frame-presenter.js';
 import {installProjectileArt} from './projectile-art.js';
+import {createExternalReplayHost,inspectExternalMemory} from './replay/external-host.js';
+import {loadExternalDosboxFactory} from './replay/external-loader.js';
+import {createSoloReplayLifecycle} from './replay/external-lifecycle.js';
 const codes={ArrowUp:265,ArrowDown:264,ArrowLeft:263,ArrowRight:262,KeyZ:90,KeyX:88,ShiftLeft:340,ShiftRight:344,Escape:256,Enter:257,Space:32};
 export class DOSBoxPC98 {
   static async create(config){const emulator=new DOSBoxPC98(config);await emulator.initialize();return emulator;}
-  constructor(config){this.config=config;this.state='loading';this.disks=new Map();this.keys=new Set();this.outputs=new Map();this.frame=null;this.replaying=false;this.tick=0;this.audioChunks=[];}
+  constructor(config){this.config=config;this.state='loading';this.disks=new Map();this.keys=new Set();this.outputs=new Map();this.frame=null;this.replaying=false;this.tick=0;this.audioChunks=[];this.externalHost=null;}
   async initialize(){
     const net=!!this.config.lockstep;
     const tracked=net&&this.config.rollbackEnabled!==false&&WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,5,2,0,1,0,1]));
@@ -32,7 +35,24 @@ export class DOSBoxPC98 {
     this.transport={sessionId:'th04-dosbox',module:this.module,net:null,
       sendMessageToServer:(name,props)=>this.module.messageHandler({data:{name,props}}),
       initMessageHandler:handler=>{receiver=handler;for(const [name,props]of queue)handler(name,props);queue.length=0;},exit:()=>{}};
-    const factory=(await import(net?(tracked?'./vendor/dosbox-x/dosbox-rollback-tracked.mjs':'./vendor/dosbox-x/dosbox-rollback.mjs'):'./vendor/dosbox-x/dosbox-jspi.mjs')).default;
+    let factory;
+    if(this.config.externalReplay&&!net){
+      const replay=this.config.externalReplay;
+      this.externalHost=createExternalReplayHost({...replay,
+        observe:replay.lifecycle?createSoloReplayLifecycle(replay.lifecycle,()=>this.module.HEAPU8):null,
+        applyInput:command=>this.applyReplayInput(command),inspect:()=>inspectExternalMemory(this.module),
+        onChunk:value=>replay.onChunk?.(value),onEnd:value=>replay.onEnd?.(value),
+        onError:error=>{if(replay.onError)replay.onError(error);else this.config.onError?.(error);},
+        onRecordingError:error=>replay.onRecordingError?.(error),
+      });
+      try{factory=await loadExternalDosboxFactory({vendor,module:this.module,host:this.externalHost});}
+      catch(error){
+        if(replay.mode!=='record')throw error;
+        this.externalHost.dispose();this.externalHost=null;delete this.module.instantiateWasm;
+        try{replay.onRecordingError?.(error);}catch{}
+        factory=(await import('./vendor/dosbox-x/dosbox-jspi.mjs')).default;
+      }
+    }else factory=(await import(net?(tracked?'./vendor/dosbox-x/dosbox-rollback-tracked.mjs':'./vendor/dosbox-x/dosbox-rollback.mjs'):'./vendor/dosbox-x/dosbox-jspi.mjs')).default;
     await factory(this.module);
     this.module.projectileArt=await installProjectileArt(this.module,this.config.artPatch);
     this.module.callMain([this.transport.sessionId]);
@@ -54,7 +74,14 @@ export class DOSBoxPC98 {
     m.netFlushAudio=()=>this.audio.flush();m.netInfo=()=>({tick:this.tick,...this.audio.info()});
     m.netPresent=()=>m.framePresenter?.flush({redraw:true})||false;
   }
-  key(code,down){const number=codes[code];if(number===undefined)return;if(down)this.keys.add(code);else this.keys.delete(code);if(this.config.lockstep)this.ci?.addKey(number,down,this.module.virtualNow);else this.ci?.sendKeyEvent(number,down);}
+  key(code,down){if(this.externalHost){if(this.externalHost.status.mode==='playback')return;this.externalHost.queue({type:'key',code,down});return;}this.applyKey(code,down);}
+  applyKey(code,down){const number=codes[code];if(number===undefined)return;if(down)this.keys.add(code);else this.keys.delete(code);if(this.config.lockstep)this.ci?.addKey(number,down,this.module.virtualNow);else if(this.externalHost)this.ci?.addKey(number,down,this.externalHost.keyTime());else this.ci?.sendKeyEvent(number,down);}
+  applyReplayInput(command){if(command.type==='key')this.applyKey(command.code,command.down);else if(command.type==='assist')this.config.applyReplayInput?.(command.input);else throw Error('单人 Replay 输入类型无效');}
+  assist(input){if(this.externalHost){if(this.externalHost.status.mode==='playback')return;this.externalHost.queue({type:'assist',input});}else this.config.applyReplayInput?.(input);}
+  finishReplay(){this.externalHost?.finish();}
+  fastForwardReplay(value){this.externalHost?.fastForward(value);}
+  stopBrowserRecording(){this.externalHost?.disable();}
+  pauseReplay(value){if(value)this.pause();else this.run();}
   addDiskImage(name,bytes){this.disks.set(name,new Uint8Array(bytes));}
   async setHdd(drive,name){
     if(drive!==0||!this.disks.has(name))throw Error('无效游戏磁盘');this.diskName=name;
@@ -62,9 +89,9 @@ export class DOSBoxPC98 {
     const network=!!this.config.lockstep,launcher=prepareFastBoot(this.extracted,{network});
     const init=[...this.extracted.files,launcher,{dosboxConf:dosboxConfig({network,fastBoot:true}),jsdosConf:{version:'8'}}];
     this.ci=await globalThis.emulators.backend(init,this.transport,{});
-    this.ci.events().onSoundPush(samples=>{this.module.audioPackets=(this.module.audioPackets||0)+1;if(this.module.warmingBoot||this.config.externalEffects)return;if(this.config.workerRuntime){this.audioChunks.push(samples.slice());return;}if(this.frame!==null)this.outputs.get(this.frame)?.push(samples.slice());else this.audio.push([samples]);});
+    this.ci.events().onSoundPush(samples=>{this.module.audioPackets=(this.module.audioPackets||0)+1;if(this.externalHost?.status.fastForward||this.module.warmingBoot||this.config.externalEffects)return;if(this.config.workerRuntime){this.audioChunks.push(samples.slice());return;}if(this.frame!==null)this.outputs.get(this.frame)?.push(samples.slice());else this.audio.push([samples]);});
     this.logs=[];this.ci.events().onMessage((type,...messages)=>{this.logs.push([type,...messages]);this.logs=this.logs.slice(-40);if(type==='error'&&messages.some(s=>String(s).includes('[panic]')))this.fail(Error(messages.join(' ')));});
-    this.ci.events().onExit(()=>{if(this.resetting)return;if(this.state!=='failed')this.state='exited';this.config.onExit?.();});
+    this.ci.events().onExit(()=>{if(this.disposed||this.resetting)return;if(this.state!=='failed')this.state='exited';this.config.onExit?.();});
     for(const code of this.keys)this.ci.sendKeyEvent(codes[code],true);
     if(this.state!=='running'&&!this.config.lockstep)this.ci.pause();
     this.module.SDL2={audioContext:this.audio.context};
@@ -72,14 +99,14 @@ export class DOSBoxPC98 {
   }
   getDiskImage(name){if(name===this.diskName&&this.extracted)return this.extracted.export(this.module.FS);const disk=this.disks.get(name);if(!disk)throw Error('未知磁盘');return disk.slice();}
   fail(error){if(this.state==='failed')return;this.failedError=error;this.state='failed';this.config.onError?.(error);}
-  run(){if(this.state==='failed'||this.state==='exited')throw this.failedError||Error('DOSBox-X 已退出');this.state='running';if(!this.config.lockstep)this.ci?.resume();this.audio.context.resume().catch(()=>{});}
-  pause(){if(this.state!=='failed'&&this.state!=='exited')this.state='paused';if(!this.config.lockstep)this.ci?.pause();this.module?.framePresenter?.resetTiming();this.audio.flush();}
+  run(){if(this.state==='failed'||this.state==='exited')throw this.failedError||Error('DOSBox-X 已退出');this.state='running';this.externalHost?.pause(false);if(!this.config.lockstep)this.ci?.resume();this.audio.context.resume().catch(()=>{});}
+  pause(){if(this.state!=='failed'&&this.state!=='exited')this.state='paused';this.externalHost?.pause(true);if(!this.config.lockstep)this.ci?.pause();this.module?.framePresenter?.resetTiming();this.audio.flush();}
   async reset(){
     const running=this.state==='running',diskName=this.diskName,disks=this.disks;
-    this.resetting=true;this.pause();
+    this.resetting=true;this.pause();this.externalHost?.dispose();
     if(this.ci){const exiting=this.ci.exit();if(this.config.lockstep){for(let i=0;!this.ci.exited&&i<1000;i++){this.module.virtualNow=Math.max(this.module.virtualNow,this.module.wakeAt);this.module.advanceNative();}}await exiting;}
     this.dispose();this.state='loading';this.failedError=null;this.keys=new Set();this.outputs=new Map();this.frame=null;this.replaying=false;this.tick=0;this.audioChunks=[];this.snapshots=null;
-    await this.initialize();this.disks=disks;
+    this.disposed=false;this.externalHost=null;await this.initialize();this.disks=disks;
     if(diskName)await this.setHdd(0,diskName);
     this.resetting=false;if(running)this.run();
   }
@@ -92,7 +119,7 @@ export class DOSBoxPC98 {
     if(!m.pendingWake)throw Error('DOSBox-X 未在同步边界挂起');
   }
   readAudio(){if(!this.audioChunks.length)return null;const length=this.audioChunks.reduce((n,s)=>n+s.length,0),samples=new Float32Array(length);let at=0;for(const block of this.audioChunks.splice(0)){samples.set(block,at);at+=block.length;}return [samples];}
-  dispose(){this.pause();this.ci?.exit();this.module?.framePresenter?.dispose();this.audio.disconnect();this.audio.context.close().catch(()=>{});for(const type of ['keydown','keyup'])this.config.canvas.removeEventListener?.(type,this.onKey);if(typeof window!=='undefined')window.removeEventListener('message',this.onSleep);}
+  dispose(){if(this.disposed)return;this.disposed=true;this.externalHost?.disable();this.pause();this.externalHost?.dispose();this.ci?.exit();this.module?.framePresenter?.dispose();this.audio.disconnect();this.audio.context.close().catch(()=>{});for(const type of ['keydown','keyup'])this.config.canvas.removeEventListener?.(type,this.onKey);if(typeof window!=='undefined')window.removeEventListener('message',this.onSleep);}
 }
 // Source imports keep their legacy class name, while every new instance uses DOSBox-X.
 export {DOSBoxPC98 as NP21};

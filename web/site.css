@@ -10,3 +10,7 @@
 
 /* Four entry modes, wrapping naturally on small screens. */
 .mode-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr))}
+#solo-replay label{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+#solo-replay input[type=checkbox]{width:18px;height:18px;min-height:0;margin:0}
+#solo-replay input[type=file]{width:min(100%,240px);min-height:0;padding:6px}
+#solo-replay p{overflow-wrap:anywhere}

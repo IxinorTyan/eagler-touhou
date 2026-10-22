@@ -65,6 +65,7 @@ export async function encodeTape(tape){
   const header=new TextEncoder().encode('P98TAPE1'+await digest(payload));return new Blob([header,payload],{type:'application/octet-stream'});
 }
 export function validateTape(tape){
+  if(tape?.header?.game!=='01'||tape?.header?.adapter!=='native-local/1'||tape?.header?.players!==1)throw Error('多人 Replay 文件已停用；多人仅支持实时旁观');
   validateHeader(tape?.header);if(!Array.isArray(tape.rows)||tape.rows.length>MAX_FRAMES||tape.end?.frame!==tape.rows.length||typeof tape.end.reason!=='string')throw Error('录像长度或结尾无效');
   tape.rows.forEach((r,f)=>validateRow(r,tape.header,f));
   if(tape.points!==undefined){
