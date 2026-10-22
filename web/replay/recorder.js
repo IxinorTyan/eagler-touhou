@@ -7,11 +7,12 @@ import {LOCAL_CHUNK,pointSize,pointIndex} from './local-points.js';
 export function createRecorder(toolbar){
   let tape=null,error='',channel=null,builder=null,pointError='',points=[],network=null,closed=false,localSolo=false;
   const id=randomId(),watch=document.createElement('a'),info=document.createElement('span');
-  watch.textContent='同浏览器旁观';watch.target='_blank';watch.rel='noopener';watch.hidden=true;
+  watch.textContent='同浏览器观战';watch.target='_blank';watch.rel='noopener';watch.hidden=true;
   watch.href=new URL('../replay.html?watch='+id,import.meta.url).href;
   toolbar?.append(watch,info);
   const open=document.createElement('a');open.textContent='单人 Replay 播放';open.href=new URL('../replay.html',import.meta.url).href;open.target='_blank';open.rel='noopener';open.hidden=true;toolbar?.append(open);
-  const remote=document.createElement('a');remote.textContent='跨设备旁观链接';remote.target='_blank';remote.rel='noopener';remote.hidden=true;toolbar?.append(remote);
+  const remote=document.createElement('a');remote.textContent='跨设备观战链接';remote.target='_blank';remote.rel='noopener';remote.hidden=true;toolbar?.append(remote);
+  const upload=document.createElement('span');toolbar?.append(upload);
   function update(){info.textContent=error?'观战历史停止：'+error:tape?` · 已确认 ${tape.rows.length} 步${tape.end?'（本段结束）':''}${points.length?' · '+points.length+' 个定位点':''}${pointError?' · '+pointError:''}`:'';}
   function fail(e){error=String(e.message||e);tape?.finish('录像辅助链路失败：'+error);builder?.finish();network?.kick();update();}
   function guard(fn){try{const r=fn();update();return r;}catch(e){fail(e);}}
@@ -24,7 +25,7 @@ export function createRecorder(toolbar){
         localSolo=adapter==='native-local/1'&&players===1;
         open.hidden=!localSolo;
         watch.hidden=localSolo;
-        if(PORTABLE)builder=createBuilder(tape.header,()=>tape.rows,p=>{points.push(p);update();},e=>{pointError='定位点生成停止：'+e.message;update();});
+        if(PORTABLE&&!localSolo)builder=createBuilder(tape.header,()=>tape.rows,p=>{points.push(p);update();},e=>{pointError='定位点生成停止：'+e.message;update();});
         if(!localSolo)channel=new BroadcastChannel('pc98-replay-'+id);
         let lastReply=0;
         if(channel)channel.onmessage=({data})=>guard(()=>{
@@ -44,7 +45,15 @@ export function createRecorder(toolbar){
     rewind:frame=>guard(()=>tape?.rewind(Math.max(frame,tape.rows.length))),
     confirm:(prefix,dirty)=>guard(()=>{tape?.confirm(prefix,dirty);builder?.kick();network?.kick();}),
     finish:reason=>guard(()=>{tape?.finish(reason);builder?.finish();network?.kick();}),
-    connectNetwork(identity){guard(()=>{if(!tape||tape.header.adapter!=='confirmed-worker/1'||network||closed)return;network=publishNetwork(tape.header,()=>tape.rows,()=>tape.end,identity,{getPoints:()=>({points,done:!builder||builder.done}),onLink:url=>{remote.href=url;remote.hidden=false;},onStatus:text=>{remote.title=text;}});});},
+    connectNetwork(identity){guard(()=>{if(!tape||tape.header.adapter!=='confirmed-worker/1'||network||closed)return;network=publishNetwork(tape.header,()=>tape.rows,()=>tape.end,identity,{getPoints:()=>({points,done:!builder||builder.done}),onLink:url=>{remote.href=url;remote.hidden=false;},onStatus:text=>{remote.title=text;upload.textContent=' · '+text;}});});},
+    async seal(timeout=30000){
+      if(!tape)return true;
+      tape.finish('联机会话结束');builder?.finish();network?.kick();
+      const deadline=performance.now()+timeout;upload.textContent=' · 正在封存观战历史…';
+      while(builder&&!builder.done&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,50));
+      const done=network?await network.seal(Math.max(0,deadline-performance.now())):!builder||builder.done;
+      upload.textContent=done?' · 观战历史已封存':' · 封存超时，保留已发布的确认历史';return done;
+    },
     async exportSoloReplay(){
       if(!tape||tape.header.adapter!=='native-local/1'||tape.header.players!==1||!tape.end)throw Error('只有已结束的单人局可以导出 TH01 Replay');
       const blob=await encodeTape(snapshot());

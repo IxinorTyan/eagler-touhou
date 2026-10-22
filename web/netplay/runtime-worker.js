@@ -25,6 +25,7 @@ function status(force=false){
  // Control, prediction and replay proof must follow every completed command.
  // UI-only diagnostics match the room's 250 ms refresh, including during replay.
  const state={proof:r.replayProof(),ready:r.readyForRollback(),reason:r.predictionBlockReason(),touch:r.touchContext()};
+ if(th04WorkerHost.replayOnly)state.scene=r.replayScene();
  if(force||simulatedSteps-lastGameStep>=30||now-lastGameAt>=1000){state.game=r.snapshot();lastGameStep=simulatedSteps;lastGameAt=now;}
  if(force||now-lastDiagnostics>=250){
   Object.assign(state,{rollback:r.rollbackInfo(),render:r.renderInfo(),diagnostics:r.diagnosticText(),fault:r.faultReport({cpu:false})});

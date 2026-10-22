@@ -61,7 +61,7 @@ class Handler(AssetHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        if replay_history.handle_get(self): return
+        if replay_history.handle_get(self, ROOMS, LOCK, '04', lambda r: room_expired(r,time.monotonic())): return
         url=urlparse(self.path)
         if url.path=='/relay':
             from relay_server import handle

@@ -174,6 +174,7 @@ function showStartup(){
   }
 }
 function closeDisconnected(reason){
+  replayRecorder.finish(reason);
   if(stopped)return;
   stopReason=String(reason);startupFailure(stopReason);
   stopped=true;running=false;clearInput();runtime?.stop();
@@ -281,7 +282,7 @@ function fail(error){
 }
 function closeFinishedRoom(){
   if(session.role!=='host'||!stopped||!onlinePeers().every(peer=>peer.ended))return;
-  disconnect();request('leave').catch(()=>{});
+  disconnect();void replayRecorder.seal().then(()=>request('leave')).catch(()=>{});
 }
 function finishGame(){
   if(stopped)return;stopped=true;running=false;clearInput();
@@ -992,5 +993,5 @@ $('ready').onclick=()=>{
   action('ready');
 };
 $('start').onclick=()=>{action('start');};
-$('leave').onclick=async()=>{replayRecorder.finish('玩家离开本局');stopped=true;running=false;clearInput();runtime?.stop();clearTimers();disconnect();try{await request('leave');}finally{location.href=networkUrl(mode);}};
+$('leave').onclick=async()=>{replayRecorder.finish('玩家离开本局');stopped=true;running=false;clearInput();runtime?.stop();clearTimers();disconnect();try{await replayRecorder.seal();await request('leave');}finally{location.href=networkUrl(mode);}};
 onBgmVersion(()=>{if(session&&state?.phase==='lobby'&&!stopped)prepareRoomAssets(state).catch(()=>{});});

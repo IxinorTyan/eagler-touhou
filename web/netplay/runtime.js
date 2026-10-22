@@ -486,6 +486,11 @@ const sync={
   start(){emulator.run();enabled=true;details.textContent='启动进度：全员已同步开局，正在启动 DOS 和游戏。';canvas.focus?.();},
   stop(){enabled=false;closed=true;clearKeys();bgm?.dispose();localSe?.dispose();if(emulator){emulator.module.netFlushAudio();emulator.pause();}},
   replayProof:()=>JSON.stringify([ticks,emulatedTicks,oldP1,mailbox,guestMemoryBase,residentAddress,gameplaySeen,blocked,pauseMenu.previous,pauseMenu.paused,pauseMenu.selection,pauseMenu.exited,snapshot()]),
+  replayScene(){
+    if(!mailboxOwned(mailbox,guestMemoryBase,residentAddress))return null;
+    const stage=emulator.module.HEAPU8[gameDataBase()+0x5394];
+    return stage<=6?{kind:'stage',stage}:null;
+  },
   replaySave,replayLoad,
   step,present,checksum,snapshot,capture,restore,confirm,
   readyForRollback:()=>gameplaySeen&&!!emulator?.module.netCapture,

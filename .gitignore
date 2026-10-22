@@ -10,6 +10,7 @@
 !/server.py
 !/web_server.py
 !/lan_server.py
+!/replay_history.py
 !/relay_server.py
 !/turn_service.py
 !/public_tunnel.py
