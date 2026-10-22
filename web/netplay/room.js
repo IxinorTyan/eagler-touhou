@@ -1,6 +1,7 @@
 import {InputLatch} from './input-latch.js';
 import {createRecorder} from '../replay/recorder.js';
 import {startFrameLoop} from '../frame-limit.js';
+import {createInputChannel,acceptInputChannel} from './input-transport.js';
 import {readNetworkMode,networkUrl} from './network-mode.js';
 import {PROTOCOL,RollbackQueue,TICK_MS,MAX_ROLLBACK,BOOT_DELAY,MAX_INPUT_DELAY,MAX_ROLLBACK_INPUT_DELAY,lockstepDelayForRtt,rollbackInputDelayForRtt,rollbackRttForSamples} from './rollback-queue.js';
 import {mountPlayer} from '../player-ui.js';
@@ -37,6 +38,7 @@ wakeChannel.port1.onmessage=event=>{
   wakePending=false;wakeTimer=null;pump(performance.now());
 };
 let waitingSince=0,replayUntil=0,rollbackCount=0,resimulated=0,maxRewind=0;
+let replayTouchContext=null;
 const pendingHashes=new Map();
 let keys=new Set(),childBits=0,pendingAction=0,bits=0,inputChangedAt=0;
 let peers=new Map(),hashes=new Map(),captureTimes=new Map();
@@ -55,7 +57,7 @@ function peerTiming(now){
   return onlinePeers().map(peer=>({role:peer.role,slot:state.slots[peer.role],hidden:!!peer.hidden,
     rttMs:peer.rtt??null,lastPacketAgeMs:Math.round(now-peer.lastPacket),
     lastInputFrame:peer.lastInputFrame??null,lastInputAgeMs:peer.lastInputAt==null?null:Math.round(now-peer.lastInputAt),
-    bufferedBytes:peer.channel?.bufferedAmount??0}));
+    bufferedBytes:peer.channel?.bufferedAmount??0,inputTransport:peer.channel?.transportStats??null}));
 }
 function recordStall(kind,durationMs,detail=''){
   const now=performance.now();
@@ -530,7 +532,7 @@ function makePeer(role,rtcConfiguration){
   };
   pc.oniceconnectionstatechange=showStartup;
   pc.onsignalingstatechange=showStartup;
-  pc.ondatachannel=event=>{try{attachChannel(peer,event.channel);}catch(error){fail(error);}};
+  pc.ondatachannel=event=>{try{acceptInputChannel(pc,event.channel,'th04-inputs',channel=>attachChannel(peer,channel));}catch(error){fail(error);}};
   peer.connectTimer=setTimeout(()=>fail(Error(`与${label(role)}建立数据通道超过 30 秒（ICE ${pc.iceConnectionState}）；这是连接超时，资源状态见加载进度`)),30000);return peer;
 }
 function makeRelayPeer(role){
@@ -658,7 +660,7 @@ async function beginGame(){
   }else{
   for(const role of activeRoles())if(role!==session.role)makePeer(role,rtcConfiguration);
   for(const peer of peers.values())if(roles.indexOf(session.role)<roles.indexOf(peer.role)){
-    attachChannel(peer,peer.pc.createDataChannel('th04-inputs',{ordered:true}));
+    attachChannel(peer,createInputChannel(peer.pc,'th04-inputs'));
     peer.signalChain=signalingStep(peer,'生成连接邀请',async()=>peer.pc.setLocalDescription(await peer.pc.createOffer()))
       .then(async()=>{if(!stopped){await signal(peer,{type:'offer',description:peer.pc.localDescription.toJSON()});peer.signalStage='已发送邀请，等待应答';showStartup();}}).catch(fail);
   }
@@ -792,19 +794,19 @@ function observeInput(){
   if(!running||document.hidden)return;
   inputLatch.observe(controlEditor.isEditing()?0:normalize(player.sample(keyboardBits(keys)|childBits|gamepadBits())|pendingAction));
 }
-function captureLocalInput(){
+function captureLocalInput(frontier=queue.frame,context=null){
   // Hidden pages must still produce authoritative input. Never read a held
   // gamepad, touch auto-fire or menu pulse while the player is away.
   let packed=0;
   if(!document.hidden){
-    player.setContext(runtime.touchContext());
+    player.setContext(context??runtime.touchContext());
     runtime.setPointPreferences({focus:!!focusSettings(),always:player.alwaysPoint()});
     observeInput();
     const value=normalize(inputLatch.sample());
     if(value!==bits){bits=value;inputChangedAt=performance.now();}
     packed=player.pack(bits|pendingAction,{includePointPreference:false});
   }else if(bits){bits=0;inputChangedAt=performance.now();}
-  const captured=queue.capture(packed);
+  const captured=queue.capture(packed,frontier);
   if(!captured)return false;
   player.consume();inputLatch.consume();
   pendingAction=0;captureTimes.set(captured.frame,performance.now());broadcast(captured);return true;
@@ -880,11 +882,14 @@ async function pump(now){
   try{
     accumulator=Math.min(accumulator+Math.max(0,now-lastNow),TICK_MS*4);lastNow=now;
     let count=0,waiting=false;const budgetStart=performance.now();
+    if(queue.frame<replayUntil&&accumulator>=TICK_MS&&captureLocalInput(replayUntil,replayTouchContext))earlyInputs++;
     if(queue.dirty!==null)queue.refreshCorrection();
     if(queue.dirty!==null){
       // Publish the due frontier input before costly replay. Never sample a
       // historical replay frame, and never resample an already captured frame.
       if(queue.frame>=replayUntil&&accumulator>=TICK_MS&&captureLocalInput())earlyInputs++;
+      // Keep touch/menu generation at the live boundary throughout repair.
+      if(queue.frame>=replayUntil)replayTouchContext=runtime.touchContext();
       const from=queue.dirty;replayUntil=Math.max(replayUntil,queue.frame);
       maxRewind=Math.max(maxRewind,replayUntil-from);rollbackCount++;
       const restoreAt=performance.now();
