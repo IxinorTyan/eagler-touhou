@@ -27,13 +27,36 @@ let core,paused=false,last=0,accumulator=0,steps=0,logicMs=0,drawMs=0,draws=0,st
 let musicContext,musicBuffer,musicSource,musicGain,musicEnabled=false,musicWanted=true,musicRequest,musicLoop;
 let musicTrack=null;
 let scoreRevision=0,scoreSaveFailed=false,formalScores;
-let nativeRecorder,nativeRecording,nativeRaw,starting=false;
+let nativeRecorder,nativeRecording,nativeRaw,starting=false,nativeReplayFinished=false,nativePromptWasPaused=false;
 function recordNativeCommand(command){
   if(!nativeRecording)return;
   try{
     nativeRecording.consumed();const frame=nativeRecording.frame-1;
     nativeRecorder.stage(frame,{inputs:[command],offlineMask:0,proof:JSON.stringify(nativeRecording.checksum()),hash:(frame+1)%120===0?nativeRecording.checksum():null});nativeRecorder.confirm(frame+1,false);
   }catch(error){nativeRecorder?.finish('原生录像停止：'+error.message);nativeRecording=null;}
+}
+function finishSoloReplay(reason){
+  if(!solo||!nativeRecording||nativeReplayFinished)return false;
+  nativeReplayFinished=true;nativeRecording=null;nativeRecorder?.finish(reason);
+  const dialog=$('solo-replay-dialog');
+  if(dialog){
+    nativePromptWasPaused=paused;paused=true;release();accumulator=0;nativeRaw.th_set_pause_overlay(1);
+    $('solo-replay-title').textContent=reason==='clear'?'路线完成，保存单人 Replay？':'本局结束，保存单人 Replay？';
+    $('solo-replay-summary').textContent=reason==='clear'?'录像覆盖到最终关卡完成，不包含之后的菜单操作。':'录像截止于首次全员阵亡，只包含续关前的操作。';
+    dialog.showModal();
+  }
+  return true;
+}
+function beforeNativeCommand(name){
+  if(solo&&name==='th_continue'&&nativeRecording&&!nativeReplayFinished&&nativeRaw.th_get(0,0)===3){
+    finishSoloReplay('game-over');return false;
+  }
+  return true;
+}
+function closeSoloReplayPrompt(){
+  const dialog=$('solo-replay-dialog');if(!dialog)return;
+  if(dialog.open)dialog.close();
+  nativeRaw.th_set_pause_overlay(nativePromptWasPaused?1:0);paused=nativePromptWasPaused;release();accumulator=0;updatePhase();present();
 }
 function restoreFormalScores(){if(formalScores){new Uint8Array(core.memory.buffer,core.th_score_data(),formalScores.length).set(formalScores);core.th_score_load(formalScores.length);}}
 function loadScores(){
@@ -120,6 +143,7 @@ function updatePhase(){
   if(!core)return;
   const phase=core.th_get(0,0),stage=core.th_get(27,0),overlay=$('overlay');
   const menu=core.th_get(50,0);$('menuControls').hidden=!menu;
+  if(solo&&!nativeReplayFinished&&(phase===3||stage===20&&(phase===2||menu>=10&&menu<=13)))finishSoloReplay(phase===3?'game-over':'clear');
   $('saveName').hidden=menu!==12;
   if(menu>=10&&menu<=13){
     overlay.hidden=true;$('phase').textContent=menu===10?'结尾演出':menu===11?'成绩评定':menu===12?'姓名登记':'成绩记录';
@@ -214,7 +238,7 @@ function toggleMusic(){
   else{stopMusicSource();$('music').textContent='音乐：关';}
 }
 document.addEventListener('keydown',event=>{
-  if(!started||configuring)return;
+  if(!started||configuring||$('solo-replay-dialog')?.open)return;
   if(!event.repeat){void unlockEffects();void startMusic();}
   if(!event.repeat&&event.code==='F10'&&core){event.preventDefault();previewBoss();return;}
   if(core?.th_get(50,0)&&!event.target.matches('select,input')){
@@ -260,6 +284,16 @@ $('hit').onclick=()=>core?.th_debug_hit(0,0);
 $('ghost').onclick=()=>{if(players()>1)core?.th_debug_hit(1,1);};
 $('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('stage').requestFullscreen();}catch(error){console.error(error);}};
 $('launch').onclick=()=>{if(!core)return;if(core.th_get(50,0))menuInput(4);else if(paused)setPaused(false);else if(core.th_get(0,0)>=2){core.th_continue();core.th_debug_invincible($('god').checked?1:0);}else core.th_step(4,0,0);updatePhase();$('game').focus({preventScroll:true});};
+if($('solo-replay-dialog')){
+  $('solo-replay-save').onclick=async()=>{
+    const button=$('solo-replay-save');button.disabled=true;
+    try{await nativeRecorder.exportSoloReplay();$('scoreStatus').textContent='Replay 已保存；续关后的操作不会进入该文件。';closeSoloReplayPrompt();}
+    catch(error){$('solo-replay-summary').textContent=`Replay 保存失败：${error.message}。可以重试保存或丢弃。`;}
+    finally{button.disabled=false;}
+  };
+  $('solo-replay-discard').onclick=()=>{closeSoloReplayPrompt();$('scoreStatus').textContent='Replay 已丢弃；续关后的操作不会被记录。';};
+  $('solo-replay-dialog').addEventListener('cancel',event=>event.preventDefault());
+}
 $('bossPreview').onclick=()=>{previewBoss();$('game').focus({preventScroll:true});};
 $('mimaPreview').onclick=()=>{previewBoss(10,1);$('game').focus({preventScroll:true});};
 $('sarielPreview').onclick=()=>{previewBoss(20,0);$('game').focus({preventScroll:true});};
@@ -279,7 +313,7 @@ async function begin(){
     nativeRecorder=createRecorder(document.querySelector('#player .toolbar'));globalThis.th01LocalReplay=nativeRecorder;
     const settings={players:players(),count:Number(saved.orbs),rank:Number(saved.difficulty),lifeCompensation:!!saved.compensation,startStage:saved.startStage};
     await nativeRecorder.boot({adapter:'native-local/1',settings,players:settings.players,hostSlot:0,tickMs:tick,opening:nativeLocalOpening(nativeRaw)});
-    if(!nativeRecorder.error)nativeRecording=new NativeLocalSimulation(nativeRaw,settings,0);
+    if(!nativeRecorder.error){nativeReplayFinished=false;nativeRecording=new NativeLocalSimulation(nativeRaw,settings,0);}
       }catch(error){nativeRecording=null;try{nativeRecorder?.finish('原生录像未启动：'+error.message);}catch{}console.warn('原生录像未启动',error);}
   }
   try{localStorage.setItem(preferenceKey,JSON.stringify(saved));}catch{}
@@ -302,7 +336,7 @@ try{
   const response=await fetch('game.wasm',{cache:'no-store'});if(!response.ok)throw Error('缺少 game.wasm，请先运行构建脚本');
   const binary=await response.arrayBuffer();const module=await WebAssembly.compile(binary);
   if(WebAssembly.Module.imports(module).length)throw Error('核心不应依赖外部导入');
-  const instance=await WebAssembly.instantiate(module,{});nativeRaw=instance.exports;core=nativeRaw;loadScores();core=localExportFacade(nativeRaw,recordNativeCommand);
+  const instance=await WebAssembly.instantiate(module,{});nativeRaw=instance.exports;core=nativeRaw;loadScores();core=localExportFacade(nativeRaw,recordNativeCommand,beforeNativeCommand);
   // Read-only diagnostics and deterministic commands for local QA.
   window.th01Native={core,buttons,reset,pause:setPaused,audio:()=>({ready:sfxReady,enabled:sfxEnabled,buffers:sfxBuffers.size,cursor:soundCursor,musicWanted,musicTrack,musicPlaying:musicEnabled&&musicContext?.state==='running',musicLoop:musicSource?[musicSource.loopStart,musicSource.loopEnd]:null})};
   $('start').disabled=false;$('start').textContent=solo?'开始单人游戏 →':'开始本地合作 →';requestAnimationFrame(loop);

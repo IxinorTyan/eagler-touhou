@@ -24,8 +24,9 @@ export class NativeLocalSimulation extends NativeSimulation{
 }
 // Wrap a plain facade, not the non-configurable WebAssembly export object.
 // Calls and their return values are unchanged; recording errors cannot escape.
-export function localExportFacade(core,onCommand){
+export function localExportFacade(core,onCommand,beforeCommand=()=>true){
   return Object.fromEntries(Object.entries(core).map(([name,value])=>[name,NATIVE_COMMANDS.has(name)?(...args)=>{
+    try{if(beforeCommand(name,args)===false)return;}catch{}
     let command;
     try{
       command={name,args:args.map(n=>Number(n)|0)};

@@ -10,7 +10,7 @@
     "bgm/akyu/manifest.json": "c0c559559bf6c201f7c425f5052fc5eb6e23ab506b4cf67892ccfb8f41159651",
     "netplay/runtime.js": "bbd98dbc1c906ce61b2215b0847e23e9b48c00e340776d9e9c43bd4a0498b0a0",
     "netplay/runtime-core.js": "268424763862882c6e7b63fcf3bba008c6b459ddb58179a8d3e3d76fdc7f5fb8",
-    "replay/recorder.js": "75b2b4629ff275dfc323a837f048d50c068883c40297c6c8c75bc036fea304d0",
+    "replay/recorder.js": "79dcf62e2ec850a87803b498f9f9fbe59b6023bb18d52b242302ac14224f37c3",
     "replay/tape.js": "41a13da39fdf885f6a2e464394c855b6ca032239dcf2615ea98561bdac5dbf68",
     "replay/profile.js": "ce49377d7289a1fb53fd3202fd991c33b4c061867c7c3f36ad67347912415a43",
     "replay/sha256.js": "9cb7be2bc039bcea2a4d727ef98bcd9047a78dfd4c11950355723147423e1f43",
