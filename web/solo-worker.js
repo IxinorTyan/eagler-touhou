@@ -3,9 +3,22 @@ import {workerEnvironment} from './solo-worker-environment.js';
 let emulator, environment, bridge, music, patch, game;
 let awaitingSnapshot=false, pendingMusic=[], pendingResults=[], lastPublish=0, costs=[], lastInput=performance.now();
 const held=new Map();
+function postReplay(type,value){
+  if(type==='chunk'&&value.clocks)postMessage({type:'external-replay-chunk',chunk:value},[value.clocks.buffer]);
+  else postMessage({type:'external-replay-'+type,...(type==='chunk'?{chunk:value}:type==='end'?{result:value}:{message:value?.message||String(value)})});
+}
+function applyAssist(value){
+  if(!bridge)return;
+  const h=emulator.module.HEAPU8;
+  const at=Number.isInteger(value.address)?value.address:bridge.live;
+  if(!bridge.valid(h,at)||new DataView(h.buffer).getUint16(at+patch.fields.generation,true)!==value.generation)return;
+  const previous=bridge.live;bridge.live=at;
+  try{bridge.setFocus(value.focus,0);bridge.setTouch(value.touch||[0,0]);}finally{bridge.live=previous;}
+}
+function queueAssist(value){value={...value,address:value.address??bridge?.live};if(emulator?.assist)emulator.assist(value);else applyAssist(value);}
 function clear(){
   for(const event of held.values())emulator?.key(event.code,false);
-  held.clear();bridge?.setFocus(0,0);bridge?.setTouch([0,0]);
+  held.clear();if(bridge)queueAssist({generation:bridge.update()?.generation,focus:0,touch:[0,0]});
 }
 function update(){
   if(!emulator)return;
@@ -31,7 +44,9 @@ async function dispatch({method,args=[]}){
     const setup=args[0];game=setup.game;patch=setup.patch;
     environment=workerEnvironment(setup.canvas,setup.sampleRate);
     const {DOSBoxPC98}=await import('./dosbox-adapter.js');
-    emulator=await DOSBoxPC98.create({...setup.config,canvas:setup.canvas,workerRuntime:true,
+    const externalReplay=setup.config.externalReplay;
+    emulator=await DOSBoxPC98.create({...setup.config,canvas:setup.canvas,workerRuntime:true,applyReplayInput:applyAssist,
+      ...(externalReplay?{externalReplay:{...externalReplay,onChunk:value=>postReplay('chunk',value),onEnd:value=>postReplay('end',value),onError:error=>postReplay('error',error),onRecordingError:error=>postReplay('error',error)}}:{}),
       onDiskChange:name=>postMessage({type:'diskChange',name}),onExit:()=>{clear();postMessage({type:'exit'});}});
     const {NativePause}=await import('./native-pause.js');bridge=new NativePause(()=>emulator,patch);
     if(setup.music){const {NativeMusic}=await import('./native-music.js');music=new NativeMusic(setup.music);}
@@ -52,9 +67,7 @@ async function dispatch({method,args=[]}){
     if(event.type==='keydown'||event.type==='keyup')emulator.key(event.code,event.type==='keydown');return;
   }
   if(method==='input'){
-    lastInput=performance.now();const input=args[0],h=emulator.module.HEAPU8;
-    if(!bridge.valid(h,bridge.live)||input.generation!==new DataView(h.buffer).getUint16(bridge.live+patch.fields.generation,true))return;
-    bridge.setFocus(input.focus,0);bridge.setTouch(input.touch||[0,0]);return;
+    lastInput=performance.now();queueAssist(args[0]);return;
   }
   if(method==='nativeRequest'){
     const state=bridge.update();
@@ -68,6 +81,10 @@ async function dispatch({method,args=[]}){
     pendingMusic=[];pendingResults=[];clear();bridge.reset();music?.reset();await emulator.reset();return;
   }
   if(method==='run'){lastInput=performance.now();emulator.run();return;}
+  if(method==='externalReplayFinish'){emulator?.finishReplay();return;}
+  if(method==='externalReplayFast'){emulator?.fastForwardReplay(args[0]);return;}
+  if(method==='externalReplayDisable'){emulator?.stopBrowserRecording();return;}
+  if(method==='externalReplayPause'){const paused=!!args[0];if(paused)emulator?.pause();else emulator?.run();return;}
   if(method==='getDiskImage')return emulator.getDiskImage(...args);
   if(method==='addDiskImage'){emulator.addDiskImage(...args);return;}
   if(method==='setHdd'){await emulator.setHdd(...args);return;}

@@ -10,6 +10,10 @@
 .solo-launch-assists label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
 .solo-launch-assists input[type=checkbox]{width:18px;height:18px;min-height:0;margin:0;accent-color:var(--pink)}
 .solo-launch-assists label:has(input:disabled){opacity:.55;cursor:default}
+#solo-replay label{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+#solo-replay input[type=checkbox]{width:18px;height:18px;min-height:0;margin:0}
+#solo-replay input[type=file]{width:min(100%,240px);min-height:0;padding:6px}
+#solo-replay p{overflow-wrap:anywhere}
 </style></head>
 <body class="shell game-page"><header class="masthead"><a class="brand" href="index.html">TOUHOU / 03 · 测试 beta0.3 · 性能版</a><small>東方夢時空 · PHANTASMAGORIA OF DIM.DREAM</small></header><nav class="mode-nav" aria-label="游戏模式"><a data-mode="solo" aria-current="page" href="solo.html">单机游戏</a><a data-mode="local" href="local.html">本地双人</a><a data-mode="lan" data-network="lan" href="lan.html?network=lan">局域网联机</a><a data-mode="public" data-network="public" href="lan.html?network=public">公网联机</a></nav><main>
 <header class="intro"><span class="eyebrow">ORIGINAL / SINGLE PLAYER</span><h1>单机游戏</h1><p>选择中文汉化或日文版，从开头进入梦时空。默认 Lunatic，全部九名角色已解锁；可在原版菜单内选择难度和角色，保留剧情与排行榜记录。</p></header>
@@ -18,6 +22,7 @@
 <p class="muted">仅影响本机播放的音乐，不改变其他玩家的选择；自动保存，游戏中切换会从头播放当前曲目。</p>
 </section>
 
+<section class="panel" id="solo-replay"><h2>单人 Replay</h2><label><input id="record-enabled" type="checkbox" checked> 录制本次首局</label><p class="muted">结束或通关时询问保存，只保留首次续关之前的操作。播放自动快进开头和录下的暂停；Esc / 空格暂停，Ctrl 快进。重新启动游戏可录制新局。</p><div class="row"><button id="record-finish" disabled>结束录制</button><button id="record-save" disabled>保存 Replay</button><button id="record-discard" disabled>丢弃 Replay</button><label>导入 Replay <input id="replay-file" type="file" accept=".th03r,application/octet-stream"></label><button id="replay-play" disabled>播放 Replay</button><button id="replay-pause" disabled>暂停播放</button><button id="replay-stop" disabled>停止播放</button></div><p id="replay-status" role="status">等待开始首局；结束或通关时询问保存 Replay。</p></section>
 <fieldset class="launch-settings"><legend>启动设置</legend><div class="settings-grid">
 <label>游戏语言 <select id="language"><option value="jp">日文原版</option><option value="cn">中文汉化</option></select></label>
 <label>声音 <select id="audio-mode" aria-describedby="audio-help"><option value="independent">独立音乐（手机建议）</option><option value="buffered">原声·缓冲</option><option value="original">原声·低延迟</option></select></label><small id="audio-help">独立音乐保持正常速度，不随游戏掉帧变调；音效仍由游戏播放。原声由模拟器播放，独立音乐由浏览器播放。</small>
