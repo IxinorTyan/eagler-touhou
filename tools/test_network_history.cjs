@@ -101,13 +101,14 @@ async function routes(context){
    console.log('long-history caught up',report.rejoined.cursor,'in',report.rejoinMs,'ms');
    assert(outageReads&&outagePushes&&htmlFailure);report.outages={outageReads,outagePushes,htmlFailure};
   }
-  const download=host.waitForEvent('download');await host.click('#history-save');await (await download).saveAs(path.join(reports,'network-prefix.th05m'));
-  report.exported=await host.evaluate(()=>th05Lan.info);assert.equal(report.exported.running,true);
-  await host.waitForFunction(n=>th05Lan.info.history.frames>=n+60,report.exported.history.frames,{timeout:60000});
+  report.liveBeforeLeave=await host.evaluate(()=>th05Lan.info);assert.equal(report.liveBeforeLeave.running,true);
+  assert.equal(await host.locator('#history-save').count(),0,'confirmed spectator history has no file export');
+  assert.equal(await viewer.locator('#file').count(),0,'network spectator has no file import');
+  await host.waitForFunction(n=>th05Lan.info.history.frames>=n+60,report.liveBeforeLeave.history.frames,{timeout:60000});
   await host.click('#leave');await host.waitForFunction(()=>!th05Lan.info.room);
   await viewer.waitForFunction(()=>th05CoopReplayQA.read().completed||th05CoopReplayQA.read().error,null,{timeout:90000});report.end=await read();assert.equal(report.end.error,null);assert.equal(report.end.cursor,report.end.frames);assert(await viewer.isVisible('#completed'));
   assert(lostUpload&&uploadRetry&&failedRead);assert.deepEqual(errors,[]);report.faults={lostUpload,uploadRetry,failedRead};
-  console.log('PASS isolated spectator context, real HTTP handlers, lost upload ACK, read retry, paused buffering, live catch-up, export and verified EOF');
+  console.log('PASS isolated spectator context, real HTTP handlers, lost upload ACK, read retry, paused buffering, live catch-up and verified EOF');
  }finally{
   report.players=await Promise.all([host,guest].filter(Boolean).map(p=>p.evaluate(()=>({info:th05Lan.info,status:document.getElementById('status').textContent})).catch(()=>null)));if(viewer)report.final=await viewer.evaluate(()=>({qa:th05CoopReplayQA.read(),status:document.getElementById('status').textContent})).catch(()=>null);
   report.elapsedSeconds=(Date.now()-began)/1000;report.errors=errors;fs.writeFileSync(path.join(reports,stress?'network-stress.json':stages?'network-stage-history.json':'network-history.json'),JSON.stringify(report,null,2));await browser.close();bridge.stdin.end();

@@ -24,7 +24,7 @@ function observeReplayRun(){
   const valid=soloInput.valid(h,replayMailbox);
   const data=replayMailbox-patch.mailbox_cs_offset+(patch.data_segment-patch.code_segment)*16;
   return !valid||h[replayMailbox+22]===3||h[replayMailbox+22]===4||
-    (h[replayMailbox+22]===0&&h[data+0x576c]===1);
+    (h[replayMailbox+22]===0&&h[data+0x576c]===1)?'end':false;
 }
 const frameTransfers=new Set();
 let p2Pulse=0,p2PulseTick=-1,p3Pulse=0,p3PulseTick=-1;
@@ -136,7 +136,9 @@ async function boot(data){
   }else{importScripts(new URL('wdosbox-x-jspi.js',vendor).href);factory=WDOSBOXXJSPI;}
   onmessage=dispatch;
   const compiledCore=await compiledTask;
-  const init=[...data.files,{dosboxConf:config(data.cycles||'max 100%',data.core||'simple'),jsdosConf:{version:'8'}}];
+  let dosboxConf=config(data.cycles||'max 100%',data.core||'simple');
+  if(data.files.some(f=>f.path==='game/CNFONT.BMP'))dosboxConf=dosboxConf.replace('[pc98]\n','[pc98]\npc-98 try font rom=false\npc-98 anex86 font=/home/web_user/game/CNFONT.BMP\n');
+  const init=[...data.files,{dosboxConf,jsdosConf:{version:'8'}}];
   const sessionId=externalHost?'th05-external-replay-v1':'th05-fast-'+Date.now(),queue=[];let receiver;
   const audioPort={postMessage:(message,transfer)=>{if(message instanceof Float32Array){audioPackets++;for(let i=0;i<message.length;i+=32)audioEnergy+=Math.abs(message[i]);}if(message instanceof Float32Array&&data.frameReplay?.mode==='playback'&&(!frameBridge?.started||paused)){replayBootAudioDrops++;return;}
     data.audioPort.postMessage(message,transfer||[]);}};

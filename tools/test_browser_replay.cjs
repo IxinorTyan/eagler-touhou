@@ -58,12 +58,13 @@ const fault=process.env.TH05_RECORD_FAULT==='1';
   }else await page.click('#record-finish');
   await page.waitForFunction(()=>!document.querySelector('#record-save').disabled||document.querySelector('#record-status').textContent.includes('录像已停止'),null,{timeout:30000});
   assert.equal(await page.locator('#record-save').isDisabled(),false,await page.locator('#record-status').innerText());
+  const download=page.waitForEvent('download');
+  await page.click(await page.locator('#replay-save-dialog').isVisible()?'#replay-prompt-save':'#record-save');
+  const file=path.join(root,'reports',`browser-replay-${language}.th05r`);await (await download).saveAs(file);report.fileBytes=fs.statSync(file).size;
   report.ended=await read();const before=await read();
   if(process.env.TH05_RECORD_QUIT!=='1'){
    await tap('ArrowRight',600);const after=await read();assert(after.ticks>before.ticks);assert(after.x>before.x);report.playerContinued={before,after};
   }
-  const download=page.waitForEvent('download');await page.click('#record-save');
-  const file=path.join(root,'reports',`browser-replay-${language}.th05r`);await (await download).saveAs(file);report.fileBytes=fs.statSync(file).size;
   const spectators=await setup(),viewer=await spectators.newPage();viewer.on('pageerror',e=>report.errors.push(e.message));
   await viewer.goto(base+'/solo-replay.html?qa=1');await viewer.setInputFiles('#file',file);await viewer.waitForFunction(()=>!document.querySelector('#play').disabled);
   report.commands=await viewer.evaluate(async fileBytes=>{

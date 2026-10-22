@@ -1,20 +1,14 @@
 import {publishNetworkHistory} from './history-network.js';
 import {ConfirmedHistory,historySessionId} from './confirmed-history.js';
-import {createReplayStore} from '../external-replay-store.js';
-import {encodeMultiplayerReplay} from './history-codec.js';
 import {createCheckpointBuilder} from '../checkpoint-builder.js';
-// Browser-owned history feeds independent file, local-channel and optional
-// HTTP publishers. BroadcastChannel remains same-browser only; the current
-// server transport does not imply main-project lobby integration.
-export function createHistoryHost(header,{record=true,watch=true,checkpoints=true,onChange=()=>{},onError=()=>{}}={}){
+// Browser-owned confirmed history feeds local and optional HTTP spectators.
+export function createHistoryHost(header,{watch=true,checkpoints=true,onChange=()=>{}}={}){
   const history=new ConfirmedHistory(header),id=historySessionId(),channel=watch?new BroadcastChannel('th05-history-'+id):null;
-  let tainted=false,recordEpoch=0;
-  let store=record?createReplayStore(failRecord):null,recordFrames=0,blob=null,sealing=null,closed=false,recordError=null;
+  let tainted=false,closed=false;
   const requests=new Map();let network=null,networkURL=null,networkStatus='',watchTimer=0;
-  let builder=null,checkpointChain=Promise.resolve(),resolveBuilder;
-  const builderDone=new Promise(resolve=>resolveBuilder=resolve);
-  function checkpointError(error){history.checkpoints.failed=error.message;history.checkpointsDone=true;builder?.terminate();builder=null;resolveBuilder();onChange();network?.kick();}
-  if(checkpoints&&(record||watch))try{
+  let builder=null,checkpointChain=Promise.resolve();
+  function checkpointError(error){history.checkpoints.failed=error.message;history.checkpointsDone=true;builder?.terminate();builder=null;onChange();network?.kick();}
+  if(checkpoints&&watch)try{
     builder=createCheckpointBuilder();
     builder.onmessage=({data})=>{
       if(closed)return;
@@ -26,12 +20,11 @@ export function createHistoryHost(header,{record=true,watch=true,checkpoints=tru
         }).catch(checkpointError);
       }
       if(data.type==='error')checkpointChain.then(()=>checkpointError(Error(data.message)));
-      if(data.type==='done')checkpointChain.then(()=>{history.checkpointsDone=true;builder?.terminate();builder=null;resolveBuilder();network?.kick();onChange();});
+      if(data.type==='done')checkpointChain.then(()=>{history.checkpointsDone=true;builder?.terminate();builder=null;network?.kick();onChange();});
     };
     builder.postMessage({type:'boot',header});
   }catch(error){checkpointError(error);}
-  else{history.checkpointsDone=true;resolveBuilder();}
-  function failRecord(error){recordError=error;store?.dispose();store=null;recordFrames=0;blob=null;onError(error);onChange();}
+  else history.checkpointsDone=true;
   function post(message,to){channel?.postMessage({...message,to});}
   function scheduleWatch(delay=0){
     if(!channel||closed||!requests.size)return;
@@ -71,59 +64,24 @@ export function createHistoryHost(header,{record=true,watch=true,checkpoints=tru
     requests.set(data.viewer,{frame:0,index:0,bootstrap:history.frames,bootstrapped:false,waiting:null,sentAt:0});
     post({type:'begin',header:history.header},data.viewer);clearTimeout(watchTimer);watchTimer=0;scheduleWatch();
   };
-  function invalidate(){if(tainted)return;tainted=true;recordEpoch++;store?.dispose();store=null;blob=null;recordFrames=0;onChange();}
-  function seal(reason='手动结束录制'){
-    if(tainted)return Promise.reject(Error('本局使用过作弊辅助，不保存 Replay'));
-    if(sealing)return sealing;
-    if(!store||!recordFrames)return Promise.reject(recordError||Error('尚无已确认输入可导出'));
-    const current=store;store=null;const frames=recordFrames,epoch=recordEpoch,stageRecords=history.stages.export(frames);
-    sealing=current.finish().then(async compressed=>{
-      // Only file finalization waits; player input never awaits this replica.
-      if(history.end){let timeout;try{await Promise.race([builderDone,new Promise(resolve=>{timeout=setTimeout(resolve,30000);})]);}finally{clearTimeout(timeout);}}await checkpointChain;
-      return encodeMultiplayerReplay({...history.header,frames,reason:String(reason).slice(0,250)},compressed,stageRecords,history.checkpoints.entries.filter(e=>e.frame<=frames));
-    })
-      .then(file=>{if(tainted||epoch!==recordEpoch)throw Error('本局录像已作废');blob=file;onChange();return file;}).catch(error=>{failRecord(error);throw error;});
-    sealing.catch(()=>{});return sealing;
-  }
+  function invalidate(){if(tainted)return;tainted=true;onChange();}
   return {
-    id,history,invalidate,get tainted(){return tainted;},get blob(){return blob;},get recording(){return !!store;},get recordFrames(){return recordFrames;},
+    id,history,invalidate,get tainted(){return tainted;},
     append(first,bytes,stageFrames){
       const batch=history.append(first,bytes,stageFrames);
       if(builder){const copy=batch.bytes.slice();builder.postMessage({type:'append',first,bytes:copy},[copy.buffer]);}
       if(history.tainted)invalidate();
       scheduleWatch();
-      if(store&&store.add(batch.bytes.slice()))recordFrames=history.frames;
       network?.kick();onChange();
     },
-    seal,
     get watch(){return watch;},
-    async snapshot(){
-      if(tainted)throw Error('本局使用过作弊辅助，不保存 Replay');
-      const epoch=recordEpoch;
-      if(history.end)return blob||seal(history.end.reason);
-      if(!store||!recordFrames)throw recordError||Error('尚无已确认输入可导出');
-      // Copy a fixed confirmed prefix on demand; the live recorder keeps running.
-      const frames=recordFrames,count=history.batches.length,stageRecords=history.stages.export(recordFrames),copy=createReplayStore(()=>{});let sliceBytes=0;
-      try{
-        for(let index=0;index<count;index++){
-          if(closed||tainted||epoch!==recordEpoch)throw Error('本局录像已作废或关闭');
-          const batch=history.batches[index];
-          if(!copy.add(batch.bytes.slice()))throw Error('录像导出压缩已停止');
-          sliceBytes+=batch.bytes.length;
-          if(sliceBytes>=16384||copy.pendingChunks>=64){await copy.drain();await new Promise(resolve=>setTimeout(resolve,0));sliceBytes=0;}
-        }
-        const file=await encodeMultiplayerReplay({...history.header,frames,reason:'途中导出的已确认片段'},await copy.finish(),stageRecords,history.checkpoints.entries.filter(e=>e.frame<=frames));
-        if(tainted||epoch!==recordEpoch)throw Error('本局录像已作废');return file;
-      }finally{copy.dispose();}
-    },
-    discard(){store?.dispose();store=null;blob=null;recordFrames=0;onChange();},
     get networkURL(){return networkURL;},get networkStatus(){return networkStatus;},
     connectNetwork(identity){if(!watch||closed||network)return;network=publishNetworkHistory(identity,history,{onLink:url=>{networkURL=url;onChange();},onStatus:value=>{networkStatus=value;onChange();}});},
     end(reason){
       builder?.postMessage({type:'end'});
       if(!history.end){history.finish(reason);scheduleWatch();}
-      if(store&&recordFrames)seal(reason);else if(store){store.dispose();store=null;}network?.kick();onChange();
+      network?.kick();onChange();
     },
-    dispose(){network?.close();closed=true;builder?.terminate();builder=null;resolveBuilder();clearTimeout(watchTimer);requests.clear();channel?.close();store?.dispose();store=null;},
+    dispose(){network?.close();closed=true;builder?.terminate();builder=null;clearTimeout(watchTimer);requests.clear();channel?.close();},
   };
 }

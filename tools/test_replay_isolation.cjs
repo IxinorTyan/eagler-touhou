@@ -20,7 +20,6 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    const {createReplayStore}=await import('/external-replay-store.js');
    const {createHistoryHost}=await import('/netplay/history-host.js');
    const {packHistoryRows}=await import('/netplay/confirmed-history.js');
-   const {decodeMultiplayerReplay}=await import('/netplay/history-codec.js');
    const {publishNetworkHistory}=await import('/netplay/history-network.js');
    const assert=(v,m)=>{if(!v)throw Error(m);},sleep=ms=>new Promise(r=>setTimeout(r,ms));
    const until=async fn=>{for(let n=0;n<200;n++){if(fn())return;await sleep(10);}throw Error('consumer timeout');};
@@ -46,7 +45,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    // Disabled watching creates no channel or network publisher.
    const RealChannel=BroadcastChannel;let channels=0;
    globalThis.BroadcastChannel=class extends RealChannel{constructor(...args){super(...args);channels++;}};
-   const off=createHistoryHost(header,{record:false,watch:false});off.append(0,batch(0));off.connectNetwork({});
+   const off=createHistoryHost(header,{watch:false});off.append(0,batch(0));off.connectNetwork({});
    assert(channels===0&&!off.networkURL,'watch disabled is inactive');off.dispose();globalThis.BroadcastChannel=RealChannel;
    // Bootstrap of a long archive sends one batch, then waits for viewer ACK.
    const host=createHistoryHost(header);for(let at=0;at<600;at+=60)host.append(at,batch(at));
@@ -60,15 +59,8 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    viewer.postMessage({type:'subscribe',viewer:id});await until(()=>count===1);
    host.append(600,batch(600));await sleep(80);assert(count===1,'sleeping viewer receives at most one batch');
    ack=true;viewer.postMessage({type:'ack',viewer:id,frames:received});host.end('fixture');await until(()=>ended);
-   assert(received===660&&bootstrap===600,'bootstrap target and final tail preserved');
-   const replay=await decodeMultiplayerReplay(await host.seal());assert(replay.frames===660,'file independent of viewer backlog');
+   assert(received===660&&bootstrap===600,'bootstrap target and final spectator tail preserved');
    host.dispose();viewer.close();
-   const fragmented=createHistoryHost(header,{watch:false});
-   for(let frame=0;frame<200;frame++){fragmented.append(frame,packHistoryRows([{pair:[32,0],offlineMask:0,ticks:frame,gameHash:123,nativeHash:0}],2));await sleep(5);}
-   // Simulate the game continuing while an explicit snapshot yields to gzip.
-   const exporting=fragmented.snapshot();fragmented.append(200,batch(200));
-   const prefix=await decodeMultiplayerReplay(await exporting);
-   assert(prefix.frames===200&&fragmented.history.frames===260,'fragmented export yields without including future frames');fragmented.dispose();
    // A stuck HTTP uploader retires only itself, preserving source recording.
    const realFetch=fetch,realBeacon=navigator.sendBeacon;let calls=0,status='',aborted=false;
    globalThis.fetch=(url,options)=>{
@@ -83,7 +75,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    publisher.kick();await sleep(20);assert(calls===2,'retired publisher cannot restart');publisher.close();globalThis.fetch=realFetch;navigator.sendBeacon=realBeacon;
    return {compressionQueueBounded:true,compressionRoundTrip:restored.length,watchDisabledChannels:channels,localReceived:received,bootstrap,uploadRetired:true};
   });
-  console.log('PASS optional consumer backpressure, bounded local bootstrap, disabled watching, gzip integrity and stuck upload retirement');
+  console.log('PASS solo compression isolation, bounded local spectator bootstrap, disabled watching and stuck upload retirement');
   // Real single-player core: fail its compressor, keep playing, then re-record.
   await context.addInitScript(()=>{
    const RealWorker=Worker;globalThis.storageWorkers=[];

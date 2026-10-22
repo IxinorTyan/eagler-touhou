@@ -102,7 +102,7 @@ window.fixture={async boot(language,playback=false,collect=true){worker=new Work
   assert.equal(after.captureStages,false);assert.equal(after.completed,60);assert(after.state.ticks>0,'sampling failure leaves the player running');
   report.faultIsolation={continuedSteps:after.completed,captureStages:after.captureStages};
  }
- if(process.env.TH05_STAGE_UI==='1'||process.env.TH05_STAGE_FILE==='1'||http){
+ if(process.env.TH05_STAGE_UI==='1'||http){
   const id='00000000-0000-4000-8000-000000000005';
   const header={...report.sourceBoot.historyHeader,...Object.fromEntries(['checksum','coreSha','diskSha','guestSha'].map(k=>[k,report.sourceBoot[k]]))};
   const batches=report.source.batches;
@@ -148,38 +148,10 @@ window.fixture={async boot(language,playback=false,collect=true){worker=new Work
   report.uiCatchupMs=Date.now()-uiSeekMs;
   await ui.locator('#end-close').click();await ui.screenshot({path:path.join(root,`reports/stage-watch-${language}-${players}-${stage}${benchmark?'-bench':''}-end.png`)});
   await ui.locator('#canvas').screenshot({path:path.join(root,`reports/stage-watch-${language}-${players}-${stage}${benchmark?'-bench':''}-canvas.png`)});
-  if(process.env.TH05_STAGE_FILE==='1'){
-   const bytes=await source.evaluate(async({header,batches})=>{
-    const {createHistoryHost}=await import('/netplay/history-host.js');
-    const host=createHistoryHost(header,{record:true,watch:false});
-    try{for(let n=0;n<batches.length;n++){const batch=batches[n];host.append(batch.first,Uint8Array.from(batch.bytes),batch.stageFrames);
-      if(n%16===15)await new Promise(resolve=>setTimeout(resolve,25));}
-     return Array.from(new Uint8Array(await (await host.snapshot()).arrayBuffer()));
-    }finally{host.dispose();}
-   },{header,batches});
-   assert.equal(Buffer.from(bytes).subarray(0,8).toString(),'T05MP002');
-   const fileUI=await context.newPage();fileUI.on('pageerror',e=>report.errors.push(e.message));await fileUI.goto(base+'/coop-replay.html?qa=1');
-   await fileUI.locator('#file').setInputFiles({name:'stage-test.th05m',mimeType:'application/octet-stream',buffer:Buffer.from(bytes)});
-   await fileUI.waitForFunction(()=>!document.querySelector('#stage-select').disabled||th05CoopReplayQA.read().error);
-   assert.equal(await fileUI.locator('#stage-select option').count(),2);
-   await fileUI.locator('#stage-select').selectOption({index:1});
-   await fileUI.waitForFunction(()=>th05CoopReplayQA.read().ready||th05CoopReplayQA.read().error,null,{timeout:60000});
-   await fileUI.locator('#pause').click();
-   await fileUI.waitForFunction(()=>th05CoopReplayQA.read().paused&&!th05CoopReplayQA.read().pending);
-   await fileUI.locator('#stage-select').selectOption({index:1});
-   await fileUI.waitForFunction(()=>{const s=th05CoopReplayQA.read();return s.ready&&s.target===null&&s.paused&&!s.pending||s.error;},null,{timeout:60000});
-   report.filePaused=await fileUI.evaluate(()=>th05CoopReplayQA.read());
-   assert.equal(report.filePaused.error,null);assert.equal(report.filePaused.stageFallback,null);assert.equal(report.filePaused.stage?.stage,stage);
-   await fileUI.locator('#pause').click();
-   await fileUI.waitForFunction(n=>th05CoopReplayQA.read().cursor>n+3||th05CoopReplayQA.read().error,prefix);
-   await fileUI.locator('#seek-frame').fill(String(report.filePaused.frames));await fileUI.locator('#seek').click();
-   await fileUI.waitForFunction(()=>th05CoopReplayQA.read().completed||th05CoopReplayQA.read().error,null,{timeout:90000});
-   report.fileEnd=await fileUI.evaluate(()=>th05CoopReplayQA.read());
-   assert.equal(report.fileEnd.error,null);assert.equal(report.fileEnd.stageFallback,null);assert(report.fileEnd.completed);assert(report.fileEnd.stage.event>500);
-   report.fileBytes=bytes.length;
-  }
+  assert.equal(await ui.locator('#file').count(),0,'spectator UI has no multiplayer file importer');
+  assert.equal(await ui.locator('#play').count(),0,'spectator UI has no offline playback button');
  }
  assert.deepEqual(report.errors,[]);
  report.passed=true;console.log('PASS native event playback',report.viewer.cursor,'of',report.source.events.length);
- }finally{fs.writeFileSync(path.join(root,'reports/stage-watch-'+language+'-'+players+'-'+stage+(pattern?'-pattern':'')+(dialog?'-dialog':'')+(offline?'-offline':'')+(controls?'-controls':'')+(rollback?'-rollback':'')+(http?'-http':'')+(benchmark?'-bench':'')+(process.env.TH05_STAGE_FILE==='1'?'-file':'')+'.json'),JSON.stringify(report,null,2));await browser.close();bridge?.stdin.end();}
+ }finally{fs.writeFileSync(path.join(root,'reports/stage-watch-'+language+'-'+players+'-'+stage+(pattern?'-pattern':'')+(dialog?'-dialog':'')+(offline?'-offline':'')+(controls?'-controls':'')+(rollback?'-rollback':'')+(http?'-http':'')+(benchmark?'-bench':'')+'.json'),JSON.stringify(report,null,2));await browser.close();bridge?.stdin.end();}
 })().catch(error=>{console.error(error);bridge?.kill();process.exitCode=1;});

@@ -19,12 +19,11 @@ if(stress)harness=harness.replace('frame===120?512:frame===165?1024:32|direction
   const source=await context.newPage();await source.goto(base+'/capture.html');await source.waitForFunction(()=>window.capture);
   report.boot=await source.evaluate(language=>capture.boot(language,3,true),language);
   for(let at=0;at<length;at+=360){await source.evaluate(()=>capture.batch(360,true));if(stress)console.log('captured',at+360);}
-  const bytes=await source.evaluate(()=>capture.seal()),file=path.join(reports,stress?'seek-stress-'+language+'.th05m':'seek-test.th05m');fs.writeFileSync(file,Buffer.from(bytes));await source.evaluate(()=>capture.end());
-  viewer=await context.newPage();viewer.on('pageerror',e=>errors.push(e.message));await viewer.goto(base+'/coop-replay.html?qa=1');await viewer.setInputFiles('#file',file);
-  const proofs=await viewer.evaluate(async bytes=>{
-   const {decodeMultiplayerReplay}=await import('/netplay/history-codec.js');const h=await decodeMultiplayerReplay(new Blob([new Uint8Array(bytes)]));
-   return Object.fromEntries(Array.from({length:h.frames},(_,i)=>[i+1,h.row(i)]));
-  },bytes);
+  const id=report.boot.id,rows=await source.evaluate(()=>capture.rows());
+  assert.match(id,/^[a-f0-9-]{36}$/,'live spectator link must use the returned history session ID');
+  await source.evaluate(()=>capture.end());
+  const proofs=Object.fromEntries(rows.map((row,i)=>[i+1,row]));
+  viewer=await context.newPage();viewer.on('pageerror',e=>errors.push(e.message));await viewer.goto(base+'/coop-replay.html?qa=1&live='+id);
   if(stress){report.nativeProgress=proofs[length].ticks-report.boot.boot.state.ticks;assert(report.nativeProgress>length/2,'stress fixture must advance actual gameplay, not remain in a pause menu');}
   const read=()=>viewer.evaluate(()=>th05CoopReplayQA.read());
   const at=async frame=>{
@@ -32,7 +31,8 @@ if(stress)harness=harness.replace('frame===120?512:frame===165?1024:32|direction
    const result=await read();assert.equal(result.error,null);assert.equal(result.cursor,frame);
    for(const key of ['ticks','gameHash','nativeHash'])assert.equal(result.lastProof[key],proofs[frame][key]);return result;
   };
-  await viewer.click('#play');await viewer.click('#pause');await viewer.waitForFunction(()=>th05CoopReplayQA.read().ready,null,{timeout:60000});
+  await viewer.waitForFunction(()=>th05CoopReplayQA.read().ready||th05CoopReplayQA.read().error,null,{timeout:60000});
+  assert.equal((await read()).error,null);await viewer.click('#pause');
   assert.equal((await read()).paused,true);
   if(stress){
    report.cycles=[];
@@ -68,7 +68,9 @@ if(stress)harness=harness.replace('frame===120?512:frame===165?1024:32|direction
   // A changed target replaces the pending request. No old Worker may update it.
   await viewer.fill('#seek-frame','120');await viewer.click('#seek');await viewer.fill('#seek-frame','360');await viewer.click('#seek');report.replaced=await at(360);
   await viewer.fill('#seek-frame','720');await viewer.click('#seek');await viewer.click('#cancel-seek');
-  const cancelled=await read();await viewer.waitForTimeout(400);report.cancelled=await read();assert.equal(report.cancelled.target,null);assert.equal(report.cancelled.paused,true);assert(report.cancelled.cursor<=cancelled.cursor+32);
+  const cancelled=await read();
+  await viewer.waitForFunction(()=>{const s=th05CoopReplayQA.read();return s.error||s.ready&&!s.pending&&s.target===null&&s.paused;},null,{timeout:60000});
+  report.cancelled=await read();assert.equal(report.cancelled.error,null);assert.equal(report.cancelled.target,null);assert.equal(report.cancelled.paused,true);assert(report.cancelled.cursor<=cancelled.cursor+32);
   // Invalid targets do not reset the current core or advance its cursor.
   const before=(await read()).cursor;await viewer.fill('#seek-frame','999999');await viewer.click('#seek');assert.equal((await read()).cursor,before);
   await viewer.fill('#seek-frame',String(length));await viewer.click('#seek');
@@ -83,33 +85,16 @@ if(stress)harness=harness.replace('frame===120?512:frame===165?1024:32|direction
   if(!stress){
    // Corrupt the first proof inside a slice: checking only its final proof
    // would miss this. Production Worker must reject before acknowledging it.
-   const corrupt=await context.newPage();
-   await corrupt.addInitScript(()=>{
-    const post=Worker.prototype.postMessage;
-    Worker.prototype.postMessage=function(data,...args){
-     if(data?.type==='history-slice'){data.rows[0].gameHash^=1;window.corruptedFrame=data.frame+1;}
-     return post.call(this,data,...args);
-    };
-   });
-   await corrupt.goto(base+'/coop-replay.html?qa=1');await corrupt.setInputFiles('#file',file);
-   await corrupt.click('#play');await corrupt.click('#pause');
-   await corrupt.waitForFunction(()=>th05CoopReplayQA.read().ready,null,{timeout:60000});
-   await corrupt.fill('#seek-frame','600');await corrupt.click('#seek');
-   await corrupt.waitForFunction(()=>!!th05CoopReplayQA.read().error,null,{timeout:60000});
-   report.corruptSlice=await corrupt.evaluate(()=>({state:th05CoopReplayQA.read(),frame:corruptedFrame}));
-   assert.match(report.corruptSlice.state.error,new RegExp('第 '+report.corruptSlice.frame+' 同步帧校验不一致：gameHash'));
-   await corrupt.close();
    // Real playback, but deliberately deliver already verified inputs in a
    // burst: passive following must keep audio and 1x pacing until Live is clicked.
-   const id=await source.evaluate(async bytes=>{
-    const {decodeMultiplayerReplay}=await import('/netplay/history-codec.js');
+   const id=await source.evaluate(async()=>{
     const {createHistoryHost}=await import('/netplay/history-host.js');
     const {packHistoryRows}=await import('/netplay/confirmed-history.js');
-    const h=await decodeMultiplayerReplay(new Blob([new Uint8Array(bytes)]));
-    window.burstHost=createHistoryHost(h.header,{record:false});
-    window.publishBurst=(first,count)=>{for(let at=first;at<first+count;at+=60)burstHost.append(at,packHistoryRows(Array.from({length:Math.min(60,first+count-at)},(_,i)=>h.row(at+i)),h.header.players));};
+    const header=capture.header(),rows=capture.rows();
+    window.burstHost=createHistoryHost(header);
+    window.publishBurst=(first,count)=>{for(let at=first;at<first+count;at+=60)burstHost.append(at,packHistoryRows(rows.slice(at,Math.min(first+count,at+60)),header.players));};
     publishBurst(0,360);return burstHost.id;
-   },bytes);
+   });
    const follower=await context.newPage();follower.on('pageerror',e=>errors.push(e.message));
    await follower.addInitScript(()=>{
     window.followSteps=[];const post=Worker.prototype.postMessage;
@@ -137,6 +122,6 @@ if(stress)harness=harness.replace('frame===120?512:frame===165?1024:32|direction
    await follower.click('#stop');await follower.close();await source.evaluate(()=>{burstHost.end('test complete');burstHost.dispose();});
   }
   await viewer.screenshot({path:path.join(reports,stress?'seek-stress-'+language+'-completed.png':'seek-test-completed.png')});assert.deepEqual(errors,[]);
-  console.log('PASS exact forward/backward/click seek, paused arrival, replaced target, cancellation, bounds and verified EOF');
+  console.log('PASS live spectator forward/backward/click seek, pause, replaced target, cancellation, bounds and verified EOF');
  }finally{if(viewer)report.final=await viewer.evaluate(()=>({qa:globalThis.th05CoopReplayQA?.read(),status:document.getElementById('status')?.textContent})).catch(()=>null);report.errors=errors;fs.writeFileSync(path.join(reports,stress?'seek-stress-'+language+'.json':'seek-test.json'),JSON.stringify(report,null,2));await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

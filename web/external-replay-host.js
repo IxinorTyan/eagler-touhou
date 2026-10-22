@@ -3,7 +3,7 @@
 export const HOST_VERSION='th05-external-jspi/2';
 export const CLOCK_BYTES=9, CLOCK_CHUNK=4096;
 const RealDate=Date,realNow=()=>performance.now();
-export function createExternalReplayHost({mode,clocks,events=[],endBoundary,onChunk,onEnd,onError,onRecordingError=onError,applyInput,observe,inspect,maxClockBytes=512*1024*1024}){
+export function createExternalReplayHost({mode,clocks,events=[],endBoundary,endReason,onChunk,onEnd,onError,onRecordingError=onError,applyInput,observe,inspect,maxClockBytes=512*1024*1024}){
   if(!['record','playback'].includes(mode))throw Error('无效的外部 replay 模式');
   let mod,boundary=0,count=0,eventCursor=0,queued=[],buffer=new Uint8Array(CLOCK_BYTES*CLOCK_CHUNK),used=0;
   let stopped=false,ending=false,held=false,wake=null,timer=null,observerMs=0,clockMs=0,lastWake=0,epoch,recording=mode==='record',finished=false;
@@ -36,14 +36,14 @@ export function createExternalReplayHost({mode,clocks,events=[],endBoundary,onCh
   }
   Object.setPrototypeOf(HostDate,RealDate);HostDate.prototype=RealDate.prototype;HostDate.now=()=>time(2);
   const hostPerformance=new Proxy(performance,{get(target,name){if(name==='now')return ()=>time(1);const value=Reflect.get(target,name,target);return typeof value==='function'?value.bind(target):value;}});
-  function finish(){
+  function finish(reason=mode==='playback'?endReason:'manual'){
     if(finished||stopped||mode==='record'&&!recording)return;finished=true;ending=false;
     if(mode==='playback')stopped=true;
     flush();
     if(mode==='record'&&!recording)return;
     recording=false;
     if(mode==='playback'&&(count*CLOCK_BYTES!==source.byteLength||eventCursor!==events.length))throw Error('Replay 结束时仍有未消费的记录');
-    const result={boundary,clockCount:count,elapsedMs:realNow()-started,observerMs,clockMs};
+    const result={boundary,clockCount:count,elapsedMs:realNow()-started,observerMs,clockMs,...(reason?{endReason:reason}:{})};
     // inspect copies the guest bytes synchronously at this boundary. Hashing,
     // compression and the save dialog must never hold the player's continuation.
     const inspected=inspect?.();
@@ -54,6 +54,18 @@ export function createExternalReplayHost({mode,clocks,events=[],endBoundary,onCh
     clearTimeout(timer);
     try{
       const at=realNow();
+      // Seal at the terminal game state before a queued continue or
+      // confirmation is delivered to the guest. The live game still resumes.
+      if(mode==='record'){
+        let terminal=null;
+        try{terminal=observe?.(boundary); }catch(error){disable(error);}
+        const ended=!!terminal&&recording;
+        if(ended){
+          const batch=queued;queued=[];finish(typeof terminal==='string'?terminal:'end');
+          for(const command of batch)applyInput(command);
+          const next=wake;wake=null;next();return;
+        }
+      }
       if(mode==='record'){
         const batch=queued;queued=[];
         for(const command of batch)applyInput(command);
@@ -62,7 +74,6 @@ export function createExternalReplayHost({mode,clocks,events=[],endBoundary,onCh
         if(events[eventCursor]?.boundary<boundary)throw Error('Replay 输入边界失步');
         while(events[eventCursor]?.boundary===boundary)for(const command of events[eventCursor++].commands)applyInput(command);
       }
-      try{if(observe?.(boundary)===true&&recording)ending=true;}catch(error){if(mode==='playback')throw error;disable(error);}
       observerMs+=realNow()-at;
       if(ending||(mode==='playback'&&boundary===endBoundary)){finish();if(mode==='playback')return;}
       if(mode==='playback'&&boundary>endBoundary)throw Error('Replay 超出结束边界');

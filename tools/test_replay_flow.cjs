@@ -1,4 +1,4 @@
-// Real Workers and file replay. Only HTTP routing is emulated; no server.
+// Real Workers and live spectator history. No server is started.
 const {chromium}=require('C:/Users/14915/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..'),web=path.join(root,'web'),reports=path.join(root,'reports'),origin='http://127.0.0.1:9877';
@@ -29,7 +29,7 @@ window.flow={
    await ask('confirm',{prefix:frame,notify:true},'history-confirmed');
   }return this.read();},
  read(){return worker?ask('flow-read',{},'flow-state'):Promise.resolve(null);},
- async seal(){await ask('history-flush',{request:1},'history-flushed');const blob=await host.seal('internal flow fixture');return {bytes:Array.from(new Uint8Array(await blob.arrayBuffer())),row:host.history.row(frame-1),frames:frame};},
+ async end(){await ask('history-flush',{request:1},'history-flushed');host.end('internal flow fixture');return {row:host.history.row(frame-1),frames:frame,id:host.id};},
  close(){host?.end('flow fixture complete');host?.dispose();worker?.terminate();worker=null;}
 };
 </script>`;
@@ -120,13 +120,13 @@ onmessage=async event=>{
   const heldResume=await run('held-fire resume settling',90,pair(0,32|8));
   assert.equal(heldResume.nativePause,0,'a teammate holding gameplay input must not trap the pause menu');
   }
-  const capture=await page.evaluate(()=>flow.seal()),file=path.join(reports,'flow-'+scenario+'-'+language+'-'+players+'.th05m');fs.writeFileSync(file,Buffer.from(capture.bytes));report.capture={frames:capture.frames,row:capture.row};
-  await page.evaluate(()=>flow.close());viewer=await context.newPage();viewer.on('pageerror',e=>errors.push(e.message));
-  await viewer.goto(origin+'/coop-replay.html?qa=1');await viewer.setInputFiles('#file',file);await viewer.click('#play');
+  const capture=await page.evaluate(()=>flow.end());report.capture={frames:capture.frames,row:capture.row};
+  viewer=await context.newPage();viewer.on('pageerror',e=>errors.push(e.message));
+  await viewer.goto(origin+'/coop-replay.html?qa=1&live='+capture.id);
   await viewer.fill('#seek-frame',String(capture.frames));await viewer.click('#seek');
   await viewer.waitForFunction(()=>th05CoopReplayQA.read().completed||th05CoopReplayQA.read().error,null,{timeout:90000});report.playback=await viewer.evaluate(()=>th05CoopReplayQA.read());assert.equal(report.playback.error,null);assert.equal(report.playback.cursor,capture.frames);
   for(const key of ['ticks','gameHash','nativeHash'])assert.equal(report.playback.lastProof[key],capture.row[key]);assert.deepEqual(errors,[]);
-  console.log('PASS native flow and fresh-core replay',scenario,language,players);
+  console.log('PASS native flow and live spectator replay',scenario,language,players);
  }finally{
   if(page)report.final=await page.evaluate(()=>flow.read()).catch(()=>null);report.errors=errors;
   fs.writeFileSync(path.join(reports,'replay-flow-'+scenario+'-'+language+'-'+players+'.json'),JSON.stringify(report,null,2));await browser.close();

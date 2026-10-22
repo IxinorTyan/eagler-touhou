@@ -108,10 +108,23 @@
 !/tools/test_stage_stream.mjs
 !/tools/build_replay_menu_font.py
 !/tools/unpack_replay_maine.py
+!/tools/build_translation.py
+!/tools/th05_archive.py
+!/tools/unpack_translation_op.py
+!/tools/test_translation.py
+!/tools/test_translation_browser.cjs
+!/tools/build_translation_fixture.py
+!/tools/test_translation_layout_reference.cjs
+!/tools/probe_stage4_dialog.cjs
+!/tools/build_local.py
+!/tools/build_solo_assets.py
+!/tools/test_startup_modes.cjs
+!/tools/test_disk_extraction.cjs
 !/patches/
 /patches/*
 !/patches/frame-replay.asm
 !/patches/frame-replay-ending.asm
+!/patches/translation/
 
 # Caches, editor configuration, credentials and device diagnostics.
 __pycache__/

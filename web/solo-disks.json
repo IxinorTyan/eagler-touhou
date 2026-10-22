@@ -6,7 +6,7 @@
     "cn": {
       "url": "th05-solo-cn.hdi.gz",
       "size": 21415936,
-      "sha256": "26147f646fab4d68c295069d5667b4711b6c97c58734dce70bcc3b0786176fc3",
+      "sha256": "20e72e18326d1888a340c8c47d548ccd63ee0e30e70a86d338544ae2dd348498",
       "source": "baseline/5-cn.hdi.gz",
       "inputPatch": {
         "signature": "TH05SOLOINPUTv1!",
@@ -56,9 +56,13 @@
           }
         ],
         "source_main_md5": "553eee5ff79429f45284913870380549",
-        "main_sha256": "2b5d9856cc642f73b0f6d805054fb211237ac493d91c956634876c36aa8e82cd",
+        "main_sha256": "2b1775e9e6881e6d3b153dc30dd7fb5a2e1e3681362b55376a4d14234916af17",
         "changed_files": [
-          "KAIKI/MAIN.EXE"
+          "KAIKI/MAIN.EXE",
+          "KAIKI/怪綺談1.DAT",
+          "KAIKI/怪綺談2.DAT",
+          "CNFONT.BMP",
+          "KAIKI/OP.EXE"
         ]
       }
     },

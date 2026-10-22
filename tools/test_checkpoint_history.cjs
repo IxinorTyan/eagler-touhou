@@ -1,4 +1,4 @@
-// Real ordinary cores, independent builder, portable file and late HTTP viewer.
+// Real ordinary cores, independent builder, live checkpoints and late HTTP viewer.
 // Browser routes call the actual Python handlers over stdio; no TCP listener.
 const {chromium}=require('C:/Users/14915/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
@@ -19,9 +19,9 @@ advance=(...args)=>{
  return auditOriginalAdvance(...args);
 };\n`;
 let harness=fs.readFileSync(path.join(__dirname,'test_multiplayer_history.cjs'),'utf8').match(/const harness=`([\s\S]*?)`;/)[1]
- .replace('const file=await host.seal(',"host.end('checkpoint fixture');const file=await host.seal(")
+ .replace(' end(){host?.end(\'自动化片段结束\');worker.terminate();worker=null;},'," connect(auth){host.connectNetwork(auth);}, async seal(){host.end('checkpoint fixture');return host.history.frames;}, end(){host?.end('fixture complete');worker?.terminate();worker=null;},")
  .replace('return {frame,recorded:host?.history.frames,failure};','return {frame,recorded:host?.history.frames,failure,points:host?.history.checkpoints.index(),done:host?.history.checkpointsDone,checkpointError:host?.history.checkpoints.failed,url:host?.networkURL};')
- .replace('async seal(){','connect(auth){host.connectNetwork(auth);}, async seal(){');
+;
 if(stageFixture)harness=harness.replace('let offlineMask=frame>=280?2:0;','let offlineMask=0;')
  .replace('const direction=(Math.floor(frame/40)+slot)%2?4:8;','const direction=frame%240<120?8:4;')
  .replace('32|direction;','32|64;');
@@ -61,17 +61,19 @@ async function routes(context){await context.route(origin+'/**',async route=>{
   await source.evaluate(auth=>capture.connect(auth),auth);await source.waitForFunction(()=>capture.read().url,null,{timeout:30000});
   const link=await source.evaluate(()=>capture.read().url),watch=new URL(link).hash.slice(7);
   for(let at=0;at<length;at+=120){await source.evaluate(()=>capture.batch(120,false));if(at%600===0)console.log('captured',at+120);}
-  const bytes=await source.evaluate(()=>capture.seal());report.archive=await source.evaluate(()=>capture.read());
+  await source.evaluate(()=>capture.seal());
+  // Sealing the input history never waits for the independent spectator core.
+  // Wait for its terminal acknowledgement before validating the full archive.
+  try{await source.waitForFunction(()=>{const s=capture.read();return s.done||s.checkpointError;},null,{timeout:120000});}
+  finally{report.archive=await source.evaluate(()=>capture.read());}
   assert.equal(report.archive.checkpointError,null);assert.equal(report.archive.done,true);
   assert(report.archive.points.some(e=>e.frame===1800));assert(report.archive.points.some(e=>e.frame===3600));
-  const file=path.join(root,'reports',stageFixture?'checkpoint-stage-history.th05m':'checkpoint-history.th05m');fs.writeFileSync(file,Buffer.from(bytes));assert.equal(Buffer.from(bytes).subarray(0,8).toString(),'T05MP003');
-  const viewer=await fresh.newPage();viewer.on('pageerror',e=>report.errors.push(e.message));await viewer.goto(origin+'/coop-replay.html?qa=1');await viewer.setInputFiles('#file',file);
+  const viewer=await fresh.newPage();viewer.on('pageerror',e=>report.errors.push(e.message));await viewer.goto(origin+'/coop-replay.html?qa=1#watch='+watch);
   const read=()=>viewer.evaluate(()=>th05CoopReplayQA.read());
+  await viewer.waitForFunction(()=>th05CoopReplayQA.read().ready||th05CoopReplayQA.read().error,null,{timeout:60000});
+  assert.equal((await read()).error,null);await viewer.click('#pause');
   report.seeks=[];
   for(const [frame,point]of [[1900,1800],[100,null],[3650,3600]]){
-   await viewer.fill('#seek-frame',String(frame));await viewer.click('#seek');await viewer.click('#pause');
-   // Pause during boot is tested separately; seek again after boot has settled.
-   await viewer.waitForFunction(()=>th05CoopReplayQA.read().ready||th05CoopReplayQA.read().error,null,{timeout:60000});
    await viewer.fill('#seek-frame',String(frame));await viewer.click('#seek');
    await viewer.waitForFunction(n=>{const s=th05CoopReplayQA.read();return s.error||s.cursor===n&&s.target===null&&!s.pending;},frame,{timeout:90000});
    const state=await read();assert.equal(state.error,null);assert.equal(state.checkpointUsed,point);assert.equal(state.paused,true);
@@ -108,9 +110,9 @@ async function routes(context){await context.route(origin+'/**',async route=>{
   await viewer.fill('#seek-frame','1900');await viewer.click('#seek');await viewer.click('#cancel-seek');
   await viewer.waitForFunction(()=>th05CoopReplayQA.read().ready||th05CoopReplayQA.read().error,null,{timeout:60000});report.cancelled=await read();
   assert.equal(report.cancelled.error,null);assert.equal(report.cancelled.cursor,0);assert.equal(report.cancelled.paused,true);
-  const broken=await fresh.newPage();
+  const broken=await players.newPage();
   await broken.addInitScript(()=>{const post=Worker.prototype.postMessage;Worker.prototype.postMessage=function(data,...args){if(data?.type==='checkpoint-load')data={...data,bytes:new Uint8Array([0])};return post.call(this,data,...args);};});
-  await broken.goto(origin+'/coop-replay.html?qa=1');await broken.setInputFiles('#file',file);
+  await broken.goto(origin+'/coop-replay.html?qa=1&live='+report.boot.id);
   await broken.fill('#seek-frame','1900');await broken.click('#seek');
   await broken.waitForFunction(()=>{const s=th05CoopReplayQA.read();return s.error||s.cursor>=1900&&s.target===null;},null,{timeout:90000});
   report.fallback=await broken.evaluate(()=>th05CoopReplayQA.read());assert.equal(report.fallback.error,null);assert.equal(report.fallback.checkpointUsed,null);assert(report.fallback.sliceStats.steps>=1900);await broken.close();
@@ -131,6 +133,6 @@ async function routes(context){await context.route(origin+'/**',async route=>{
   assert(report.remote.sliceStats.steps<=length-latePoint);assert(lostCheckpointAck&&retriedCheckpoint&&failedCheckpointRead);
   const tail=await source.evaluate(()=>capture.batch(0,false).then(r=>r.tail));
   for(const key of ['ticks','gameHash','nativeHash'])assert.equal(report.remote.lastProof[key],tail[key]);
-  assert.deepEqual(report.errors,[]);report.passed=true;console.log('PASS portable file seek, cancellation, late local and independent HTTP joins, lost chunk ACK and download retry');
+  assert.deepEqual(report.errors,[]);report.passed=true;console.log('PASS live spectator seek, cancellation, late local and independent HTTP joins, lost chunk ACK and download retry');
  }finally{fs.writeFileSync(path.join(root,'reports',stageFixture?'checkpoint-stage-history.json':'checkpoint-history.json'),JSON.stringify(report,null,2));await browser.close();bridge.stdin.end();}
 })().catch(error=>{console.error(error);bridge.kill();process.exitCode=1;});

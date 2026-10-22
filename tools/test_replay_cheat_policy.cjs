@@ -13,29 +13,22 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
  await page.goto('http://127.0.0.1:9877/policy-test.html');
  const result=await page.evaluate(async()=>{
   const {createHistoryHost}=await import('/netplay/history-host.js'),{ConfirmedHistory,packHistoryRows}=await import('/netplay/confirmed-history.js');
-  const {encodeMultiplayerReplay,decodeMultiplayerReplay}=await import('/netplay/history-codec.js'),{CHEAT_USED,packTouch}=await import('/touch-input.js');
+  const {CHEAT_USED,packTouch}=await import('/touch-input.js');
   const header={version:'th05-confirmed-input/1',protocol:'th05-netplay/9',language:'cn',players:2,config:{rank:1,players:[{character:0,spares:3,bombs:3},{character:1,spares:3,bombs:3}]},identity:'a'.repeat(64),coreSha:'b'.repeat(64),diskSha:'c'.repeat(64),guestSha:'d'.repeat(64),checksum:'12345678'};
   const row=pair=>({pair,offlineMask:0,ticks:1,gameHash:1234,nativeHash:0}),bytes=pair=>packHistoryRows([row(pair)],2);
   const assert=(v,message)=>{if(!v)throw Error(message);};
-  const reject=async(p,message)=>{try{await p;throw Error('unexpected success: '+message);}catch(e){if(e.message.startsWith('unexpected success'))throw e;}};
   const host=createHistoryHost(header),viewer=new BroadcastChannel('th05-history-'+host.id),source=new ConfirmedHistory(header);let received=0;
   const viewerId='11111111-1111-4111-8111-111111111111';
   viewer.onmessage=({data})=>{if(data.type==='batch'){source.append(data.first,data.bytes);received++;viewer.postMessage({type:'ack',viewer:viewerId,frames:source.frames});}};
   viewer.postMessage({type:'subscribe',viewer:viewerId});
   host.append(0,bytes([packTouch(32,{active:true,x:400,y:-200}),32]));
-  const saved=await host.snapshot();await decodeMultiplayerReplay(saved);
-  // A pending export must fail even when compression was already in flight.
-  const racing=host.snapshot();host.append(1,bytes([32,CHEAT_USED]));
-  await reject(racing,'export race');assert(host.tainted&&!host.recording&&!host.blob&&host.recordFrames===0,'all unsaved file state is destroyed');
-  await reject(host.snapshot(),'snapshot after taint');await reject(host.seal(),'seal after taint');
+  host.append(1,bytes([32,CHEAT_USED]));
   host.append(2,bytes([32,0]));
   await new Promise(resolve=>setTimeout(resolve,150));
-  assert(received===3&&source.frames===3&&source.tainted,'watchers continue receiving, retaining the cheating label after the switch is off');
-  const raw=bytes([0,CHEAT_USED]),compressed={rawBytes:raw.length,chunks:[await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()]};
-  const malicious=await encodeMultiplayerReplay({...header,frames:1,reason:'fixture'},compressed);await reject(decodeMultiplayerReplay(malicious),'import cheating file');
-  const fresh=createHistoryHost(header);fresh.append(0,bytes([32,32]));assert(!fresh.tainted&&fresh.recording,'fresh match records normally');await decodeMultiplayerReplay(await fresh.snapshot());
+  assert(received===3&&source.frames===3&&source.tainted&&host.tainted,'spectators keep receiving history and retain the cheating label after the switch is off');
+  const fresh=createHistoryHost(header);fresh.append(0,bytes([32,32]));assert(!fresh.tainted,'a new match starts with a clean spectator state');
   host.dispose();fresh.dispose();viewer.close();return {received,frames:source.frames,tainted:source.tainted};
  });
- assert.equal(result.frames,3);console.log('PASS multiplayer remote-seat sticky taint, export-race cancellation, continuous spectator history, cheating-file rejection and clean next match',result);
+ assert.equal(result.frames,3);console.log('PASS multiplayer remote-seat sticky taint and continuous spectator history',result);
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

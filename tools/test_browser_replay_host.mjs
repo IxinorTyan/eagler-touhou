@@ -25,5 +25,14 @@ try{
  failed.queue({type:'key',code:262,down:true});await other.env.__asyncjs__syncSleep(0,1);
  assert.match(fault.message,/容量/);assert.equal(failed.status.recording,false);assert.equal(failed.status.stopped,false);assert.equal(live.length,1);
  failed.queue({type:'key',code:262,down:false});await other.env.__asyncjs__syncSleep(0,1);assert.equal(live.length,2);assert.deepEqual(errors,[]);
- console.log('PASS optional hashing never holds player continuation; recording EOF/limit preserve live input');
+ const terminalInputs=[],terminalChunks=[];let terminalEnd=null;
+ const terminal=createExternalReplayHost({mode:'record',observe:()=> 'clear',onChunk:c=>terminalChunks.push(c),onEnd:r=>terminalEnd=r,
+  applyInput:c=>terminalInputs.push(c)});
+ const terminalImports={env:{initTimeoutSyncSleep(){},__asyncjs__syncSleep(){}}};terminal.attach({},terminalImports);terminalImports.env.initTimeoutSyncSleep();
+ const continued={type:'key',code:90,down:true};terminal.queue(continued);await terminalImports.env.__asyncjs__syncSleep(0,1);
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.deepEqual(terminalInputs,[continued],'terminal input still reaches the live guest at its original boundary');
+ assert.equal(terminalChunks.flatMap(chunk=>chunk.events||[]).length,0,'continue confirmation is excluded from the terminal replay');
+ assert.equal(terminalEnd?.endReason,'clear','terminal reason reaches the saved replay metadata');
+ console.log('PASS optional hashing never holds player continuation; terminal input stays live and outside the replay');
 }finally{if(NativeSuspending)WebAssembly.Suspending=NativeSuspending;else delete WebAssembly.Suspending;}

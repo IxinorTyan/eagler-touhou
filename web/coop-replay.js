@@ -1,5 +1,4 @@
 import {ConfirmedHistory,historySessionId} from './netplay/confirmed-history.js';
-import {decodeMultiplayerReplay} from './netplay/history-codec.js';
 import {receiveNetworkHistory,fetchNetworkCheckpoint} from './netplay/history-network.js';
 import {createFrameDisplay} from './frame-display.js';
 import {LocalSfx} from './netplay/local-sfx.js';
@@ -8,7 +7,7 @@ const $=id=>document.getElementById(id),TICK_MS=1000/60;
 let source=null,worker=null,display=null,channel=null,context=null,audio=null,music=null;
 let cursor=0,epoch=0,pending=false,paused=false,ready=false,completed=false,timer=0,lastProof=null,live=false,bootstrapped=false,receiving=false;
 let viewError=null,musicState=[],target=null,goalKind=null,arrivalPaused=false,following=false,quiet=false,ackFrame=null,nativeExited=false,nextDue=0;
-let wakeSerial=0,networkReceiver=null,importSerial=0,pendingEnd=0,sliceStart=0,lastSliceUi=0;
+let wakeSerial=0,networkReceiver=null,pendingEnd=0,sliceStart=0,lastSliceUi=0;
 let sliceStats={count:0,steps:0,maxSteps:0,maxMs:0,totalMs:0};
 let stageSession=null,stageFallback=null;
 let stageOptions='';
@@ -49,7 +48,7 @@ function update(){
   $('checkpoint-status').textContent=source?`浏览器检查点：${points.filter(e=>e.frame>0).length} 个${checkpointLoading?' · 正在恢复':checkpointUsed!==null?` · 本次从帧 ${checkpointUsed} 恢复`:''}；尚未生成检查点的区间仍需逐帧执行。`:'';
   $('cheat-warning').hidden=!source?.tainted;
   $('play').disabled=!source||!!worker;$('pause').disabled=!worker||completed;$('stop').disabled=!worker&&!receiving;
-  $('file').disabled=!!worker||receiving;$('pause').textContent=paused?'继续播放':'暂停播放';
+  $('pause').textContent=paused?'继续播放':'暂停播放';
   $('timeline').max=source?.frames||0;$('timeline').value=cursor;$('timeline').disabled=!source;
   $('seek-frame').max=source?.frames||0;$('seek').disabled=!source;$('cancel-seek').disabled=target===null;
   $('live-edge').disabled=!source||!live||!!source.end;
@@ -73,7 +72,7 @@ function stop(){
   if(receiving&&source&&!source.end)source.finish('观看者停止接收，保留已收到片段');
   receiving=false;if(channel&&localViewer)channel.postMessage({type:'unsubscribe',viewer:localViewer});channel?.close();channel=null;networkReceiver?.close();networkReceiver=null;stopCore();$('completed').close();update();
 }
-function fail(error){viewError=error.message;stop();status('回放停止：'+error.message);update();}
+function fail(error){viewError=error.message;stop();status('旁观停止：'+error.message);update();}
 function acceptMusic(events){
   for(const [ax,hash]of events){
     if((ax>>>8)<=1)musicState=[];musicState.push([ax,hash]);if(musicState.length>64)musicState.splice(1,1);
@@ -100,8 +99,8 @@ function schedule(delay=TICK_MS){
 function present(){if(ready)worker?.postMessage({type:'history-present'});}
 function finish(){
   if(completed)return;completed=true;pending=false;target=goalKind=null;following=false;clearSchedule();context?.suspend();present();
-  status(stageSession?'本段分面播放已到达可验证边界。':'本段回放已结束 · 逐帧校验一致。');
-  $('end-summary').textContent=stageSession?`从第 ${stageSession.stage+1} 面重建，已校验 ${stageSession.event} 条原生事件。画面停在最后完整执行边界；剩余 ${stageSession.sent-stageSession.event} 条事件不足以完成下一步。`: `已播放 ${cursor} 个已确认同步帧，输入、原生计数和状态检查一致。停在这里是正常结束。这是所保存／接收片段的终点，不代表游戏通关。`;
+  status(stageSession?'本段分面旁观已到达可验证边界。':'本段旁观已结束 · 逐帧校验一致。');
+  $('end-summary').textContent=stageSession?`从第 ${stageSession.stage+1} 面重建，已校验 ${stageSession.event} 条原生事件。画面停在最后完整执行边界；剩余 ${stageSession.sent-stageSession.event} 条事件不足以完成下一步。`: `已播放 ${cursor} 个已确认同步帧，输入、原生计数和状态检查一致。停在这里是正常结束。这是已接收旁观历史的终点，不代表游戏通关。`;
   $('completed').showModal();update();
 }
 function settleGoal(){
@@ -201,7 +200,7 @@ function start(plan=null){
       if(data.type==='ready'){
         const h=source.header;
         for(const key of ['checksum','coreSha','diskSha','guestSha'])if(data[key]!==h[key])throw Error('开局或资源校验不一致：'+key);
-        if(data.historyHeader?.identity!==h.identity)throw Error('多人 Replay 与当前适配器版本不一致，请重新录制');
+        if(data.historyHeader?.identity!==h.identity)throw Error('旁观来源与当前适配器版本不一致');
         if(selected){
           pending=true;checkpointLoading=true;update();
           const baseEntry=[...(source.checkpoints.index()||[]),...checkpointIndex].find(e=>e.frame===0);
@@ -299,11 +298,7 @@ function togglePause(){
   if(target!==null||!paused){pauseHere();return;}
   paused=false;quiet=false;restoreMusic();context?.resume();nextDue=performance.now();status('继续按帧重演。');schedule(0);update();
 }
-$('file').onchange=async()=>{const request=++importSerial;try{
-  const file=$('file').files[0];if(!file)return;stop();const decoded=await decodeMultiplayerReplay(file);if(request!==importSerial)return;
-  source=decoded;checkpointIndex=[];checkpointCache.clear();live=false;bootstrapped=true;cursor=0;completed=false;viewError=null;status(`已导入 ${source.frames} 个已确认同步帧。`);update();
-}catch(error){if(request===importSerial){source=null;fail(error);}}};
-$('play').onclick=()=>start();$('pause').onclick=togglePause;$('stop').onclick=()=>{stop();status('观看已停止，可重新播放或导入文件。');};
+$('play').onclick=()=>start();$('pause').onclick=togglePause;$('stop').onclick=()=>{stop();status('旁观已停止，可重新打开旁观链接。');};
 $('seek').onclick=()=>seek(Number($('seek-frame').value));$('timeline').onchange=()=>seek(Number($('timeline').value));
 $('stage-select').onchange=()=>{if($('stage-select').value!=='')seek(Number($('stage-select').value));};
 $('cancel-seek').onclick=pauseHere;$('live-edge').onclick=()=>seek(edge(),'live');

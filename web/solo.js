@@ -8,7 +8,7 @@ const $=id=>document.getElementById(id);
 let emulator=null,busy=false,disposed=false,oldButtons=0,lastInfo=0,menuBits=0,menuUntil=0;
 let recorder=null,recordBlob=null,lastRecordInput='';
 const recordingStatus=text=>{if($('record-status'))$('record-status').textContent=text;};
-function discardRecording(){recordBlob=null;if($('record-save'))$('record-save').disabled=true;if($('record-discard'))$('record-discard').disabled=true;}
+function discardRecording(){recordBlob=null;if($('record-save'))$('record-save').disabled=true;if($('record-discard'))$('record-discard').disabled=true;$('replay-save-dialog')?.close();}
 function clearRecorder(){recorder?.dispose();recorder=null;lastRecordInput='';if($('record-finish'))$('record-finish').disabled=true;}
 const held=new Set(),pulses=new Map();
 const keys={ArrowUp:1,ArrowDown:2,ArrowLeft:4,ArrowRight:8,KeyX:16,KeyZ:32,ShiftLeft:64,ShiftRight:64,Escape:128,Enter:256};
@@ -139,7 +139,10 @@ async function start(){
       try{recorder=await createBrowserRecorder({language,onStatus:recordingStatus,
         onRun:()=>{$('record-finish').disabled=false;},
         onResult:()=>{$('record-finish').disabled=true;},
-        onFile:blob=>{recordBlob=blob;$('record-save').disabled=false;$('record-discard').disabled=false;}});
+        onFile:(blob,result)=>{recordBlob=blob;$('record-save').disabled=false;$('record-discard').disabled=false;
+          $('replay-save-title').textContent='本局结束，保存单人 Replay？';
+          $('replay-save-summary').textContent=`${result.endReason==='clear'?'已通关。':'录像已封存。'}只包含首次续关前的操作，不包含续关和后续操作。`;
+          $('replay-save-dialog').showModal();}});
       }catch(error){recordingStatus('录像未能启动：'+error.message+'；游戏继续。');}
       if(disposed){clearRecorder();return;}
     }else recordingStatus('本次启动不录制。');
@@ -162,8 +165,12 @@ if($('record-finish'))$('record-finish').onclick=()=>recorder?.finish();
 if($('record-save'))$('record-save').onclick=()=>{
   if(!recordBlob)return;const url=URL.createObjectURL(recordBlob),link=document.createElement('a');
   link.href=url;link.download='th05-solo-browser.th05r';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  $('replay-save-dialog')?.close();
 };
 if($('record-discard'))$('record-discard').onclick=()=>{discardRecording();recordingStatus('录像已丢弃，游戏继续。');};
+if($('replay-prompt-save'))$('replay-prompt-save').onclick=()=>$('record-save').click();
+if($('replay-prompt-discard'))$('replay-prompt-discard').onclick=()=>$('record-discard').click();
+$('replay-save-dialog')?.addEventListener('cancel',event=>event.preventDefault());
 $('fullscreen').onclick=()=>player.enter();$('sound').onclick=enableSound;
 $('bgm-volume').oninput=()=>emulator?.bgm?.setVolume(Number($('bgm-volume').value)/100);
 $('capture').onclick=async()=>{
