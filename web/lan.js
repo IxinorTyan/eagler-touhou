@@ -1,4 +1,5 @@
 import {PROTOCOL,TICK_MS,PAUSE,RESUME,GameQueue,inputPolicy as makeInputPolicy,planReplay,nextInputs,PREDICTION_LEAD_LIMIT,ROLLBACK_ARM_AHEAD,MAX_ROLLBACK} from './netplay/protocol.js';
+import {createInputChannel,acceptInputChannel} from './netplay/input-transport.js';
 import {createFrameDisplay} from './frame-display.js';
 import {LocalSfx} from './netplay/local-sfx.js';
 import {createRelayChannel} from './netplay/relay-channel.js';
@@ -328,13 +329,13 @@ function activate(){
   sessionStarted=lastNow=performance.now();accumulator=TICK_MS;capture();render();status(`已连接 · 输入缓冲 ${room.settings.rollback?sessionPolicy.inputDelay:queue.lockstepDelay} 步。点击画面即可操作自己的角色。`);
   $('canvas').focus();schedule();diagnostics();
 }
-function capture(){
+function capture(frontier=queue.frame){
   touchContext();
   const sampled=player.sample(buttons());
   if(sampled&128)controls|=128;
   if(player.unlimited())localCheatUsed=true;
   if(localCheatUsed)historyHost?.invalidate();
-  const control=controls,packet=queue.capture(player.pack((sampled&~128)|control)+(localCheatUsed?CHEAT_USED:0));
+  const control=controls,packet=queue.capture(player.pack((sampled&~128)|control)+(localCheatUsed?CHEAT_USED:0),frontier);
   if(packet){controls&=~control;pendingPresses=0;player.consume();captureTimes.set(packet.frame,performance.now());send(packet);return true;}
   return false;
 }
@@ -513,7 +514,7 @@ function meshChannel(){
 function attachChannel(value,role){
   const peer=peers.get(role);
   if(!peer||peer.channel)throw Error('重复游戏连接');peer.channel=value;
-  if(!value.ordered||value.maxRetransmits!==null||value.maxPacketLifeTime!==null)throw Error('游戏需要可靠有序连接');
+  if(value.kind!=='loss-resilient'&&(!value.ordered||value.maxRetransmits!==null||value.maxPacketLifeTime!==null))throw Error('游戏需要可恢复的输入连接');
   value.onmessage=event=>{if(peers.get(role)===peer)onPacket(event,role);};
   value.onclose=()=>{if(peers.get(role)===peer&&auth&&!offlineRoles.has(role))networkFailure('连接已关闭',{role});};
   value.onerror=event=>{if(peers.get(role)===peer)networkFailure(event.error?.message||'游戏数据通道发生错误',{role});};
@@ -611,7 +612,8 @@ async function connect(){
       if(data.type==='stage-recording-stopped'){historyWarning='分面捷径停止：'+data.message+'；确认帧历史继续';historyUI();return;}
       if(data.type==='history-flushed'){historyFlushes.get(data.request)?.();historyFlushes.delete(data.request);return;}
       if(finishing){data.bitmap?.close();return;}
-      if(data.control){liveControl=data.control;touchContext();}
+      // Intermediate repair control belongs to history, not the visible UI.
+      if(data.control&&data.type!=='restored'&&(data.type!=='replayed'||data.frame>=replayUntil)){liveControl=data.control;touchContext();}
       if(data.type==='boot-progress'){
         bootProgress[data.stage]=data.message;
         if(!running)status(data.message);diagnostics();
@@ -658,7 +660,8 @@ function makePeer(role,attempt=0){
   const peer={role,pc:connection,channel:null,lastMessage:old?.lastMessage||performance.now(),suspectAt:old?.suspectAt??null,signalChain:Promise.resolve(),attempt,repairing:attempt>0,attemptAt:performance.now(),repairTimer:0};peers.set(role,peer);
   if(!pc||pc===old?.pc)pc=connection;
   connection.ondatachannel=event=>{if(auth!==identity||peers.get(role)!==peer){event.channel.close();return;}try{
-    if(roles.indexOf(identity.role)<roles.indexOf(role))throw Error('意外的数据通道');attachChannel(event.channel,role);
+    if(roles.indexOf(identity.role)<roles.indexOf(role))throw Error('意外的数据通道');
+    acceptInputChannel(connection,event.channel,'th05-input',value=>attachChannel(value,role));
   }catch(error){finish(error.message);}};
   connection.onconnectionstatechange=()=>{if(auth!==identity||peers.get(role)!==peer||offlineRoles.has(role))return;
     if(connection.connectionState==='failed'||running&&['disconnected','closed'].includes(connection.connectionState))networkFailure('WebRTC 连接中断',{role});};
@@ -668,7 +671,7 @@ async function offerPeer(peer){
   if(!peer||transport!=='rtc'||!auth)return;
   const identity=auth,{role,pc:connection}=peer;
   try{
-    attachChannel(connection.createDataChannel('th05-input',{ordered:true}),role);
+    attachChannel(createInputChannel(connection,'th05-input'),role);
     await connection.setLocalDescription(await connection.createOffer());await completeIce(connection);
     if(auth!==identity||peers.get(role)!==peer||transport!=='rtc'||offlineRoles.has(role))return;
     await api('signal',{to:role,signal:{...connection.localDescription.toJSON(),attempt:peer.attempt}},identity);
@@ -736,6 +739,7 @@ function pump(){try{
   if(membership){reportMembership();return;}
   if(channel.bufferedAmount>65536){for(const role of remoteRoles())suspect(role,'网络发送暂时积压');setActivity('network-wait');schedule(16);return;}
   const now=performance.now();accumulator=Math.min(accumulator+Math.max(0,now-lastNow),TICK_MS*4);lastNow=now;
+  if(queue.frame<replayUntil&&accumulator>=TICK_MS&&capture(replayUntil))earlyInputs++;
   if(queue.dirty!==null){
     // Publish due live input before costly restore, never from a history frame.
     if(queue.frame>=replayUntil&&accumulator>=TICK_MS&&capture())earlyInputs++;
@@ -830,7 +834,7 @@ document.addEventListener('visibilitychange',()=>{clearInputs();if(document.hidd
 addEventListener('pagehide',()=>{historyHost?.end('来源页面已关闭（已接收片段结束）');if(!auth)return;const data=JSON.stringify({...auth,protocol:PROTOCOL});navigator.sendBeacon('/api/leave',new Blob([data],{type:'application/json'}));});
 // Read-only diagnostics for repeatable two-browser validation.
 globalThis.th05Lan={get info(){return {history:historyHost?{frames:historyHost.history.frames,ended:!!historyHost.history.end}:null,running,paused,rollbackEnabled:room?.settings.rollback,rollbackActive:queue?.active,activation:queue?.activation,inputPolicy:sessionPolicy,startupTiming:{policy:runSettings,reports:Object.fromEntries(startupReports)},prediction:runtimePolicy,
-  performance:performanceInfo(),recovery:recoveryInfo(),
+  performance:performanceInfo(),recovery:recoveryInfo(),inputTransport:Object.fromEntries([...peers].map(([role,peer])=>[role,peer.channel?.transportStats??null])),
   replayUntil,resimulated,maxRewind,earlyInputs,inputAgeMs:inputAge,lead:queue?Math.max(0,queue.frame-queue.confirmed):0,predictionLeadLimit:PREDICTION_LEAD_LIMIT,waitReason:queue?.waitReason,
   rollbackCount,music:bgm?{status:bgm.status,id:bgm.active?.id,generation:bgm.generation,audioTime:context?.currentTime,sourceStart:bgm.sourceStart,paused:bgm.paused}:null,frame:queue?.frame,confirmed:queue?.confirmed,state:lastState,boot,hashMatches,steps,waits,endedReason,transport,network:room?.network||network,networkEvents:networkEvents.slice(),display:display?.metrics,audio:audio?.info(),role:auth?.role,slot:auth&&room?room.slots[auth.role]:null,room:auth?.room,
   capabilities:{secure:isSecureContext,subtle:!!globalThis.crypto?.subtle,audioWorklet:!!context?.audioWorklet,offscreen:!!globalThis.OffscreenCanvas}};}};

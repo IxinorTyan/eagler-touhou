@@ -357,6 +357,9 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 class LanHTTPServer(ThreadingHTTPServer):
+    # Three clients can import Worker modules and signal at the same time.
+    # Match TH02/TH04 rather than the default five pending connections.
+    request_queue_size = 128
     # Windows SO_REUSEADDR can silently start two different builds on one
     # port. Require one owner so API and static files belong to the same build.
     allow_reuse_address = False
