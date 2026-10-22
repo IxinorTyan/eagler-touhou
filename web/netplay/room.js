@@ -12,7 +12,7 @@ import {createRelay} from './relay.js';
 import {mergeDeparture} from './membership.js';
 import {loadRtcConfiguration,refreshRtcPath,describeRtcConfiguration,countIceCandidate,describeIceCandidates,recordIceServerError} from './connection.js';
 import {assetBytes,freshJSON,parallelAssets} from '../preload-cache.js';
-import {bgmVersion,onBgmVersion} from '../bgm-version.js';
+import {bgmVersion,onBgmVersion,resolveBgmTrack,loadMidiTracks} from '../bgm-version.js';
 const $=id=>document.getElementById(id),roles=['host','guest','guest2'];
 const label=role=>({host:'房主',guest:'客机 1',guest2:'客机 2'})[role];
 const status=text=>{$('status').textContent=text;player.note(text);};
@@ -304,14 +304,13 @@ async function prepareRoomResources(value){
  const report=text=>{if(generation===preloadGeneration&&state?.phase==='lobby'&&!stopped)$('resource-status').textContent=text;};
  preloadPromise=(async()=>{
   report('正在预载游戏磁盘、DOSBox-X、音效和开场音乐…');
-  const [patch,manifest,sfxManifest,bgmManifest,alternate]=await Promise.all([
+  const [patch,manifest,sfxManifest,bgmManifest,alternate,midi]=await Promise.all([
    freshJSON('local-patch.json'),freshJSON('netplay/runtime.json'),freshJSON('sfx/manifest.json'),
-   freshJSON('bgm/manifest.json'),freshJSON('bgm/akyu/manifest.json')]);
+   freshJSON('bgm/manifest.json'),freshJSON('bgm/akyu/manifest.json'),loadMidiTracks()]);
   const disk=patch.disks[value.settings.language];if(!disk)throw Error('找不到所选语言的游戏磁盘');
   const supports=WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,5,2,0,1,0,1]));
   const core=!!value.settings.rollback&&supports?'tracked':'plain',coreEntry=manifest.cores[core];
-  const trackManifest=bgmVersion()==='new'&&alternate.tracks?alternate:bgmManifest;
-  const track=trackManifest.tracks[`stage${value.settings.stage}-m86`];
+  const track=resolveBgmTrack(`stage${value.settings.stage}-m86`,bgmManifest.tracks,alternate.tracks,midi);
   await Promise.all([
    parallelAssets(Object.entries(manifest.assets),async([path,hash])=>assetBytes(path,{hash})),
    assetBytes(disk.file,{hash:disk.sha256,size:disk.size,gzip:true}),
