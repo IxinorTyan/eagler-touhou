@@ -1,6 +1,6 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#111210"><title>东方怪绮谈 · 联机大厅</title><link rel="icon" href="data:,"><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="site-adapter.css"><link rel="stylesheet" href="replay-menu.css"></head>
-<body class="shell">
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#111210"><title>东方怪绮谈 · 联机大厅</title><link rel="icon" href="data:,"><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="site-adapter.css"><link rel="stylesheet" href="replay-menu.css"><link rel="stylesheet" href="room-ui.css"></head>
+<body data-room-game="05" class="shell">
 <header class="masthead"><a class="brand" href="index.html">TOUHOU / 05</a><small>東方怪綺談 · MYSTIC SQUARE</small></header>
 <nav class="mode-nav" aria-label="游戏模式"><a href="solo.html">单机游戏</a><a href="local.html">本地多人</a><a href="lan.html?network=lan" data-mode="lan">局域网联机</a><a href="lan.html?network=public-rtc" data-mode="public">公网联机</a></nav>
 <p class="muted">多人默认启用满火力支援：已满火力者拾取大小 Power 时，将火力收益给予火力最低的存活队友；同火力优先离道具最近者，再按席位顺序。分数计入全队。</p>
@@ -23,4 +23,4 @@
 <div class="local-layout"><section class="game-column"><div class="toolbar"><button id="pause" disabled>暂停游戏</button><button id="fullscreen">全屏</button><button id="capture">保存画面</button><button id="sound">开启声音</button><label>BGM <input id="bgm-volume" type="range" min="0" max="100" value="70"></label></div><div id="player"></div><div id="screen"><canvas id="canvas" width="640" height="400" tabindex="0" aria-label="怪绮谈联机游戏画面"></canvas><div id="overlay" hidden></div></div></section>
 <aside class="panel controls-help"><h2 id="my-seat">我的操作</h2><p>方向键 / WASD 移动<br>Z / J 射击<br>X / L Bomb<br>Shift / K 低速与救援（连按 5 次）<br>Esc 原版暂停菜单</p><p>P1 用 Enter / Z 操作原版对话与续关。每人只操作自己的席位，也可开启触屏操作。</p><p>右侧统计显示自己席位。救援幽灵会消耗一条生命，救援者 Bomb 减半，队友获得一个 Bomb。</p><p>任意席位可操作原版暂停菜单；选择退出将结束本局并退出模拟器。切出页面请求原生暂停。断线后可重新建房。</p></aside></div>
 <details><summary>联机状态</summary><pre id="diagnostics">等待连接。</pre></details></main>
-<footer class="footer"><a href="index.html">← 返回启动器</a><span>TH05 · MYSTIC SQUARE</span></footer><script type="module" src="lan.js"></script><script type="module" src="bgm-version.js"></script><script type="module" src="replay-menu.js"></script></body></html>
+<footer class="footer"><a href="index.html">← 返回启动器</a><span>TH05 · MYSTIC SQUARE</span></footer><script type="module" src="lan.js"></script><script type="module" src="bgm-version.js"></script><script type="module" src="replay-menu.js"></script><script type="module" src="room-ui.js"></script></body></html>
