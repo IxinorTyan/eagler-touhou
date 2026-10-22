@@ -18,7 +18,7 @@
     "netplay/runtime-core.js": "268424763862882c6e7b63fcf3bba008c6b459ddb58179a8d3e3d76fdc7f5fb8",
     "netplay/runtime-worker-client.js": "4a0c4da6380d1a70634d0bbb1ab309f4d51e44cb4dc5d611d6637cced0ad30c2",
     "netplay/runtime.js": "bbd98dbc1c906ce61b2215b0847e23e9b48c00e340776d9e9c43bd4a0498b0a0",
-    "netplay/session.js": "20cf2950c0e353e10216db5ba4a9f6626f5b8cf30821e93bd7546d88193d4963",
+    "netplay/session.js": "4bd4ee3a9e928df71733606bb762ed5287bc2a02b47187a2cb03c825a4a71b2b",
     "netplay/sha256.js": "9cb7be2bc039bcea2a4d727ef98bcd9047a78dfd4c11950355723147423e1f43",
     "netplay/simulation-worker.js": "353897a1f799600f2b71b59860ffb4cf2141ab186edf782c082b48d4330b83ac",
     "netplay/udp-config.js": "6a04c0244c0912b8c6235dbca15d0943eda0218a5f281be688dec41191af0a5f",
@@ -28,6 +28,7 @@
     "replay/sha256.js": "9cb7be2bc039bcea2a4d727ef98bcd9047a78dfd4c11950355723147423e1f43",
     "replay/tape.js": "744c95ab59dc2d47231898b7db83143085bbfc672bb34611c2e98734802b106c",
     "sfx/manifest.json": "ed4fa79a0c7af68a8ca1e943fdd496527aa4df0364b37a3a1f911ec91b677b02",
-    "stage-select.js": "346e673950c5914f5146617ed7dc17801398b3b5e52cda17ef5443e3d29d59e4"
+    "stage-select.js": "346e673950c5914f5146617ed7dc17801398b3b5e52cda17ef5443e3d29d59e4",
+    "netplay/input-transport.js": "1ebc7119d439ed35feccbb834a5526232419c877b723c58d692d171727c2cd38"
   }
 }

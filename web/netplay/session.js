@@ -1,4 +1,5 @@
 import {PROTOCOL,FrameQueue} from './queue.js';
+import {createInputChannel,acceptInputChannel} from './input-transport.js';
 import {createRecorder} from '../replay/recorder.js';
 import {GameRuntime} from './runtime.js';
 import {WorkerGameRuntime,supportsSimulationWorker} from './runtime-worker-client.js';
@@ -35,6 +36,7 @@ export class NetSession{
     channel.send(JSON.stringify({...value,from:source,protocol:PROTOCOL,generation:this.room.generation}));
   }
   send(value){for(const role of this.links)this.sendTo(role,value);}
+  get inputTransportStats(){return Object.fromEntries([...this.peers].map(([role,peer])=>[role,peer.channel?.transportStats??null]));}
   signal(target,message){
     this.signalChain=this.signalChain.then(()=>this.api('signal',{generation:this.room.generation,target,message}));
     this.signalChain.catch(e=>this.fail(e));return this.signalChain;
@@ -65,11 +67,10 @@ export class NetSession{
         pc.onicecandidateerror=e=>recordIceServerError(this.iceErrors,e);
         pc.onconnectionstatechange=()=>this.connectionChanged(role);
         pc.ondatachannel=e=>{
-          if(peer.channel||e.channel.label!=='th01-inputs'){e.channel.close();this.fail(Error('收到无效数据通道'));return;}
-          this.attach(role,e.channel);
+          try{acceptInputChannel(pc,e.channel,'th01-inputs',channel=>this.attach(role,channel));}catch(error){this.fail(error);}
         };
         if(this.identity.role==='host'){
-          this.attach(role,pc.createDataChannel('th01-inputs',{ordered:true}));
+          this.attach(role,createInputChannel(pc,'th01-inputs'));
           await pc.setLocalDescription(await pc.createOffer());
           await this.signal(role,{type:'offer',sdp:pc.localDescription.sdp});
         }
