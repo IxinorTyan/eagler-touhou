@@ -1,4 +1,5 @@
 import {startFrameLoop} from '../frame-limit.js';
+import {createInputChannel,acceptInputChannel} from './input-transport.js';
 import {readNetworkMode,networkUrl} from './network-mode.js';
 import {PROTOCOL,RollbackQueue,TICK_MS,MAX_ROLLBACK,BOOT_DELAY,MAX_INPUT_DELAY,MAX_ROLLBACK_INPUT_DELAY,lockstepDelayForRtt,rollbackInputDelayForRtt,rollbackRttForSamples} from './rollback-queue.js';
 import {mountPlayer} from '../player-ui.js';
@@ -88,6 +89,7 @@ faultDownload.onclick=()=>{
     running,stopped,stopReason,inputPolicy,lockstepDelay:queue?.lockstepDelay,
     predictionLeadLimit:queue?.active?Math.max(1,queue.directionPrediction):0,
     rollbackSafetyWindow:MAX_ROLLBACK,render:runtime.renderInfo(),performanceHistory,
+    inputTransport:Object.fromEntries([...peers].map(([role,peer])=>[role,peer.channel?.transportStats??null])),
     diagnostics:$('diagnostics').textContent,runtime:runtime.faultReport()},'th02-network-fault.json');
     player.note('故障信息已下载，只保存在本机。');
   }catch(error){player.note('读取故障信息失败：'+error.message);}
@@ -521,7 +523,7 @@ function makePeer(role,rtcConfiguration,previous=null,attempt=0){
   };
   pc.oniceconnectionstatechange=showStartup;
   pc.onsignalingstatechange=showStartup;
-  pc.ondatachannel=event=>{if(!currentRtcPeer(peer)){event.channel.close();return;}try{attachChannel(peer,event.channel);}catch(error){rtcFailure(peer,error);}};
+  pc.ondatachannel=event=>{if(!currentRtcPeer(peer)){event.channel.close();return;}try{acceptInputChannel(pc,event.channel,'th02-inputs',channel=>attachChannel(peer,channel));}catch(error){rtcFailure(peer,error);}};
   peer.connectTimer=setTimeout(()=>rtcFailure(peer,Error(`与${label(role)}直连等待超过 8 秒（ICE ${pc.iceConnectionState}）`)),8000);return peer;
 }
 function makeRelayPeer(role){
@@ -548,7 +550,7 @@ function reconnectRtc(peer){
     signal(peer,{type:'reconnect'}).catch(()=>{});return;
   }
   const replacement=makePeer(peer.role,peer.rtcConfiguration,peer,peer.attempt+1);
-  attachChannel(replacement,replacement.pc.createDataChannel('th02-inputs',{ordered:true}));
+  attachChannel(replacement,createInputChannel(replacement.pc,'th02-inputs'));
   replacement.signalChain=signalingStep(replacement,'恢复设备直连',async()=>replacement.pc.setLocalDescription(await replacement.pc.createOffer()))
     .then(()=>{if(currentRtcPeer(replacement))return signal(replacement,{type:'offer',description:replacement.pc.localDescription.toJSON()});})
     .catch(error=>rtcFailure(replacement,error));
@@ -593,7 +595,7 @@ async function setupConnections(){
     try{
       for(const role of activeRoles())if(role!==session.role)makePeer(role,rtcConfiguration);
       for(const peer of peers.values())if(roles.indexOf(session.role)<roles.indexOf(peer.role)){
-        attachChannel(peer,peer.pc.createDataChannel('th02-inputs',{ordered:true}));
+        attachChannel(peer,createInputChannel(peer.pc,'th02-inputs'));
         peer.signalChain=signalingStep(peer,'生成连接邀请',async()=>peer.pc.setLocalDescription(await peer.pc.createOffer()))
           .then(async()=>{if(currentRtcPeer(peer)){await signal(peer,{type:'offer',description:peer.pc.localDescription.toJSON()});if(currentRtcPeer(peer)){peer.signalStage='已发送邀请，等待应答';showStartup();}}}).catch(error=>rtcFailure(peer,error));
       }

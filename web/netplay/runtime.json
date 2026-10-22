@@ -43,7 +43,7 @@
     "netplay/network-mode.js": "dda8c24274cb84bf50aa50ca9405ffa8d707f9567137cb80cb2133ea45fb019b",
     "netplay/relay.js": "8189520a9dd4b8900bfb76065787056234ad1a4331b021d99cafe2652251aacf",
     "netplay/rollback-queue.js": "9a3d6cbf8bc184601a0a3bbcd16c0b5937680cca736b7bcf3e81baea2cf61802",
-    "netplay/room.js": "6eace3c1d7c053e2a528656118a2fb2da864360b23aeb50bfa6b21247ffd81a4",
+    "netplay/room.js": "338f8542a570cf4087cac05f57e0c99738328e475843ce5a29c98340b762eba4",
     "netplay/runtime-worker-client.js": "a4203f3ddc6f3fb7ef1b097871197e9fd49a8886d2b007dd4bc080ee4c3a744d",
     "netplay/runtime-worker.js": "2bf997177c62ec47170b1eeb7d27d50633a4a84687fca714aff03bbf4733c292",
     "netplay/runtime.html": "e2c5a129ac58cfc4824fc14e8b33fe036f548ec3621249734f06ab2568f70028",
@@ -116,7 +116,8 @@
     "solo-boss-hud-replay.json": "750130178ec86fe55b539a6624b13be5328307a82eedffb769f931b2c14cf0a3",
     "sfx/manifest.json": "743a7be54818c5483b8b03b89ad138a7a7cd65e4a0de185967322646ea5c3faf",
     "vendor/dosbox-x/snapshot-diff.wasm": "bb1b100252f74fd6b7ee5e9428cb5d701d7053dab8bcae0b0ed9157b607a31b3",
-    "vendor/dosbox-x/snapshot-diff-tracked.wasm": "9b563935571f450950575e8feafb6bfa840f31dfdd7a033e2822396a299ac6e1"
+    "vendor/dosbox-x/snapshot-diff-tracked.wasm": "9b563935571f450950575e8feafb6bfa840f31dfdd7a033e2822396a299ac6e1",
+    "netplay/input-transport.js": "1ebc7119d439ed35feccbb834a5526232419c877b723c58d692d171727c2cd38"
   },
   "cores": {
     "plain": {
@@ -128,5 +129,5 @@
       "sha256": "271ca7dbe31ef4f7bd8657c91332d534f634b4e0b52f536f940fa21f3fcc5ef7"
     }
   },
-  "build": "5f660ca23d020359f2cac57d328cd8636271abea3012b3b47ae21de23bed8222"
+  "build": "b8f67996df5157214f39295404eb5bc8b9b7eca8b1af766db7628c74c2a837f0"
 }
