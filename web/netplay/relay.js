@@ -79,7 +79,7 @@ export function createRelay(session,generation,roles,onFailure){
     deadline||=performance.now()+RECONNECT_MS;
     if(performance.now()>=deadline){fail('服务器转发在 30 秒内未恢复，请检查网络及服务／隧道窗口');return;}
     const url=new URL('/relay',location.href);url.protocol=location.protocol==='https:'?'wss:':'ws:';
-    url.search=new URLSearchParams({room:session.room,token:session.token,client});
+    url.search=new URLSearchParams({room:session.room,token:session.token,runId:session.runId,client});
     socket=new WebSocket(url);socket.binaryType='arraybuffer';
     const current=socket;
     handshakeTimer=setTimeout(()=>{if(!closed&&socket===current&&current.readyState===WebSocket.CONNECTING)lost(current);},8000);

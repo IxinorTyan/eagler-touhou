@@ -9,9 +9,9 @@ import {assetBytes} from '../preload-cache.js';
 import {hashNativeMemory} from './native-hash.js';
 const workerHost=globalThis.th02WorkerHost;
 const PROTOCOL='th02-rollback/6',canvas=workerHost?.canvas??document.getElementById('canvas'),details=workerHost?{}:document.getElementById('details');
-const nativeCanvas=workerHost?new OffscreenCanvas(640,400):document.createElement('canvas');nativeCanvas.width=640;nativeCanvas.height=400;
+const nativeCanvas=workerHost?.canvas??document.createElement('canvas');nativeCanvas.width=640;nativeCanvas.height=400;
 if(!workerHost){nativeCanvas.hidden=true;document.body.append(nativeCanvas);}
-const ctx=canvas.getContext('2d');
+const ctx=workerHost?null:canvas.getContext('2d');
 const nativeKeys=[['ArrowUp',1],['ArrowDown',2],['ArrowLeft',4],['ArrowRight',8],['KeyZ',16],['KeyX',32],['Escape',64],['Enter',128]];
 let emulator,patch,version,config,bootPromise,mailbox=-1,oldP1=0,ticks=0,emulatedTicks=0,localSlot=0,players=2;
 let enabled=false,closed=false,keys=new Set(),inputListener=()=>{},editing=false,pending=false,raw=false,points={focus:true,always:false};
@@ -137,6 +137,7 @@ async function boot(settings){
   onError:error=>notifyParent({protocol:PROTOCOL,event:'boot-error',message:error.message}),
   onExit:()=>notifyParent({protocol:PROTOCOL,event:'runtime-exit'})});
  emulator.module.playerArt.view(localSlot);
+ if(workerHost)emulator.module.getHitPoints=hitPoints;
  if(closed){emulator.dispose();return;}
  if(emulator.audio.context.sampleRate!==44100)throw Error('浏览器未提供统一的 44100 Hz 音频，请使用新版 Chrome / Edge');
  sfx=workerHost?workerHost.sfx:new LocalSfx(emulator.audio.context);await sfx.load();
@@ -243,6 +244,7 @@ function step(inputs,{frame=ticks,replay=false,offlineMask=0}={}){
   applyKeys(mapped[0]|mapped.slice(1).reduce((v,n)=>v|(n&192),0));
   previousInputs=inputs.slice();
   const nativeStarted=workerHost?performance.now():0;
+  const pausedBefore=nativePaused(m.HEAPU8,mailbox,patch),previousMailbox=mailbox;
   emulator.step();
   workerHost?.recordNative?.(performance.now()-nativeStarted,frame,replay);
   ticks++;emulatedTicks++;
@@ -252,7 +254,11 @@ function step(inputs,{frame=ticks,replay=false,offlineMask=0}={}){
    m.bootCPUMetrics=m.UTF8ToString(m._getCPUMetrics());
    if(m.bootCPUMetrics.split('|')[0]!=='30000')throw Error('TH02 联机周期未恢复为 30000');
   }
-  effects.set(frame,{music:mailbox>=0?readMusic():null,sounds:mailbox>=0?readSfx():[]});if(!replay)pending=true;
+  // The original pause routine publishes its confirmed quit result in MAIN's
+  // shared quit byte. Do not treat MAIN -> MAINE ending ownership as an exit.
+  const quitAt=previousMailbox-patch.entries.mailbox+(patch.dataSegment-patch.codeSegment)*16+0x2b97;
+  const exit=pausedBefore&&!nativePaused(m.HEAPU8,mailbox,patch)&&m.HEAPU8[quitAt]===1;
+  effects.set(frame,{exit,music:mailbox>=0?readMusic():null,sounds:mailbox>=0?readSfx():[]});if(!replay)pending=true;
  }finally{m.netEndFrame();}
 }
 function capture(frame,restored=false){
@@ -278,10 +284,11 @@ function restore(frame){
 }
 function retained(prefix){const next=states.get(prefix);if(next)return next.nativeFrame;const previous=states.get(prefix-1);return previous?.nativeFrame===prefix-1?prefix-1:prefix;}
 function confirm(prefix){
- let sound=null;
+ let sound=null,exit=false;
  for(let frame=confirmedPrefix;frame<prefix;frame++){
   if(!effects.has(frame))throw Error('TH02 确认步缺少模拟结果');
   const effect=effects.get(frame);
+  if(effect.exit)exit=true;
   emulator.module.netConfirm(frame+1,retained(frame+1));if(effect.music)confirmedMusic(effect.music);
   if(effect.sounds.length)sound=effect.sounds.at(-1);effects.delete(frame);
  }
@@ -289,6 +296,7 @@ function confirm(prefix){
  // PMD has one SE voice. A confirmation burst starts only its newest event,
  // never a queue of obsolete sounds. Playback thereafter uses device time.
  if(sound!==null&&(workerHost||!document.hidden))sfx.play(sound);
+ return exit?'exit':undefined;
 }
 function checksum(){
  let h=0x811c9dc5;const hash=n=>{h=Math.imul(h^n,0x01000193);};
@@ -297,15 +305,22 @@ function checksum(){
  if(guestMemoryBase>=0)h=hashNativeMemory(emulator.module.nativeExports().memory,guestMemoryBase,guestMemoryBase+0xa0000,h);
  return {tick:ticks,hash:(h>>>0).toString(16).padStart(8,'0'),gameFrame:state()?.gameFrame||0};
 }
-function present(){
- if(!enabled||!pending||!emulator.module.netPresent())return false;
- ctx.drawImage(nativeCanvas,0,0,640,400);const s=state(),p=s?.players[localSlot];
+function hitPoints(){
+ const s=state(),p=s?.players[localSlot];
  if(!raw&&p&&!p.hit&&!p.out&&!nativePaused(emulator.module.HEAPU8,mailbox,patch)&&(points.always||(points.focus&&(previousInputs[localSlot]&64)))){
   // Native rendering adds 0x28d4 hardware scroll; scanout removes it. The
   // published player coordinates are already the visible screen position.
-  const x=p.x+16,y=p.y+21;
-  ctx.fillStyle='#000';ctx.fillRect(x-2,y-2,5,5);ctx.fillStyle='#fff';ctx.fillRect(x-1,y-1,3,3);
+  return [[p.x+16,p.y+21]];
  }
+ return [];
+}
+function present(){
+ if(!enabled||!pending||!emulator.module.netPresent())return false;
+ // Like TH05, the Worker transfers its rendered WebGL canvas directly.
+ // The compatibility backend retains its page-owned 2D canvas.
+ if(ctx){ctx.drawImage(nativeCanvas,0,0,640,400);for(const [x,y]of hitPoints()){
+  ctx.fillStyle='#000';ctx.fillRect(x-2,y-2,5,5);ctx.fillStyle='#fff';ctx.fillRect(x-1,y-1,3,3);
+ }}
  pending=false;presentationCount++;return true;
 }
 function predictionBlockReason(){return !state()?'原版菜单或关卡加载':nativePaused(emulator.module.HEAPU8,mailbox,patch)?'原生暂停菜单':'';}

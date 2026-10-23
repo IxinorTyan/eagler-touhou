@@ -3,6 +3,7 @@
 // batch boundary, after replay has caught up. No browser callback reads the heap.
 export function installFramePresenter(mod,{deferred=false,isReplaying=()=>false}={}){
   const gl=mod.gl;
+  const gpuHitPoints=deferred&&!!mod.worker;
   if(!gl||mod.glfx)throw Error('TH02 画面呈现需要 PC-98 2D WebGL 上下文');
   const metrics={mode:deferred?'batch':'direct',submitted:0,uploaded:0,drawn:0,repeated:0,replaySubmitted:0,coalesced:0,restores:0};
   const gaps=new Float64Array(512);
@@ -18,12 +19,21 @@ export function installFramePresenter(mod,{deferred=false,isReplaying=()=>false}
     void main(){gl_Position=vec4(position,0.0,1.0);texcoord=uv;}`);
   const fs=shader(gl.FRAGMENT_SHADER,`
     precision mediump float; varying vec2 texcoord; uniform sampler2D image;
-    void main(){gl_FragColor=vec4(texture2D(image,texcoord).rgb,1.0);}`);
+    ${gpuHitPoints?`uniform vec2 hitpoint; uniform vec2 frameSize;
+    void main(){
+      vec3 rgb=texture2D(image,texcoord).rgb;
+      vec2 distance=abs(floor(texcoord*frameSize)-hitpoint);
+      float pointDistance=max(distance.x,distance.y);
+      if(pointDistance<=2.0)rgb=pointDistance<=1.0?vec3(1.0):vec3(0.0);
+      gl_FragColor=vec4(rgb,1.0);
+    }`:'void main(){gl_FragColor=vec4(texture2D(image,texcoord).rgb,1.0);}'}
+  `);
   const program=gl.createProgram();gl.attachShader(program,vs);gl.attachShader(program,fs);gl.linkProgram(program);
   gl.deleteShader(vs);gl.deleteShader(fs);
   if(!gl.getProgramParameter(program,gl.LINK_STATUS)){const message=gl.getProgramInfoLog(program);gl.deleteProgram(program);throw Error(message);}
   const position=gl.getAttribLocation(program,'position'),uv=gl.getAttribLocation(program,'uv');
   const sampler=gl.getUniformLocation(program,'image'),buffer=gl.createBuffer(),texture=gl.createTexture();
+  const hitpoint=gl.getUniformLocation(program,'hitpoint'),frameSize=gl.getUniformLocation(program,'frameSize');
   gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
   // Match upstream's top-left RGB orientation and nearest-neighbor scaling.
   gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([
@@ -45,6 +55,7 @@ export function installFramePresenter(mod,{deferred=false,isReplaying=()=>false}
     gl.vertexAttribPointer(position,2,gl.FLOAT,false,16,0);gl.vertexAttribPointer(uv,2,gl.FLOAT,false,16,8);
     gl.enableVertexAttribArray(position);gl.enableVertexAttribArray(uv);
     gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texture);gl.uniform1i(sampler,0);
+    if(gpuHitPoints){gl.uniform2f(hitpoint,...(mod.getHitPoints?.()[0]||[-100,-100]));gl.uniform2f(frameSize,frameWidth,frameHeight);}
     gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);
     // WebGL consumes this view during the call. Reacquire the heap on every
     // upload, including after memory growth or a rollback restore.

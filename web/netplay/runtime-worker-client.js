@@ -1,12 +1,16 @@
 import {keyboardBits,isBound,isFormTarget,useControlSnapshot,controlsSummary} from '../control-settings.js';
 import {LocalSfx} from './local-sfx.js';
 import {LocalBgm} from './local-bgm.js';
-const PROTOCOL='th02-rollback/6',canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
+const PROTOCOL='th02-rollback/6',canvas=document.getElementById('canvas');
+let bitmapContext;try{bitmapContext=canvas.getContext('bitmaprenderer',{alpha:false});}catch{bitmapContext=null;}
+const ctx=bitmapContext||canvas.getContext('2d',{alpha:false});
+if(!ctx)throw Error('浏览器无法创建游戏画面');
+if(!bitmapContext)ctx.imageSmoothingEnabled=false;
 let worker,serial=0,stopped=false,settings,configuration=[0,0,2],volume=.7,blocked=false,listener=()=>{},keys=new Set();
 let context,sfx,bgm,musicTask,musicError='',playedName='',pendingMusic=[],cache={},check=null,queuedFrame=null,preparedFrame=null,raf=0,presentPending=false;
 let raw=false,points={focus:true,always:false},lastPoints='',acknowledgedPrefix=0,sentPrefix=0,stagedMode=false,preparedReady=false,bootPromise;
 const requests=new Map();
-const rpcMetrics={roundTripMs:0,commands:0,workerExecutionMs:0,loadRoundTripMs:0,loadExecutionMs:0,displayMs:0,displayed:0,replaced:0,queuedConfirmations:0,presentationRpcs:0};
+const rpcMetrics={renderer:bitmapContext?'bitmaprenderer':'2d',roundTripMs:0,commands:0,workerExecutionMs:0,loadRoundTripMs:0,loadExecutionMs:0,displayMs:0,displayed:0,replaced:0,expired:0,hiddenDiscarded:0,queuedConfirmations:0,presentationRpcs:0};
 function request(type,args=[],extra={}){
  if(stopped)return Promise.reject(Error('TH02 worker 已停止'));
  const id=++serial;return new Promise((resolve,reject)=>{requests.set(id,{resolve,reject,type,started:performance.now()});worker.postMessage({type,args,id,...extra});});
@@ -17,8 +21,16 @@ function clearKeys(){keys.clear();listener(0);}
 function releaseFrame(frame){frame.bitmap.close();worker?.postMessage({type:'frame-ack',sequence:frame.sequence});}
 function discardPrepared(){preparedReady=false;if(preparedFrame){releaseFrame(preparedFrame);preparedFrame=null;}}
 function discardFrames(){preparedReady=false;if(preparedFrame){releaseFrame(preparedFrame);preparedFrame=null;}if(queuedFrame){releaseFrame(queuedFrame);queuedFrame=null;}if(raf){cancelAnimationFrame(raf);raf=0;}}
-function queueForDisplay(frame){if(queuedFrame){releaseFrame(queuedFrame);rpcMetrics.replaced++;}queuedFrame=frame;if(!raf)raf=requestAnimationFrame(draw);}
-function draw(){raf=0;if(!queuedFrame||stopped)return;const frame=queuedFrame;queuedFrame=null;const at=performance.now();try{ctx.drawImage(frame.bitmap,0,0,640,400);}finally{releaseFrame(frame);}rpcMetrics.displayMs+=performance.now()-at;rpcMetrics.displayed++;}
+function queueForDisplay(frame){if(document.hidden){releaseFrame(frame);rpcMetrics.hiddenDiscarded++;return;}if(queuedFrame){releaseFrame(queuedFrame);rpcMetrics.replaced++;}queuedFrame=frame;if(!raf)raf=requestAnimationFrame(draw);}
+function draw(){
+ raf=0;if(!queuedFrame||stopped)return;const frame=queuedFrame;queuedFrame=null;
+ const hidden=document.hidden,expired=Number.isFinite(frame.producedAt)&&performance.timeOrigin+performance.now()-frame.producedAt>50;
+ if(hidden||expired){releaseFrame(frame);rpcMetrics[hidden?'hiddenDiscarded':'expired']++;return;}
+ const at=performance.now();
+ try{if(bitmapContext)bitmapContext.transferFromImageBitmap(frame.bitmap);else ctx.drawImage(frame.bitmap,0,0,640,400);rpcMetrics.displayMs+=performance.now()-at;rpcMetrics.displayed++;}
+ catch(error){fatal(error.message);}
+ finally{releaseFrame(frame);}
+}
 function music(event){
  if(event.name){if(playedName!==event.name){pendingMusic.push([0,event.name]);if(event.ax>>>8)pendingMusic.push([event.ax,event.name]);}else pendingMusic.push([event.ax,event.name]);playedName=event.name;}
  else if(playedName)pendingMusic.push([event.ax,playedName]);
@@ -78,6 +90,7 @@ const sync={
 window.addEventListener('keydown',e=>{if(blocked||isFormTarget(e.target)||e.metaKey||e.ctrlKey||e.altKey||!isBound(e.code))return;e.preventDefault();e.stopImmediatePropagation();keys.add(e.code);listener(keyboardBits(keys));},true);
 window.addEventListener('keyup',e=>{if(keys.delete(e.code)){e.preventDefault();e.stopImmediatePropagation();listener(keyboardBits(keys));}},true);
 window.addEventListener('blur',clearKeys);window.addEventListener('pagehide',()=>sync.stop());
-document.addEventListener('visibilitychange',()=>{if(document.hidden){clearKeys();sfx?.stop();}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){clearKeys();sfx?.stop();discardFrames();}});
+canvas.addEventListener('contextlost',()=>fatal('游戏画面上下文已丢失，请重新开始'));
 canvas.addEventListener('pointerdown',()=>canvas.focus());document.getElementById('sound').onclick=()=>sync.unlockAudio();
 window.th02Sync=sync;

@@ -29,7 +29,7 @@ function present(staged=false){
  if(transfers.size>=2)return false;
  if(!timed('presentMs','presentations',()=>th02WorkerHost.runtime.present()))return false;
  const bitmap=timed('bitmapMs','bitmaps',()=>th02WorkerHost.canvas.transferToImageBitmap()),sequence=++frameSequence;
- transfers.add(sequence);send({type:'frame',bitmap,sequence,staged},[bitmap]);return true;
+ transfers.add(sequence);send({type:'frame',bitmap,sequence,staged,producedAt:performance.timeOrigin+performance.now()},[bitmap]);return true;
 }
 let chain=Promise.resolve();
 onmessage=({data})=>{

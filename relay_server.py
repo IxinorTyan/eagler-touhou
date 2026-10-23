@@ -96,7 +96,10 @@ def handle(handler,rooms,room_lock,roles,ttl,expired=None):
         if role is None or room['phase']!='loading' or room.get('transport','rtc')!='ws':
             handler.reply({'error':'中继身份或房间模式无效'},403);return
         generation=room['generation'];count=room['settings']['players'];source=roles.index(role)
-    key=(code,generation)
+    run_id=room.get('runId',0)
+    if str(data.get('runId'))!=str(run_id):
+        handler.reply({'error':'本局编号已失效'},409);return
+    key=(code,generation,run_id)
     sock=handler.connection
     sock.settimeout(5)
     sock.setsockopt(socket.IPPROTO_TCP,socket.TCP_NODELAY,1)
@@ -155,7 +158,7 @@ def handle(handler,rooms,room_lock,roles,ttl,expired=None):
         while True:
             with room_lock:
                 current=rooms.get(code)
-                valid=current and current['generation']==generation and current[role]==token and not expired(current,time.monotonic())
+                valid=current and current['generation']==generation and current.get('runId',0)==run_id and current['phase']=='loading' and current[role]==token and not expired(current,time.monotonic())
             if not valid:break
             if (entry['ready'] and time.monotonic()-last_data>40) or (not entry['ready'] and time.monotonic()-started>30):break
             if not select.select([sock],[],[],1)[0]:continue
@@ -178,7 +181,7 @@ def handle(handler,rooms,room_lock,roles,ttl,expired=None):
                 if len(packet)<3 or packet[0]!=0xe7 or packet[1]>=count or packet[1]==source:raise ValueError('bad envelope')
                 with room_lock:
                     current=rooms.get(code)
-                    if current and current['generation']==generation and current[role]==token:current['seen'][role]=time.monotonic()
+                    if current and current['generation']==generation and current.get('runId',0)==run_id and current['phase']=='loading' and current[role]==token:current['seen'][role]=time.monotonic()
                 with HUB_LOCK:
                     peers=HUBS.get(key,{}).get('peers',{})
                     if peers.get(source) is not entry:return

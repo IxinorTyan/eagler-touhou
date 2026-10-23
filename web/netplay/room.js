@@ -31,6 +31,7 @@ let inputPolicy;
 let timingSent=false,runDelay=null,runInputDelay=null;
 let relay;
 let preparing=false,running=false,stopped=false,busy=false,runRequested=false;
+let returningTask=null,runEpoch=0;
 let nativeBusy=false;
 const boundaryActions=[];
 function atNativeBoundary(action){if(nativeBusy)boundaryActions.push(action);else action();}
@@ -211,15 +212,15 @@ function applyDeparture(message){
 }
 async function request(action,data={}){
   const response=await fetch(`/api/${action}`,{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({protocol:PROTOCOL,transport:useRelay?'ws':'rtc',room:session?.room,token:session?.token,...data}),signal:AbortSignal.timeout(10000)});
+    body:JSON.stringify({protocol:PROTOCOL,transport:useRelay?'ws':'rtc',room:session?.room,token:session?.token,runId:state?.runId??0,...data}),signal:AbortSignal.timeout(10000)});
   const result=await response.json();if(!response.ok)throw Object.assign(Error(result.error||`HTTP ${response.status}`),{status:response.status});return result;
 }
-function signal(peer,message){return request('signal',{to:peer.role,message:{...message,attempt:peer.attempt||0}});}
+function signal(peer,message){if(stopped||peers.get(peer.role)!==peer)return Promise.resolve();return request('signal',{to:peer.role,message:{...message,attempt:peer.attempt||0}});}
 function send(peer,message){
   if(!peer||peer.offline)return;
   if(peer.channel?.readyState!=='open'){suspect(peer);return;}
   if(peer.channel.bufferedAmount>262144){suspect(peer);return;}
-  try{peer.channel.send(JSON.stringify({...message,protocol:PROTOCOL,generation:state.generation}));}
+  try{peer.channel.send(JSON.stringify({...message,protocol:PROTOCOL,generation:state.generation,runId:state.runId}));}
   catch{suspect(peer);}
 }
 function broadcast(message){for(const peer of onlinePeers())send(peer,message);}
@@ -243,31 +244,68 @@ function clearTimers(){
   cancelWake();raf?.();raf=null;
   for(const peer of peers.values())clearTimeout(peer.connectTimer);
 }
-function disconnect(){relay?.close();for(const peer of peers.values()){peer.channel?.close();peer.pc.close();}}
+function disconnect(){
+  if(relay)relay.close();relay=null;
+  for(const peer of peers.values()){
+    if(peer.channel)peer.channel.onopen=peer.channel.onclose=peer.channel.onerror=peer.channel.onmessage=null;
+    if(peer.pc)peer.pc.onconnectionstatechange=peer.pc.ondatachannel=peer.pc.onicecandidate=null;
+    peer.channel?.close();peer.pc?.close();
+  }
+}
 function fail(error){
   if(stopped)return;
+  if(session&&state?.phase==='loading'){void returnToRoom('本局已停止：'+(error.message||error));return;}
   stopReason=String(error.message||error);startupFailure(stopReason);replayRecorder.finish(stopReason);
   stopped=true;running=false;clearInput();
   for(const peer of peers.values())if(peer.channel?.readyState==='open'){
     try{send(peer,{type:'fatal',reason:String(error.message||error).slice(0,600)});}catch{}
   }
   runtime?.stop();clearTimers();disconnect();render();
-  status(`本局已停止：${error.message||error}。所有玩家点击“结束并返回”后重新建房。`);
+  status(`本局已停止：${error.message||error}。点击“返回房间”后可重新准备。`);
 }
-function closeFinishedRoom(){
-  if(session.role!=='host'||!stopped||!onlinePeers().every(peer=>peer.ended))return;
-  disconnect();void replayRecorder.seal().then(()=>request('leave')).catch(()=>{});
+function closeFinishedRoom(){} // End acknowledgements never release room membership.
+function finishGame(){void returnToRoom('本局已结束，返回房间后可重新准备。');}
+async function returnToRoom(reason='本局已结束，可重新准备。',snapshot=null){
+  if(returningTask)return returningTask;
+  const ownedRun=state?.runId,ownedSession=session;
+  if(!ownedSession)return;
+  stopped=true;running=false;busy=true;runEpoch++;clearInput();clearTimers();
+  replayRecorder.finish(reason);runtime?.stop();disconnect();
+  iframe?.remove();iframe=null;runtime=null;
+  returningTask=(async()=>{
+    try{
+      await replayRecorder.seal(2000);
+      const result=snapshot?{state:snapshot}:await request('end',{runId:ownedRun});
+      if(session!==ownedSession)return;
+      peers.clear();hashes.clear();pendingHashes.clear();captureTimes.clear();
+      boundaryActions.length=0;nativeBusy=false;pumping=false;
+      queue=null;localReady=null;preparing=runRequested=false;
+      connectionAttempt++;connectionReadySent=fallbackPending=false;
+      waitedMs=measuredWaitMs=waitPercent=0;measuredGame=gameHz=null;performanceHistory.length=0;
+      connectionConfigPending=false;pendingConnectionSignals=[];
+      membership=null;membershipId=0;waitingSince=replayUntil=0;replayTouchContext=null;
+      rollbackCount=resimulated=maxRewind=0;receivedInputs=earlyInputs=0;
+      lastNow=accumulator=lastUi=lastMeasure=measureFrame=0;
+      stepCost=stepCount=maxCost=hz=averageCost=peakCost=inputAge=lastApplied=0;
+      costs=newCosts();measuredCosts=newCosts();waitDetail='';stopReason='';
+      bootStep=0;bootStage='等待全员准备';pollFailedAt=0;roomServiceError='';
+      stopped=false;busy=false;state=result.state;
+      render();status(reason);clearTimeout(pollTimer);pollTimer=setTimeout(poll,0);
+    }catch(error){
+      status('返回房间失败：'+error.message+'。可点击“返回房间”重试。');
+    }finally{returningTask=null;busy=false;render();}
+  })();
+  return returningTask;
 }
-function finishGame(){
-  if(stopped)return;stopped=true;running=false;clearInput();
-  replayRecorder.finish('房主结束本局');runtime?.stop();iframe?.remove();runtime=null;clearTimers();
-  if(session.role==='host'){broadcast({type:'end'});closeFinishedRoom();}
-  else send(peers.get('host'),{type:'end-ack'});
-  status('房主已退出，本局游戏已关闭。');render();
-}
+const returnButton=document.createElement('button');returnButton.type='button';
+returnButton.id='return-room';returnButton.className='room-ui-return';returnButton.textContent='返回房间';
+returnButton.onclick=()=>{if(state?.phase!=='lobby')void returnToRoom();};
+$('game').append(returnButton);
 function render(){
   if(!session||!state)return;
   $('lobby').dataset.roomPhase=state.phase;
+  returnButton.hidden=state.phase==='lobby';returnButton.disabled=!!returningTask;
+  $('leave').textContent=session.role==='host'?'解散房间':'离开房间';
   $('lobby').dataset.roomLanguage=state.settings.language;
   if(state.phase!=='lobby')$('lobby').dispatchEvent(new Event('room-preview-stop'));
   if(state.phase==='lobby')prepareRoomResources(state).catch(()=>{});
@@ -331,6 +369,9 @@ async function prepareRoomResources(value){
  return preloadPromise;
 }
 function update(value){
+  if(returningTask)return;
+  if(state&&value?.revision<=state.revision)return;
+  if(value?.phase==='lobby'&&state?.phase==='loading'){void returnToRoom('本局已结束，可重新准备。',value);return;}
   if(stopped)return;
   if(!value||value.protocol!==PROTOCOL||typeof value.settings?.rollback!=='boolean'||assistFlags.some(key=>typeof value.settings?.[key]!=='boolean')||value.settings?.focusPercent!==50||'cpuMultiplier' in value.settings||!['cn','jp'].includes(value.settings?.language)||!['ws','rtc'].includes(value.transport)||typeof value.connectionCommitted!=='boolean')throw Error('请关闭旧服务窗口，重新运行新版 start-lan.bat（公网使用 start-public.bat），并刷新所有玩家的页面');
   if(state&&value.revision<=state.revision)return;
@@ -352,7 +393,7 @@ function update(value){
     // host can usually satisfy the browser's user-activation requirement for
     // native fullscreen; guests still lose the old top/bottom chrome.
     player.enter({native:true}).catch(()=>{});
-    beginGame().catch(fail);
+    const ownedEpoch=runEpoch;beginGame().catch(error=>{if(ownedEpoch===runEpoch)fail(error);});
   }
   if(preparing)maybeRun();
 }
@@ -375,7 +416,7 @@ async function poll(){
   if(stopped)return;
   let result;
   try{
-    const q=new URLSearchParams({room:session.room,token:session.token});
+    const q=new URLSearchParams({room:session.room,token:session.token,runId:state?.runId??0});
     if(preparing&&!running){q.set('boot_stage',bootStage);q.set('boot_step',String(bootStep));}
     const response=await fetch(`/api/events?${q}`,{signal:AbortSignal.timeout(10000)});
     result=await response.json();if(!response.ok)throw Error(result.error||`HTTP ${response.status}`);
@@ -391,6 +432,8 @@ async function poll(){
     pollTimer=setTimeout(poll,1000);return;
   }
   try{
+    if(returningTask)return;
+    if(result.state?.revision<state?.revision){if(!stopped)pollTimer=setTimeout(poll,400);return;}
     update(result.state);
     for(const [role,progress]of Object.entries(result.startup||{})){
       const peer=peers.get(role);if(!peer)continue;
@@ -428,11 +471,12 @@ function attachChannel(peer,channel){
     catch(error){fail(error);}
   };
   channel.onmessage=event=>{
+    if(peers.get(peer.role)!==peer)return;
     try{
       if(peer.offline||peers.get(peer.role)!==peer)return;
       if(typeof event.data!=='string'||event.data.length>65536)throw Error('无效同步消息');
       const m=JSON.parse(event.data);
-      if(m.protocol!==PROTOCOL||m.generation!==state.generation)throw Error('同步消息不属于本局');
+      if(m.protocol!==PROTOCOL||m.generation!==state.generation||m.runId!==state.runId)throw Error('同步消息不属于本局');
       const recovering=peer.recovering;
       peer.lastPacket=performance.now();peer.suspectAt=null;peer.recovering=false;
       if(recovering&&running&&onlinePeers().every(p=>!p.recovering)){
@@ -506,9 +550,9 @@ function attachChannel(peer,channel){
       }
     }catch(error){fail(error);}
   };
-  channel.onclose=()=>{if(stopped||peer.offline)peer.pc.close();else suspect(peer);};
-  channel.onerror=()=>suspect(peer);
-  channel.onreconnecting=()=>suspect(peer);
+  channel.onclose=()=>{if(peers.get(peer.role)!==peer)return;if(stopped||peer.offline)peer.pc.close();else suspect(peer);};
+  channel.onerror=()=>{if(peers.get(peer.role)===peer)suspect(peer);};
+  channel.onreconnecting=()=>{if(peers.get(peer.role)===peer)suspect(peer);};
 }
 function makePeer(role,rtcConfiguration,previous=null,attempt=0){
   const pc=new RTCPeerConnection(rtcConfiguration);
@@ -568,6 +612,7 @@ async function requestRelayFallback(reason){
   status(`${reason}，正在为全房间切换服务器转发…`);
   try{
     const result=await request('fallback');if(stopped)return;
+    if(returningTask||result.state?.revision<state?.revision)return;
     update(result.state);
     if(!useRelay)fail(Error(`${reason}；本局已完成连接确认，请重新建房`));
   }catch(error){if(!stopped&&!useRelay)fail(Error(`${reason}；请求服务器转发失败：${error.message||error}`));}
@@ -595,7 +640,7 @@ async function setupConnections(){
   if(stopped||attempt!==connectionAttempt)return;
   connectionConfigSummary=relayMode?'服务器转发（不需要 STUN/TURN 账号）':describeRtcConfiguration(rtcConfiguration);
   if(relayMode){
-    relay=createRelay(session,state.generation,roles,fail);
+    relay=createRelay({...session,runId:state.runId},state.generation,roles,fail);
     for(const role of activeRoles())if(role!==session.role)makeRelayPeer(role);
     relay.connect();
   }else{
@@ -691,11 +736,12 @@ async function receivedSignal({from,message}){
   }else throw Error('未知信令');
 }
 async function beginGame(){
-  await prepareRoomResources(state).catch(()=>{});if(stopped)return;
+  const ownedEpoch=runEpoch;
+  await prepareRoomResources(state).catch(()=>{});if(stopped||ownedEpoch!==runEpoch)return;
   bootStartedAt=performance.now();
   bootStage='获取网络连接配置';showStartup();
   await setupConnections();
-  if(stopped)return;
+  if(stopped||ownedEpoch!==runEpoch)return;
   heartbeatTimer=setInterval(()=>{
     try{
       const now=performance.now();
@@ -726,10 +772,10 @@ async function beginGame(){
   bootStage='加载游戏页面与 JavaScript 模块';showStartup();
   iframe=document.createElement('iframe');iframe.title='本机游戏模拟器';iframe.allow='autoplay; gamepad; fullscreen';iframe.allowFullscreen=true;
   const loaded=new Promise((resolve,reject)=>{iframe.onload=resolve;iframe.onerror=()=>reject(Error('游戏页面加载失败'));});
-  iframe.src='netplay/runtime.html';player.stage.append(iframe);await loaded;if(stopped)return;
+  iframe.src='netplay/runtime.html';player.stage.append(iframe);await loaded;if(stopped||ownedEpoch!==runEpoch)return;
   if(!iframe.contentWindow.th02RuntimeReady)throw Error('游戏页面版本不匹配，请刷新所有页面');
   if(!await iframe.contentWindow.th02RuntimeReady)throw Error('游戏模块加载失败，详情见游戏页面');
-  if(stopped)return;
+  if(stopped||ownedEpoch!==runEpoch)return;
   runtime=iframe.contentWindow.th02Sync;if(!runtime)throw Error('游戏模块没有就绪');
   runtime.setMusicVolume(Number(musicVolume.value)/100);
   runtime.configure(state.slots.host,state.slots[session.role],state.settings.players);
@@ -741,9 +787,10 @@ async function beginGame(){
   runtime.updateControls(controlSnapshot(),controlEditor.isEditing());
   runtime.onInput(value=>{childBits=value;observeInput();wake();});runtime.onMenuAction(value=>{pendingAction|=value;observeInput();wake();});
   // Extra uses its native rank selected by stage; the launcher rank byte is 0–3.
-  localReady=await runtime.load({...state.settings,difficulty:state.settings.difficulty===4?1:state.settings.difficulty});if(stopped){runtime.stop();return;}
+  localReady=await runtime.load({...state.settings,difficulty:state.settings.difficulty===4?1:state.settings.difficulty});if(stopped||ownedEpoch!==runEpoch)return;
   await replayRecorder.boot({settings:{...state.settings,difficulty:state.settings.difficulty===4?1:state.settings.difficulty},players:state.settings.players,hostSlot:state.slots.host,opening:localReady});
-  if(session.role==='host')replayRecorder.connectNetwork({room:session.room,token:session.token,generation:state.generation});
+  if(stopped||ownedEpoch!==runEpoch)return;
+  if(session.role==='host')replayRecorder.connectNetwork({room:session.room,token:session.token,generation:state.generation,runId:state.runId});
   for(const peer of peers.values())if(peer.channel?.readyState==='open')send(peer,{type:'ready',build:localReady});maybeRun();
 }
 function maybeRun(){
@@ -814,10 +861,12 @@ function armRollback(){
   const frame=queue.frame+120;queue.arm(frame);broadcast({type:'rollback',frame});
 }
 async function confirmFrames(){
+  const ownedEpoch=runEpoch;
   const before=performance.now();
   const prefix=Math.min(queue.frame,queue.confirmed);
   const outcome=runtime.confirmQueued?undefined:await runtime.confirm(prefix);
-  runtime.confirmQueued?.(prefix,finishGame);
+  if(stopped||ownedEpoch!==runEpoch)return;
+  runtime.confirmQueued?.(prefix,()=>{if(!stopped&&ownedEpoch===runEpoch)finishGame();});
   replayRecorder.confirm(prefix,queue.dirty!==null);
   if(outcome==='exit'){finishGame();return;}
   if(stopped)return;
@@ -832,6 +881,7 @@ async function confirmFrames(){
   costs.confirm+=performance.now()-before;
 }
 async function simulate(pair,replay){
+  const ownedEpoch=runEpoch;
   const before=performance.now();
   const frame=queue.frame;
   const capture=queue.active&&frame>=queue.confirmed;
@@ -842,7 +892,7 @@ async function simulate(pair,replay){
   nativeBusy=true;
   if(runtime.asyncExecution)await runtime.execute(pair,{frame,replay,offlineMask:queue.offlineMask(frame),capture,hash:(frame+1)%120===0});
   else runtime.step(pair,{frame,replay,offlineMask:queue.offlineMask(frame)});
-  if(stopped){completeNativeBoundary();return;}
+  if(stopped||ownedEpoch!==runEpoch)return;
   replayRecorder.stage(frame,{inputs:pair,offlineMask:queue.offlineMask(frame),proof:runtime.replayProof(),hash:(frame+1)%120===0?runtime.checksum():null});
   queue.commit(pair);
   // Inputs can arrive while a Worker owns this step. Include its actual
@@ -944,6 +994,7 @@ function updateMetrics(now,waiting){
 }
 async function pump(now){
   if(!running||stopped||pumping)return;
+  const ownedEpoch=runEpoch;
   // Message/timer wakes can run before an rAF carrying an older timestamp.
   // Never move the elapsed-time baseline backward and count that time twice.
   now=Math.max(now,lastNow);
@@ -969,7 +1020,7 @@ async function pump(now){
       const from=queue.dirty;replayUntil=Math.max(replayUntil,queue.frame);
       maxRewind=Math.max(maxRewind,replayUntil-from);rollbackCount++;
       const restoreAt=performance.now();
-      nativeBusy=true;await runtime.restore(from);if(stopped)return;replayRecorder.rewind(from);queue.rewind(from);
+      nativeBusy=true;await runtime.restore(from);if(stopped||ownedEpoch!==runEpoch)return;replayRecorder.rewind(from);queue.rewind(from);
       // A still earlier input can arrive during restore, before rewind clears
       // the old correction marker. Reconcile the retained completed history.
       if(runtime.asyncExecution&&queue.active)queue.refreshCorrection(true);
@@ -983,7 +1034,7 @@ async function pump(now){
       if(runtime.asyncExecution){
         if(!plans.length){waiting=true;nextInputs();break;}
         const replayAt=performance.now();nativeBusy=true;
-        const outcome=await runtime.replaySlice(queue.frame,plans);if(stopped)return;
+        const outcome=await runtime.replaySlice(queue.frame,plans);if(stopped||ownedEpoch!==runEpoch)return;
         if(!Number.isInteger(outcome?.applied)||outcome.applied<0||outcome.applied>plans.length||!Array.isArray(outcome.records)||outcome.records.length!==outcome.applied)throw Error('Worker 回滚补算返回边界异常');
         for(let index=0;index<outcome.applied;index++){
           const plan=plans[index],record=outcome.records[index];
@@ -1003,14 +1054,14 @@ async function pump(now){
       }else{
         const pair=nextInputs();if(!pair){waiting=true;break;}
         endWait();const replayAt=performance.now();
-        await simulate(pair,queue.frame+1<replayUntil);if(stopped)return;resimulated++;count++;
+        await simulate(pair,queue.frame+1<replayUntil);if(stopped||ownedEpoch!==runEpoch)return;resimulated++;count++;
         costs.replay+=performance.now()-replayAt;costs.replays++;
       }
       if(queue.dirty!==null||membership)break;
     }
     // Never confirm or present a branch that changed while the worker ran.
     if(queue.dirty!==null||membership){wake();return;}
-    await confirmFrames();if(stopped)return;
+    await confirmFrames();if(stopped||ownedEpoch!==runEpoch)return;
     if(queue.dirty!==null||membership){wake();return;}
     if(queue.frame<replayUntil){
       if(waiting&&!waitingSince)waitingSince=performance.now();
@@ -1020,12 +1071,12 @@ async function pump(now){
       captureLocalInput();
       const pair=nextInputs();if(!pair){waiting=true;break;}
       endWait();
-      await simulate(pair,false);if(stopped)return;
+      await simulate(pair,false);if(stopped||ownedEpoch!==runEpoch)return;
       const after=performance.now();
       const at=captureTimes.get(queue.frame-1);if(pair[queue.slot]!==lastApplied&&at)inputAge=after-at;
       lastApplied=pair[queue.slot];captureTimes.delete(queue.frame-1);accumulator-=TICK_MS;count++;
       if(queue.dirty!==null||membership)break;
-      await confirmFrames();if(stopped)return;
+      await confirmFrames();if(stopped||ownedEpoch!==runEpoch)return;
       if(queue.dirty!==null||membership)break;
     }
     if(queue.dirty!==null||membership){wake();return;}
@@ -1037,7 +1088,7 @@ async function pump(now){
     // Native execution time counts toward this tick's budget. The old timer
     // waited another full interval after a 15 ms step, reducing throughput.
     wake(waiting?16:Math.max(0,TICK_MS-accumulator-(after-lastNow)));
-  }catch(error){fail(error);}finally{nativeBusy=false;pumping=false;}
+  }catch(error){if(ownedEpoch===runEpoch)fail(error);}finally{if(ownedEpoch===runEpoch){nativeBusy=false;pumping=false;}}
 }
 const focusSettings=mountFocusSettings($('control-settings'),{alwaysPointControl:player.alwaysPointControl});
 const controlEditor=mountControlSettings($('control-settings'),{
