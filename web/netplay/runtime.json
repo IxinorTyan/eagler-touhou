@@ -29,7 +29,7 @@
   "controls_sha256": "45488e160ccd0025de6861b70a661e923c773aac55f3eade39d4ea86c2bbd879",
   "pause_sha256": "92977ae14ace41e7d47a27a565cd9786fa71b236e97fe510b33bd7ae1a44ccb3",
   "native_sound": {
-    "disk_sha256": "ecea60e928bc1a283e598afa5d68a32d1240b19da700272ef9cdaf96025e4870",
+    "disk_sha256": "bf178e2d3f90732cfa840ea2ed4192abc4abe673116534db2b2561899281c068",
     "bgm": 0,
     "se": 1,
     "schema": 2,
@@ -139,7 +139,7 @@
   },
   "native_sound_by_language": {
     "cn": {
-      "disk_sha256": "ecea60e928bc1a283e598afa5d68a32d1240b19da700272ef9cdaf96025e4870",
+      "disk_sha256": "bf178e2d3f90732cfa840ea2ed4192abc4abe673116534db2b2561899281c068",
       "bgm": 0,
       "se": 1,
       "schema": 2,
@@ -248,7 +248,7 @@
       }
     },
     "jp": {
-      "disk_sha256": "9832e8af1fc8a296d18174931d42d09b2e93ce528da3daf5c5392d31195e2a2e",
+      "disk_sha256": "3291109ed7ff0efbbb61ef0419f0b5a14b20cd4ef9113f107194a5a92ea6fcf2",
       "bgm": 0,
       "se": 1,
       "schema": 2,
@@ -375,7 +375,7 @@
   "projectile_art_sha256": "7465bfdfdd38367a559cec8b825012242d396027a68e040b082d82f45c753ac8",
   "external_sound_by_language": {
     "cn": {
-      "disk_sha256": "ecea60e928bc1a283e598afa5d68a32d1240b19da700272ef9cdaf96025e4870",
+      "disk_sha256": "bf178e2d3f90732cfa840ea2ed4192abc4abe673116534db2b2561899281c068",
       "bgm": 0,
       "se": 1,
       "schema": 3,
@@ -581,7 +581,7 @@
       }
     },
     "jp": {
-      "disk_sha256": "9832e8af1fc8a296d18174931d42d09b2e93ce528da3daf5c5392d31195e2a2e",
+      "disk_sha256": "3291109ed7ff0efbbb61ef0419f0b5a14b20cd4ef9113f107194a5a92ea6fcf2",
       "bgm": 0,
       "se": 1,
       "schema": 3,
