@@ -34,5 +34,18 @@ try{
  assert.deepEqual(terminalInputs,[continued],'terminal input still reaches the live guest at its original boundary');
  assert.equal(terminalChunks.flatMap(chunk=>chunk.events||[]).length,0,'continue confirmation is excluded from the terminal replay');
  assert.equal(terminalEnd?.endReason,'clear','terminal reason reaches the saved replay metadata');
+ const playbackClocks=new Uint8Array(18),clockView=new DataView(playbackClocks.buffer);
+ for(let n=0;n<2;n++){clockView.setUint8(n*9,2);clockView.setFloat64(n*9+1,1000+n*24,true);}
+ let observed=0,played=null;
+ const playback=createExternalReplayHost({mode:'playback',clocks:playbackClocks,endBoundary:1,
+  observe:()=>{observed++;return 'end';},inspect:()=>({guestHash:'read-only'}),
+  applyInput:()=>assert.fail('no input in this fixture'),onEnd:r=>played=r,onError:e=>errors.push(e)});
+ const replayImports={env:{initTimeoutSyncSleep(){},__asyncjs__syncSleep(){}}};
+ playback.attach({},replayImports);replayImports.env.initTimeoutSyncSleep();
+ replayImports.env.__asyncjs__syncSleep(0,1);
+ await new Promise(resolve=>setTimeout(resolve,5));
+ assert.equal(observed,1,'playback refreshes native display ownership before final inspection');
+ assert.equal(played?.guestHash,'read-only');assert.equal(played?.clockCount,2);
+ assert.deepEqual(errors,[]);
  console.log('PASS optional hashing never holds player continuation; terminal input stays live and outside the replay');
 }finally{if(NativeSuspending)WebAssembly.Suspending=NativeSuspending;else delete WebAssembly.Suspending;}

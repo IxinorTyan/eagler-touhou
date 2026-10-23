@@ -65,7 +65,7 @@ export function createExternalReplayHost({mode,clocks,events=[],endBoundary,endR
           for(const command of batch)applyInput(command);
           const next=wake;wake=null;next();return;
         }
-      }
+      }else observe?.(boundary);
       if(mode==='record'){
         const batch=queued;queued=[];
         for(const command of batch)applyInput(command);

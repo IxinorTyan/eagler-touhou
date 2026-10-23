@@ -25,7 +25,7 @@ globalThis.installFramePresenter = function installFramePresenter(mod, mode = 'd
     precision mediump float; varying vec2 texcoord; uniform sampler2D image;
     uniform vec3 sidebarBlack; uniform bool normalizeSidebar;
     uniform vec2 hitpoint1; uniform vec2 hitpoint2; uniform vec2 hitpoint3; uniform vec2 frameSize;
-    uniform sampler2D personalHud;
+    uniform sampler2D personalHud; uniform sampler2D bossHud; uniform float bossHudTop;
     void main(){
       vec3 rgb=texture2D(image,texcoord).rgb;
       if(normalizeSidebar && texcoord.x>=0.7 && texcoord.x<0.9 &&
@@ -42,7 +42,13 @@ globalThis.installFramePresenter = function installFramePresenter(mod, mode = 'd
         else if(pixel.x>=272.0&&pixel.x<400.0)
           hud=texture2D(personalHud,vec2((pixel.x+0.5-272.0+128.0)/256.0,texcoord.y));
       }
-      gl_FragColor=vec4(mix(rgb,hud.rgb,hud.a),1.0);
+      rgb=mix(rgb,hud.rgb,hud.a);
+      if(frameSize.x==640.0&&frameSize.y==400.0&&bossHudTop>=0.0&&
+         pixel.x>=448.0&&pixel.x<576.0&&pixel.y>=bossHudTop&&pixel.y<bossHudTop+32.0){
+        vec4 boss=texture2D(bossHud,vec2((pixel.x+0.5-448.0)/128.0,(pixel.y+0.5-bossHudTop)/32.0));
+        rgb=mix(rgb,boss.rgb,boss.a);
+      }
+      gl_FragColor=vec4(rgb,1.0);
     }`);
   const program = gl.createProgram();
   gl.attachShader(program, vs); gl.attachShader(program, fs); gl.linkProgram(program);
@@ -70,6 +76,11 @@ globalThis.installFramePresenter = function installFramePresenter(mod, mode = 'd
   for(const [parameter,value]of [[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE],[gl.TEXTURE_MIN_FILTER,gl.NEAREST],[gl.TEXTURE_MAG_FILTER,gl.NEAREST]])gl.texParameteri(gl.TEXTURE_2D,parameter,value);
   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4));
   let hudRevision=-1;
+  const bossSampler=gl.getUniformLocation(program,'bossHud'),bossTop=gl.getUniformLocation(program,'bossHudTop'),bossTexture=gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D,bossTexture);
+  for(const [parameter,value]of [[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE],[gl.TEXTURE_MIN_FILTER,gl.NEAREST],[gl.TEXTURE_MAG_FILTER,gl.NEAREST]])gl.texParameteri(gl.TEXTURE_2D,parameter,value);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4));
+  let bossRevision=-1;
   let width = 0, height = 0;
   let current=null,pending=false;
   function drawCurrent(){
@@ -112,6 +123,13 @@ globalThis.installFramePresenter = function installFramePresenter(mod, mode = 'd
     if(hud&&hud.revision!==hudRevision){
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false);
       gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,hud.canvas);hudRevision=hud.revision;
+    }
+    gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,bossTexture);gl.uniform1i(bossSampler,2);
+    const boss=mod.getBossHud?.();
+    gl.uniform1f(bossTop,boss?.visible?boss.top:-32);
+    if(boss&&boss.revision!==bossRevision){
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,boss.canvas);bossRevision=boss.revision;
     }
     gl.activeTexture(gl.TEXTURE0);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
