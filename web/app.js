@@ -111,7 +111,7 @@ setInterval(()=>{
     predictionLead:Math.max(0,(sync?.queue.frame??0)-(sync?.queue.confirmed??0)),directionPrediction:sync?.queue.directionPrediction??null,
     inputDelay:sync?.queue.inputDelay??null,bootInputDelay:sync?.queue.bootDelay??null,inputPolicy:netplay?.inputPolicy??null,
     startupRttSamples:netplay?.rttSamples??null,
-    predictionLeadLimit:sync?.queue.active?Math.max(1,sync.queue.directionPrediction):0,
+    predictionLeadLimit:sync?.queue.active?sync.queue.predictionLead:0,
     phase:nativeState?.phase??0,selecting:nativePause?.selecting??false,pauseSeat,hiddenSeats:[...hiddenSeats],documentHidden:document.hidden,
     nativeMaxMs:emulator.module.stepMetrics?.maxMs??0,program:emulator.module.programReads?.at(-1)?.name??null,
     snapshotStorage:emulator.module.netSnapshotInfo?.().storage??'disabled',writeJournal:emulator.module.mobileRuntime.writeJournal,heapBytes:emulator.module.HEAPU8?.length??emulator.module.heapBytes,
@@ -638,7 +638,7 @@ $('start').addEventListener('click', async () => {
       replayRecorder=createRecorder($('screen').querySelector('.player-toolbar'));globalThis.th03Replay=replayRecorder;
       await replayRecorder.boot({settings:{language:activeLang,difficulty:$('difficulty').value,clock:$('clock').value,rollback:rollbackEnabled,focusEnabled:roomFocusEnabled,touchUnlimitedAllowed:roomTouchUnlimitedAllowed,hostSeat:roomHostSeat},players:2,hostSlot:roomHostSeat,opening:syncIdentity});
       if(netQuery.get('role')==='host')replayRecorder.connectNetwork({room:netQuery.get('room'),token:netQuery.get('token'),runId:Number(netQuery.get('runId'))});
-      const options={recorder:replayRecorder,proof:()=>battleProof(emulator,nativePause,controls,nativeMusic,pauseSeat,pauseSelection,hiddenSeats),network:netplay,rollbackEnabled,inputDelay:inputPolicy.inputDelay,snapshotStride:2,onError:report,onState:message=>status(message)};
+      const options={recorder:replayRecorder,proof:()=>battleProof(emulator,nativePause,controls,nativeMusic,pauseSeat,pauseSelection,hiddenSeats),network:netplay,rollbackEnabled,inputDelay:inputPolicy.inputDelay,predictionLead:inputPolicy.predictionLead,snapshotStride:2,onError:report,onState:message=>status(message)};
       sync=emulator.isNetworkWorker?new AsyncLockstep({...options,execute:(inputs,frame)=>emulator.execute(inputs,frame),replaySlice:(frame,plans)=>emulator.replaySlice(frame,plans),restore:frame=>emulator.restore(frame),
         confirmQueued:(prefix,retain)=>emulator.confirmQueued(prefix,retain),present:()=>emulator.present(presentationDue)})
         :new Lockstep({...options,step:stepSynchronized,present:()=>{if(presentationDue(performance.now()))presentFrame();},hash:syncHash,capture:captureSynchronized,restore:restoreSynchronized,confirm:confirmSynchronized});

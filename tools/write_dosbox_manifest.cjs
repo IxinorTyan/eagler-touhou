@@ -44,7 +44,7 @@ function write() {
       .map(name => 'vendor/dosbox-x/' + name),
   ];
   const network = {
-    protocol:'th03-rollback/6', tickHz:60, epoch:946684800000,
+    protocol:'th03-rollback/7', tickHz:60, epoch:946684800000,
     adapter:'dosbox-x-full-asyncify-v1', dispatch:'dosbox-x-simple', cpu_cycles:16000,snapshotStride:2,
     native_sound:{bgm:0,se:0,schema:3,config_bgm_mode:1,mute:'network PCM output',se_part:15,
       effects:'confirmed-local-waveforms',bridge:'network-audio.json'}, files:{},

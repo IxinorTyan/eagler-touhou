@@ -10,10 +10,24 @@ from urllib.parse import parse_qs, urlparse
 HUBS, HUB_LOCK = {}, threading.RLock()
 ACTIONS = {'up', 'down', 'left', 'right', 'shot', 'rapid', 'attack', 'focus'}
 
+def valid_input_policy(value):
+    if not isinstance(value, dict) or type(value.get('rollbackEnabled')) is not bool:
+        return False
+    if any(type(value.get(key)) is not int for key in ('schema', 'rttMs', 'transitSteps', 'inputDelay', 'predictionSteps', 'predictionLead')):
+        return False
+    rtt, enabled = value['rttMs'], value['rollbackEnabled']
+    if not 0 <= rtt <= 60000:
+        return False
+    transit = (rtt*3+99)//100 if enabled and rtt > 20 else 0
+    prediction = min(2, max(0, transit-1))
+    return value == {'schema': 2, 'rollbackEnabled': enabled, 'rttMs': rtt, 'transitSteps': transit,
+                     'inputDelay': min(6, transit-prediction), 'predictionSteps': prediction,
+                     'predictionLead': prediction+2 if enabled else 0}
+
 def valid_message(message):
     if not isinstance(message, dict):
         return False
-    if message.get('sync') == 'th03-rollback/6':
+    if message.get('sync') == 'th03-rollback/7':
         kind = message.get('type')
         if kind == 'sync-ready':
             return isinstance(message.get('identity'), dict)
@@ -25,12 +39,7 @@ def valid_message(message):
                 and type(value.get('rttMs')) is int and type(value.get('maxRttMs')) is int \
                 and 0 <= value['rttMs'] <= value['maxRttMs'] <= 60000
         if kind in ('buffer-policy', 'buffer-ack'):
-            value = message.get('policy')
-            return isinstance(value, dict) and type(value.get('schema')) is int and value['schema'] == 1 \
-                and type(value.get('rollbackEnabled')) is bool \
-                and type(value.get('rttMs')) is int and 0 <= value['rttMs'] <= 60000 \
-                and type(value.get('inputDelay')) is int and 0 <= value['inputDelay'] <= 6 \
-                and (value['rollbackEnabled'] or value['inputDelay'] == 0)
+            return valid_input_policy(message.get('policy'))
         if kind == 'rollback':
             return type(message.get('frame')) is int and 0 <= message['frame'] < 2**53
         if kind == 'check':

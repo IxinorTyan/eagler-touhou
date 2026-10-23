@@ -106,7 +106,7 @@ export class Netplay {
       this.sendPacket({type:'buffer-ack',policy:expected});
     }
     this.inputPolicy=Object.freeze(expected);
-    this.onState(rollbackEnabled?`双方输入缓冲 ${expected.inputDelay} 帧（约 ${Math.round(expected.inputDelay*1000/60)} ms）· 开局 RTT ${expected.rttMs} ms`:'回滚关闭 · 使用 2 帧确认锁步');
+    this.onState(rollbackEnabled?`双方输入缓冲 ${expected.inputDelay} 帧（约 ${Math.round(expected.inputDelay*1000/60)} ms）· 预测预算 ${expected.predictionSteps} 帧 · 领先上限 ${expected.predictionLead} 帧 · 开局 RTT ${expected.rttMs} ms`:'回滚关闭 · 使用 2 帧确认锁步');
     return this.inputPolicy;
   }
   setPacketHandler(handler){

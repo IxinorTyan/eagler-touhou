@@ -33,15 +33,19 @@
     "snapshotScan": "adaptive-word8",
     "gameplayAccepted": false,
     "inputPolicy": {
-      "mode": "room-rtt-fixed",
+      "mode": "room-rtt-hybrid",
       "minInputDelay": 0,
       "maxInputDelay": 6,
       "zeroDelayRttMs": 20,
       "rttSamples": 3,
       "directionPrediction": 6,
-      "maxPredictionLead": 6,
+      "maxPredictionLead": 4,
       "maxRollback": 12,
-      "lockstepBootDelay": 2
+      "lockstepBootDelay": 2,
+      "schedulingMarginSteps": 0,
+      "policySchema": 2,
+      "hybridReserveSteps": 2,
+      "predictionJitterSteps": 2
     }
   },
   "presentation": {
@@ -66,7 +70,7 @@
     "LICENSE": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
     "NOTICE.md": "39fe71fe22fd9ab82192f39715b372a3345713f660fb51ff41cfebb2aff00eee",
     "audio-worklet.js": "e1e8912f986479b1926cca0d8342f6b504defca873d3a51aac1172e5fbbf4c5d",
-    "core-build.json": "5e0a859f5ef763d6904cd43f073ca437e970dd447d44bedad482d4d6cc8a35fc",
+    "core-build.json": "dad611bdc5d3970a5841d16b3917a6cbeb938cac805ba7707fb230108ceb0e71",
     "dosbox-jspi.mjs": "b762346410a2ca8d66af37a6e48024bb8b28376bbb83d3b84020f305e94a677e",
     "dosbox-rollback-tracked.mjs": "6519cdb4b4d0bef1b63e534d5f25f3de2124c1859b5783462120d8147b6ee5aa",
     "dosbox-rollback.mjs": "6413468063aab490225edaf90d0fc5af42675ab83220f599bb45c5b78e4dc7dd",

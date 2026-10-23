@@ -70,11 +70,11 @@
     "controls.js": "ab98a2e219bcc6cb76aac6cabce326cf58ecd03a6cee05a9b2370565b5b510ca",
     "fire-control.js": "5a97f636996386694884cf110c20db9478df19e00b7ab79de0e3ac915f123c2f",
     "native-music.js": "fdbb791ca9e5b7c920ab1b4fd9cce6c18163ed5a4a676c1b8739d139a6d22b4e",
-    "lockstep.js": "33c2c95d791b8e574416df513608bc8987601d558130b9df4d8034949e1bca0d",
+    "lockstep.js": "7294c1ef065cc27ddf491285d9b205117b20ed2dd1efde1c4ef7e46fe3c651db",
     "dosbox-disk.js": "37ebddc4bfe02cfb3d53bfaee5cde69efbc1a63d8b1c4672332b18fdf0860694",
-    "frame-queue.js": "d43ce95ddad787c0f61e829b972b06d51c11a017c3ef24a3c1b904fa00bea962",
-    "netplay.js": "1010278324b54b540c697577a430c35ff8c29cb4f6632b92ac8b08f50e2bc32c",
-    "netplay/input-policy.js": "502fdd94b0d43b6ba633596d812c6b319f9d44f96c0508d30a97eecca88a234b",
+    "frame-queue.js": "38e42220c06cd820254cf804c1ac25140ddc3b74a67338c84c712535188ce514",
+    "netplay.js": "8f39c1c80aa277bf62a742e90c88f532059966f01b8a1e236a44d0d411737ac0",
+    "netplay/input-policy.js": "82b449760fcb066099c6e7bfb639f8c84a62270a1f9b711a372f1cca90afd2f7",
     "native-pause.js": "76c91720c9358efd910382c2fabe0a7a0d454a9df106a64014adaf6a9101cf4f",
     "netplay/async-lockstep.js": "2afb38800e11ffaddbdc39f272a0e8b24649347cd07d6a9fb1e4f9b296289fb7",
     "netplay/frame-controls.js": "36ab58422ec4814c3002da3ea269bd68ce4cc433883fcd78d0eb5ca80f7c17c4",
@@ -155,15 +155,19 @@
     }
   },
   "inputPolicy": {
-    "mode": "room-rtt-fixed",
+    "mode": "room-rtt-hybrid",
     "minInputDelay": 0,
     "maxInputDelay": 6,
     "zeroDelayRttMs": 20,
     "rttSamples": 3,
     "directionPrediction": 6,
-    "maxPredictionLead": 6,
+    "maxPredictionLead": 4,
     "maxRollback": 12,
-    "lockstepBootDelay": 2
+    "lockstepBootDelay": 2,
+    "schedulingMarginSteps": 0,
+    "policySchema": 2,
+    "hybridReserveSteps": 2,
+    "predictionJitterSteps": 2
   },
   "bridgeLifecycle": {
     "version": 1,

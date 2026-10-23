@@ -2,7 +2,7 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict'),{spawnSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..'),web=path.join(root,'web'),read=name=>fs.readFileSync(path.join(web,name)),sha=b=>crypto.createHash('sha256').update(b).digest('hex');
 const runtime=JSON.parse(read('vendor/dosbox-x/runtime.json')),network=JSON.parse(read('lockstep-runtime.json'));
-assert.equal(network.protocol,'th03-rollback/6');assert.equal(network.cpu_cycles,16000);assert.equal(network.snapshotStride,2);
+assert.equal(network.protocol,'th03-rollback/7');assert.equal(network.cpu_cycles,16000);assert.equal(network.snapshotStride,2);
 for(const [name,hash]of Object.entries(network.files))assert.equal(sha(read(name)),hash,'Network fingerprint '+name);
 for(const [name,hash]of Object.entries(runtime.files))assert.equal(sha(read('vendor/dosbox-x/'+name)),hash,'Core fingerprint '+name);
 const buildPath=path.join(web,'vendor/dosbox-x/core-build.json');
@@ -19,7 +19,7 @@ if(build){
  for(const [key,value]of Object.entries(build.releaseProfile))assert.equal(runtime.network[key],value,'Native profile '+key);
  assert.equal(network.snapshotScan,build.snapshotScan);
  if(build.inputPolicy){
-  assert.deepEqual(build.inputPolicy,{mode:'room-rtt-fixed',minInputDelay:0,maxInputDelay:6,zeroDelayRttMs:20,rttSamples:3,directionPrediction:6,maxPredictionLead:6,maxRollback:12,lockstepBootDelay:2});
+  assert.deepEqual(build.inputPolicy,{mode:'room-rtt-hybrid',minInputDelay:0,maxInputDelay:6,zeroDelayRttMs:20,rttSamples:3,directionPrediction:6,maxPredictionLead:4,maxRollback:12,lockstepBootDelay:2,schedulingMarginSteps:0,policySchema:2,hybridReserveSteps:2,predictionJitterSteps:2});
   assert.deepEqual(network.inputPolicy,build.inputPolicy);assert.deepEqual(runtime.network.inputPolicy,build.inputPolicy);
  }
  if(build.networkWorker){

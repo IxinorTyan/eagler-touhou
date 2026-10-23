@@ -1,10 +1,10 @@
 import {FrameQueue,TICK_MS,DIRECTION_PREDICTION} from './frame-queue.js';
 export class Lockstep {
-  constructor({network,step,present,hash,onError,onState,capture,restore,confirm,recorder,proof,rollbackEnabled=false,directionPrediction=DIRECTION_PREDICTION,inputDelay=0,snapshotStride=1}){
+  constructor({network,step,present,hash,onError,onState,capture,restore,confirm,recorder,proof,rollbackEnabled=false,directionPrediction=DIRECTION_PREDICTION,predictionLead=directionPrediction,inputDelay=0,snapshotStride=1}){
     if(!Number.isInteger(snapshotStride)||snapshotStride<1||snapshotStride>2)throw Error('无效回滚检查点间隔');
     Object.assign(this,{network,step,present,hash,onError,onState,capture,restore,confirm,recorder,proof,rollbackEnabled,snapshotStride});
     this.checkpoints=new Set();this.lastConfirmation=null;
-    this.queue=new FrameQueue(network.localSeat,{rollbackEnabled,directionPrediction,inputDelay});this.hashes=new Map();this.remoteHashes=new Map();this.pendingHashes=new Map();
+    this.queue=new FrameQueue(network.localSeat,{rollbackEnabled,directionPrediction,predictionLead,inputDelay});this.hashes=new Map();this.remoteHashes=new Map();this.pendingHashes=new Map();
     this.costs={simulate:0,steps:0,capture:0,captures:0,restore:0,restores:0,hash:0,confirm:0,confirmCallbacks:0,skippedConfirmations:0,replays:0};
     this.running=false;this.applying=false;this.last=0;this.budget=0;this.lastProgress=performance.now();this.replayUntil=null;
     this.timer=null;this.wakeTimer=null;this.wakePending=false;this.wakeToken=0;this.frameHandle=null;this.pumping=false;
@@ -78,10 +78,10 @@ export class Lockstep {
     },Math.max(0,delay));
   }
   nextInputs(repairing=false){
-    // Bound new speculative work to the useful direction prediction horizon.
+    // Bound new speculative work to the separately negotiated lead budget.
     // Historical repair must still reach its old frontier; peek retains the
     // independent 12-frame safety window and authoritative-input checks.
-    const queue=this.queue,limit=Math.max(1,queue.directionPrediction);
+    const queue=this.queue,limit=Math.max(1,queue.predictionLead);
     if(!repairing&&queue.active&&queue.frame-queue.confirmed>=limit){
       queue.waitReason='prediction-lead';return null;
     }

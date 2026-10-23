@@ -12,11 +12,12 @@ export function validInput(input){
 }
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 export class FrameQueue {
-  constructor(slot,{rollbackEnabled=false,directionPrediction=DIRECTION_PREDICTION,inputDelay=INPUT_DELAY}={}){
+  constructor(slot,{rollbackEnabled=false,directionPrediction=DIRECTION_PREDICTION,predictionLead=directionPrediction,inputDelay=INPUT_DELAY}={}){
     if(![0,1].includes(slot)||typeof rollbackEnabled!=='boolean'||!Number.isInteger(directionPrediction)||directionPrediction<0||directionPrediction>MAX_ROLLBACK||!Number.isInteger(inputDelay)||inputDelay<0||inputDelay>6||(!rollbackEnabled&&inputDelay!==0))throw Error('无效预测策略');
+    if(!Number.isInteger(predictionLead)||predictionLead<0||predictionLead>MAX_ROLLBACK)throw Error('无效预测领先额度');
     // Choose before sampling. Starting with at least this much neutral input
     // avoids a hole when the future activation switches to rollback timing.
-    Object.defineProperties(this,{inputDelay:{value:inputDelay,enumerable:true},bootDelay:{value:Math.max(BOOT_DELAY,inputDelay),enumerable:true}});
+    Object.defineProperties(this,{inputDelay:{value:inputDelay,enumerable:true},predictionLead:{value:predictionLead,enumerable:true},bootDelay:{value:Math.max(BOOT_DELAY,inputDelay),enumerable:true}});
     this.slot=slot;this.rollbackEnabled=rollbackEnabled;this.directionPrediction=directionPrediction;this.frame=0;this.confirmed=this.bootDelay;
     this.activation=null;this.dirty=null;this.waitReason='';this.inputs=[new Map(),new Map()];this.used=new Map();
     for(const lane of this.inputs)for(let n=0;n<this.bootDelay;n++)lane.set(n,neutral());
