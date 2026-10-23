@@ -51,6 +51,7 @@ function scan04(now){
     }
     cursor=end;
   }
+  emulator.module.sidebarPaletteAddress=mailbox<0?-1:mailbox-patch.mailbox_cs_offset+(patch.data_segment-patch.code_segment)*16+0x2a82;
   if(mailbox<0)return null;
   const at=mailbox,data=at-patch.mailbox_cs_offset+(patch.data_segment-patch.code_segment)*16;
   return {at,mode:h[at+22],flags:h[at+23],generation:v.getUint16(at+24,true),ticks:v.getUint32(at+16,true),pointOptions:h[at+26],

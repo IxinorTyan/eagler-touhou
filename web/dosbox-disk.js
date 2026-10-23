@@ -7,7 +7,7 @@ export function extractGame(disk){
     const stem=decode.decode(disk.subarray(at,at+8)).trim(),ext=decode.decode(disk.subarray(at+8,at+11)).trim();if(stem==='.'||stem==='..')continue;
     const name=parent+stem+(ext?'.'+ext:'');
     if(attr&16){if(name==='GENSO')walk(fat.chain(fat.view.getUint16(at+26,true)).map(c=>[fat.offset(c),fat.clusterSize]),name+'/');}
-    else if(name.startsWith('GENSO/')||name==='COOP.COM'){files.push({path:'game/'+name,contents:fat.view.getUint32(at+28,true)?fat.read(at):new Uint8Array()});entries.set(name,at);}
+    else if(name.startsWith('GENSO/')||name==='COOP.COM'||name==='NBHUD.BIN'){files.push({path:'game/'+name,contents:fat.view.getUint32(at+28,true)?fat.read(at):new Uint8Array()});entries.set(name,at);}
   }}
   walk([[fat.root,fat.rootSize]],'');
   if(!entries.has('GENSO/MAIN.EXE')||!entries.has('GENSO/GAME.BAT'))throw Error('TH04 游戏文件缺失');

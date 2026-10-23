@@ -17,8 +17,21 @@ export function installFramePresenter(mod,{deferred=false,isReplaying=()=>false}
   const vs=shader(gl.VERTEX_SHADER,`
     attribute vec2 position; attribute vec2 uv; varying vec2 texcoord;
     void main(){gl_Position=vec4(position,0.0,1.0);texcoord=uv;}`);
+  // The cooperative native HUD clears graphics to palette index zero.
+  // Orange/Elly deliberately recolor that entry during battle. TRAM black
+  // spaces conceal it, so sampling a fixed pixel cannot identify the color
+  // behind visible text. Read the bound guest palette instead.
+  const sidebarShader=`
+    uniform bool normalizeSidebar; uniform vec3 sidebarBackground;
+    vec3 sidebarRgb(vec3 rgb){
+      if(normalizeSidebar&&texcoord.x>=0.7&&texcoord.x<0.9){
+        if(all(lessThan(abs(rgb-sidebarBackground),vec3(0.0001))))return vec3(0.0);
+      }
+      return rgb;
+    }`;
   const fs=shader(gl.FRAGMENT_SHADER,overlays?`
     precision mediump float; varying vec2 texcoord; uniform sampler2D image;
+    ${sidebarShader}
     uniform sampler2D personalHud; uniform vec2 frameSize;
     uniform vec2 hitpoint1; uniform vec2 hitpoint2; uniform vec2 hitpoint3;
     vec3 marker(vec3 rgb,vec2 pixel,vec2 point){
@@ -26,7 +39,7 @@ export function installFramePresenter(mod,{deferred=false,isReplaying=()=>false}
       return edge<=2.0?(edge<=1.0?vec3(1.0):vec3(0.0)):rgb;
     }
     void main(){
-      vec3 rgb=texture2D(image,texcoord).rgb;vec2 pixel=floor(texcoord*frameSize);
+      vec3 rgb=sidebarRgb(texture2D(image,texcoord).rgb);vec2 pixel=floor(texcoord*frameSize);
       if(pixel.x>=32.0&&pixel.x<416.0&&pixel.y>=16.0&&pixel.y<384.0){
         rgb=marker(rgb,pixel,hitpoint1);rgb=marker(rgb,pixel,hitpoint2);rgb=marker(rgb,pixel,hitpoint3);
       }
@@ -40,12 +53,15 @@ export function installFramePresenter(mod,{deferred=false,isReplaying=()=>false}
       gl_FragColor=vec4(mix(rgb,hud.rgb,hud.a),1.0);
     }`:`
     precision mediump float; varying vec2 texcoord; uniform sampler2D image;
-    void main(){gl_FragColor=vec4(texture2D(image,texcoord).rgb,1.0);}`);
+    ${sidebarShader}
+    void main(){gl_FragColor=vec4(sidebarRgb(texture2D(image,texcoord).rgb),1.0);}`);
   const program=gl.createProgram();gl.attachShader(program,vs);gl.attachShader(program,fs);gl.linkProgram(program);
   gl.deleteShader(vs);gl.deleteShader(fs);
   if(!gl.getProgramParameter(program,gl.LINK_STATUS)){const message=gl.getProgramInfoLog(program);gl.deleteProgram(program);throw Error(message);}
   const position=gl.getAttribLocation(program,'position'),uv=gl.getAttribLocation(program,'uv');
   const sampler=gl.getUniformLocation(program,'image'),buffer=gl.createBuffer(),texture=gl.createTexture();
+  const normalizeSidebar=gl.getUniformLocation(program,'normalizeSidebar');
+  const sidebarBackground=gl.getUniformLocation(program,'sidebarBackground');
   gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
   // Match upstream's top-left RGB orientation and nearest-neighbor scaling.
   gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([
@@ -77,6 +93,18 @@ export function installFramePresenter(mod,{deferred=false,isReplaying=()=>false}
     gl.vertexAttribPointer(position,2,gl.FLOAT,false,16,0);gl.vertexAttribPointer(uv,2,gl.FLOAT,false,16,8);
     gl.enableVertexAttribArray(position);gl.enableVertexAttribArray(uv);
     gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texture);gl.uniform1i(sampler,0);
+    const palette=mod.sidebarPaletteAddress;
+    // DOS EXEC can retain OP as the reported program name during solo MAIN.
+    // Callers bind this address only while a validated game mailbox is live.
+    const normalize=frameWidth===640&&frameHeight===400&&Number.isInteger(palette)&&palette>=0&&palette+3<=mod.HEAPU8.length;
+    gl.uniform1i(normalizeSidebar,normalize?1:0);
+    if(normalize){
+      // DOSBox-X dac_4to6, then the VGA 6-to-8-bit DAC expansion.
+      const rgb=Array.from(mod.HEAPU8.subarray(palette,palette+3),value=>{
+        const nibble=value>>4,six=(nibble<<2)|(nibble>>2);return ((six<<2)|(six>>4))/255;
+      });
+      gl.uniform3f(sidebarBackground,...rgb);
+    }
     gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);
     // WebGL consumes this view during the call. Reacquire the heap on every
     // upload, including after memory growth or a rollback restore.

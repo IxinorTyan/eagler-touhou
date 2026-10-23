@@ -118,6 +118,7 @@ function scan(now){
     scanCursor=end;
   }
   if(previous!==mailbox)clearNative(previous);
+  emulator.module.sidebarPaletteAddress=mailbox<0?-1:mailbox-patch.mailbox_cs_offset+(patch.data_segment-patch.code_segment)*16+0x2a82;
   return mailbox<0?null:{at:mailbox,mode:h[mailbox+22],flags:h[mailbox+23],generation:view.getUint16(mailbox+24,true)};
 }
 function tick(now){

@@ -527,7 +527,7 @@
       "name": "in-place twin-row Marisa laser body; native row write order"
     }
   ],
-  "sha256": "dec34802171b9af632ffc2a4f9d7995e6ca4200cdc1f6aea5a8d18dc396de038",
+  "sha256": "bd5c9135fe98944fbe0fd7f0adf8aba9da297835396f5bd5bb317b95d4eff9b4",
   "source": {
     "language": "ja",
     "file": "4-jp.hdi.gz",
@@ -596,5 +596,25 @@
         326683
       ]
     ]
+  },
+  "native_boss_hud": {
+    "schema": 1,
+    "implementation": "guest-ems",
+    "module": "A:\\NBHUD.BIN",
+    "moduleSha256": "4228ecf8131dd78b01db1b67b2ae76426c0198734982ed8264cdfd18cb289eb6",
+    "moduleBytes": 3941,
+    "emsPages": 1,
+    "conventionalBytesAdded": 0,
+    "bridge": {
+      "entry": 17901,
+      "cleanup": 17985,
+      "handle": 18010,
+      "status": 18012,
+      "pointer": 18013
+    },
+    "hp": true,
+    "phaseCuts": true,
+    "timer": "native audited deadlines; unavailable deadlines blank",
+    "browserOverlay": false
   }
 }

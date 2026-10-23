@@ -2,7 +2,7 @@
   "version": 1,
   "original_md5": "e2b685961daaa8b668b3914461fbdb8a",
   "original_size": 156258,
-  "patched_size": 157842,
+  "patched_size": 158354,
   "native_crash_fixes": [
     {
       "name": "stage-4 Marisa zero-divisor flystep stays still",
@@ -27,11 +27,11 @@
       "payload_bytes_added": 0
     }
   ],
-  "sha256": "cf99457561c290bcc01478ce0b85ec5ede09e83c67001103463052135d44801f",
+  "sha256": "0316908acbdda9d155122947f2a0afea88304adbf1fa85546655e61eaf2467b2",
   "insert_image_offset": 78048,
-  "insert_size": 1584,
+  "insert_size": 2096,
   "code_segment": 2735,
-  "data_segment": 8599,
+  "data_segment": 8631,
   "mailbox_cs_offset": 34306,
   "signature": "TH04SOLOINPUTv1!",
   "entries": [
@@ -184,7 +184,7 @@
     "main_md5": "e2b685961daaa8b668b3914461fbdb8a"
   },
   "disk": {
-    "sha256": "1d06126a44fe1f343f88c3414e061053eaac92e2472a21b920006951aa1cefbe",
+    "sha256": "6b0cba0524b9a31e348f2d0b20e295dcc065e625fb61fdcef99ceb0c3293e2c5",
     "size": 21415936
   },
   "unchanged_files": {
@@ -222,5 +222,25 @@
     "VEMEMM.SYS": "672f9c9678061fcaad5b453538488b64660fa11b5ef3eea809376b56e558038e",
     "VEMHSB.SYS": "72c7a2222a994aac5523dfd723544609a07dd6dff9bfb6b43a1b4be6e27a1751",
     "VEMRSM.SYS": "48ce36a0c8483584239241412707f67d8635648421595cf31f59befaaae1f64b"
+  },
+  "native_boss_hud": {
+    "schema": 1,
+    "implementation": "guest-ems",
+    "module": "A:\\NBHUD.BIN",
+    "moduleSha256": "248765e184ef7068e3468b0b83427251f03b36dbfb1933e72ac3443fce8ae013",
+    "moduleBytes": 3941,
+    "emsPages": 1,
+    "conventionalBytesAdded": 512,
+    "bridge": {
+      "entry": 35872,
+      "cleanup": 35956,
+      "handle": 35981,
+      "status": 35983,
+      "pointer": 35984
+    },
+    "hp": true,
+    "phaseCuts": true,
+    "timer": "native audited deadlines; unavailable deadlines blank",
+    "browserOverlay": false
   }
 }
