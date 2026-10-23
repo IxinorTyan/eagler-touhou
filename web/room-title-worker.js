@@ -1,5 +1,5 @@
 // A disposable native instance: no input, recording, saves, or match state.
-let emulator, timer, paused = false, loop = 0;
+let emulator, timer, paused = false;
 const send = (type, props = {}) => postMessage({type, ...props});
 async function boot({game, canvas, disk, wasmBinary, module}) {
   if (game === '01') {
@@ -57,29 +57,18 @@ async function boot({game, canvas, disk, wasmBinary, module}) {
     await new Promise(resolve => setTimeout(resolve, 0));
   }
   m.netPresent();
-  m.netCapture(0); m.netEndFrame();
-  let cycles = 0, presented = 0;
-  const rewind = () => {
-    m.netRestore(0); m.netCapture(0, true); m.netEndFrame(); loop = 0; cycles++;
-  };
+  let presented = 0;
   send('ready', {frames, pixels, program: m.UTF8ToString(m._emGetRunningProgram())});
   timer = setInterval(() => {
     if (paused) return;
     try {
-      // Replay a short native title interval, before its attract-mode timeout.
-      // The checkpoint belongs only to this worker and never to the match.
-      if (loop === 180) rewind();
+      // Let the original title, fades and demo playback advance continuously.
+      // This isolated worker is discarded before the match starts.
       for (let i = 0; i < 2; i++) emulator.step();
-      loop += 2;
       pixels = sample();
-      // Some OP intros fade earlier than their demo timer. Restore before
-      // presenting that frame, so the room never shows a black transition.
-      if (pixels.colored < .08 || pixels.lit < .12 ||
-          m.UTF8ToString(m._emGetRunningProgram()).toUpperCase() !== 'OP') {
-        rewind(); pixels = sample();
-      }
       m.netPresent(); presented++;
-      if (presented % 30 === 0) send('frame', {frames: emulator.tick, loop, cycles, pixels,program:'OP'});
+      if (presented % 30 === 0) send('frame', {frames: emulator.tick, pixels,
+        program:m.UTF8ToString(m._emGetRunningProgram())});
     } catch (error) { clearInterval(timer); send('error', {message: error.message}); }
   }, 1000 / 30);
 }

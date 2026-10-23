@@ -228,7 +228,7 @@ def handle_get(handler, rooms=None, room_lock=None, game=None, is_expired=None):
                 room = rooms.get(code)
                 if not room or is_expired and is_expired(room):
                     raise PermissionError('房间不存在或已过期')
-                owner = (game, code, room.get('host'), room.get('generation'), room.get('runId',0))
+                owner = (game, code, room.get('host'), room.get('generation'), room.get('runId', 0))
                 with HISTORY.lock:
                     HISTORY.prune()
                     watch = next((w for w, a in HISTORY.archives.items() if a['owner'] == owner), None)
@@ -273,7 +273,7 @@ def handle_post(handler, rooms, room_lock, game, is_expired=None):
                 raise PermissionError('观战房间代次不匹配')
             run_id = data.get('runId')
             owner = (game, code, room['host'], generation, run_id)
-            if type(run_id) is not int or not 1 <= run_id <= room.get('runId',0) or (action == '/api/replay/open' and run_id != room.get('runId',0)):
+            if type(run_id) is not int or not 1 <= run_id <= room.get('runId', 0) or (action == '/api/replay/open' and run_id != room.get('runId', 0)):
                 raise PermissionError('观战本局编号不匹配')
             if action == '/api/replay/open':
                 header = data.get('header')
@@ -293,6 +293,11 @@ def handle_post(handler, rooms, room_lock, game, is_expired=None):
                 result = HISTORY.points_end(owner, data.get('watch'))
             else:
                 raise ValueError('未知观战接口')
+            # Accepted live uploads are host activity too. A stalled lobby poll
+            # must not expire a room whose confirmed history is still arriving.
+            # Sealing an earlier run never renews the current room's lease.
+            if run_id == room.get('runId') and not room.get('ended') and (room.get('phase') == 'loading' or room.get('started')):
+                room['seen']['host'] = time.monotonic()
         handler.reply(result)
     except PermissionError as e:
         handler.reply({'error': str(e)}, 403)

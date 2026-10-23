@@ -9,7 +9,6 @@ export async function createTitleCore({canvas, disk, wasmBinary}) {
   const {default:factory} = await import('./vendor/dosbox-net/dosbox-rollback.mjs');
   globalThis.onmessage = dispatch;
   const {gameFiles} = await import('./disk-files.js');
-  const {createDosboxSnapshots} = await import('./dosbox-snapshots.js');
   const files = gameFiles(disk, {solo:true});
   const batch = files.find(file => file.path === 'game/KAIKI/FAST.BAT');
   batch.contents = new TextEncoder().encode(new TextDecoder().decode(batch.contents).replace('\r\nop\r\n', '\r\nz:\\system\\config.com -set "cpu cycles=30000"\r\nop\r\n'));
@@ -44,8 +43,6 @@ export async function createTitleCore({canvas, disk, wasmBinary}) {
   ci.events().onSoundPush(()=>{});
   const emulator={module:m, ci, keys:new Set(), get tick(){return tick;},set tick(value){tick=value;},run(){},
     step(){m.targetNow=Math.max(m.virtualNow,Math.floor(++tick*1000/60));let safety=0;while(m.wakeAt<=m.targetNow){if(++safety>1000)throw Error('标题模拟未让出执行');m.virtualNow=Math.max(m.virtualNow,m.wakeAt);m.advanceNative();}m.virtualNow=m.targetNow;}};
-  const snapshots=createDosboxSnapshots(emulator);
-  m.netCapture=(frame,restored)=>snapshots.capture(frame,restored);
-  m.netRestore=frame=>snapshots.restore(frame);m.netEndFrame=()=>snapshots.seal();m.netPresent=present;
+  m.netPresent=present;
   return emulator;
 }
