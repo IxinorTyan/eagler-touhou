@@ -30,7 +30,7 @@ def validated_settings(value, host_seat=0):
 def snapshot(room):
     return {'protocol': PROTOCOL, 'room': room['code'], 'mode': room['mode'],
             'network': room['network'], 'ice': room['ice'],
-            'revision': room['revision'], 'started': room['started'],
+            'revision': room['revision'], 'started': room['started'], 'runId': room.get('runId', 0),
             'present': {'host': bool(room['host']), 'guest': bool(room['guest'])},
             'ready': dict(room['ready']), 'settings': dict(room['settings']),
             'startup': dict(room['startup'])}
@@ -93,7 +93,7 @@ class Handler(SimpleHTTPRequestHandler):
                 while code in ROOMS: code = f'{secrets.randbelow(10000):04d}'
                 token = secrets.token_urlsafe(18)
                 room = {'code': code, 'mode': mode, 'network': network, 'ice': ice,
-                        'host': token, 'guest': None, 'revision': 1, 'started': False,
+                        'host': token, 'guest': None, 'revision': 1, 'started': False, 'runId': 0,
                         'seen': {'host': now, 'guest': now}, 'signals': {'host': [], 'guest': []},
                         'ready': {'host': False, 'guest': False}, 'startup': {},
                         'settings': settings}
@@ -111,12 +111,25 @@ class Handler(SimpleHTTPRequestHandler):
             if not role: return self.reply({'error': '房间身份无效'}, 403)
             if data.get('protocol') != PROTOCOL: return self.reply({'error': '请刷新联机页面'}, 409)
             room['seen'][role] = now
+            if action in ('end', 'signal', 'progress', 'signals', 'ready', 'start') and str(data.get('runId')) != str(room['runId']):
+                return self.reply({'error': '本局编号已失效'}, 409)
+            if action == 'end':
+                if room['started']:
+                    room['started'] = False
+                    room['ready'] = {'host': False, 'guest': False}
+                    room['startup'] = {}
+                    room['signals'] = {'host': [], 'guest': []}
+                    room['ice_requested'] = {}
+                    room['revision'] += 1
+                return self.reply(snapshot(room))
             if action == 'state':
                 if self.path.startswith('/api/relay-auth'):
                     if data.get('protocol') != PROTOCOL or data.get('role') != role or room['mode'] != 'relay' or not room['started']:
                         return self.reply({'ok': False}, 403)
                     return self.reply({'ok': True, 'mode': room['mode'], 'role': role})
                 if self.path.startswith('/api/signals'):
+                    if str(data.get('runId')) != str(room['runId']):
+                        return self.reply({'error': '本局编号已失效'}, 409)
                     messages, room['signals'][role] = room['signals'][role], []
                     return self.reply({'messages': messages, 'state': snapshot(room)})
                 return self.reply(snapshot(room))
@@ -149,7 +162,7 @@ class Handler(SimpleHTTPRequestHandler):
             if action == 'start':
                 if role != 'host' or room['started'] or not room['guest'] or not all(room['ready'].values()):
                     return self.reply({'error': '需要双方加入并准备后，由房主开始'}, 409)
-                room['started'] = True; room['revision'] += 1
+                room['started'] = True; room['revision'] += 1; room['runId'] += 1
                 return self.reply(snapshot(room))
             if action == 'leave':
                 if role == 'host': ROOMS.pop(code, None)

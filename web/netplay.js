@@ -5,7 +5,7 @@ import {loadRtcConfiguration,hasTurn,describeRtcPath} from './netplay/udp-config
 import {SYNC_PROTOCOL,RTT_SAMPLES,validInputReport,validInputPolicy,chooseInputPolicy} from './netplay/input-policy.js';
 const ACTIONS=['up','down','left','right','shot','rapid','attack','focus'], protocol='th03-lan/1';
 export class Netplay {
-  constructor({room,token,role,mode,sampleLocal,onState=()=>{},onError=()=>{}}){this.room=room;this.token=token;this.role=role;this.mode=mode;this.sampleLocal=sampleLocal;this.localSeat=role==='host'?0:1;this.onState=onState;this.onError=onError;this.remote=new Set();this.seq=0;this.lastRemote=-1;this.socket=null;this.pc=null;this.rtcPoll=null;this.rtcTimer=null;this.rtcResolve=null;this.rtcReject=null;this.pendingIce=[];this.remoteDescriptionReady=false;}
+  constructor({room,token,role,mode,runId=0,sampleLocal,onState=()=>{},onError=()=>{}}){this.room=room;this.runId=runId;this.token=token;this.role=role;this.mode=mode;this.sampleLocal=sampleLocal;this.localSeat=role==='host'?0:1;this.onState=onState;this.onError=onError;this.remote=new Set();this.seq=0;this.lastRemote=-1;this.socket=null;this.pc=null;this.rtcPoll=null;this.rtcTimer=null;this.rtcResolve=null;this.rtcReject=null;this.pendingIce=[];this.remoteDescriptionReady=false;}
   async start(){
     try{
       const state=await this.state();
@@ -23,8 +23,8 @@ export class Netplay {
       return await (this.mode==='relay'?this.startRelay():this.startRtc());
     }catch(error){this.close();throw error;}
   }
-  async state(){const query=new URLSearchParams({protocol,room:this.room,token:this.token});const response=await fetch(`/api/state?${query}`,{cache:'no-store'});const state=await response.json();if(!response.ok)throw Error(state.error||'房间已结束');if(!state.present.host||!state.present.guest)throw Error('另一位玩家已离开');return state;}
-  async waitForPlayers(){const response=await fetch('/api/progress',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({protocol,room:this.room,token:this.token,message:'本机资源已就绪',loaded:true})});if(!response.ok)throw Error('房间准备确认失败');const deadline=performance.now()+600000;while(!this.closed){const state=await this.state();if(state.startup.host?.error||state.startup.guest?.error)throw Error('另一端加载失败，请结束后重新建房');if(state.startup.host?.loaded&&state.startup.guest?.loaded)return;if(performance.now()>deadline)throw Error('等待另一端加载超时');await new Promise(resolve=>setTimeout(resolve,200));}throw Error('连接已关闭');}
+  async state(){const query=new URLSearchParams({protocol,room:this.room,token:this.token,runId:this.runId});const response=await fetch(`/api/state?${query}`,{cache:'no-store'});const state=await response.json();if(!response.ok)throw Error(state.error||'房间已结束');if(state.runId!==this.runId||!state.started)throw Error('本局已结束');if(!state.present.host||!state.present.guest)throw Error('另一位玩家已离开');return state;}
+  async waitForPlayers(){const response=await fetch('/api/progress',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({protocol,room:this.room,token:this.token,runId:this.runId,message:'本机资源已就绪',loaded:true})});if(!response.ok)throw Error('房间准备确认失败');const deadline=performance.now()+600000;while(!this.closed){const state=await this.state();if(state.startup.host?.error||state.startup.guest?.error)throw Error('另一端加载失败，请结束后重新建房');if(state.startup.host?.loaded&&state.startup.guest?.loaded)return;if(performance.now()>deadline)throw Error('等待另一端加载超时');await new Promise(resolve=>setTimeout(resolve,200));}throw Error('连接已关闭');}
   fail(error){if(this.closed)return;this.rtcReject?.(error);this.relayReject?.(error);this.rtcResolve=this.rtcReject=this.relayReject=null;this.close();this.onState(error.message);this.onError(error);}
   get isLockstep(){return true;}
   get inputTransportStats(){return this.channel?.transportStats??null;}
@@ -158,7 +158,7 @@ export class Netplay {
   takeTouch(){const touch=this.closed?null:this.remoteTouch;if(!touch)return 0;const value=packTouch(0,touch);touch.x=touch.y=0;return value;}
   startRelay(){
     const url=new URL('/relay',location.href);url.protocol=location.protocol==='https:'?'wss:':'ws:';
-    url.search=new URLSearchParams({room:this.room,token:this.token,role:this.role,protocol});
+    url.search=new URLSearchParams({room:this.room,token:this.token,runId:this.runId,role:this.role,protocol});
     this.onState('正在连接 TCP 服务器转发');this.socket=new WebSocket(url);
     const owner=this;
     this.channel={get readyState(){return owner.socket?.readyState===WebSocket.OPEN?'open':'connecting';},
@@ -181,7 +181,7 @@ export class Netplay {
       this.socket.onclose=()=>this.fail(Error('TCP 转发连接已断开，请重新建房'));
     });
   }
-  async signal(target,message){if(this.closed)return;const response=await fetch('/api/signal',{method:'POST',headers:{'Content-Type':'application/json'},signal:this.rtcAbort?.signal,body:JSON.stringify({protocol,room:this.room,token:this.token,to:target,message})});if(!response.ok)throw Error(`信令发送失败 (${response.status})`);}
+  async signal(target,message){if(this.closed)return;const response=await fetch('/api/signal',{method:'POST',headers:{'Content-Type':'application/json'},signal:this.rtcAbort?.signal,body:JSON.stringify({protocol,room:this.room,token:this.token,runId:this.runId,to:target,message})});if(!response.ok)throw Error(`信令发送失败 (${response.status})`);}
   async startRtc(){
     if(typeof RTCPeerConnection!=='function')throw Error('浏览器不支持 WebRTC，请用现代浏览器或 TCP 服务器转发');
     this.rtcAbort=new AbortController();
@@ -269,7 +269,7 @@ export class Netplay {
   async readSignals(){
     if(this.closed)return;
     try{
-      const query=new URLSearchParams({protocol,room:this.room,token:this.token});
+      const query=new URLSearchParams({protocol,room:this.room,token:this.token,runId:this.runId});
       const response=await fetch(`/api/signals?${query}`,{cache:'no-store',signal:this.rtcAbort.signal});
       const value=await response.json();if(!response.ok)throw Error(value.error||'信令读取失败');
       for(const item of value.messages||[]){if(this.closed)return;await this.handleSignal(item.from,item.message);}

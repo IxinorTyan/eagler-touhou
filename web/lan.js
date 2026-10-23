@@ -8,6 +8,7 @@ const roomIds={start:'room-start',language:'room-language',difficulty:'room-diff
 for(const [source,target]of Object.entries(roomIds)){const node=document.getElementById(source);if(node)node.id=target;}
 const $ = id => document.getElementById(roomIds[id]||id), protocol = 'th03-lan/1';
 let session = null, timer = null, busy = false, state = null, runtime = null;
+let runtimeFrame=null,returningTask=null,runStopped=false;
 let preloadKey='',preloadPromise=null,preloadGeneration=0,preloadRetryAt=0;
 onBgmVersion(()=>{if(session&&state&&!state.started)prepareRoomAssets(state).catch(()=>{});});
 const query = new URLSearchParams(location.search);
@@ -50,7 +51,7 @@ function status(value, error = false) { $('lan-status').textContent = value; $('
 const seatFor = role => (state.settings.hostSeat === 1 ? 1 : 0) ^ (role === 'guest' ? 1 : 0);
 const seatLabel = role => seatFor(role) === 0 ? 'P1 · 左侧' : 'P2 · 右侧';
 async function api(path, data = {}, method = 'POST') {
-  const payload = {protocol, ...(session || {}), ...data};
+  const payload = {protocol, ...(session || {}), runId:state?.runId??0, ...data};
   const url = method === 'GET' ? `/api/${path}?${new URLSearchParams(payload)}` : `/api/${path}`;
   const response = await fetch(url, {method, cache: 'no-store',
     headers: method === 'POST' ? {'Content-Type': 'application/json'} : undefined,
@@ -61,6 +62,8 @@ async function api(path, data = {}, method = 'POST') {
 }
 function render(value) {
   if (!session) return;
+  if(returningTask)return;
+  if(!value.started&&state?.started&&(runtime||runStopped)){void returnToRoom('本局已结束，可重新准备。',value);return;}
   state = value;
   $('lobby').dataset.roomPhase=state.started?'loading':'lobby';
   $('lobby').dataset.roomLanguage=state.settings.language;
@@ -93,47 +96,48 @@ function render(value) {
   $('room-settings').disabled = busy || session.role !== 'host' || state.started;
   $('ready').disabled = busy || state.started;
   $('ready').textContent = state.ready[session.role] ? '取消准备' : '准备';
+  returnButton.hidden=!state.started;returnButton.disabled=!!returningTask;
+  $('leave').textContent=session.role==='host'?'解散房间':'离开房间';
   $('start').disabled = busy || session.role !== 'host' || state.started || !state.present.guest || !state.ready.host || !state.ready.guest;
   $('startup-progress').hidden = !state.started;
   if(session&&!state.started)prepareRoomAssets(state).catch(()=>{});
   networkRuntime.disabled=state.started;
-  if (state.started && !runtime) launch().catch(error=>status(error.message,true));
+  if (state.started && !runtime && !runStopped) launch().catch(error=>void returnToRoom(error.message));
   if (runtime && (!state.present.host || !state.present.guest)) {
-    runtime.stop(); status('另一位玩家已离开，本局已结束', true);
+    void returnToRoom('另一位玩家已离开，本局已结束');
   }
 }
 async function launch() {
-  for(const [source,target]of Object.entries(roomIds)){const node=document.getElementById(source);if(node)node.id=target;}
-  $('controls-dialog').close();$('controls-dialog').querySelector('iframe').removeAttribute('src');
-  globalThis.th03RoomHost??={};
-  runtime={stop(){globalThis.th03Replay?.finish('联机会话结束');globalThis.th03RoomHost.stopped=true;globalThis.th03RoomHost.runtime?.stop();}};
   const params=new URLSearchParams({net:state.mode,room:session.room,token:session.token,role:session.role,
-    language:state.settings.language,difficulty:state.settings.difficulty,clock:state.settings.clock,rollback:state.settings.rollback?'1':'0'});
-  params.set('netWorker',networkRuntime.value==='worker'?'1':'0');
-  const response=await fetch(new URL('local.html',import.meta.url),{cache:'no-store'});
-  if(globalThis.th03RoomHost.stopped)return;
-  if(!response.ok)throw Error('游戏界面加载失败');
-  const page=new DOMParser().parseFromString(await response.text(),'text/html');
-  const root=$('game');root.replaceChildren();root.hidden=false;
-  const main=page.querySelector('main');
-  for(const node of main.children){
-    if(node.matches('.intro,.local-music-settings'))continue;
-    const copy=document.importNode(node,true);
-    if(copy.matches('.launch-settings,.launch-toolbar,.players'))copy.hidden=true;
-    root.append(copy);
-  }
-  root.append(document.importNode(page.getElementById('settings'),true));
-  // Keep runtime lookups scoped, and leave the lobby's controls addressable.
-  for(const node of root.querySelectorAll('[id]')){
-    node.dataset.runtimeId=node.id;
-    if(document.getElementById(node.id)!==node)node.id='runtime-'+node.id;
-  }
-  globalThis.th03RoomHost??={};Object.assign(globalThis.th03RoomHost,{root,params,notify:handleRuntimeMessage});
-  preloadRetryAt=0;
-  globalThis.th03RoomHost.preloadPromise=prepareRoomAssets(state);
-  await import('./app.js');
-  requestAnimationFrame(()=>root.scrollIntoView({block:'start'}));
+    runId:state.runId,embedded:'1',language:state.settings.language,difficulty:state.settings.difficulty,
+    clock:state.settings.clock,rollback:state.settings.rollback?'1':'0',netWorker:networkRuntime.value==='worker'?'1':'0'});
+  const frame=document.createElement('iframe');runtimeFrame=frame;
+  frame.title='东方梦时空联机';frame.allow='autoplay; gamepad; fullscreen';frame.allowFullscreen=true;
+  frame.style.cssText='width:100%;height:100%;min-height:480px;border:0';
+  runtime={stop(){frame.contentWindow?.th03EmbeddedRuntime?.stop();frame.remove();if(runtimeFrame===frame)runtimeFrame=null;}};
+  frame.src='local.html?'+params;const root=$('game');root.replaceChildren(frame);root.hidden=false;
 }
+async function returnToRoom(reason='本局已结束，可重新准备。',snapshot=null){
+  if(returningTask)return returningTask;
+  const old=runtime,frame=runtimeFrame,runId=state.runId;
+  busy=true;runStopped=true;clearTimeout(timer);
+  frame?.contentWindow?.th03EmbeddedRuntime?.stop();
+  returningTask=(async()=>{
+    try{
+      const recorder=frame?.contentWindow?.th03Replay;
+      recorder?.finish(reason);await recorder?.seal(2000);old?.stop();runtime=null;
+      const next=snapshot||await api('end',{runId});
+      state=next;runStopped=false;status(reason);$('game').hidden=true;
+    }catch(error){status('返回房间失败：'+error.message,true);}
+    finally{returningTask=null;busy=false;render(state);clearTimeout(timer);timer=setTimeout(poll,0);}
+  })();return returningTask;
+}
+const returnButton=document.createElement('button');returnButton.type='button';
+returnButton.id='return-room';returnButton.textContent='返回房间';returnButton.hidden=true;
+returnButton.onclick=()=>void returnToRoom();$('leave').after(returnButton);
+window.addEventListener('message',event=>{
+  if(event.origin===location.origin&&event.source===runtimeFrame?.contentWindow)void handleRuntimeMessage(event.data);
+});
 async function prepareRoomAssets(room){
   const key=`${room.settings.language}:${room.settings.rollback?'rollback':'lockstep'}:${bgmVersion()}`;
   if(performance.now()<preloadRetryAt&&key===preloadKey)return preloadPromise;
@@ -177,8 +181,8 @@ async function poll() {
   if (!session) return;
   try { if (!busy) {const next=await api('state', {}, 'GET');if(!busy&&next.revision>=state.revision)render(next);} }
   catch (error) {
-    runtime?.stop(); status(error.message, true);
-    if (runtime || /房间不存在|房间身份无效/.test(error.message)) return;
+    status(error.message, true);
+    if (/房间不存在|房间身份无效/.test(error.message)) {runtime?.stop();return;}
   }
   timer = setTimeout(poll, 1000);
 }
@@ -191,7 +195,7 @@ async function mutate(path, data = {}) {
 }
 $('create').onclick = () => enter('create'); $('join').onclick = () => enter('join');
 $('configure-controls').onclick=()=>{
-  if(runtime){globalThis.th03RoomHost?.runtime?.openControls();$('game').scrollIntoView({block:'start'});return;}
+  if(runtime){runtimeFrame?.contentWindow?.th03EmbeddedRuntime?.openControls();$('game').scrollIntoView({block:'start'});return;}
   $('controls-dialog').querySelector('iframe').src='local.html?controlsOnly=1';
   $('controls-dialog').showModal();
 };
@@ -201,21 +205,29 @@ $('ready').onclick = () => mutate('ready'); $('start').onclick = () => mutate('s
 for (const id of ['language', 'difficulty', 'clock', 'rollback', 'focus-enabled', 'touch-unlimited-allowed', 'host-seat-choice']) $(id).onchange = () => mutate('settings', {settings: {
   hostSeat: Number($('host-seat-choice').value), language: $('language').value, difficulty: Number($('difficulty').value), clock: Number($('clock').value), rollback: $('rollback').checked, focusEnabled: $('focus-enabled').checked, touchUnlimitedAllowed: $('touch-unlimited-allowed').checked}});
 $('leave').onclick = async () => {
-  clearTimeout(timer); runtime?.stop();
-  try { globalThis.th03Replay?.finish('玩家离开本局'); await globalThis.th03Replay?.seal(); await api('leave'); } catch {}
+  busy=true;clearTimeout(timer);runtimeFrame?.contentWindow?.th03EmbeddedRuntime?.stop();
+  try { const recorder=runtimeFrame?.contentWindow?.th03Replay;recorder?.finish('玩家离开本局');await recorder?.seal(2000);await api('leave'); } catch {}
+  runtime?.stop();
   location.href = `lan.html?${networkParams(connection)}`;
 };
 async function handleRuntimeMessage(value){
-  if(value?.protocol!==protocol)return;
-  if(value.event==='view'){$('game').classList.toggle('game-immersive',value.immersive===true);return;}
+  if(value?.protocol!==protocol||returningTask)return;
+  if(value.event==='room-menu'){void returnToRoom();return;}
+  if(value.event==='view'){runtimeFrame?.classList.toggle('game-immersive',value.immersive===true);return;}
   if(value.event==='connection'){
     $('connection-details').hidden=false;$('connection-path').hidden=false;
     $('connection-path').textContent='本机连接：'+String(value.message).slice(0,240);return;
   }
   if(value.event!=='progress')return;
-  try{render(await api('progress',{message:value.message,loaded:value.loaded===true,error:value.error===true}));}
-  catch(error){status(error.message,true);}
-  if(value.error)status(value.message,true);else if(value.loaded)status('本机游戏已启动');
+  const ownedFrame=runtimeFrame,ownedRun=state.runId;
+  try{
+    const next=await api('progress',{message:value.message,loaded:value.loaded===true,error:value.error===true});
+    if(returningTask||runtimeFrame!==ownedFrame||state.runId!==ownedRun||next.revision<state.revision)return;
+    render(next);
+  }
+  catch(error){if(!returningTask&&runtimeFrame===ownedFrame&&state.runId===ownedRun)status(error.message,true);}
+  if(returningTask||runtimeFrame!==ownedFrame||state.runId!==ownedRun)return;
+  if(value.error){status(value.message,true);void returnToRoom(value.message);}else if(value.loaded)status('本机游戏已启动');
 }
 window.addEventListener('pagehide', () => {
   globalThis.th03Replay?.finish('观战来源页面关闭');globalThis.th03Replay?.close();

@@ -111,4 +111,5 @@ body.embedded .toolbar,body.embedded .status,body.embedded .players{padding-inli
 }
 /* A room iframe must fill the parent viewport for the native-fullscreen fallback. */
 #game iframe.game-immersive{position:fixed;inset:0;z-index:10000;width:100vw;height:100dvh!important;border:0}
+.th03-player .room-return-current-run{position:absolute;z-index:45;top:max(10px,env(safe-area-inset-top));left:max(62px,calc(env(safe-area-inset-left) + 62px));height:42px;min-height:0;padding:0 10px;border:0;border-radius:7px;background:#121511d1;color:#eee;font:12px system-ui}
 html:has(#game iframe.game-immersive){overflow:hidden}

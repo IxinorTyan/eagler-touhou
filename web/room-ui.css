@@ -2,6 +2,7 @@
 body.shell.unified-room{--ink:#141413;--paper:#f4eee8;--muted:#b2b0a7;--line:#ffffff21;--pink:#edb6ad;--wine:#66251f;--room-accent:#d9695c;color:var(--paper);background:var(--ink);max-width:1480px;padding:0 24px 24px;font:14px/1.6 system-ui,"Microsoft YaHei",sans-serif;letter-spacing:0}
 .unified-room *, .unified-room *::before, .unified-room *::after{box-sizing:border-box;letter-spacing:0}
 .unified-room [hidden][hidden]{display:none!important}
+.unified-room .room-ui-return{position:absolute;z-index:45;top:max(10px,env(safe-area-inset-top));left:max(62px,calc(env(safe-area-inset-left) + 62px));height:42px;min-height:0;padding:0 10px;border:0;border-radius:7px;background:#121511d1;color:#eee;font:12px system-ui}
 .unified-room :is(button,a,input,select,summary):focus-visible{outline:2px solid var(--room-accent);outline-offset:3px}
 .unified-room :is(button,.button):not(.room-ui-native *){min-height:44px;border-radius:7px;background:#2a2b27;border:1px solid var(--line);padding:9px 14px;font-family:inherit;font-size:14px;font-weight:600;color:var(--paper);cursor:pointer;touch-action:manipulation}
 .unified-room button:hover:not(:disabled){background:#383934;border-color:#ffffff38}

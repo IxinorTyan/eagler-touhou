@@ -14,7 +14,7 @@ function present(staged=false){
   const key=`${emulator.module.frameUploads||0}:${simulation.renderEpoch||0}`;
   if(transfers.size>=2||(staged&&presentedKey===key)||!emulator.module.netPresent())return false;
   const bitmap=canvas.transferToImageBitmap(),id=++sequence;transfers.add(id);presentedKey=key;
-  send({type:'frame',sequence:id,bitmap,staged},[bitmap]);return true;
+  send({type:'frame',sequence:id,bitmap,staged,producedAt:performance.timeOrigin+performance.now()},[bitmap]);return true;
 }
 async function dispatch(method,args){
   if(method==='init'){

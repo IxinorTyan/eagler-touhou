@@ -15,12 +15,15 @@ export class WorkerNetworkSimulation {
     this.context=new AudioContext({sampleRate:44100,latencyHint:'interactive'});this.context.resume().catch(()=>{});
     this.audio={context:this.context};this.module={SDL2:{audioContext:this.context},executionThread:'worker',heapBytes:0,
       netSnapshotInfo:()=>this.snapshot.snapshots||{snapshotBytes:0,snapshots:0},netKey(){}};
+    this.displayMetrics={expired:0,hiddenDiscarded:0,replaced:0};this.module.displayMetrics=this.displayMetrics;
     try{this.worker=new Worker(new URL('./simulation-worker.js',import.meta.url),{type:'module',name:'TH03 network simulation'});}
     catch(error){this.context.close().catch(()=>{});throw error;}
     this.worker.onmessage=({data})=>this.receive(data);
     this.worker.onerror=event=>this.fail(Error(event.message||'联机模拟线程失败'));
     this.worker.onmessageerror=()=>this.fail(Error('联机模拟线程通信失败'));
     this.onPageHide=()=>this.dispose();window.addEventListener('pagehide',this.onPageHide);
+    this.onVisibility=()=>{if(document.hidden)this.clearFrames();};document.addEventListener('visibilitychange',this.onVisibility);
+    this.onContextLost=()=>this.fail(Error('游戏画面上下文已丢失，请重新开始'));config.canvas.addEventListener('contextlost',this.onContextLost);
   }
   call(method,args=[]){
     if(this.closed)return Promise.reject(Error('联机模拟线程已关闭'));
@@ -34,10 +37,11 @@ export class WorkerNetworkSimulation {
   receive(data){
     if(data.type==='frame'){
       if(this.closed){data.bitmap.close();return;}
+      if(document.hidden){this.releaseFrame(data,true);this.displayMetrics.hiddenDiscarded++;return;}
       if(data.staged){
         this.discardPreparedFrame();this.preparedFrame=data;return;
       }
-      if(this.queuedFrame)this.releaseFrame(this.queuedFrame);
+      if(this.queuedFrame){this.releaseFrame(this.queuedFrame);this.displayMetrics.replaced++;}
       this.queuedFrame=data;
       if(!this.drawHandle)this.drawHandle=requestAnimationFrame(()=>this.draw());return;
     }
@@ -60,15 +64,17 @@ export class WorkerNetworkSimulation {
     this.executionMs=(this.executionMs||0)+(data.executionMs||0);
     clearTimeout(pending.timer);this.pending.delete(data.id);pending.resolve(data.result);
   }
-  releaseFrame(frame){frame.bitmap.close();if(!this.closed)this.worker.postMessage({type:'frame-ack',sequence:frame.sequence,discarded:!!frame.staged});}
+  releaseFrame(frame,discarded=!!frame.staged){frame.bitmap.close();if(!this.closed)this.worker.postMessage({type:'frame-ack',sequence:frame.sequence,discarded});}
   discardPreparedFrame(){if(this.preparedFrame){this.releaseFrame(this.preparedFrame);this.preparedFrame=null;}}
   clearFrames(){
     this.discardPreparedFrame();
     if(this.drawHandle)cancelAnimationFrame(this.drawHandle);this.drawHandle=0;
-    if(this.queuedFrame){this.releaseFrame(this.queuedFrame);this.queuedFrame=null;}
+    if(this.queuedFrame){this.releaseFrame(this.queuedFrame,true);this.queuedFrame=null;}
   }
   draw(){
     this.drawHandle=0;const frame=this.queuedFrame;this.queuedFrame=null;if(!frame)return;
+    const hidden=document.hidden,expired=Number.isFinite(frame.producedAt)&&performance.timeOrigin+performance.now()-frame.producedAt>50;
+    if(hidden||expired){this.releaseFrame(frame,true);this.displayMetrics[hidden?'hiddenDiscarded':'expired']++;return;}
     try{if(!this.closed){this.onDraw?.(frame.bitmap);this.drawn=(this.drawn||0)+1;}}catch(error){this.fail(error);}finally{this.releaseFrame(frame);}
   }
   present(due){
@@ -111,6 +117,7 @@ export class WorkerNetworkSimulation {
     this.clearFrames();
     this.worker.terminate();for(const pending of this.pending.values()){clearTimeout(pending.timer);pending.reject(this.failure||Error('联机模拟线程已关闭'));}this.pending.clear();
     window.removeEventListener('pagehide',this.onPageHide);this.context.close().catch(()=>{});
+    document.removeEventListener('visibilitychange',this.onVisibility);this.config.canvas.removeEventListener('contextlost',this.onContextLost);
   }
 }
 export function workerNetworkPause(client){

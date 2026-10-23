@@ -33,6 +33,11 @@ function notifyRoom(message, loaded = false, error = false) {
   if(roomHost)roomHost.notify({protocol:'th03-lan/1',event:'progress',message,loaded,error});
   if (embedded) window.parent.postMessage({protocol: 'th03-lan/1', event: 'progress', message, loaded, error}, location.origin);
 }
+function returnRoom() {
+  const event={protocol:'th03-lan/1',event:'room-menu'};
+  if(roomHost)roomHost.notify(event);
+  if(embedded)window.parent.postMessage(event,location.origin);
+}
 if (embedded) {
   document.body.classList.add('embedded');
   new ResizeObserver(() => window.parent.postMessage({protocol: 'th03-lan/1', event: 'resize',
@@ -50,9 +55,11 @@ nativeCanvas.width = 640; nativeCanvas.height = 400;
 nativeCanvas.hidden = true; nativeCanvas.style.display = 'none';
 document.body.append(nativeCanvas);
 const visibleCanvas = $('canvas');
-// TH04 single-player renders directly to its visible canvas. Only rollback
-// needs a separate native canvas, because discarded frames must stay hidden.
-const visibleContext = online ? visibleCanvas.getContext('2d', {alpha: false}) : null;
+const useNetworkWorker=online&&netQuery.get('netWorker')!=='0'&&supportsNetworkWorker();
+let bitmapContext=null;
+if(useNetworkWorker)try{bitmapContext=visibleCanvas.getContext('bitmaprenderer',{alpha:false});}catch{}
+const visibleContext=online?(bitmapContext||visibleCanvas.getContext('2d',{alpha:false})):null;
+if(online&&!visibleContext)throw Error('浏览器无法创建游戏画面');
 const presentationDue = createFrameGate();
 let presentationCount = 0, lastUpload = -1;
 let presentationMs=0;
@@ -119,6 +126,10 @@ const inGameplay = () => !!nativeState?.phase;
 const screenChildren = [...$('screen').children];
 const player = mountPlayer($('screen'), {solo: true,network:online, onGesture: () => { clearEscape(); resumeAudio(); },
   onFullscreenExit: () => { if(pauseSeat===null)openPause(0); }});
+if(embedded){
+  const back=document.createElement('button');back.type='button';back.className='room-return-current-run';back.textContent='返回房间';
+  back.onclick=returnRoom;$('screen').append(back);
+}
 $('screen').addEventListener('player-viewchange',event=>{
   if(roomHost)roomHost.notify({protocol:'th03-lan/1',event:'view',immersive:event.detail.immersive});
   else if(embedded)window.parent.postMessage({protocol:'th03-lan/1',event:'view',immersive:event.detail.immersive},location.origin);
@@ -397,6 +408,7 @@ function handleEscape() {
   escapeTimer = setTimeout(() => { clearEscape(); reflectState(); }, 1000);
 }
 async function closeGame() {
+  if(online){returnRoom();return;}
   closing = true; controls.release(); visibilityPaused = false;
   emulator.pause(); clearTimeout(saveTimer); saveTimer = null;
   localBgm?.dispose(); localBgm = null;
@@ -525,7 +537,7 @@ $('start').addEventListener('click', async () => {
       const query = new URLSearchParams({protocol: 'th03-lan/1', room: netQuery.get('room'), token: netQuery.get('token')});
       const response = await fetch(`/api/state?${query}`, {cache: 'no-store'});
       const room = await response.json();
-      if (!response.ok || !room.started || room.mode !== netQuery.get('net')) throw Error(room.error || '房间尚未开始或模式不一致');
+      if (!response.ok || !room.started || room.runId!==Number(netQuery.get('runId')) || room.mode !== netQuery.get('net')) throw Error(room.error || '房间尚未开始或本局编号已失效');
       for (const id of ['language', 'difficulty', 'clock']) $(id).value = String(room.settings[id]);
       rollbackEnabled=room.settings.rollback===true;
       roomFocusEnabled=room.settings.focusEnabled!==false;
@@ -561,6 +573,7 @@ $('start').addEventListener('click', async () => {
       DIPswtch: [0x3e, 0xf3, 0x7b], ExMemory: 7, Latencys: online?40:100, SampleHz: 44100, SNDboard: 4,
       no_mouse: true, use_menu: false, fontfile: activeLang === 'cn' ? 'font_cn.bmp' : 'font.bmp',
       onDiskChange: diskChanged, onExit: () => {
+        if(online){returnRoom();return;}
         localBgm?.stop();
         localSfx?.stop();
         controls.release(); pauseSeat = null; nativeState = null;
@@ -570,14 +583,13 @@ $('start').addEventListener('click', async () => {
     const useWorker=!online&&netQuery.get('runtime')!=='main'&&supportsSoloWorker();
     // Keep simulation off the page by default, with an explicit main-thread
     // compatibility option using the same resources and input policy.
-    const useNetworkWorker=online&&netQuery.get('netWorker')!=='0'&&supportsNetworkWorker();
     emulator=useNetworkWorker?await WorkerNetworkSimulation.create(config,{patch:nativePause.meta,music:networkAudio,
       focusEnabled:roomFocusEnabled,touchUnlimitedAllowed:roomTouchUnlimitedAllowed,fullHash:netQuery.get('fullHash')==='1'})
       :useWorker?await WorkerNP21.create(config,{game:'03local',patch:nativePause.meta,music:(await nativeAssets()).meta.startup.music,onError:report}):await DOSBoxPC98.create(config);
     if(emulator.isWorker)nativePause=emulator.isNetworkWorker?workerNetworkPause(emulator):workerLocalPause(emulator);
     if(emulator.isNetworkWorker){
-      emulator.onSnapshot=reflectNetworkSnapshot;emulator.onExit=()=>{replayRecorder?.finish('游戏已退出');sync?.stop();};
-      emulator.onDraw=bitmap=>{const began=performance.now();visibleContext.imageSmoothingEnabled=false;visibleContext.drawImage(bitmap,0,0,640,400);presentationCount++;presentationMs+=performance.now()-began;};
+      emulator.onSnapshot=reflectNetworkSnapshot;emulator.onExit=()=>{replayRecorder?.finish('游戏已退出');sync?.stop();returnRoom();};
+      emulator.onDraw=bitmap=>{const began=performance.now();if(bitmapContext)bitmapContext.transferFromImageBitmap(bitmap);else{visibleContext.imageSmoothingEnabled=false;visibleContext.drawImage(bitmap,0,0,640,400);}presentationCount++;presentationMs+=performance.now()-began;};
     }
     localBgm = new LocalBgm(emulator.module.SDL2.audioContext, () => {});
     nativeMusic = new NativeMusic(online?networkAudio:(await nativeAssets()).meta.startup.music);
@@ -610,7 +622,7 @@ $('start').addEventListener('click', async () => {
     }
     if(roomHost?.stopped)throw Error('房间已结束');
     if (online) {
-      netplay = new Netplay({room: netQuery.get('room'), token: netQuery.get('token'), role: netQuery.get('role'), mode: netQuery.get('net'),sampleLocal:controls.sampleLocal,
+      netplay = new Netplay({room: netQuery.get('room'), token: netQuery.get('token'), role: netQuery.get('role'), mode: netQuery.get('net'),runId:Number(netQuery.get('runId')),sampleLocal:controls.sampleLocal,
         onState: message => {
           $('connection-path').hidden=false;$('connection-path').textContent=`本机连接：${message}`;
           if(roomHost)roomHost.notify({protocol:'th03-lan/1',event:'connection',message});
@@ -625,7 +637,7 @@ $('start').addEventListener('click', async () => {
       const inputPolicy=await netplay.negotiateInputPolicy({rollbackEnabled});
       replayRecorder=createRecorder($('screen').querySelector('.player-toolbar'));globalThis.th03Replay=replayRecorder;
       await replayRecorder.boot({settings:{language:activeLang,difficulty:$('difficulty').value,clock:$('clock').value,rollback:rollbackEnabled,focusEnabled:roomFocusEnabled,touchUnlimitedAllowed:roomTouchUnlimitedAllowed,hostSeat:roomHostSeat},players:2,hostSlot:roomHostSeat,opening:syncIdentity});
-      if(netQuery.get('role')==='host')replayRecorder.connectNetwork({room:netQuery.get('room'),token:netQuery.get('token')});
+      if(netQuery.get('role')==='host')replayRecorder.connectNetwork({room:netQuery.get('room'),token:netQuery.get('token'),runId:Number(netQuery.get('runId'))});
       const options={recorder:replayRecorder,proof:()=>battleProof(emulator,nativePause,controls,nativeMusic,pauseSeat,pauseSelection,hiddenSeats),network:netplay,rollbackEnabled,inputDelay:inputPolicy.inputDelay,snapshotStride:2,onError:report,onState:message=>status(message)};
       sync=emulator.isNetworkWorker?new AsyncLockstep({...options,execute:(inputs,frame)=>emulator.execute(inputs,frame),replaySlice:(frame,plans)=>emulator.replaySlice(frame,plans),restore:frame=>emulator.restore(frame),
         confirmQueued:(prefix,retain)=>emulator.confirmQueued(prefix,retain),present:()=>emulator.present(presentationDue)})
@@ -650,7 +662,9 @@ $('start').addEventListener('click', async () => {
     $('start').onclick = () => location.reload();
   } finally { starting = false; }
 });
-if(roomHost)roomHost.runtime={openControls:()=>$('controls').click(),stop(){roomHost.stopped=true;closed=true;controls.release();sync?.stop();netplay?.close();localBgm?.dispose();localSfx?.dispose();if(emulator?.isNetworkWorker)emulator.dispose();else emulator?.pause();}};
+const embeddedRuntime={openControls:()=>$('controls').click(),stop(){if(roomHost)roomHost.stopped=true;closed=true;controls.release();sync?.stop();netplay?.close();localBgm?.dispose();localSfx?.dispose();if(emulator?.isNetworkWorker)emulator.dispose();else emulator?.pause();}};
+if(roomHost)roomHost.runtime=embeddedRuntime;
+if(embedded)window.th03EmbeddedRuntime=embeddedRuntime;
 if (!controlsOnly&&(restartOnLoad || embedded || roomHost)) $('start').click();
 $('reset').addEventListener('click', async () => {
   if (online || closed || closing || nativePause?.pending) return;

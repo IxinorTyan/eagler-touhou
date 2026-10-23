@@ -98,7 +98,10 @@ def handle(handler, rooms, room_lock, ttl):
           or room['mode'] != 'relay' or not room['started'] or data.get('protocol') != 'th03-lan/1':
             handler.reply({'error': '中继身份或房间模式无效'}, 403); return
         identity = room['host']
-    key = (code, identity); sock = handler.connection
+    run_id=room.get('runId',0)
+    if str(data.get('runId'))!=str(run_id):
+        handler.reply({'error':'本局编号已失效'},409);return
+    key = (code, identity, run_id); sock = handler.connection
     sock.settimeout(5); sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     handler.close_connection = True
     protocol = ServerProtocol(max_size=65536); send_lock = threading.Lock(); writer = OutboundWriter(sock)
@@ -129,7 +132,7 @@ def handle(handler, rooms, room_lock, ttl):
         while True:
             with room_lock:
                 current = rooms.get(code)
-                if current is not room or current[role] != token or not current['started'] \
+                if current is not room or current.get('runId',0)!=run_id or current[role] != token or not current['started'] \
                   or time.monotonic() - current['seen']['host'] > ttl: break
             if time.monotonic() - last_data > 40: break
             if not select.select([sock], [], [], 1)[0]: continue
