@@ -24,7 +24,7 @@ export function createRelay(session,generation,roles,onFailure){
   }
   function connect(){
     const url=new URL('/relay',location.href);url.protocol=location.protocol==='https:'?'wss:':'ws:';
-    url.search=new URLSearchParams({room:session.room,token:session.token});
+    url.search=new URLSearchParams({room:session.room,token:session.token,runId:session.runId});
     socket=new WebSocket(url);socket.binaryType='arraybuffer';
     socket.onmessage=event=>{
       if(closed)return;

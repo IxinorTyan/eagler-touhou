@@ -65,7 +65,7 @@ def cleanup():
 def public(code, room, role):
     return dict(room=code, role=role, settings=room['settings'], phase=room['phase'],
                 generation=room['generation'], transport=room['transport'],
-                seats=room['seats'], ready=room['ready'],
+                seats=room['seats'], ready=room['ready'], runId=room.get('runId', 0),
                 present={r: bool(room[r]) for r in ROLES}, ended=room['ended'])
 
 def network_capabilities():
@@ -197,7 +197,7 @@ class Handler(AssetHandler):
             while code in ROOMS: code = str(secrets.randbelow(9000)+1000)
             token = secrets.token_urlsafe(24)
             room = dict(host=token, guest=None, guest2=None, settings=config, transport=config['transport'],
-                        phase='lobby', generation=secrets.token_hex(12),
+                        phase='lobby', generation=secrets.token_hex(12), runId=0,
                         seats={'host': 0, 'guest': 1, 'guest2': 2}, ready=dict.fromkeys(ROLES, False),
                         seen={'host': time.monotonic(), 'guest': 0, 'guest2': 0},
                         signals={r: [] for r in ROLES}, ice_requested={}, ended='')
@@ -214,6 +214,17 @@ class Handler(AssetHandler):
             room['ready'] = dict.fromkeys(ROLES, False)
             return {**public(code, room, role), 'token': room[role]}
         code, room, role = self.identity(data)
+        if path == '/api/end':
+            if data.get('runId') != room['runId']: raise ValueError('本局编号已失效')
+            if room['phase'] != 'lobby':
+                room['phase'] = 'lobby'
+                room['ended'] = ''
+                room['ready'] = dict.fromkeys(ROLES, False)
+                room['signals'] = {r: [] for r in ROLES}
+                room['ice_requested'] = {}
+            return public(code, room, role)
+        if path in ('/api/signal', '/api/ready', '/api/start') and data.get('runId') != room['runId']:
+            raise ValueError('本局编号已失效')
         if path == '/api/leave':
             if role == 'host': del ROOMS[code]
             else:
@@ -264,6 +275,7 @@ class Handler(AssetHandler):
             if role != 'host': raise ValueError('仅房主开始')
             if not all(room[r] and room['ready'][r] for r in active_roles(room)): raise ValueError('需要全员加入并准备')
             room['phase'] = 'loading'
+            room['runId'] += 1
         else: raise ValueError('接口不存在')
         return public(code, room, role)
 

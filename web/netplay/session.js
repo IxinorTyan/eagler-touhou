@@ -33,23 +33,24 @@ export class NetSession{
     const channel=this.peers.get(role)?.channel;
     if(this.closed||channel?.readyState!=='open')throw Error('输入通道尚未就绪');
     if(channel.bufferedAmount>262144)throw Error('网络发送积压，请重开房间');
-    channel.send(JSON.stringify({...value,from:source,protocol:PROTOCOL,generation:this.room.generation}));
+    channel.send(JSON.stringify({...value,from:source,protocol:PROTOCOL,generation:this.room.generation,runId:this.room.runId}));
   }
   send(value){for(const role of this.links)this.sendTo(role,value);}
   get inputTransportStats(){return Object.fromEntries([...this.peers].map(([role,peer])=>[role,peer.channel?.transportStats??null]));}
   signal(target,message){
-    this.signalChain=this.signalChain.then(()=>this.api('signal',{generation:this.room.generation,target,message}));
+    this.signalChain=this.signalChain.then(()=>this.api('signal',{generation:this.room.generation,runId:this.room.runId,target,message}));
     this.signalChain.catch(e=>this.fail(e));return this.signalChain;
   }
   async prepare(){
     this.loadTask=this.game.load(this.room.settings,this.status).then(async hash=>{
       if(this.closed){this.game.stop();return;}
       await this.recorder.boot({settings:this.room.settings,players:this.roles.length,hostSlot:this.room.seats.host,opening:hash,tickMs:TICK});
-      if(this.identity.role==='host')this.recorder.connectNetwork({...this.identity,generation:this.room.generation});
+      if(this.closed){this.recorder.close(true);return;}
+      if(this.identity.role==='host')this.recorder.connectNetwork({...this.identity,generation:this.room.generation,runId:this.room.runId});
       this.loadedHash=hash;this.maybeHello();
     }).catch(e=>this.fail(e));
     if(this.room.transport==='ws'){
-      this.relay=createRelay(this.identity,this.room.generation,this.roles,e=>this.fail(e));
+      this.relay=createRelay({...this.identity,runId:this.room.runId},this.room.generation,this.roles,e=>this.fail(e));
       for(const role of this.links){this.peers.set(role,{});this.attach(role,this.relay.channelFor(role));}
       this.relay.connect();
     }else{
@@ -198,7 +199,7 @@ export class NetSession{
   }
   receive(message,link){
     if(this.closed)return;
-    if(message.protocol!==PROTOCOL||message.generation!==this.room.generation)throw Error('联机协议或运行代次不同');
+    if(message.protocol!==PROTOCOL||message.generation!==this.room.generation||message.runId!==this.room.runId)throw Error('联机协议或运行代次不同');
     const source=message.from;
     if(!this.links.includes(link)||!this.remotes.includes(source)||
       (this.identity.role==='host'&&source!==link)||
@@ -285,7 +286,10 @@ export class NetSession{
         if(this.game.asyncExecution)await this.game.execute(inputs,recordedFrame);else this.game.step(inputs);
         if(this.closed)return;
         this.recorder.stage(recordedFrame,{inputs,offlineMask:0,proof:this.game.replayProof(),hash:(recordedFrame+1)%120===0?this.game.checksum():null});
-        this.recorder.confirm(recordedFrame+1,false);this.queue.commit();this.lastAdvance=performance.now();this.nextTick+=TICK;
+        this.recorder.confirm(recordedFrame+1,false);this.queue.commit();
+        const nativeState=this.game.state();
+        if(nativeState&&!nativeState.menu)this.sawGameplay=true;
+        if(this.sawGameplay&&nativeState?.menu===1){this.fail(Error('已返回标题，本局结束。'),false);return;}this.lastAdvance=performance.now();this.nextTick+=TICK;
         if(this.nextTick<now-4*TICK)this.nextTick=now;
         if(this.queue.frame%HASH_INTERVAL===0){
           const checksum=this.game.checksum();this.hashes.set(checksum.frame,checksum);
@@ -374,7 +378,7 @@ export class NetSession{
     if(this.closed)return;
     if(notify)for(const role of this.links)if(this.peers.get(role)?.channel?.readyState==='open')try{this.sendTo(role,{type:'ended'});}catch{}
     this.close();
-    if(notify)this.api('signal',{generation:this.room.generation,message:{type:'ended'}}).catch(()=>{});
+
     this.failure(error.message||String(error),this);
   }
   close(){

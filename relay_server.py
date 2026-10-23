@@ -91,7 +91,10 @@ def handle(handler,rooms,room_lock,roles,ttl):
         if role is None or room['phase']!='loading' or room.get('transport','rtc')!='ws':
             handler.reply({'error':'中继身份或房间模式无效'},403);return
         generation=room['generation'];count=room['settings']['players'];source=roles.index(role)
-    key=(code,generation)
+    run_id=room.get('runId',0)
+    if str(data.get('runId'))!=str(run_id):
+        handler.reply({'error':'本局编号已失效'},409);return
+    key=(code,generation,run_id)
     sock=handler.connection
     sock.settimeout(5)
     sock.setsockopt(socket.IPPROTO_TCP,socket.TCP_NODELAY,1)
@@ -135,7 +138,7 @@ def handle(handler,rooms,room_lock,roles,ttl):
         while True:
             with room_lock:
                 current=rooms.get(code)
-                valid=current and current['generation']==generation and current[role]==token and time.monotonic()-current['seen']['host']<=ttl
+                valid=current and current['generation']==generation and current.get('runId',0)==run_id and current['phase']=='loading' and current[role]==token and time.monotonic()-current['seen']['host']<=ttl
             if not valid:break
             if (entry['ready'] and time.monotonic()-last_data>40) or (not entry['ready'] and time.monotonic()-started>30):break
             if not select.select([sock],[],[],1)[0]:continue

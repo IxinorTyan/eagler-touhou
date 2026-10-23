@@ -9,6 +9,7 @@ import {stageSelection} from '../stage-select.js';
 const $=id=>document.getElementById(id),roles=['host','guest','guest2'];
 populateStages($('startStage'));
 let identity,room,session,polling=false,busy=false,editing=false,leaving=false;
+let returningTask=null;
 let roomPreloadKey='',roomPreloadPromise=null,roomPreloadGeneration=0,roomPreloadRetryAt=0;
 const keys=new Set(),touches=new Map();let taps=0,commands=0;
 const keyBits={ArrowLeft:1,ArrowRight:2,KeyZ:4,KeyX:8,KeyC:4096,ArrowUp:16,ArrowDown:32,Enter:64,Escape:128};
@@ -47,7 +48,7 @@ for(const button of document.querySelectorAll('[data-bit]')){
   button.onpointerup=button.onpointercancel=button.onlostpointercapture=release;
 }
 async function post(action,data={}){
-  const response=await fetch(`/api/${action}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...identity,...data})});
+  const response=await fetch(`/api/${action}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...identity,runId:room?.runId??0,...data})});
   const value=await response.json();if(!response.ok)throw Error(value.error||'房间请求失败');return value;
 }
 function showRoom(value){
@@ -64,6 +65,8 @@ function showRoom(value){
   }));
   $('swap').disabled=$('settings').disabled=!host||!lobby;$('ready').disabled=!lobby;
   $('ready').textContent=room.ready[identity.role]?'取消准备':'准备';
+  returnButton.hidden=lobby;returnButton.disabled=!!returningTask;
+  $('leave').textContent=host?'解散房间':'离开房间';
   $('start').disabled=!host||!lobby||!roles.slice(0,room.settings.players).every(r=>room.present[r]&&room.ready[r]);
   $('seat-note').textContent=`你控制 P${room.seats[identity.role]+1}；${host?'你负责菜单、路线选择和续关。':'菜单由房主操作，你可以请求暂停。'}`;
 }
@@ -102,8 +105,10 @@ function render(current){
   if(current.game.scoreSaveError)$('menu-note').textContent+=' 本机成绩保存失败，本局可继续。';
   $('coop-hud').replaceChildren(...(state?.players||[]).map((p,i)=>{const el=document.createElement('span');el.textContent=`P${i+1}${i===current.slot?'（你）':''} · ${p.ghost?'幽灵':`残机 ${p.lives} / Bomb ${p.bombs}`} · 获救 ${p.rescues}`;return el;}));
 }
-function failure(reason,current){clear();status(reason);$('fallback').hidden=false;$('connection').textContent=current.connectionText();}
+function failure(reason,current){if(current!==session||returningTask)return;clear();status(reason);$('connection').textContent=current.connectionText();void returnToRoom(reason);}
 async function accept(value){
+  if(returningTask)return;
+  if(identity&&value.phase==='lobby'&&room?.phase==='loading'){await returnToRoom('本局已结束，可重新准备。',value);return;}
   if(!identity)identity={room:value.room,role:value.role,token:value.token};showRoom(value);
   if(room.ended&&session&&!session.closed){session.fail(Error(room.ended),false);return;}
   if(room.phase==='loading'&&!session){
@@ -113,7 +118,9 @@ async function accept(value){
     session.game.onMusicStatus=text=>{$('music-status').textContent=text;};session.game.setMusicVolume(Number($('music-volume').value)/100);
     window.th01Net={get session(){return session;},get room(){return room;},
       ...(room.settings.qa&&identity.role==='host'?{qa(bit){commands|=bit;wake();}}:{})};
-    try{await session.prepare();}catch(error){session.fail(error);return;}
+    const current=session;
+    try{await current.prepare();}catch(error){current.fail(error);return;}
+    if(session!==current||current.closed)return;
   }
   for(const message of value.signals||[])await session?.receiveSignal(message);
 }
@@ -133,6 +140,24 @@ $('swap').onclick=()=>action(async()=>accept(await post('seat')));
 $('settings').onclick=()=>{editing=!editing;$('entry').hidden=!editing;$('entry-actions').hidden=true;$('save-settings').hidden=false;
   for(const id of ['startStage','players','rank','count','network','transport','ice','delay'])$(id).value=String(room.settings[id]);$('life-compensation').checked=room.settings.lifeCompensation;help();};
 $('save-settings').onclick=()=>action(async()=>{const value=await post('settings',{settings:config()});editing=false;await accept(value);});
+async function returnToRoom(reason='本局已结束，可重新准备。',snapshot=null){
+  if(returningTask)return returningTask;
+  const old=session,runId=room?.runId;
+  old?.close();clear();
+  returningTask=(async()=>{
+    try{
+      await old?.recorder.seal(2000);
+      const next=snapshot||await post('end',{runId});
+      old?.recorder.close(true);session=null;
+      $('cover').hidden=false;$('fallback').hidden=true;
+      showRoom(next);status(reason);
+    }catch(error){status('返回房间失败：'+error.message+'，可点击返回房间重试。');}
+    finally{returningTask=null;returnButton.disabled=false;}
+  })();return returningTask;
+}
+const returnButton=document.createElement('button');returnButton.type='button';
+returnButton.id='return-room';returnButton.textContent='返回房间';returnButton.hidden=true;
+returnButton.onclick=()=>void returnToRoom();$('leave').after(returnButton);
 async function leave(mode=room?.settings||config()){
   leaving=true;session?.close();try{await session?.recorder.seal();if(identity)await post('leave');}finally{identity=null;location.href='lan.html?'+networkParams(mode);}
 }
