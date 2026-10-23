@@ -62,6 +62,9 @@ async function api(path, data = {}, method = 'POST') {
 function render(value) {
   if (!session) return;
   state = value;
+  $('lobby').dataset.roomPhase=state.started?'loading':'lobby';
+  $('lobby').dataset.roomLanguage=state.settings.language;
+  if(state.started)$('lobby').dispatchEvent(new Event('room-preview-stop'));
   if(session.role==='host')saveRoomPreferences({settings:state.settings,connection:{network:state.network||'lan',mode:state.mode,ice:state.ice||'all'}});
   document.body.dataset.view=state.started?'playing':'room';
   $('entry').hidden = true; $('lobby').hidden = false; $('mode').disabled = true; $('mode').value = state.mode;
