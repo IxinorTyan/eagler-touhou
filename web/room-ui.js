@@ -1,4 +1,5 @@
 // Shared room chrome; controllers keep their original nodes and handlers.
+import {mountTitlePreview} from './room-title-preview.js';
 const games = {
   '01': '东方灵异传', '02': '东方封魔录', '03': '东方梦时空',
   '04': '东方幻想乡', '05': '东方怪绮谈',
@@ -237,5 +238,5 @@ function mountRoom(game) {
   if (stageContent) launchObserver.observe(stageContent, {childList: true, subtree: true});
   const existingPlayer = playerNode();
   if (existingPlayer) { observer.observe(existingPlayer, {attributes: true, attributeFilter: ['class']}); launchObserver.disconnect(); }
-  findHistory(); update();
+  findHistory(); update(); mountTitlePreview({game, lobby, waiting});
 }

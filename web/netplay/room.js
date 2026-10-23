@@ -238,7 +238,7 @@ function applyDeparture(message){
 async function request(action,data={}){
   const response=await fetch(`/api/${action}`,{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({protocol:PROTOCOL,transport:useRelay?'ws':'rtc',room:session?.room,token:session?.token,...data}),signal:AbortSignal.timeout(10000)});
-  const result=await response.json();if(!response.ok)throw Error(result.error||`HTTP ${response.status}`);return result;
+  const result=await response.json();if(!response.ok)throw Object.assign(Error(result.error||`HTTP ${response.status}`),{status:response.status});return result;
 }
 function signal(peer,message){return request('signal',{to:peer.role,message});}
 function send(peer,message){
@@ -294,6 +294,9 @@ function finishGame(){
 }
 function render(){
   if(!session||!state)return;
+  $('lobby').dataset.roomPhase=state.phase;
+  $('lobby').dataset.roomLanguage=state.settings.language;
+  if(state.phase!=='lobby')$('lobby').dispatchEvent(new Event('room-preview-stop'));
   const slot=state.slots[session.role],lobby=state.phase==='lobby'&&!stopped,active=activeRoles();
   $('entry').hidden=true;$('lobby').hidden=false;$('transport').disabled=true;
   $('room-info').textContent=`房间 ${session.room} · ${state.settings.players} 人模式 · ${state.settings.language==='jp'?'日文版':'汉化版'} · 你是${label(session.role)} · ${slot===null?'尚未选座':`P${slot+1}`}`;
@@ -993,5 +996,12 @@ $('ready').onclick=()=>{
   action('ready');
 };
 $('start').onclick=()=>{action('start');};
-$('leave').onclick=async()=>{replayRecorder.finish('玩家离开本局');stopped=true;running=false;clearInput();runtime?.stop();clearTimers();disconnect();try{await replayRecorder.seal();await request('leave');}finally{location.href=networkUrl(mode);}};
+$('leave').onclick=async()=>{
+  replayRecorder.finish('玩家离开本局');stopped=true;running=false;clearInput();runtime?.stop();clearTimers();disconnect();
+  try{await replayRecorder.seal();await request('leave');}
+  catch(error){
+    // The host may remove this disconnected seat while its recording seals.
+    if(![403,404].includes(error.status))throw error;
+  }finally{location.href=networkUrl(mode);}
+};
 onBgmVersion(()=>{if(session&&state?.phase==='lobby'&&!stopped)prepareRoomAssets(state).catch(()=>{});});
