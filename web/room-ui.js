@@ -49,6 +49,9 @@ function mountRoom(game) {
   settingsToggle.type = 'button'; settingsToggle.title = '本局设置';
   settingsToggle.setAttribute('aria-label', '打开本局设置'); settingsToggle.append(icon('room-gear-six'));
   headerActions.append(copy, settingsToggle);
+  const headerReturn = make('button', 'room-ui-return-header', '返回房间');
+  headerReturn.type='button';headerReturn.id='return-room-header';headerReturn.hidden=true;
+  headerReturn.onclick=()=>$('return-room')?.click();headerActions.prepend(headerReturn);
   if (leave) {
     leave.classList.add('room-ui-back'); leave.setAttribute('aria-label', '离开房间'); leave.title = '离开房间';
     leave.prepend(icon('room-caret-left')); header.append(leave);
@@ -167,6 +170,8 @@ function mountRoom(game) {
     copyTimer = setTimeout(() => { copyFeedback.textContent = ''; }, 4000);
   };
   const update = () => {
+    const returnButton = $('return-room');
+    if (returnButton && ['01', '03'].includes(game) && returnButton.parentNode !== headerActions) headerActions.prepend(returnButton);
     const active = !lobby.hidden; document.body.classList.toggle('room-ui-in-room', active);
     for (const {node, destination, anchor} of relocations) {
       if (active && node.parentNode !== destination) destination.append(node);
@@ -196,7 +201,10 @@ function mountRoom(game) {
     const nativePlayer = playerNode();
     const started = game === '01' ? $('cover')?.hidden === true : game === '03' ? !stageContent.hidden : game === '05' ? !$('pause').disabled : nativePlayer?.classList.contains('immersive');
     // Returning from fullscreen must keep the actual game visible in its room.
-    nativeOpened = active && (nativeOpened || !!started);
+    nativeOpened = active && lobby.dataset.roomPhase !== 'lobby' && (nativeOpened || !!started);
+    headerReturn.hidden=!active||!returnButton||returnButton.hidden||['01','03'].includes(game)||nativeOpened;
+    headerReturn.disabled=!!returnButton?.disabled;
+    if(leave){leave.setAttribute('aria-label',leave.textContent.trim());leave.title=leave.textContent.trim();}
     stage.classList.toggle('room-ui-started', nativeOpened);
     if (seatsSource) {
       const values = seatsSource.textContent.split(' / ');

@@ -12,11 +12,12 @@ import {LocalSe,readNativeSe} from './local-se.js';
 import {assetBytes} from '../preload-cache.js';
 const workerHost=globalThis.th04WorkerHost;
 const canvas=workerHost?.canvas??document.getElementById('canvas'),details=workerHost?{}:document.getElementById('details');
-const nativeCanvas=workerHost?new OffscreenCanvas(640,400):document.createElement('canvas');
+const nativeCanvas=workerHost?.canvas??document.createElement('canvas');
 nativeCanvas.width=640;nativeCanvas.height=400;
 if(!workerHost){nativeCanvas.hidden=true;nativeCanvas.style.display='none';document.body.append(nativeCanvas);}
 function notifyParent(message){if(workerHost)workerHost.notify(message);else if(typeof globalThis.th04RuntimeNotify==='function')globalThis.th04RuntimeNotify(message);}
-const presentPersonalHud=createPersonalHud(canvas,nativeCanvas);
+const presentPersonalHud=createPersonalHud(canvas,nativeCanvas,{overlay:!!workerHost});
+let presentationHud=null;
 let rawPresentation=false,presentationCount=0,presentationPending=false;
 let pointPreferences={focus:true,always:false};
 const signature=new TextEncoder().encode('TH04COOPLABv001!');
@@ -142,6 +143,10 @@ async function boot(config){
     onError:error=>reportRuntimeFailure('emulator-error',Error('模拟器异常：'+String(error?.message||error))),
     onExit:()=>reportRuntimeFailure('emulator-exit',Error('游戏模拟器已经退出'))});
   emulator.module.projectileArt.view(localSlot);
+  if(workerHost){
+    emulator.module.getPersonalHud=()=>presentationHud;
+    emulator.module.getHitPoints=()=>presentationHud?.points||[];
+  }
   if(closed){emulator.pause();return;}
   localSe=workerHost?workerHost.se:new LocalSe(emulator.module.SDL2.audioContext);
   const seLoading=localSe.load().catch(error=>{if(!closed)seError='浏览器音效加载失败：'+error.message;});
@@ -295,11 +300,13 @@ function step(inputs,{frame=ticks,replay=false,offlineMask=0}={}){
 function present(){
   if(!enabled||!presentationPending)return false;
   // Called once per completed room batch, synchronously after all simulation.
-  // Flush the current native RGB before drawing HUD from the same state.
-  if(!emulator.module.netPresent())return false;
+  // Resolve overlays from this simulation boundary before the Worker GPU draw.
   const live=mailboxOwned(mailbox,guestMemoryBase,residentAddress);
-  presentPersonalHud({raw:rawPresentation,heap:emulator.module.HEAPU8,mailbox:live?mailbox:-1,patch,slot:localSlot,
-    guestBase:live?guestBase():0,points:{...pointPreferences,players:playerCount}});
+  const hud={raw:rawPresentation,heap:emulator.module.HEAPU8,mailbox:live?mailbox:-1,patch,slot:localSlot,
+    guestBase:live?guestBase():0,points:{...pointPreferences,players:playerCount}};
+  if(workerHost)presentationHud=presentPersonalHud(hud);
+  if(!emulator.module.netPresent())return false;
+  if(!workerHost)presentPersonalHud(hud);
   presentationPending=false;presentationCount++;return true;
 }
 function capture(frame,restored=false){

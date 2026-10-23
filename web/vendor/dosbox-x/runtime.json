@@ -29,7 +29,7 @@
   "presentation": {
     "local": "direct",
     "network": "completed batch",
-    "sha256": "83893ca252caa26c9ecdb6a8fcca7fe496d793bb5f95d29e921c360a4c957631"
+    "sha256": "d6e61b8eeade72830e1d17d42aac66b7ec0e1045444394f6406124f4b86b6480"
   },
   "sourceWasm": "c154235667747e613be00d0955f068b54cbf8e1fb8e5c34d34e5552292f4c72a",
   "keyboardFix": {

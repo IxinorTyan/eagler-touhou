@@ -1,11 +1,14 @@
 import {hudDigits} from './hud-digits.js';
-import {drawCollisionPoints} from './collision-points.js';
+import {drawCollisionPoints,collisionPoints} from './collision-points.js';
 
 // Only final pixels differ by local seat. Never write a local seat selector
 // into NP21 RAM, VRAM, devices, snapshots or the state checksum.
-export function createPersonalHud(canvas,nativeCanvas){
+export function createPersonalHud(canvas,nativeCanvas,{overlay=false}={}){
   const makeCanvas=()=>typeof document==='undefined'||typeof document.createElement!=='function'?new OffscreenCanvas(1,1):document.createElement('canvas');
-  const context=canvas.getContext('2d',{alpha:false});
+  const layer=overlay?makeCanvas():canvas;
+  if(overlay){layer.width=256;layer.height=400;}
+  const context=layer.getContext('2d',{alpha:overlay});
+  let rows=[],points=[],signature='',revision=0;
   let tramAddress=-1,tramBuffer=null,lastTramSearch=-Infinity;
   const atlas=makeCanvas();atlas.width=160;atlas.height=16;
   const ink=atlas.getContext('2d'),pixels=ink.createImageData(160,16);
@@ -17,6 +20,11 @@ export function createPersonalHud(canvas,nativeCanvas){
   const numbers=new Map();
   function number(value,x,y,count,zeros=false){
     const text=String(value).padStart(count,zeros?'0':' ').slice(-count);
+    if(overlay){rows.push([text,x>=448?x-448:x-272+128,y]);return;}
+    drawNumber(text,x,y);
+  }
+  function drawNumber(text,x,y){
+    const count=text.length;
     const key=x+','+y+','+count;
     let row=numbers.get(key);
     if(!row){
@@ -31,12 +39,12 @@ export function createPersonalHud(canvas,nativeCanvas){
     }
     context.drawImage(row.image,x,y);
   }
-  return ({heap,mailbox,patch,slot,guestBase,raw=false,points={}})=>{
-    if(canvas.width!==640||canvas.height!==400){
+  function paint({heap,mailbox,patch,slot,guestBase,raw=false,points:preferences={}}){
+    if(!overlay&&(canvas.width!==640||canvas.height!==400)){
       canvas.width=640;canvas.height=400;
     }
     context.imageSmoothingEnabled=false;
-    context.drawImage(nativeCanvas,0,0,640,400);
+    if(!overlay)context.drawImage(nativeCanvas,0,0,640,400);
     if(raw||mailbox<0||!patch?.personal_stats||slot==null)return;
     const view=new DataView(heap.buffer);
     if(tramBuffer!==heap.buffer){tramBuffer=heap.buffer;tramAddress=-1;lastTramSearch=-Infinity;}
@@ -49,7 +57,8 @@ export function createPersonalHud(canvas,nativeCanvas){
     // Don't paint over the boot screen, cleared menus or ending artwork.
     const cell=view.getUint16(tram+6*160+56*2,true);
     if((cell&255)!==0x57||(cell>>>8)<0x20||(cell>>>8)>0x29)return;
-    drawCollisionPoints(context,{heap,mailbox,patch,...points});
+    if(overlay)points=collisionPoints({heap,mailbox,patch,...preferences});
+    else drawCollisionPoints(context,{heap,mailbox,patch,...preferences});
     const schema=patch.personal_stats;
     const at=mailbox-patch.mailbox_cs_offset+schema.cs_offset;
     number(view.getUint32(at+schema.high_score,true),448,64,8,true);
@@ -73,6 +82,17 @@ export function createPersonalHud(canvas,nativeCanvas){
       number(heap[at+schema.point],320,all?272:256,5);
       number(view.getUint32(bonus+1,true),272,336,8);
     }
+  }
+  return state=>{
+    if(!overlay)return paint(state);
+    rows=[];points=[];paint(state);
+    const next=JSON.stringify(rows);
+    if(next!==signature){
+      context.clearRect(0,0,256,400);
+      for(const [text,x,y]of rows)drawNumber(text,x,y);
+      signature=next;revision++;
+    }
+    return {canvas:layer,revision,points};
   };
 }
 

@@ -6,7 +6,8 @@ import {LOCAL_CHUNK,pointSize,pointIndex} from './local-points.js';
 // Every public operation isolates failures from the player's execution loop.
 export function createRecorder(toolbar){
   let tape=null,error='',channel=null,builder=null,pointError='',points=[],network=null,closed=false,localSolo=false;
-  const id=randomId(),watch=document.createElement('a'),info=document.createElement('span');
+  let id=randomId();
+  const watch=document.createElement('a'),info=document.createElement('span');
   watch.textContent='同浏览器观战';watch.target='_blank';watch.rel='noopener';watch.hidden=true;
   watch.href=new URL('../replay.html?watch='+id,import.meta.url).href;
   toolbar?.append(watch,info);
@@ -20,6 +21,10 @@ export function createRecorder(toolbar){
   return {
     async boot({settings,players,hostSlot,opening,tickMs=1000/60,adapter='confirmed-worker/1'}){
       try{
+        network?.stop();builder?.stop();channel?.close();
+        network=builder=channel=null;points=[];pointError=error='';closed=false;
+        id=randomId();watch.href=new URL('../replay.html?watch='+id,import.meta.url).href;
+        remote.hidden=true;upload.textContent='';
         const identity=await fingerprint(SOURCE_PATHS);if(closed)return;
         tape=new ConfirmedTape({version:VERSION,game:GAME,adapter,settings:structuredClone(settings),players,hostSlot,tickMs,identity,opening});
         localSolo=adapter==='native-local/1'&&players===1;
@@ -62,6 +67,7 @@ export function createRecorder(toolbar){
     },
     snapshot,
     get error(){return error;},
-    close(){closed=true;tape?.finish('观战来源关闭');channel?.close();builder?.stop();network?.stop();}
+    get ended(){return !tape||!!tape.end;},
+    close(removeLinks=false){closed=true;tape?.finish('观战来源关闭');channel?.close();builder?.stop();network?.stop();if(removeLinks)for(const node of [watch,info,open,remote,upload])node.remove();}
   };
 }

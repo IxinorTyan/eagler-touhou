@@ -37,7 +37,7 @@ function present(staged=false){
  if(transfers.size>=2)return false;
  if(!th04WorkerHost.runtime.present())return false;
  const bitmap=th04WorkerHost.canvas.transferToImageBitmap(),sequence=++frameSequence;
- transfers.add(sequence);send({type:'frame',bitmap,sequence,staged},[bitmap]);return true;
+ transfers.add(sequence);send({type:'frame',bitmap,sequence,staged,producedAt:performance.timeOrigin+performance.now()},[bitmap]);return true;
 }
 let chain=Promise.resolve();
 onmessage=({data})=>{

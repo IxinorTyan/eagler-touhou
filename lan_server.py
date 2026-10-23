@@ -36,7 +36,7 @@ def room_expired(room,now):
 def snapshot(room):
     return {'protocol':PROTOCOL,'revision':room['revision'],'phase':room['phase'],'slots':room['slots'],
             'present':{r:bool(room[r]) for r in ROLES},
-            'ready':room['ready'],'settings':room['settings'],'generation':room['generation']}
+            'ready':room['ready'],'settings':room['settings'],'generation':room['generation'],'runId':room.get('runId',0)}
 
 
 class Handler(AssetHandler):
@@ -142,7 +142,7 @@ class Handler(AssetHandler):
                 ROOMS[code]={'host':token,'guest':None,'guest2':None,'queues':{r:[] for r in ROLES},
                     'transport':transport,
                     'seen':{r:now for r in ROLES},'revision':1,'phase':'lobby','slots':{r:None for r in ROLES},
-                    'ready':{r:False for r in ROLES},'generation':secrets.token_hex(8),
+                    'ready':{r:False for r in ROLES},'generation':secrets.token_hex(8),'runId':0,
                     'settings':{'p1':0,'p2':2,'p3':0,'players':2,'difficulty':1,'lives':3,'bombs':2,'language':'cn','rollback':rollback}}
                 return self.reply({'room':code,'token':token,'role':'host','protocol':PROTOCOL,'state':snapshot(ROOMS[code])})
             code=str(data.get('room','')).upper()
@@ -169,6 +169,19 @@ class Handler(AssetHandler):
                 return self.reply({'error':'房间身份无效'},403)
             room['seen'][role]=now
             active=ROLES[:room['settings']['players']]
+            if action in ('end','signal','drop','ready','start') and data.get('runId')!=room['runId']:
+                return self.reply({'error':'本局编号已失效'},409)
+            if action=='end':
+                if room['phase']!='lobby':
+                    room['phase']='lobby'
+                    room['ready']={r:False for r in ROLES}
+                    room['queues']={r:[] for r in ROLES}
+                    room['startup']={}
+                    room['ice_requested']={}
+                    for member in ROLES:
+                        if not room[member]:room['slots'][member]=None
+                    room['revision']+=1
+                return self.reply({'state':snapshot(room)})
             if action=='events':
                 # HTTP diagnostics work before the WebRTC channel opens.
                 if room['phase']=='loading' and 'boot_stage' in data:
@@ -220,6 +233,7 @@ class Handler(AssetHandler):
                 if role!='host' or room['phase']!='lobby' or not all(room[r] and room['ready'][r] for r in active) or {room['slots'][r] for r in active}!=set(range(len(active))):
                     return self.reply({'error':'需要所有已开放座位的玩家加入并准备'},409)
                 room['phase']='loading'
+                room['runId']+=1
                 room['revision']+=1
                 return self.reply({'state':snapshot(room)})
             if action=='signal':
