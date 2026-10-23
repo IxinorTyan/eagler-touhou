@@ -164,6 +164,9 @@ function render(){
   $('watch').disabled=!!auth||!version?.historyAvailable||entering;
   $('lobby').hidden=!auth;$('pause').disabled=!running;
   if(!auth||!room)return;
+  $('lobby').dataset.roomPhase=room.phase;
+  $('lobby').dataset.roomLanguage=room.settings.language;
+  if(room.phase!=='lobby')$('lobby').dispatchEvent(new Event('room-preview-stop'));
   if(room.phase==='lobby')prepareRoomResources(room).catch(()=>{});
   $('room-title').textContent=`房间 ${auth.room} · ${host?'我是房主':'我是队友'}`;
   $('my-seat').textContent=`我的角色：P${room.slots[auth.role]+1}`;
