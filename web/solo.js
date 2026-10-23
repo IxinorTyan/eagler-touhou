@@ -9,7 +9,6 @@ import {createBrowserSoloRecorder} from './replay/external-recorder.js';
 import {decodeExternalReplay,restoreExternalReplayDisk} from './replay/external-codec.js';
 import {fingerprint} from './replay/tape.js';
 import {mountSoloReplayToolbar} from './replay/external-ui.js';
-import {readSoloBoss,mountSoloBossHud,compatibleSoloReplay} from './solo-boss-hud.js';
 
 const $=id=>document.getElementById(id),keys=new Set();
 const nativeKeys=[['ArrowUp',1],['ArrowDown',2],['ArrowLeft',4],['ArrowRight',8],['KeyX',16],['KeyZ',32],['Escape',128],['Enter',256]];
@@ -28,7 +27,6 @@ const replayUI=mountSoloReplayToolbar(host,{isPlayback:()=>playback,isSynthetic:
 });
 const screen=document.createElement('div');screen.className='screen solo-screen';
 let canvas=document.createElement('canvas');canvas.width=640;canvas.height=400;canvas.tabIndex=0;canvas.setAttribute('aria-label','东方封魔录单人游戏画面');screen.append(canvas);player.stage.prepend(screen);
-const bossHud=mountSoloBossHud(screen);
 player.setLabel('单人游戏');
 mountControlSettings($('control-settings'),{solo:true,onChange:()=>{$('controls-summary').textContent=controlsSummary('solo');release();},onEditing:value=>{editing=value;release();}});
 const pointMask=mountFocusSettings($('control-settings'),{profile:'solo',alwaysPointControl:player.alwaysPointControl});
@@ -124,10 +122,8 @@ function tick(now){
     try{scan();const s=readSoloState(),play=s?.mode===1;
       player.setActive(emulator.state==='running');player.setContext({key:`${s?.generation??0}:${play?'game':'menu'}`,play:play&&!s.hit});
       syncInput(true);music?.poll(emulator.module.HEAPU8,now);
-      const data=mailbox-patch.entries.mailbox+(patch.dataSegment-patch.codeSegment)*16;
-      bossHud.update(s?readSoloBoss(emulator.module.HEAPU8,data,s.mode):null,s?.generation,s?.ticks);
     }catch(error){status('运行错误：'+error.message);}
-  }else bossHud.hide();
+  }
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
@@ -157,7 +153,7 @@ async function startGame(replay=null){
     let externalReplay=null;
     if(playback){
       const identity=await fingerprint(replaySources);
-      if(!await compatibleSoloReplay(replay.header.identity,identity)||replay.header.runtime!=='main'||replay.header.boundaryMode!=='sleep')throw Error('Replay 与当前游戏或模拟器版本不一致');
+      if(replay.header.identity!==identity||replay.header.runtime!=='main'||replay.header.boundaryMode!=='sleep')throw Error('Replay 与当前游戏或模拟器版本不一致');
       externalReplay={mode:'playback',boundaryMode:replay.header.boundaryMode,clocks:replay.clocks,events:replay.events,endBoundary:replay.header.endBoundary,endReason:replay.header.result.endReason,endPhase:replay.header.result.endPhase,timeline:replay.header.result.timeline,
         onEnd:value=>{
           const matches=value.memoryHash===replay.header.result.memoryHash&&value.memorySha256===replay.header.result.memorySha256;
@@ -209,7 +205,6 @@ $('replay-pause').onclick=()=>{if(!emulator||!playback)return;const paused=$('re
   emulator.pauseReplay(!paused);$('replay-pause').dataset.paused=String(!paused);$('replay-pause').textContent=paused?'暂停播放':'继续播放';canvas.focus();};
 function stopPlayback(){
   if(!playback)return;replayUI.reset();release();emulator?.dispose?.();emulator=null;playback=false;
-  bossHud.hide();
   const next=canvas.cloneNode(false);canvas.replaceWith(next);canvas=next;canvas.onpointerdown=()=>canvas.focus();
   $('language').disabled=$('audio-mode').disabled=false;$('pause').disabled=true;
   $('start').disabled=false;$('replay-play').disabled=!loadedReplay;

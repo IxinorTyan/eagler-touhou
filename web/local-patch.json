@@ -4,9 +4,9 @@
   "mode": "local-coop",
   "core": "dosbox-x-jspi",
   "insert": 64192,
-  "gap": 16384,
+  "gap": 16896,
   "codeSegment": 2838,
-  "dataSegment": 8615,
+  "dataSegment": 8647,
   "headerSize": 6656,
   "entries": {
     "stage_hook": 19190,
@@ -250,19 +250,19 @@
   "disks": {
     "jp": {
       "file": "th02-local-jp.hdi.gz",
-      "sha256": "f99ed3314e58d7d9653f1eaac04299f481a13af189e4534c68a557fdd86f15ad",
-      "compressedSha256": "6d976c83e13537c79521f8cd4f2533ed20d742fb6d37c1402f46a5ea8cfc7c73",
+      "sha256": "0e76cc4557ef5e1a674204e83944790282b9f860971b6697f0a992af9d1ee952",
+      "compressedSha256": "06dea5bd458097a5201459249f98dbd692b8159a88a1b593f0468f6d1a1d79ae",
       "size": 21415936,
-      "mainSha256": "fb9e1630db2cdc8396d34c9e38b817fc2f0a6648c4bcbc526fd17030e63db651",
+      "mainSha256": "d3ecc5b708c27b44b596ef0353ca44d604c1c86a81f32bb0d57da792c74d4a3a",
       "opSha256": "e2022a3a4725cc53499eccfd46fd73816dda222a43d00c499b014852276f7731",
       "originalOpMD5": "9fb2839db50f38119d0b98d4fb70cd0e"
     },
     "cn": {
       "file": "th02-local-cn.hdi.gz",
-      "sha256": "8991ac441dff6edd1d11ea5bbc46f46b053e244cd9876f711dd61d9f6e638cb5",
-      "compressedSha256": "b910109821bdeac8afa3173f6938557e1163b0bd483c08ca686b6b09c1a3e680",
+      "sha256": "fd46abb34621549d9e788616ce5cadfd3d0bc82bef0b913297d8df3cafe90f42",
+      "compressedSha256": "5f125e6f2a308a169b07dd73730bb786c0df49dac930236b80b2ae2c4e13fe4a",
       "size": 21415936,
-      "mainSha256": "95809e7242a99072b58047703f21ae0d72882c241da888bce00b6100f119af67",
+      "mainSha256": "53e5782ec9c5280b596ca782c8f31d0ad2a9bac3d99d391dfebf024b91ff1956",
       "opSha256": "4260d79cd3287b750283b3a4d0f7a7588e902203834b43b86d0cbafee7dccd41",
       "originalOpMD5": "b17105388f7289e08dd80815f82ab0bb"
     }
@@ -1598,5 +1598,25 @@
       1300
     ],
     "sigmaFinal": 1300
+  },
+  "nativeBossHud": {
+    "schema": 1,
+    "implementation": "guest-ems",
+    "module": "A:\\NBHUD.BIN",
+    "moduleSha256": "00ca2b9a44eff57dcd04f6048332bba9658a9eef8b53353e9f9fbefef3bd637f",
+    "moduleBytes": 2060,
+    "emsPages": 1,
+    "conventionalBytesAdded": 512,
+    "bridge": {
+      "entry": 35168,
+      "cleanup": 35246,
+      "handle": 35271,
+      "status": 35273,
+      "pointer": 35274
+    },
+    "hp": true,
+    "phaseCuts": true,
+    "timer": "native audited deadlines; unavailable deadlines blank",
+    "browserOverlay": false
   }
 }

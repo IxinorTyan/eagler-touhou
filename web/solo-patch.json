@@ -4,7 +4,7 @@
     "jp": {
       "file": "th02-solo-jp.hdi.gz",
       "size": 21415936,
-      "sha256": "c5096b5579f64092ae6c1d10a4902e4f73f5d404e3cd6eb1ff2786a09b44485d",
+      "sha256": "cee071982eac6c7190bfc1e5aed769fe2afb9596b96d9ba72e644a1717e83ad8",
       "signature": "TH02SOLOINPUTv1!",
       "entries": {
         "stage": 19053,
@@ -19,10 +19,10 @@
       },
       "headerSize": 6656,
       "codeSegment": 2838,
-      "dataSegment": 7673,
-      "gap": 1312,
+      "dataSegment": 7705,
+      "gap": 1824,
       "originalMainSha256": "9e9a323781e793738c8e3a5b575d99c0cb6a71bac8c3d581178976b4977f0a92",
-      "mainSha256": "528ba75c248331c6f2e5990e7157852fb873ef8e466d1ab50e2e17177386ad6e",
+      "mainSha256": "a23cdbbb957beaf7338a866b1487bb4881f4aaea8e3ee49a440f02e91fb45a59",
       "hooks": [
         {
           "offset": 46619,
@@ -59,12 +59,33 @@
           "original": "e8d01c",
           "entry": "exit"
         }
-      ]
+      ],
+      "compressedSha256": "77c74bfe34a6c49ebf8b4ca423d6b05fa523005e5b39534b35ac17112584f8ba",
+      "nativeBossHud": {
+        "schema": 1,
+        "implementation": "guest-ems",
+        "module": "A:\\NBHUD.BIN",
+        "moduleSha256": "4784b2e9688b3b8cbb7be80c86f444531ae2556eba63127a23a611a91e258aa0",
+        "moduleBytes": 1993,
+        "emsPages": 1,
+        "conventionalBytesAdded": 512,
+        "bridge": {
+          "entry": 20096,
+          "cleanup": 20174,
+          "handle": 20199,
+          "status": 20201,
+          "pointer": 20202
+        },
+        "hp": true,
+        "phaseCuts": true,
+        "timer": "native audited deadlines; unavailable deadlines blank",
+        "browserOverlay": false
+      }
     },
     "cn": {
       "file": "th02-solo-cn.hdi.gz",
       "size": 21415936,
-      "sha256": "d4b4b9c66ddbf6049c52a74bba038a8721b231cb91cb57fcac48dc8c794236b2",
+      "sha256": "ad105a4cbff46bf2fc02de77fe5f054e9900453cc847d7b9fa336d653a28b6b9",
       "signature": "TH02SOLOINPUTv1!",
       "entries": {
         "stage": 19053,
@@ -79,10 +100,10 @@
       },
       "headerSize": 6656,
       "codeSegment": 2838,
-      "dataSegment": 7673,
-      "gap": 1312,
+      "dataSegment": 7705,
+      "gap": 1824,
       "originalMainSha256": "d54640c76acab16c3f0bdf34774c5153468172d7ca132426ab845ef2a1c8dce8",
-      "mainSha256": "7bd8dd753e41e63ccbf308ffd59b9f25240902166249cb69e805196176cc8df9",
+      "mainSha256": "00eea3318ad14818c1429be55c9ba250a8af0576379adc03c58716e7e9d36168",
       "hooks": [
         {
           "offset": 46619,
@@ -119,7 +140,28 @@
           "original": "e8d01c",
           "entry": "exit"
         }
-      ]
+      ],
+      "compressedSha256": "2b005df5c3deb052a6a7b639363ec438f386a77de8203da36032fd94861c069c",
+      "nativeBossHud": {
+        "schema": 1,
+        "implementation": "guest-ems",
+        "module": "A:\\NBHUD.BIN",
+        "moduleSha256": "4784b2e9688b3b8cbb7be80c86f444531ae2556eba63127a23a611a91e258aa0",
+        "moduleBytes": 1993,
+        "emsPages": 1,
+        "conventionalBytesAdded": 512,
+        "bridge": {
+          "entry": 20096,
+          "cleanup": 20174,
+          "handle": 20199,
+          "status": 20201,
+          "pointer": 20202
+        },
+        "hp": true,
+        "phaseCuts": true,
+        "timer": "native audited deadlines; unavailable deadlines blank",
+        "browserOverlay": false
+      }
     }
   }
 }

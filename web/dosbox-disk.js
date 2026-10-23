@@ -12,7 +12,7 @@ export function extractGame(disk){
       const name=parent+stem+(ext?'.'+ext:'');
       if(attr&16){
         if(name==='HUMAROKU')walk(fat.chain(fat.view.getUint16(at+26,true)).map(c=>[fat.offset(c),fat.clusterSize]),name+'/');
-      }else if(name.startsWith('HUMAROKU/')){
+      }else if(name.startsWith('HUMAROKU/')||name==='NBHUD.BIN'){
         files.push({path:'game/'+name,contents:fat.read(at)});entries.set(name,at);
       }
     }
