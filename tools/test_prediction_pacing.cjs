@@ -6,7 +6,7 @@ const {pathToFileURL}=require('node:url');
  const root=path.resolve(__dirname,'..');
  const {RollbackQueue}=await import(pathToFileURL(path.join(root,'web/netplay/rollback-queue.js')));
  const source=fs.readFileSync(path.join(root,'web/netplay/room.js'),'utf8');
- const body=source.slice(source.indexOf('function nextInputs(){'),source.indexOf('function updateMetrics('));
+ const body=source.slice(source.indexOf('function nextInputs('),source.indexOf('function updateMetrics('));
  let waitClosures=0;
  const makeNext=q=>Function('queue','runtime','MAX_ROLLBACK','endInputWait','peers','state',`let waitDetail='';${body};return nextInputs;`)(q,{canPredict:()=>true,predictionBlockReason:()=>''},12,()=>{waitClosures++;},new Map(),{slots:{}});
  for(const players of [2,3])for(const horizon of [3,6]){

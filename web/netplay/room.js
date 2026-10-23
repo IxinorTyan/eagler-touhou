@@ -3,7 +3,7 @@ import {createRecorder} from '../replay/recorder.js';
 import {startFrameLoop} from '../frame-limit.js';
 import {createInputChannel,acceptInputChannel} from './input-transport.js';
 import {readNetworkMode,networkUrl} from './network-mode.js';
-import {PROTOCOL,RollbackQueue,TICK_MS,MAX_ROLLBACK,BOOT_DELAY,MAX_INPUT_DELAY,MAX_ROLLBACK_INPUT_DELAY,lockstepDelayForRtt,rollbackInputDelayForRtt,rollbackRttForSamples} from './rollback-queue.js';
+import {PROTOCOL,POLICY_SCHEMA,RollbackQueue,TICK_MS,MAX_ROLLBACK,BOOT_DELAY,MAX_INPUT_DELAY,MAX_ROLLBACK_INPUT_DELAY,lockstepDelayForRtt,rollbackPolicyForRtt,validRollbackPolicy,rollbackRttForSamples} from './rollback-queue.js';
 import {mountPlayer} from '../player-ui.js';
 import {isBound,keyboardBits,gamepadBits,gamepadStatus,normalize} from './controls.js';
 import {mountFocusSettings} from '../focus-settings.js';
@@ -26,7 +26,7 @@ const useRelay=mode.transport==='ws';
 // always use the host's server-authoritative setting, frozen at game start.
 const defaultRollback=mode.rollback==='on';
 let inputPolicy;
-let timingSent=false,runDelay=null,runInputDelay=null;
+let timingSent=false,runDelay=null,runInputDelay=null,runPolicy=null;
 let relay;
 let preparing=false,running=false,stopped=false,busy=false,runRequested=false;
 let returningTask=null,runEpoch=0;
@@ -109,7 +109,7 @@ faultDownload.onclick=async()=>{
     downloadFaultReport({schema:'touhou-network-fault/1',recordedAt:new Date().toISOString(),
     environment:{userAgent:navigator.userAgent,visibility:document.visibilityState},
     settings:state?.settings,slot:queue?.slot,frame:queue?.frame,confirmed:queue?.confirmed,
-    timing:{lockstepDelay:queue?.lockstepDelay,inputDelay:queue?.inputDelay,jitterReserveSteps:inputPolicy?.jitterSteps},
+    timing:{lockstepDelay:queue?.lockstepDelay,inputDelay:queue?.inputDelay,predictionLead:queue?.predictionLead,inputPolicy,jitterReserveSteps:inputPolicy?.jitterSteps},
     running,stopped,stopReason,stalls:stallReport(),diagnostics:$('diagnostics').textContent,runtime:fault},'th04-network-fault.json');
     player.note('故障信息已下载，只保存在本机。');
   }catch(error){player.note('读取故障信息失败：'+error.message);}
@@ -494,6 +494,7 @@ function attachChannel(peer,channel){
       if(stopped&&m.type!=='end'&&m.type!=='end-ack')return;
       switch(m.type){
         case 'hello':
+          if(m.inputPolicy?.policySchema!==POLICY_SCHEMA)throw Error('输入策略版本不同，请所有玩家刷新后重新建房');
           if(JSON.stringify(m.settings)!==JSON.stringify(state.settings)||JSON.stringify(m.slots)!==JSON.stringify(state.slots))throw Error('开局设置不一致');
           if(m.inputPolicy?.inputDelay!==inputPolicy.inputDelay||m.inputPolicy?.directionPrediction!==inputPolicy.directionPrediction||m.inputPolicy?.rollbackEnabled!==inputPolicy.rollbackEnabled||m.inputPolicy?.jitterSteps!==inputPolicy.jitterSteps)throw Error('联机性能策略不一致，请全员刷新并使用相同网络模式');
           peer.hello=true;maybeRun();break;
@@ -508,7 +509,9 @@ function attachChannel(peer,channel){
           if(!Number.isInteger(m.delay)||m.delay<BOOT_DELAY||m.delay>MAX_INPUT_DELAY)throw Error('无效开局输入缓冲');
           if(!Number.isInteger(m.inputDelay)||m.inputDelay<0||m.inputDelay>MAX_ROLLBACK_INPUT_DELAY||
              m.inputDelay>m.delay||(!inputPolicy.rollbackEnabled&&m.inputDelay!==0))throw Error('无效回滚输入策略');
-          runDelay=m.delay;runInputDelay=m.inputDelay;
+          if(!validRollbackPolicy(m.policy)||m.policy.rollbackEnabled!==inputPolicy.rollbackEnabled||
+             m.policy.inputDelay!==m.inputDelay||m.policy.rttMs<Math.ceil(Math.max(...[...peers.values()].map(p=>rollbackRttForSamples(p.timingSamples)))))throw Error('无效混合输入策略');
+          runDelay=m.delay;runInputDelay=m.inputDelay;runPolicy=m.policy;
           runRequested=true;maybeRun();break;
 
         case 'input':
@@ -697,10 +700,10 @@ async function beginGame(){
   const ownedEpoch=runEpoch;
   // Six steps cover a slow peer's input delivery without the old twelve-step
   // speculative tail. Real input still corrects a predicted release immediately.
-  timingSent=false;runDelay=null;runInputDelay=null;
+  timingSent=false;runDelay=null;runInputDelay=null;runPolicy=null;
   // A small fixed reserve absorbs short relay/tunnel jitter without changing
   // an in-flight authoritative input timeline. LAN and prediction stay as-is.
-  inputPolicy=Object.freeze({inputDelay:0,directionPrediction:6,rollbackEnabled:state.settings.rollback,
+  inputPolicy=Object.freeze({inputDelay:0,directionPrediction:6,policySchema:POLICY_SCHEMA,rollbackEnabled:state.settings.rollback,
     jitterSteps:!state.settings.rollback&&networkMode==='public'&&useRelay?2:0});
   bootStartedAt=performance.now();
   if(!useRelay&&!window.RTCPeerConnection)throw Error('请使用新版 Chrome 或 Edge');
@@ -768,13 +771,15 @@ function maybeRun(){
     if(![...peers.values()].every(peer=>Number.isFinite(peer.startRtt)))return;
     const rtt=Math.max(...[...peers.values()].flatMap(peer=>[peer.startRtt,...peer.timingSamples]));
     const rollbackRtt=Math.max(...[...peers.values()].flatMap(peer=>[peer.startRollbackRtt,rollbackRttForSamples(peer.timingSamples)]));
-    runInputDelay=inputPolicy.rollbackEnabled?rollbackInputDelayForRtt(rollbackRtt):0;
+    runPolicy=rollbackPolicyForRtt(rollbackRtt,inputPolicy.rollbackEnabled);
+    runInputDelay=runPolicy.inputDelay;
     runDelay=inputPolicy.rollbackEnabled?Math.max(BOOT_DELAY,runInputDelay):lockstepDelayForRtt(rtt,inputPolicy.jitterSteps);
-    broadcast({type:'run',delay:runDelay,inputDelay:runInputDelay});runRequested=true;
+    broadcast({type:'run',delay:runDelay,inputDelay:runInputDelay,policy:runPolicy});runRequested=true;
   }
   if(!runRequested)return;
   queue.setLockstepDelay(runDelay);queue.setInputDelay(runInputDelay);
-  inputPolicy=Object.freeze({...inputPolicy,inputDelay:runInputDelay});
+  queue.setPredictionLead(runPolicy.predictionLead);
+  inputPolicy=Object.freeze({...inputPolicy,...runPolicy});
   clearTimeout(loadTimer);runtime.start();running=true;player.setActive(true);
   for(const peer of onlinePeers()){peer.lastPacket=performance.now();peer.suspectAt=null;}
   lastNow=lastMeasure=performance.now();measureFrame=queue.frame;accumulator=0;
@@ -872,10 +877,9 @@ function captureLocalInput(frontier=queue.frame,context=null){
   pendingAction=0;captureTimes.set(captured.frame,performance.now());broadcast(captured);return true;
 }
 function nextInputs(source=queue,report=source===queue){
-  // Do not let the faster peer speculate beyond the direction predictor's
-  // useful horizon. Otherwise a held direction expires and every arriving
-  // input invalidates a long tail. Keep the full rollback history unchanged.
-  const leadLimit=Math.max(1,source.directionPrediction);
+  // Bound speculative work using the negotiated lead budget, independently
+  // from direction persistence and the twelve-step restore safety window.
+  const leadLimit=Math.max(1,source.predictionLead);
   if(source.active&&source.frame>=source.confirmed+leadLimit){
     if(report)waitDetail=`等待对端输入 · 预测领先 ${source.frame-source.confirmed}/${leadLimit} 步`;
     return null;
@@ -914,7 +918,7 @@ function updateMetrics(now,waiting){
     +`本机 ${hz.toFixed(1)}/60 步每秒 · 执行平均 ${averageCost.toFixed(1)} / 最慢 ${peakCost.toFixed(1)} ms\n`
     +`性能诊断 v2 · 最近统计周期：模拟 ${(c.simulate/Math.max(1,c.steps)).toFixed(1)} ms/步 · 呈现 ${(c.present/Math.max(1,c.presentations)).toFixed(1)} ms/批 · 快照 ${(c.capture/Math.max(1,c.captures)).toFixed(1)} ms/次（${c.captures} 次）\n`
     +`恢复 ${c.restore.toFixed(1)} ms（${c.restores} 次） · 重算 ${c.replay.toFixed(1)} ms（${c.replays} 步，含模拟和快照） · 确认 ${c.confirm.toFixed(1)} ms · 校验 ${c.hash.toFixed(1)} ms\n`
-    +`${queue.active?`预测回滚 · 本地缓冲 ${queue.inputDelay} 步 · 方向预测 ${queue.directionPrediction} 步`:inputPolicy.rollbackEnabled?'确认锁步 · 等待回滚启用':`确认锁步 · 回滚已关闭 · 输入缓冲 ${queue.lockstepDelay} 步（${(queue.lockstepDelay*TICK_MS).toFixed(0)} ms）${inputPolicy.jitterSteps?' · 已启用公网抖动余量':''}`} · 最近输入至应用 ${inputAge.toFixed(1)} ms · 已收输入 ${receivedInputs}\n${links}\n`
+    +`${queue.active?`混合回滚 · 本地缓冲 D=${queue.inputDelay} · 预测预算 P=${inputPolicy.predictionSteps} · 领先上限 ${queue.predictionLead} 步 · 方向保持 ${queue.directionPrediction} 步`:inputPolicy.rollbackEnabled?'确认锁步 · 等待回滚启用':`确认锁步 · 回滚已关闭 · 输入缓冲 ${queue.lockstepDelay} 步（${(queue.lockstepDelay*TICK_MS).toFixed(0)} ms）${inputPolicy.jitterSteps?' · 已启用公网抖动余量':''}`} · 最近输入至应用 ${inputAge.toFixed(1)} ms · 已收输入 ${receivedInputs}\n${links}\n`
     +`已确认 ${Math.min(queue.frame,queue.confirmed)} · 预测领先 ${Math.max(0,queue.frame-queue.confirmed)}/${MAX_ROLLBACK} 步\n`
     +`最近周期最大领先 ${c.lead} 步 · 游戏帧 ${game?.gameFrame??'启动中'} · 预测条件：${runtime.predictionBlockReason()||'允许'} · 补算前提前发输入 ${earlyInputs} 次\n`
     +`回滚 ${rollbackCount} 次 · 重算 ${resimulated} 步 · 最长 ${maxRewind} 步 · 快照 ${((runtime.rollbackInfo()?.snapshotBytes||0)/1048576).toFixed(0)} MiB\n`
@@ -942,6 +946,9 @@ async function pump(now){
   pumping=true;
   try{
     accumulator=Math.min(accumulator+Math.max(0,now-lastNow),TICK_MS*4);lastNow=now;
+    // Retry one already-due live frame without accumulating network-wait debt.
+    // A historical replay remains governed by replayUntil, not this credit.
+    if(queue.retryFrame===queue.frame&&queue.frame>=replayUntil&&queue.dirty===null)accumulator=Math.min(accumulator,TICK_MS);
     let count=0,waiting=false;const budgetStart=performance.now();
     if(queue.frame<replayUntil&&accumulator>=TICK_MS&&captureLocalInput(replayUntil,replayTouchContext))earlyInputs++;
     if(queue.dirty!==null)queue.refreshCorrection();
@@ -1003,12 +1010,13 @@ async function pump(now){
     }
     while(accumulator>=TICK_MS&&count<4&&(count===0||performance.now()-budgetStart<6)){
       captureLocalInput();
-      const pair=nextInputs();if(!pair){waiting=true;break;}
+      const pair=nextInputs();if(!pair){queue.retryFrame=queue.frame;accumulator=Math.min(accumulator,TICK_MS);waiting=true;break;}
       endInputWait();
       await simulate(pair,false);if(stopped||ownedEpoch!==runEpoch)return;
       const after=performance.now();
       const at=captureTimes.get(queue.frame-1);if(pair[queue.slot]!==lastApplied&&at)inputAge=after-at;
       lastApplied=pair[queue.slot];captureTimes.delete(queue.frame-1);accumulator-=TICK_MS;count++;
+      queue.retryFrame=null;
       if(queue.dirty!==null||membership)break;
       await confirmFrames();if(stopped||ownedEpoch!==runEpoch)return;
       if(queue.dirty!==null||membership)break;
