@@ -5,17 +5,27 @@ export const BOOT_DELAY=2;
 export const MAX_ROLLBACK=12;
 export const MAX_INPUT_DELAY=12;
 export const MAX_ROLLBACK_INPUT_DELAY=6;
+export const HYBRID_RESERVE=2,PREDICTION_JITTER_STEPS=2;
 export function rollbackRttForSamples(samples){
   if(!Array.isArray(samples)||samples.length!==3||samples.some(n=>!Number.isFinite(n)||n<0||n>30000))throw Error('无效开局延迟采样');
   return [...samples].sort((a,b)=>a-b)[1];
 }
-// Sample all directed links after native loading, before gameplay starts.
-// Keep low-RTT play immediate; give WAN input one transit plus a scheduling step.
-export function rollbackInputDelayForRtt(rtt){
-  if(!Number.isFinite(rtt)||rtt<0)throw Error('无效网络延迟');
-  if(rtt<=20)return 0;
-  return Math.min(MAX_ROLLBACK_INPUT_DELAY,Math.ceil(rtt/2/TICK_MS)+1);
+// Split transit into fixed local delay D and a bounded prediction reserve P.
+// Keep direction persistence independent from the speculative work limit.
+export function rollbackPolicyForRtt(rtt,rollbackEnabled=true){
+  if(!Number.isFinite(rtt)||rtt<0||rtt>30000||typeof rollbackEnabled!=='boolean')throw Error('无效网络延迟');
+  const rttMs=Math.ceil(rtt),transitSteps=rollbackEnabled&&rttMs>20?Math.ceil(rttMs/2/TICK_MS):0;
+  const predictionSteps=Math.min(HYBRID_RESERVE,Math.max(0,transitSteps-1));
+  const inputDelay=Math.min(MAX_ROLLBACK_INPUT_DELAY,transitSteps-predictionSteps);
+  const predictionLead=rollbackEnabled?predictionSteps+PREDICTION_JITTER_STEPS:0;
+  return {schema:2,rollbackEnabled,rttMs,transitSteps,inputDelay,predictionSteps,predictionLead};
 }
+export function validRollbackPolicy(policy){
+  if(!policy)return false;
+  try{const expected=rollbackPolicyForRtt(policy.rttMs,policy.rollbackEnabled);return Object.keys(policy).length===Object.keys(expected).length&&Object.entries(expected).every(([key,value])=>policy[key]===value);}
+  catch{return false;}
+}
+export function rollbackInputDelayForRtt(rtt){return rollbackPolicyForRtt(rtt).inputDelay;}
 // One-way transit plus one scheduling step. The three-player host includes
 // all directed peer measurements; using a whole RTT doubles ordinary delay.
 export function lockstepDelayForRtt(rtt){
@@ -28,13 +38,14 @@ const HELD=32|64|2048,DIRECTIONS=15;
 // confirmed is an exclusive contiguous prefix of authoritative inputs, not
 // the largest frame received. Prediction never advances it.
 export class RollbackQueue {
-  constructor(slot,players=2,{inputDelay=0,directionPrediction=3,rollbackEnabled=true}={}){
+  constructor(slot,players=2,{inputDelay=0,directionPrediction=3,predictionLead=directionPrediction,rollbackEnabled=true}={}){
     if(![2,3].includes(players)||!Number.isInteger(slot)||slot<0||slot>=players)throw Error('无效玩家槽位');
     // A longer rollback lead must be negotiated and prefilled before activation.
     if(!Number.isInteger(inputDelay)||inputDelay<0||inputDelay>MAX_ROLLBACK_INPUT_DELAY||
        !Number.isInteger(directionPrediction)||directionPrediction<0||directionPrediction>MAX_ROLLBACK||
+       !Number.isInteger(predictionLead)||predictionLead<0||predictionLead>MAX_ROLLBACK||
        typeof rollbackEnabled!=='boolean')throw Error('无效预测策略');
-    this.inputDelay=inputDelay;this.directionPrediction=directionPrediction;this.rollbackEnabled=rollbackEnabled;
+    this.inputDelay=inputDelay;this.directionPrediction=directionPrediction;this.predictionLead=predictionLead;this.rollbackEnabled=rollbackEnabled;
     this.lockstepDelay=BOOT_DELAY;
     this.slot=slot;this.players=players;this.frame=0;this.confirmed=BOOT_DELAY;
     this.activation=null;this.dirty=null;this.skippedCorrections=0;this.inputs=Array.from({length:players},()=>new Map());
@@ -58,6 +69,10 @@ export class RollbackQueue {
     if(this.frame!==0||this.activation!==null||!Number.isInteger(delay)||delay<0||
        delay>MAX_ROLLBACK_INPUT_DELAY||delay>this.lockstepDelay)throw Error('无效回滚输入缓冲');
     this.inputDelay=delay;
+  }
+  setPredictionLead(lead){
+    if(this.frame!==0||this.activation!==null||!Number.isInteger(lead)||lead<0||lead>MAX_ROLLBACK)throw Error('无效预测领先额度');
+    this.predictionLead=lead;
   }
   arm(frame){
     if(!this.rollbackEnabled||this.activation!==null||!Number.isSafeInteger(frame)||frame<this.frame||frame>this.frame+240)throw Error('无效回滚启用帧');

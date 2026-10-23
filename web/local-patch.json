@@ -1016,7 +1016,7 @@
       1
     ]
   ],
-  "runtimeSha256": "dc6a9729e7b504d52383b536c3e559763f6f9b8ec0fe76439dd69a8d43ae146e",
+  "runtimeSha256": "77efbc5cac5de8a2b92a3943bec93f1811ac738a8d3947c1e1f3414a0136a431",
   "ghost": {
     "file": "assets/ghost-32.png",
     "sha256": "b65bde17c040b32d2c3ca90436a8905006c4c4fc4dabb899876fecf2374674d2",
@@ -1334,9 +1334,9 @@
     },
     "contextEntry": "art_context",
     "cores": {
-      "wdosbox-x-fast.wasm": "dc6a9729e7b504d52383b536c3e559763f6f9b8ec0fe76439dd69a8d43ae146e",
-      "wdosbox-x-rollback.wasm": "a54f426fbca576f169474b07fd4b004a579c548dfe36ca5340f6bb1d51117990",
-      "wdosbox-x-rollback-tracked.wasm": "271ca7dbe31ef4f7bd8657c91332d534f634b4e0b52f536f940fa21f3fcc5ef7"
+      "wdosbox-x-fast.wasm": "77efbc5cac5de8a2b92a3943bec93f1811ac738a8d3947c1e1f3414a0136a431",
+      "wdosbox-x-rollback.wasm": "bb711759ac1b20873e5276a10ac63d216b530157beaee6cb5dfd09500b7fde53",
+      "wdosbox-x-rollback-tracked.wasm": "4f3e9d6205cd1f1c9eee0a4a768e09f3ba6073e71c3706a274ba4fa6e22213e9"
     }
   },
   "shots": {

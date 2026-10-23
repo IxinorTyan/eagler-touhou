@@ -1,7 +1,7 @@
 import {startFrameLoop} from '../frame-limit.js';
 import {createInputChannel,acceptInputChannel} from './input-transport.js';
 import {readNetworkMode,networkUrl} from './network-mode.js';
-import {PROTOCOL,RollbackQueue,TICK_MS,MAX_ROLLBACK,BOOT_DELAY,MAX_INPUT_DELAY,MAX_ROLLBACK_INPUT_DELAY,lockstepDelayForRtt,rollbackInputDelayForRtt,rollbackRttForSamples} from './rollback-queue.js';
+import {PROTOCOL,RollbackQueue,TICK_MS,MAX_ROLLBACK,BOOT_DELAY,MAX_INPUT_DELAY,MAX_ROLLBACK_INPUT_DELAY,lockstepDelayForRtt,rollbackPolicyForRtt,validRollbackPolicy,rollbackRttForSamples} from './rollback-queue.js';
 import {mountPlayer} from '../player-ui.js';
 import {isBound,keyboardBits,gamepadBits,gamepadStatus,normalize} from './controls.js';
 import {mountFocusSettings} from './focus-display.js';
@@ -28,7 +28,7 @@ let useRelay=mode.transport==='ws';
 const defaultRollback=mode.rollback!=='off';
 const inputLatch=new InputLatch();
 let inputPolicy;
-let timingSent=false,runDelay=null,runInputDelay=null;
+let timingSent=false,runDelay=null,runInputDelay=null,runPolicy=null;
 let relay;
 let preparing=false,running=false,stopped=false,busy=false,runRequested=false;
 let returningTask=null,runEpoch=0;
@@ -88,7 +88,7 @@ faultDownload.onclick=()=>{
     environment:{userAgent:navigator.userAgent,visibility:document.visibilityState},
     settings:state?.settings,slot:queue?.slot,frame:queue?.frame,confirmed:queue?.confirmed,
     running,stopped,stopReason,inputPolicy,lockstepDelay:queue?.lockstepDelay,
-    predictionLeadLimit:queue?.active?Math.max(1,queue.directionPrediction):0,
+    predictionLeadLimit:queue?.active?queue.predictionLead:0,
     rollbackSafetyWindow:MAX_ROLLBACK,render:runtime.renderInfo(),performanceHistory,
     inputTransport:Object.fromEntries([...peers].map(([role,peer])=>[role,peer.channel?.transportStats??null])),
     diagnostics:$('diagnostics').textContent,runtime:runtime.faultReport()},'th02-network-fault.json');
@@ -485,6 +485,7 @@ function attachChannel(peer,channel){
       if(stopped&&m.type!=='end'&&m.type!=='end-ack')return;
       switch(m.type){
         case 'hello':
+          if(m.inputPolicy?.policySchema!==2)throw Error('输入策略版本不同，请所有玩家刷新后重新建房');
           if(JSON.stringify(m.settings)!==JSON.stringify(state.settings)||JSON.stringify(m.slots)!==JSON.stringify(state.slots))throw Error('开局设置不一致');
           if(m.inputPolicy?.inputDelay!==inputPolicy.inputDelay||m.inputPolicy?.directionPrediction!==inputPolicy.directionPrediction||m.inputPolicy?.rollbackEnabled!==inputPolicy.rollbackEnabled)throw Error('联机性能策略不一致，请全员刷新并使用相同网络模式');
           peer.hello=true;maybeRun();break;
@@ -499,7 +500,9 @@ function attachChannel(peer,channel){
           if(!Number.isInteger(m.delay)||m.delay<BOOT_DELAY||m.delay>MAX_INPUT_DELAY)throw Error('无效开局输入缓冲');
           if(!Number.isInteger(m.inputDelay)||m.inputDelay<0||m.inputDelay>MAX_ROLLBACK_INPUT_DELAY||
              m.inputDelay>m.delay||(!inputPolicy.rollbackEnabled&&m.inputDelay!==0))throw Error('无效回滚输入策略');
-          runDelay=m.delay;runInputDelay=m.inputDelay;
+          if(!validRollbackPolicy(m.policy)||m.policy.rollbackEnabled!==inputPolicy.rollbackEnabled||
+             m.policy.inputDelay!==m.inputDelay||m.policy.rttMs<Math.ceil(Math.max(...[...peers.values()].map(p=>rollbackRttForSamples(p.timingSamples)))))throw Error('无效混合输入策略');
+          runDelay=m.delay;runInputDelay=m.inputDelay;runPolicy=m.policy;
           runRequested=true;maybeRun();break;
         case 'input':
           if(membership?.roles.includes(peer.role))break;
@@ -625,7 +628,8 @@ async function setupConnections(){
   const oldPeers=[...peers.values()];peers.clear();
   for(const peer of oldPeers){clearTimeout(peer.connectTimer);peer.channel?.close();peer.pc.close();}
   relay?.close();relay=null;
-  inputPolicy=Object.freeze({inputDelay:0,directionPrediction:6,rollbackEnabled:state.settings.rollback});
+  runPolicy=null;
+  inputPolicy=Object.freeze({inputDelay:0,directionPrediction:6,policySchema:2,rollbackEnabled:state.settings.rollback});
   queue=new RollbackQueue(state.slots[session.role],state.settings.players,inputPolicy);
   let rtcConfiguration=null;
   if(!relayMode){
@@ -821,13 +825,15 @@ function maybeRun(){
     if(![...peers.values()].every(peer=>Number.isFinite(peer.startRtt)))return;
     const rtt=Math.max(...[...peers.values()].flatMap(peer=>[peer.startRtt,...peer.timingSamples]));
     const rollbackRtt=Math.max(...[...peers.values()].flatMap(peer=>[peer.startRollbackRtt,rollbackRttForSamples(peer.timingSamples)]));
-    runInputDelay=inputPolicy.rollbackEnabled?rollbackInputDelayForRtt(rollbackRtt):0;
+    runPolicy=rollbackPolicyForRtt(rollbackRtt,inputPolicy.rollbackEnabled);
+    runInputDelay=runPolicy.inputDelay;
     runDelay=inputPolicy.rollbackEnabled?Math.max(BOOT_DELAY,runInputDelay):lockstepDelayForRtt(rtt);
-    broadcast({type:'run',delay:runDelay,inputDelay:runInputDelay});runRequested=true;
+    broadcast({type:'run',delay:runDelay,inputDelay:runInputDelay,policy:runPolicy});runRequested=true;
   }
   if(!runRequested)return;
   queue.setLockstepDelay(runDelay);queue.setInputDelay(runInputDelay);
-  inputPolicy=Object.freeze({...inputPolicy,inputDelay:runInputDelay});
+  queue.setPredictionLead(runPolicy.predictionLead);
+  inputPolicy=Object.freeze({...inputPolicy,...runPolicy});
   if(inputPolicy.rollbackEnabled)queue.arm(0);
   clearTimeout(loadTimer);runtime.start();running=true;player.setActive(true);
   for(const peer of onlinePeers()){peer.lastPacket=performance.now();peer.suspectAt=null;}
@@ -927,11 +933,10 @@ function captureLocalInput(frontier=queue.frame,context=null){
   pendingAction=0;captureTimes.set(captured.frame,performance.now());broadcast(captured);return true;
 }
 function nextInputs(source=queue,report=source===queue){
-  // A held direction is only predicted for six steps. Letting the faster
-  // peer run further invents releases that each arriving held input undoes.
-  // Bound speculative work, retaining the full twelve-step restore window.
+  // Bound speculative work using the negotiated lead budget, independently
+  // from direction persistence and the twelve-step restore safety window.
   // confirmed is a contiguous authoritative prefix; late packets wake pump.
-  const leadLimit=Math.max(1,source.directionPrediction);
+  const leadLimit=Math.max(1,source.predictionLead);
   if(source.active&&source.frame>=source.confirmed+leadLimit){
     if(report)waitDetail=`等待对端输入 · 预测领先 ${source.frame-source.confirmed}/${leadLimit} 步`;
     return null;
@@ -968,7 +973,7 @@ function updateMetrics(now,waiting){
     waitPercent=Math.min(100,Math.max(0,(totalWait-measuredWaitMs)*100/span));measuredWaitMs=totalWait;
     gameHz=game&&measuredGame&&game.generation===measuredGame.generation&&game.stage===measuredGame.stage&&game.gameFrame>=measuredGame.gameFrame?(game.gameFrame-measuredGame.gameFrame)*1000/span:null;
     measuredGame=game;
-    performanceHistory.push({timeMs:Math.round(now),frame:queue.frame,hz,gameHz,waitPercent,stepMs:averageCost,lockstepDelay:queue.lockstepDelay,predictionLeadLimit:queue.active?Math.max(1,queue.directionPrediction):0,rollbackCount,resimulated,maxRewind,costs:{...costs},workerPerformance:runtime.performanceInfo?.(),rtt:onlinePeers().map(peer=>({role:peer.role,ms:peer.rtt}))});
+    performanceHistory.push({timeMs:Math.round(now),frame:queue.frame,hz,gameHz,waitPercent,stepMs:averageCost,lockstepDelay:queue.lockstepDelay,inputPolicy,predictionLeadLimit:queue.active?queue.predictionLead:0,rollbackCount,resimulated,maxRewind,costs:{...costs},workerPerformance:runtime.performanceInfo?.(),rtt:onlinePeers().map(peer=>({role:peer.role,ms:peer.rtt}))});
     if(performanceHistory.length>120)performanceHistory.shift();
     costs=newCosts();lastMeasure=now;measureFrame=queue.frame;stepCost=stepCount=maxCost=0;
   }
@@ -981,8 +986,8 @@ function updateMetrics(now,waiting){
     +`游戏逻辑 ${gameHz===null?'待统计':gameHz.toFixed(1)} 帧/秒 · 等输入时间 ${waitPercent.toFixed(0)}%（最近周期）\n`
     +`性能诊断 v2 · 最近统计周期：模拟 ${(c.simulate/Math.max(1,c.steps)).toFixed(1)} ms/步 · 呈现 ${(c.present/Math.max(1,c.presentations)).toFixed(1)} ms/批 · 快照 ${(c.capture/Math.max(1,c.captures)).toFixed(1)} ms/次（${c.captures} 次）\n`
     +`恢复 ${c.restore.toFixed(1)} ms（${c.restores} 次） · 重算 ${c.replay.toFixed(1)} ms（${c.replays} 步，含模拟和快照） · 确认 ${c.confirm.toFixed(1)} ms · 校验 ${c.hash.toFixed(1)} ms\n`
-    +`${queue.active?`预测回滚 · 本地缓冲 ${queue.inputDelay} 步 · 方向预测 ${queue.directionPrediction} 步`:`确认锁步 · 自适应缓冲 ${queue.lockstepDelay} 步（${Math.round(queue.lockstepDelay*TICK_MS)} ms） · ${inputPolicy.rollbackEnabled?'等待回滚启用':'回滚已关闭'}`} · 最近输入至应用 ${inputAge.toFixed(1)} ms · 已收输入 ${receivedInputs}\n${links}\n`
-    +`已确认 ${Math.min(queue.frame,queue.confirmed)} · 预测领先 ${Math.max(0,queue.frame-queue.confirmed)}/${queue.active?Math.max(1,queue.directionPrediction):0} 步 · 回滚安全窗口 ${MAX_ROLLBACK} 步\n`
+    +`${queue.active?`混合回滚 · 本地缓冲 D=${queue.inputDelay} · 预测预算 P=${inputPolicy.predictionSteps} · 领先上限 ${queue.predictionLead} 步 · 方向保持 ${queue.directionPrediction} 步`:`确认锁步 · 自适应缓冲 ${queue.lockstepDelay} 步（${Math.round(queue.lockstepDelay*TICK_MS)} ms） · ${inputPolicy.rollbackEnabled?'等待回滚启用':'回滚已关闭'}`} · 最近输入至应用 ${inputAge.toFixed(1)} ms · 已收输入 ${receivedInputs}\n${links}\n`
+    +`已确认 ${Math.min(queue.frame,queue.confirmed)} · 预测领先 ${Math.max(0,queue.frame-queue.confirmed)}/${queue.active?queue.predictionLead:0} 步 · 回滚安全窗口 ${MAX_ROLLBACK} 步\n`
     +`最近周期最大领先 ${c.lead} 步 · 游戏帧 ${game?.gameFrame??'启动中'} · 预测条件：${runtime.predictionBlockReason()||'允许'} · 补算前提前发输入 ${earlyInputs} 次\n`
     +`回滚 ${rollbackCount} 次 · 重算 ${resimulated} 步 · 最长 ${maxRewind} 步 · 快照 ${((runtime.rollbackInfo()?.snapshotBytes||0)/1048576).toFixed(0)} MiB\n`
     +`检查点每 ${runtime.rollbackInfo()?.checkpointFrames||1} 步 · 当前 ${runtime.rollbackInfo()?.snapshots||0} 个 · 边界重建 ${runtime.rollbackInfo()?.checkpointReplays||0} 步\n`
@@ -1006,6 +1011,9 @@ async function pump(now){
   pumping=true;
   try{
     accumulator=Math.min(accumulator+Math.max(0,now-lastNow),TICK_MS*4);lastNow=now;
+    // Retry one already-due live frame. Network waiting must not accumulate
+    // several fresh samples at once; historical repair keeps its own frontier.
+    if(queue.retryFrame===queue.frame&&queue.frame>=replayUntil&&queue.dirty===null)accumulator=Math.min(accumulator,TICK_MS);
     let count=0,waiting=false;const budgetStart=performance.now();
     // A new live tick can become due while old history is still replaying.
     // Send it before more repair work, without sampling the historical cursor.
@@ -1069,12 +1077,13 @@ async function pump(now){
     }
     while(accumulator>=TICK_MS&&count<4&&(count===0||performance.now()-budgetStart<6)){
       captureLocalInput();
-      const pair=nextInputs();if(!pair){waiting=true;break;}
+      const pair=nextInputs();if(!pair){queue.retryFrame=queue.frame;accumulator=Math.min(accumulator,TICK_MS);waiting=true;break;}
       endWait();
       await simulate(pair,false);if(stopped||ownedEpoch!==runEpoch)return;
       const after=performance.now();
       const at=captureTimes.get(queue.frame-1);if(pair[queue.slot]!==lastApplied&&at)inputAge=after-at;
       lastApplied=pair[queue.slot];captureTimes.delete(queue.frame-1);accumulator-=TICK_MS;count++;
+      queue.retryFrame=null;
       if(queue.dirty!==null||membership)break;
       await confirmFrames();if(stopped||ownedEpoch!==runEpoch)return;
       if(queue.dirty!==null||membership)break;
