@@ -44,7 +44,7 @@
     "netplay/network-mode.js": "dda8c24274cb84bf50aa50ca9405ffa8d707f9567137cb80cb2133ea45fb019b",
     "netplay/relay.js": "8189520a9dd4b8900bfb76065787056234ad1a4331b021d99cafe2652251aacf",
     "netplay/rollback-queue.js": "9a3d6cbf8bc184601a0a3bbcd16c0b5937680cca736b7bcf3e81baea2cf61802",
-    "netplay/room.js": "d1ac8d18b7707b49013be479d0dab0a924143de445d54efaeaea1df6de55140d",
+    "netplay/room.js": "2c0b778a0c8876074c8189867f9c1808415ae1deb47f4e2881a5e71d83ddb7f3",
     "netplay/runtime-worker-client.js": "a4203f3ddc6f3fb7ef1b097871197e9fd49a8886d2b007dd4bc080ee4c3a744d",
     "netplay/runtime-worker.js": "f246541dba68cfb6056770117d4ad39c13ef11e770ed64b4220c2804e6435a26",
     "netplay/runtime.html": "e2c5a129ac58cfc4824fc14e8b33fe036f548ec3621249734f06ab2568f70028",
@@ -79,12 +79,16 @@
     "replay/sha256.js": "9cb7be2bc039bcea2a4d727ef98bcd9047a78dfd4c11950355723147423e1f43",
     "replay/tape.js": "c0a23bdf4441ac719bcd10f8327b252efacff3f1c699e99367b44b5321c5de04",
     "replay.html": "7c0870f87db2e8e318b4b2e9ab0f81b49ed1899445bef2775429a11ba5d227e9",
-    "room-ui.css": "07358a96cdaa0acf6766bba611efe9a209a5542dcbb82d0826267914a3f1f68a",
-    "room-ui.js": "1caa7179e355de0da46d2af0a42004e1d051295ddb93e0338dd5c9914364228c",
+    "room-title-environment.js": "106a1b5530cc2948a18421401229511a2af83c14fb366f15a5bd10d8d9e91a1c",
+    "room-title-preview.js": "56d271dba5dea94d631c98cd8c0b8dfe4120414f478ee887a8fde21a1d57cdab",
+    "room-title-th05.js": "574401ae3252ad014d802863b180ed34c6c725c37122e60cd43ef9d61d190b39",
+    "room-title-worker.js": "2bed85ac41627af806b652a20ff62f866de630eb8ba781f5bef21005569b0c1b",
+    "room-ui.css": "4dbbbb68760e9991279b69bc8240442b4b24898b22421e5a56ae9ee394bc211c",
+    "room-ui.js": "b52a3bc0581ab7cb6adee1b0cd90744ade1f28cfc493d0f64349e43009f3ff58",
     "room.css": "0941351b7196802708669da4464f3a17f83c1a5e4c54178d2797f3fb37609959",
     "site.css": "ebd8d1925a424846e79b697bfc60347b1a6d5f23e61fffd75a9b0b79ae210ed0",
     "solo-boss-glyphs.js": "199fd5948cdec11550568b9f76745294d7902c968bb9cd785f209d04e383b211",
-    "solo-boss-hud.js": "2b4fa6630ca683a7bfcd79b38deb599d2711b91f8c12e7abd01fe99352a088ef",
+    "solo-boss-hud.js": "388e91f3439bd46714ddb2a6723c4481b2f6bd7bfec4e6260dfecef28b137133",
     "solo-fat12.js": "d17be5e4cd2e677427b9ce0d37d89ccde70658b24801cc83fccdb8d0207cf4b0",
     "solo-music.com": "2484a6c68a5e512834f96ec96cacab756b5d3b88b33f47df7c2249efba9e32ab",
     "solo-music.js": "2179c9c02b1ebe99d1f5dee15548c444ed69c830c4faa2c173b4f98c6e7c7645",
@@ -133,5 +137,5 @@
       "sha256": "271ca7dbe31ef4f7bd8657c91332d534f634b4e0b52f536f940fa21f3fcc5ef7"
     }
   },
-  "build": "70ab910192397920d4f71d0c9565cb1805ff59cfc7b84466d0381efdd5fec042"
+  "build": "eb88eeb85d913d04e890bfb23d57330fb66f8107b0fecbef1fa3f8ed821349f7"
 }

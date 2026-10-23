@@ -212,7 +212,7 @@ function applyDeparture(message){
 async function request(action,data={}){
   const response=await fetch(`/api/${action}`,{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({protocol:PROTOCOL,transport:useRelay?'ws':'rtc',room:session?.room,token:session?.token,...data}),signal:AbortSignal.timeout(10000)});
-  const result=await response.json();if(!response.ok)throw Error(result.error||`HTTP ${response.status}`);return result;
+  const result=await response.json();if(!response.ok)throw Object.assign(Error(result.error||`HTTP ${response.status}`),{status:response.status});return result;
 }
 function signal(peer,message){return request('signal',{to:peer.role,message:{...message,attempt:peer.attempt||0}});}
 function send(peer,message){
@@ -267,6 +267,9 @@ function finishGame(){
 }
 function render(){
   if(!session||!state)return;
+  $('lobby').dataset.roomPhase=state.phase;
+  $('lobby').dataset.roomLanguage=state.settings.language;
+  if(state.phase!=='lobby')$('lobby').dispatchEvent(new Event('room-preview-stop'));
   if(state.phase==='lobby')prepareRoomResources(state).catch(()=>{});
   const slot=state.slots[session.role],lobby=state.phase==='lobby'&&!stopped,active=activeRoles();
   $('entry').hidden=true;$('lobby').hidden=false;$('transport').disabled=true;
@@ -1078,5 +1081,12 @@ $('ready').onclick=()=>{
   action('ready');
 };
 $('start').onclick=()=>{action('start');};
-$('leave').onclick=async()=>{replayRecorder.finish('玩家离开本局');stopped=true;running=false;clearInput();runtime?.stop();clearTimers();disconnect();try{await replayRecorder.seal();await request('leave');}finally{location.href=networkUrl(mode);}};
+$('leave').onclick=async()=>{
+  replayRecorder.finish('玩家离开本局');stopped=true;running=false;clearInput();runtime?.stop();clearTimers();disconnect();
+  try{await replayRecorder.seal();await request('leave');}
+  catch(error){
+    // The host may remove this disconnected seat while its recording seals.
+    if(![403,404].includes(error.status))throw error;
+  }finally{location.href=networkUrl(mode);}
+};
 onBgmVersion(()=>{if(session&&state?.phase==='lobby'&&!stopped)prepareRoomResources(state).catch(()=>{});});

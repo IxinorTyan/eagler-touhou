@@ -3,37 +3,40 @@ import {powerBarGlyphs} from './solo-boss-glyphs.js';
 const bosses=[['RIKA',2261],['MEIRA',2400],['STONES',1450],['MARISA',900],['MIMA',4700],['SIGMA',8500]];
 const phases={4:[600,700,800,1500,1100],5:[1800,1800,1800,1800,1300]};
 const stones=[140,140,120,120,930];
-// Integer 8x16 cells, like native PC-98 sidebar text. Browser fillText adds
-// antialiasing before the 640x400 canvas is enlarged, which blurs the strokes.
+// DOSBox-X jfont.h pc98_freecg_sbcs, matching the multiplayer TRAM font.
+// See vendor/dosbox-x/LICENSE (GPL-2.0). Draw integer pixels without filtering.
 const captionGlyphs={
-  A:[14,17,17,31,17,17,17],E:[31,16,16,30,16,16,31],
-  G:[14,17,16,23,17,17,14],I:[14,4,4,4,4,4,14],
-  K:[17,18,20,24,20,18,17],L:[16,16,16,16,16,16,31],
-  M:[17,27,21,21,17,17,17],N:[17,25,21,19,17,17,17],
-  O:[14,17,17,17,17,17,14],R:[30,17,17,30,20,18,17],
-  S:[15,16,16,14,1,1,30],T:[31,4,4,4,4,4,4],
-  Y:[17,17,10,4,4,4,4],
+  A:[0,0,0,0,24,36,36,66,66,126,66,66,66,66,0,0],
+  E:[0,0,0,0,126,64,64,64,124,64,64,64,64,126,0,0],
+  G:[0,0,0,0,60,66,66,64,64,78,66,66,70,58,0,0],
+  I:[0,0,0,0,62,8,8,8,8,8,8,8,8,62,0,0],
+  K:[0,0,0,0,66,68,72,80,96,96,80,72,68,66,0,0],
+  M:[0,0,0,0,66,66,102,102,90,90,66,66,66,66,0,0],
+  N:[0,0,0,0,66,98,98,82,82,74,74,70,70,66,0,0],
+  O:[0,0,0,0,60,66,66,66,66,66,66,66,66,60,0,0],
+  R:[0,0,0,0,124,66,66,66,124,72,68,68,66,66,0,0],
+  S:[0,0,0,0,60,66,66,64,48,12,2,66,66,60,0,0],
+  T:[0,0,0,0,127,8,8,8,8,8,8,8,8,8,0,0],
+  Y:[0,0,0,0,65,65,34,34,20,8,8,8,8,8,0,0],
 };
 
 export function drawBossCaption(context,text,x,y,color='#fff'){
   context.fillStyle=color;
   for(const letter of text){
     const glyph=captionGlyphs[letter];
-    if(glyph)for(let row=0;row<7;row++)for(let col=0;col<5;col++){
-      if(glyph[row]&(16>>col))context.fillRect(x+col+1,y+row*2+1,1,2);
+    if(glyph)for(let row=0;row<16;row++)for(let col=0;col<8;col++){
+      if(glyph[row]&(0x80>>col))context.fillRect(x+col,y+row,1,1);
     }
     x+=8;
   }
 }
 
 export function drawBossBar(context,bar,x,y){
-  // Use the game's own 16x16 partial-fill gaiji, just like the Power display.
-  // Empty space stays transparent; there is no browser-style gray track.
-  const power=Math.ceil(bar*80/128);
-  const level=[0,1,2,2,3,3,4,4,5,5,6,6,6,7,7,7,8,8,8,8,9][power>>2];
-  context.fillStyle=['#f00','#f00','#f00','#f0f','#f0f','#00f','#0f0','#0ff','#ff0','#fff'][level];
-  for(let cell=0;cell<5;cell++){
-    const width=Math.min(16,power-cell*16);if(width<=0)break;
+  // Match patches/boss-hud.asm: eight native gaiji and TH04 health colors.
+  // Empty cells stay transparent, as in the multiplayer TRAM gauge.
+  context.fillStyle=['#f00','#f0f','#0ff','#ff0','#fff'][bar>>5];
+  for(let cell=0;cell<8;cell++){
+    const width=Math.min(16,bar-cell*16);if(width<=0)break;
     const glyph=powerBarGlyphs[width-1];
     for(let row=0;row<16;row++)for(let col=0;col<16;col++){
       if(glyph[row]&(0x8000>>col))context.fillRect(x+cell*16+col,y+row,1,1);
@@ -75,9 +78,10 @@ export function mountSoloBossHud(screen){
       const next=`${key}:${bar}`;
       canvas.hidden=false;if(next===previous)return;previous=next;
       context.clearRect(0,0,640,400);
-      drawBossCaption(context,boss.name,496,144);
-      drawBossCaption(context,'ENEMY',448,160,'#ff0');
-      drawBossBar(context,bar,496,160);
+      // The solo Power display occupies the multiplayer gauge's row 20.
+      // Use the free space below Score while keeping its left edge/layout.
+      drawBossCaption(context,`ENEMY ${boss.name}`,448,144,'#ff0');
+      drawBossBar(context,bar,448,160);
     },
     hide(){this.update(null);},
   };
