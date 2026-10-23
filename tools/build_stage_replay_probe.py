@@ -14,6 +14,8 @@ WATCH = os.environ.get('TH05_STAGE_WATCH') == '1'
 OUT = ROOT / ('build/stage-watch' if WATCH else 'build/stage-replay-probe-trace' if TRACE else 'build/stage-replay-probe')
 
 def main():
+    from runpy import run_path
+    run_path(str(ROOT.parent/'tools/native_boss_hud_build_guard.py'))['protect'](ROOT/'web')
     assert OUT.resolve().is_relative_to((ROOT / 'build').resolve())
     protected = [ROOT / 'build/local.bin', ROOT / 'patches/local.asm', ROOT / 'patches/shot-layout.inc']
     protected += [ROOT / 'web' / name for name in (

@@ -6,8 +6,7 @@ import {createReplayStore} from './external-replay-store.js';
 export async function browserReplayIdentity(language){
   const names=['solo-disks.json','vendor/dosbox-x/runtime.json','external-replay-host.js','external-replay-codec.js',
     'dosbox-runtime.js','dosbox-worker.js','disk-files.js','solo-input.js','game-locator.js','native-players.js',
-    'native-touch.js','touch-input.js','frame-presenter.js','sidebar-background.js','personal-hud.js',
-    'boss-hud.js','boss-hud-glyphs.js'];
+    'native-touch.js','touch-input.js','frame-presenter.js','sidebar-background.js','personal-hud.js'];
   const sources=await Promise.all(names.map(async name=>{
     const response=await fetch(new URL(name,import.meta.url),{cache:'no-store'});
     if(!response.ok)throw Error('浏览器 Replay 资源身份读取失败');

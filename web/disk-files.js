@@ -15,7 +15,7 @@ export function gameFiles(bytes,{solo=false}={}) {
     const stem=decode.decode(bytes.subarray(at,at+8)).trim(),ext=decode.decode(bytes.subarray(at+8,at+11)).trim();if(stem==='.'||stem==='..')continue;
     const path=parent+stem+(ext?'.'+ext:''),parts=chain(u16(at+26));
     if(bytes[at+11]&16)walk(parts.map(c=>[offset(c),clusterSize]),path+'/');
-    else if(path==='COOP.COM'||path==='CNFONT.BMP'||path.startsWith('KAIKI/')){
+    else if(path==='NBHUD.BIN'||path==='COOP.COM'||path==='CNFONT.BMP'||path.startsWith('KAIKI/')){
       const size=u32(at+28),contents=new Uint8Array(size);let dest=0;
       for(const c of parts){const n=Math.min(clusterSize,size-dest);if(n<=0)break;contents.set(bytes.subarray(offset(c),offset(c)+n),dest);dest+=n;}
       if(dest!==size)throw Error('磁盘文件长度不匹配');files.push({path:'game/'+path,contents});

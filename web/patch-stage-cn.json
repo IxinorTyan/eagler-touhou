@@ -1,6 +1,6 @@
 {
   "language": "cn",
-  "sha256": "c068c4c250f23e53775f490b31ff34e4a0fc7fa3da01291334a5e4c3e45660fe",
+  "sha256": "60c6674642bbe3843c4229287eccc59f6f6b329e9c155873bd64d01b52b34a85",
   "size": 21415936,
   "source_main_md5": "553eee5ff79429f45284913870380549",
   "insert_offset": 84656,
@@ -1064,5 +1064,25 @@
     "one original Bomb effect at a time; stocks independent"
   ],
   "stage_observation": 1,
-  "stage_disk": "th05-stage-cn.hdi.gz"
+  "stage_disk": "th05-stage-cn.hdi.gz",
+  "native_boss_hud": {
+    "schema": 1,
+    "implementation": "guest-ems",
+    "module": "A:\\NBHUD.BIN",
+    "moduleSha256": "ea8188fe41e5a34fe6acba2d1310c1aaf9682fefef8263be3dc49e9eb4ee7e03",
+    "moduleBytes": 5176,
+    "emsPages": 1,
+    "conventionalBytesAdded": 0,
+    "bridge": {
+      "entry": 9339,
+      "cleanup": 9423,
+      "handle": 9448,
+      "status": 9450,
+      "pointer": 9451
+    },
+    "hp": true,
+    "phaseCuts": true,
+    "timer": "native audited deadlines; unavailable deadlines blank",
+    "browserOverlay": false
+  }
 }

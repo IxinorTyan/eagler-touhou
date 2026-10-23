@@ -2,7 +2,6 @@ import {nativePlayers} from './native-players.js';
 import {createGameLocator} from './game-locator.js';
 import {installAfterimageArt,loadAfterimageArt} from './afterimage-art.js';
 import {createPersonalHud} from './personal-hud.js';
-import {createBossHud} from './boss-hud.js';
 import './frame-presenter.js';
 import './sidebar-background.js';
 import {gameFiles} from './disk-files.js';
@@ -204,7 +203,6 @@ async function boot(data){
     postMessage:(name,props)=>{if(receiver)receiver(name,props);else messages.push([name,props]);},onAbort:fail};
   mod.installFramePresenter=()=>{
     mod.getPersonalHud=createPersonalHud(()=>mailbox<0||nativePause()?null:{heap:mod.HEAPU8,mailbox,patch},()=>viewSlot);
-    mod.getBossHud=createBossHud(()=>mailbox<0||nativePause()?null:{heap:mod.HEAPU8,mailbox,patch});
     mod.getHitPoints=()=>nativePause()?[]:nativeHitPoints(mod.HEAPU8,mailbox,patch,pointInputs);
     mod.onFrameRendered=(_ptr,width,height,seq)=>{
       frames++;

@@ -86,9 +86,9 @@ async function boot(data){
   if(data.frameReplay&&data.frameReplay.mode!=='playback'&&!data.qa)throw Error('旧单人 Replay 仅允许播放，录制请使用浏览器方案');
   soloMode=!!data.solo;
   const dependency=name=>import(new URL(name,data.base).href);
-  const [locator,{writeNativeTouch,nativeHitPoints},{NativeMusic},players,{createPersonalHud,compositePersonalHudRgb},solo,art,{createBossHud,compositeBossHudRgb}]=await Promise.all([
+  const [locator,{writeNativeTouch,nativeHitPoints},{NativeMusic},players,{createPersonalHud,compositePersonalHudRgb},solo,art]=await Promise.all([
     dependency('game-locator.js'),dependency('native-touch.js'),dependency('solo-native-music.js'),dependency('native-players.js'),dependency('personal-hud.js'),
-    soloMode?dependency('solo-input.js'):null,soloMode?null:dependency('afterimage-art.js'),dependency('boss-hud.js'),
+    soloMode?dependency('solo-input.js'):null,soloMode?null:dependency('afterimage-art.js'),
   ]);
   gameLocator=locator.createGameLocator();if(solo)soloInput=new solo.SoloInput(data.patch);
   nativeTouch=soloMode?null:writeNativeTouch;musicReader=data.musicPatch?new NativeMusic(data.musicPatch):null;
@@ -202,15 +202,6 @@ async function boot(data){
   };
   mod.getHitPoints=()=>soloMode?soloInput.markers(mod.HEAPU8):nativeStatus().paused?[]:nativeHitPoints(mod.HEAPU8,mailbox,patch,input.touch||[0,0]);
   mod.getPersonalHud=createPersonalHud(()=>mailbox<0||nativeStatus().paused?null:{heap:mod.HEAPU8,mailbox,patch},()=>viewSlot);
-  mod.getBossHud=createBossHud(()=>{
-    if(nativeStatus().paused)return null;
-    if(soloMode){
-      const s=soloInput?.snapshot;
-      if(!s||!soloInput.valid(mod.HEAPU8,s.at)||mod.HEAPU8[s.at+22]!==1)return null;
-      return {heap:mod.HEAPU8,mailbox:s.at,patch,solo:true};
-    }
-    return mailbox<0?null:{heap:mod.HEAPU8,mailbox,patch};
-  });
   mod.onFrameRendered=(frame,width,height,seq)=>{
     if(data.frameReplay?.mode==='playback'&&!frameBridge.started)return;
     if(frameProofHolding)return; // QA: retain the exact verified image until resume.
@@ -224,7 +215,6 @@ async function boot(data){
       frameProofHolding=true;paused=true;ci.pause();
       const raw=rgb.slice(),background=mod.sidebarBlack,changed=normalizeSidebarRgb(rgb,width,height,background);
       if(width===640&&height===400)compositePersonalHudRgb(rgb,mod.getPersonalHud());
-      if(width===640&&height===400)compositeBossHudRgb(rgb,mod.getBossHud());
       import(new URL('netplay/sha256.js',data.base||self.location.href).href).then(({sha256})=>Promise.all([sha256(rgb),sha256(raw)]))
         .then(([hash,rawHash])=>send('qa-result',{id:proof.id,state:state(),proof:{seq,width,height,sha256:hash,rawSha256:rawHash,sidebarBlack:background,normalizedPixels:changed}})).catch(emitError);
     }

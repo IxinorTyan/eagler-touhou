@@ -1,6 +1,6 @@
 {
   "language": "cn",
-  "sha256": "b426728c7b8c9c6f9d22b2df49206d54a1de0d9330551fead70068f274343b31",
+  "sha256": "cfeb5337c290b98cde74f303b29af49168d5d46b6b1ee74c6926b63afd6257e0",
   "size": 21415936,
   "source_main_md5": "553eee5ff79429f45284913870380549",
   "insert_offset": 84656,
@@ -895,8 +895,8 @@
     "KAIKI/GAME.BAT",
     "KAIKI/MAIN.EXE",
     "KAIKI/OP.EXE",
-    "KAIKI/\u602a\u7dba\u8ac71.DAT",
-    "KAIKI/\u602a\u7dba\u8ac72.DAT"
+    "KAIKI/怪綺談1.DAT",
+    "KAIKI/怪綺談2.DAT"
   ],
   "mailbox_offsets": {
     "out_flags": 92,
@@ -1075,5 +1075,25 @@
   },
   "limitations": [
     "one original Bomb effect at a time; stocks independent"
-  ]
+  ],
+  "native_boss_hud": {
+    "schema": 1,
+    "implementation": "guest-ems",
+    "module": "A:\\NBHUD.BIN",
+    "moduleSha256": "ea8188fe41e5a34fe6acba2d1310c1aaf9682fefef8263be3dc49e9eb4ee7e03",
+    "moduleBytes": 5176,
+    "emsPages": 1,
+    "conventionalBytesAdded": 0,
+    "bridge": {
+      "entry": 9339,
+      "cleanup": 9423,
+      "handle": 9448,
+      "status": 9450,
+      "pointer": 9451
+    },
+    "hp": true,
+    "phaseCuts": true,
+    "timer": "native audited deadlines; unavailable deadlines blank",
+    "browserOverlay": false
+  }
 }

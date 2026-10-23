@@ -354,6 +354,8 @@ def build(lang):
 
 
 def main():
+    from runpy import run_path
+    run_path(str(ROOT.parent/'tools/native_boss_hud_build_guard.py'))['protect'](ROOT/'web')
     from build_player_colors import build as build_player_colors
     build_player_colors()
     from build_afterimage_art import build as build_afterimage_art

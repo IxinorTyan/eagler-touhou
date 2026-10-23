@@ -6,13 +6,13 @@
     "cn": {
       "url": "th05-solo-cn.hdi.gz",
       "size": 21415936,
-      "sha256": "20e72e18326d1888a340c8c47d548ccd63ee0e30e70a86d338544ae2dd348498",
+      "sha256": "ca0faf81db8ac0684a2dc2ebf19d75f36bb0cdbea5f33c02065e9ff0289e51a9",
       "source": "baseline/5-cn.hdi.gz",
       "inputPatch": {
         "signature": "TH05SOLOINPUTv1!",
         "mailbox_size": 36,
         "code_segment": 2785,
-        "data_segment": 8384,
+        "data_segment": 8416,
         "mailbox_cs_offset": 40124,
         "entries": {
           "init_hook": 40249,
@@ -22,7 +22,7 @@
           "world_hook": 40325,
           "mailbox": 40124
         },
-        "insert_size": 560,
+        "insert_size": 1072,
         "hooks": [
           {
             "name": "init_hook",
@@ -56,26 +56,46 @@
           }
         ],
         "source_main_md5": "553eee5ff79429f45284913870380549",
-        "main_sha256": "2b1775e9e6881e6d3b153dc30dd7fb5a2e1e3681362b55376a4d14234916af17",
+        "main_sha256": "8260d43414f557b0f123f82c52431a6fc6ee07ef55e740d0c64bc89c1f152e90",
         "changed_files": [
           "KAIKI/MAIN.EXE",
           "KAIKI/怪綺談1.DAT",
           "KAIKI/怪綺談2.DAT",
           "CNFONT.BMP",
           "KAIKI/OP.EXE"
-        ]
+        ],
+        "native_boss_hud": {
+          "schema": 1,
+          "implementation": "guest-ems",
+          "module": "A:\\NBHUD.BIN",
+          "moduleSha256": "8255355c30dcf4b948d1077ab28a72a9a323965d31bdf85c2a6160d7a5f45974",
+          "moduleBytes": 5176,
+          "emsPages": 1,
+          "conventionalBytesAdded": 512,
+          "bridge": {
+            "entry": 40656,
+            "cleanup": 40740,
+            "handle": 40765,
+            "status": 40767,
+            "pointer": 40768
+          },
+          "hp": true,
+          "phaseCuts": true,
+          "timer": "native audited deadlines; unavailable deadlines blank",
+          "browserOverlay": false
+        }
       }
     },
     "jp": {
       "url": "th05-solo-jp.hdi.gz",
       "size": 21415936,
-      "sha256": "fa2ca14571820550ab3e320362f911ffca87e251481651844c9d59e35c7ffce4",
+      "sha256": "462e34bcb478764f75ea3e827343f7dfae8fe687865fb0f7bcd0d9cde91632a7",
       "source": "baseline/5-jp.hdi.gz",
       "inputPatch": {
         "signature": "TH05SOLOINPUTv1!",
         "mailbox_size": 36,
         "code_segment": 2785,
-        "data_segment": 8384,
+        "data_segment": 8416,
         "mailbox_cs_offset": 40124,
         "entries": {
           "init_hook": 40249,
@@ -85,7 +105,7 @@
           "world_hook": 40325,
           "mailbox": 40124
         },
-        "insert_size": 560,
+        "insert_size": 1072,
         "hooks": [
           {
             "name": "init_hook",
@@ -119,10 +139,30 @@
           }
         ],
         "source_main_md5": "952585e02435c3b3b111975a78b05983",
-        "main_sha256": "4dd20b4759ae8cf981aa7cb62f9df4b4f14263652e95c8d3d7d715ad39573d41",
+        "main_sha256": "74e94382fa57f93d7d41dce03c706ac3bdba31ae9ea5bf1ed12cad964070efa4",
         "changed_files": [
           "KAIKI/MAIN.EXE"
-        ]
+        ],
+        "native_boss_hud": {
+          "schema": 1,
+          "implementation": "guest-ems",
+          "module": "A:\\NBHUD.BIN",
+          "moduleSha256": "8255355c30dcf4b948d1077ab28a72a9a323965d31bdf85c2a6160d7a5f45974",
+          "moduleBytes": 5176,
+          "emsPages": 1,
+          "conventionalBytesAdded": 512,
+          "bridge": {
+            "entry": 40656,
+            "cleanup": 40740,
+            "handle": 40765,
+            "status": 40767,
+            "pointer": 40768
+          },
+          "hp": true,
+          "phaseCuts": true,
+          "timer": "native audited deadlines; unavailable deadlines blank",
+          "browserOverlay": false
+        }
       }
     }
   }

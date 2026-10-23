@@ -62,6 +62,8 @@ def build_exe(exe, payload, language):
 
 
 def main():
+    from runpy import run_path
+    run_path(str(ROOT.parent/'tools/native_boss_hud_build_guard.py'))['protect'](ROOT/'web')
     out = ROOT / 'build'
     out.mkdir(exist_ok=True)
     touch = (ROOT / 'patches/touch.asm').read_text(encoding='utf-8')
