@@ -20,7 +20,7 @@ async function jsonRequest(url,options){
 // The transport owns no emulator, input sampling or file recording. At most
 // one upload is outstanding; the existing bounded history is the send queue.
 export function publishNetworkHistory(identity,history,{onLink=()=>{},onStatus=()=>{},maxPendingFrames=3600}={}){
-  const auth={protocol:PROTOCOL,room:identity.room,token:identity.token,generation:identity.generation};
+  const auth={protocol:PROTOCOL,room:identity.room,token:identity.token,generation:identity.generation,runId:identity.runId};
   let watch=null,prefix=0,busy=false,closed=false,finished=false,timer=0,retries=0,upload=null,retryAt=0;
   let checkpointIndex=0,checkpointOffset=0,checkpointDone=false,endPosted=false,checkpointRetired=false;
   const abort=new AbortController();

@@ -49,7 +49,7 @@ def build_id():
 
 
 def snapshot(room):
-    return {key: room[key] for key in ('generation', 'revision', 'phase', 'slots', 'characters', 'ready', 'settings', 'transport')} | {
+    return {key: room[key] for key in ('generation', 'revision', 'phase', 'slots', 'characters', 'ready', 'settings', 'transport', 'runId')} | {
         'protocol': PROTOCOL, 'network': room.get('network', 'lan'),
         'present': {r: bool(room['tokens'][r]) and not room.get('offline', {}).get(r, False) for r in ROLES}}
 
@@ -167,7 +167,7 @@ class Handler(SimpleHTTPRequestHandler):
                     code = f'{secrets.randbelow(10000):04d}'
                 token = secrets.token_urlsafe(24)
                 room = {'tokens': {'host': token, 'guest': None, 'guest2': None}, 'seen': dict.fromkeys(ROLES, now),
-                        'generation': secrets.token_hex(16), 'revision': 1, 'phase': 'lobby',
+                        'generation': secrets.token_hex(16), 'revision': 1, 'phase': 'lobby', 'runId': 0,
                         'network': network, 'transport': 'relay' if network == 'public-ws' else 'rtc',
                         'slots': {'host': 0, 'guest': 1, 'guest2': 2}, 'characters': {'host': 0, 'guest': 1, 'guest2': 2},
                         'ready': dict.fromkeys(ROLES, False), 'offline': dict.fromkeys(ROLES, False), 'queues': {r: [] for r in ROLES},
@@ -209,16 +209,33 @@ class Handler(SimpleHTTPRequestHandler):
             if data.get('generation') != room['generation']:
                 return self.reply({'error': '房间版本已失效'}, 409)
             room['seen'][role] = now
+            if action in ('end', 'signal', 'drop', 'fallback', 'ready', 'start') and data.get('runId') != room['runId']:
+                return self.reply({'error': '本局编号已失效'}, 409)
+            if action == 'end':
+                if room['phase'] == 'ended':
+                    return self.reply({'error': '房间已解散'}, 409)
+                if room['phase'] != 'lobby':
+                    room['phase'] = 'lobby'
+                    room['ready'] = dict.fromkeys(ROLES, False)
+                    room['offline'] = dict.fromkeys(ROLES, False)
+                    room['queues'] = {r: [] for r in ROLES}
+                    room.pop('relay_started', None)
+                    room.pop('history_watch', None)
+                    room['revision'] += 1
+                return self.reply({'state': snapshot(room)})
             if action == 'events':
                 messages, room['queues'][role] = room['queues'][role], []
                 return self.reply({'state': snapshot(room), 'messages': messages})
             if action.startswith('history-'):
                 if role != 'host':
                     return self.reply({'error': '只有房主可以发布旁观帧'}, 403)
-                owner = (code, room['generation'], room['tokens']['host'])
+                run_id = data.get('runId')
+                owner = (code, room['generation'], room['tokens']['host'], run_id)
+                if type(run_id) is not int or not 1 <= run_id <= room['runId']:
+                    return self.reply({'error':'观战本局编号不匹配'},409)
                 try:
                     if action == 'history-open':
-                        if room['phase'] != 'loading':
+                        if room['phase'] != 'loading' or run_id != room['runId']:
                             raise ValueError('旁观需在游戏开局后发布')
                         header = data.get('header')
                         if not isinstance(header, dict) or header.get('players') != room['settings']['players'] or header.get('language') != room['settings']['language']:
@@ -348,6 +365,7 @@ class Handler(SimpleHTTPRequestHandler):
                     if role != 'host' or not all(room['tokens'][r] for r in active_roles(room)) or not all(room['ready'][r] for r in active_roles(room)):
                         return self.reply({'error': '需要全员准备后由房主开始'}, 409)
                     room['phase'] = 'loading'
+                    room['runId'] += 1
                 else:
                     return self.reply({'error': '未知接口'}, 404)
             except ValueError as error:

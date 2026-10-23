@@ -95,7 +95,10 @@ def handle(handler, rooms, room_lock):
         slot = room['slots'][role]
         roles=('host','guest','guest2')[:room['settings']['players']]
         if role not in roles:return handler.reply({'error':'中继座位无效'},403)
-    key = (code, generation)
+    run_id=room.get('runId',0)
+    if str(query.get('runId'))!=str(run_id):
+        handler.reply({'error':'本局编号已失效'},409);return
+    key = (code, generation, run_id)
     sock = handler.connection
     sock.settimeout(5)
     sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
@@ -154,7 +157,7 @@ def handle(handler, rooms, room_lock):
         while True:
             with room_lock:
                 current = rooms.get(code)
-                valid = current and current['generation'] == generation and current['phase'] == 'loading' and current['tokens'][role] == token
+                valid = current and current['generation'] == generation and current.get('runId',0)==run_id and current['phase'] == 'loading' and current['tokens'][role] == token
             with HUB_LOCK:
                 valid = valid and HUBS.get(key, {}).get(role) is entry
             if not valid or time.monotonic() - last_data > (130 if entry['ready'] else 30):

@@ -18,7 +18,7 @@ import {assetBytes,freshJSON} from './preload-cache.js';
 import {bgmVersion,onBgmVersion,resolveBgmTrack} from './bgm-version.js';
 const GRACE_MS=5000;
 let localCheatUsed=false;
-let historyHost=null,historyWarning='',finishing=false,historyRequest=0;
+let historyHost=null,historyWarning='',finishing=false,historyRequest=0,awaitingRoomReturn=false;
 let historyCaptureDisabled=false;
 const historyFlushes=new Map();
 function historyChanged(){
@@ -139,7 +139,7 @@ function diagnostics(){
   player.diagnostics($('diagnostics').textContent);
 }
 async function api(action,extra={},identity=auth){
-  const payload={protocol:PROTOCOL,...(identity?{room:identity.room,token:identity.token,generation:identity.generation}:{}),...extra};
+  const payload={protocol:PROTOCOL,...(identity?{room:identity.room,token:identity.token,generation:identity.generation,runId:identity.runId??room?.runId??0}:{}),...extra};
   const response=await fetch('/api/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(8000)});
   const data=await response.json();if(!response.ok)throw Error(data.error||'局域网服务请求失败');return data;
 }
@@ -178,7 +178,9 @@ function render(){
   $('character').value=room.characters[auth.role];$('character').disabled=!lobby;
   $('seat').value=room.slots.host;$('seat').disabled=!lobby||!host;
   for(const key of ['rank','spares','bombs','language','rollback','players']){$(key).value=String(room.settings[key]);$(key).disabled=!lobby||!host;}
-  $('ready').disabled=!lobby;$('ready').textContent=room.ready[auth.role]?'取消准备':'准备';
+  $('ready').disabled=!lobby||finishing;
+  returnButton.hidden=room.phase==='lobby';returnButton.disabled=finishing;
+  $('leave').textContent=host?'解散房间':'离开房间';$('ready').textContent=room.ready[auth.role]?'取消准备':'准备';
   $('guest2-seat').hidden=room.settings.players<3;
   $('seat').querySelector('[value="2"]').hidden=room.settings.players<3;
   $('start').disabled=!lobby||!host||!activeRoles().every(role=>room.present[role]&&room.ready[role]);
@@ -212,13 +214,14 @@ async function prepareRoomResources(value){
   return preloadPromise;
 }
 async function setRoom(data){
-  if(!auth)return;
+  if(!auth||finishing)return;
   if(data.state?.protocol!==PROTOCOL||data.state.generation!==auth.generation)throw Object.assign(Error('房间版本已失效，请重新建房。'),{fatal:true});
   if(room&&data.state.revision<room.revision)return;
-  room=data.state;render();
-  if(room.phase==='ended'){await finish('房间已结束，请重新建房。',false);return;}
+  if(data.state.phase==='lobby'&&room?.phase==='loading'){await finish('本局已结束，可重新准备。',false,true,true,data.state);return;}
+  room=data.state;auth.runId=room.runId;render();
+  if(room.phase==='ended'){await finish('房间已解散。',false,true,false);return;}
   if(running)for(const role of remoteRoles())if(!room.present[role])suspect(role,'队友已离开');
-  if(room.phase==='loading'&&!connecting){const identity=auth;connecting=true;connect().catch(error=>{if(auth===identity)finish(error.message);});}
+  if(room.phase==='loading'&&!connecting&&!awaitingRoomReturn){const identity=auth;connecting=true;connect().catch(error=>{if(auth===identity)finish(error.message);});}
   else if(room.phase==='loading'&&room.transport==='relay'&&transport!=='relay')switchRelay();
 }
 async function poll(){
@@ -244,7 +247,7 @@ async function enter(action){
   if(entering||auth||finishing)return;entering=true;render();
   try{
   const data=await api(action,action==='join'?{room:$('room-code').value.trim()}:{network});
-  auth={room:data.room,token:data.token,role:data.role,generation:data.state.generation};
+  auth={room:data.room,token:data.token,role:data.role,generation:data.state.generation,runId:data.state.runId};
   room=data.state;endedReason=null;networkEvents=[];transport='rtc';fallbackPending=false;offlineRoles.clear();membership=null;membershipId=0;lastDeparture=null;render();status(`已${action==='create'?'创建':'加入'}房间 ${auth.room}。请选择角色并准备。`);
   pollFailures=0;pollFailedAt=pollRetryAt=0;
   pollTimer=setInterval(poll,500);
@@ -277,7 +280,7 @@ function sendHandshake(role){
     startupPing(role);
   }
 }
-function hello(){return {type:'hello',protocol:PROTOCOL,build:version.build,generation:auth.generation,slot:room.slots[auth.role],
+function hello(){return {type:'hello',protocol:PROTOCOL,build:version.build,generation:auth.generation,runId:auth.runId,slot:room.slots[auth.role],
   settings:room.settings,characters:room.characters,slots:room.slots,inputPolicy:makeInputPolicy(transport,room.settings.rollback),
   coreSha:boot.coreSha,diskSha:boot.diskSha,guestSha:boot.guestSha,checksum:boot.checksum};}
 function tryLoaded(){
@@ -285,7 +288,7 @@ function tryLoaded(){
   const own=hello();
   for(const role of remoteRoles()){
     const remote=peerHello.get(role);
-    for(const key of ['protocol','build','generation','settings','characters','slots','inputPolicy','coreSha','diskSha','guestSha','checksum'])
+    for(const key of ['protocol','build','generation','runId','settings','characters','slots','inputPolicy','coreSha','diskSha','guestSha','checksum'])
       if(JSON.stringify(own[key])!==JSON.stringify(remote[key]))throw Error('全员游戏版本、配置或初始状态不一致，请刷新后重新建房。');
     if(remote.slot!==room.slots[role]||remote.slot===own.slot)throw Error('玩家座位冲突');
   }
@@ -437,7 +440,7 @@ function sendResume(role){if(!running)return;sendTo(role,resumePacket());const c
 function acceptResume(role,message){
   const remote=message.hello,own=hello();
   if(!remote||remote.slot!==room.slots[role])throw Error('重连身份无效');
-  for(const key of ['protocol','build','generation','settings','characters','slots','inputPolicy','coreSha','diskSha','guestSha','checksum'])if(JSON.stringify(remote[key])!==JSON.stringify(own[key]))throw Error('重连游戏版本或开局身份不一致');
+  for(const key of ['protocol','build','generation','runId','settings','characters','slots','inputPolicy','coreSha','diskSha','guestSha','checksum'])if(JSON.stringify(remote[key])!==JSON.stringify(own[key]))throw Error('重连游戏版本或开局身份不一致');
   const settings=validateStartupPolicy({delay:message.lockstepDelay,inputDelay:message.inputPolicy?.inputDelay},room.settings.rollback);
   if(JSON.stringify(message.inputPolicy)!==JSON.stringify(makeInputPolicy(transport,room.settings.rollback,settings.inputDelay)))throw Error('重连输入策略不一致');
   if(running){
@@ -554,7 +557,7 @@ async function requestRelay(reason){
 }
 function switchRelay(){
   if(transport==='relay'||!auth)return;
-  if(running){finish('队友连接中断，本局结束，请重新建房。');return;}
+  if(running){finish('队友连接中断，本局已结束，返回房间。');return;}
   closeTransport();transport='relay';peerHello.clear();peerLoaded.clear();loadedSent=false;pendingGo=false;earlyPackets=[];resetStartupTiming();
   for(const role of remoteRoles())peers.set(role,{role,pc:null,channel:null,lastMessage:performance.now(),suspectAt:null});
   openRelay();
@@ -601,7 +604,7 @@ async function connect(){
   rtcPreparing=false;
   for(const signal of pendingSignals.splice(0))void receiveSignal(signal).catch(error=>{if(auth===identity)finish(error.message);});
   if(!directRelay)rtcTimeout=setTimeout(()=>{if(auth===identity&&transport==='rtc')requestRelay('WebRTC 连接超时');},room.network==='public-rtc'?20000:8000);
-  bootTimeout=setTimeout(()=>finish('全员启动或同步确认超时，请重新建房。'),600000);
+  bootTimeout=setTimeout(()=>finish('全员启动或同步确认超时，返回房间。'),600000);
   display=createFrameDisplay($('canvas'),{release:seq=>worker?.postMessage({type:'frame-ack',seq}),onError:error=>finish(error.message)});
   await prepareRoomResources(room).catch(()=>{});if(current!==epoch||auth!==identity)return;
   worker=new Worker('lan-worker.js',{type:'module'});
@@ -765,24 +768,36 @@ function pump(){try{
   worker.postMessage({type:'step',frame:queue.frame,pair,predicted:queue.active&&queue.frame>=queue.confirmed,offlineMask:queue.offlineMask()});
 }catch(error){finish(error.message);}}
 function pauseControl(){if(!running)return;clearInputs();controls|=paused?RESUME:PAUSE;$('canvas').focus();schedule(0);}
-async function finish(reason,notify=true,flush=true){
+async function finish(reason,notify=true,flush=true,keepRoom=true,snapshot=null){
   if(finishing||(!auth&&!worker))return;finishing=true;const identity=auth;
+  awaitingRoomReturn=keepRoom;
   running=false;clearTimeout(timer);wakePending=false;
   if(flush)await flushHistory();
   const endedHistory=worker?historyHost:null;
   endedHistory?.end(reason);
   if(notify&&channel?.readyState==='open')try{send({type:'stop',reason:reason.slice(0,250)});}catch{}
-  auth=null;epoch++;running=connecting=busy=paused=false;rtcPreparing=false;pendingSignals=[];liveControl=null;controls=0;clearInputs();
+  epoch++;running=connecting=busy=paused=false;rtcPreparing=false;pendingSignals=[];liveControl=null;controls=0;clearInputs();
   setActivity('ended');pings.clear();rtt.clear();nativeFps=null;
-  clearInterval(pollTimer);clearInterval(heartbeat);clearTimeout(timer);clearTimeout(rtcTimeout);clearTimeout(bootTimeout);
+  if(!keepRoom)clearInterval(pollTimer);clearInterval(heartbeat);clearTimeout(timer);clearTimeout(rtcTimeout);clearTimeout(bootTimeout);
   wakePending=false;wakeToken++;sessionPolicy=null;runtimePolicy={ready:false,canPredict:false,blockReason:'游戏已结束'};
   worker?.terminate();worker=null;display?.stop();display=null;audio?.disconnect();audio=null;
   bgm?.dispose();bgm=null;context?.close().catch(()=>{});context=null;player.setActive(false);player.exit();
-  closeTransport();fallbackPending=false;
+  closeTransport();transport='rtc';fallbackPending=false;
   offlineRoles.clear();membership=null;membershipId=0;lastDeparture=null;hashHistory.clear();comparedFrames.clear();
-  boot=null;peerHello.clear();peerLoaded.clear();loadedSent=pendingGo=false;earlyPackets=[];queue=null;room=null;resetStartupTiming();
-  endedReason=reason;status(reason);overlay(reason);render();diagnostics();finishing=false;historyUI();
-  if(identity)try{await api('leave',{},identity);}catch{}
+  boot=null;peerHello.clear();peerLoaded.clear();loadedSent=pendingGo=false;earlyPackets=[];queue=null;resetStartupTiming();
+  endedReason=reason;lastState=liveControl=null;committedPrefix=0;inflight=null;
+  rollbackPeers.clear();captureTimes.clear();hashes.clear();peerHashes.clear();hashMatches=waits=steps=0;
+  rollbackCount=resimulated=maxRewind=earlyInputs=0;inflightPlans=[];pendingKind='';replayUntil=0;accumulator=0;
+  try{
+    if(keepRoom&&identity){
+      const result=snapshot?{state:snapshot}:await api('end',{runId:identity.runId},identity);
+      room=result.state;auth={...identity,runId:room.runId};awaitingRoomReturn=false;
+    }else{
+      auth=null;room=null;if(identity)await api('leave',{},identity);
+    }
+    status(keepRoom?reason+' 可重新准备。':reason);overlay(null);
+  }catch(error){status('返回房间失败：'+error.message+'，可点击返回房间重试。');}
+  finally{finishing=false;render();diagnostics();historyUI();}
 }
 function action(fn){return async()=>{try{await fn();}catch(error){status(error.message);}};}
 let lobbyChanges=Promise.resolve();
@@ -810,7 +825,10 @@ $('watch').onclick=action(async()=>{
     location.assign(url.href);
   }finally{entering=false;render();}
 });
-$('leave').onclick=()=>finish('已离开房间，可重新建房。');
+const returnButton=document.createElement('button');returnButton.type='button';
+returnButton.id='return-room';returnButton.className='room-ui-return';returnButton.textContent='返回房间';returnButton.hidden=true;
+returnButton.onclick=()=>finish('本局已结束。');$('player').append(returnButton);
+$('leave').onclick=()=>finish('已离开房间，可重新建房。',true,true,false);
 $('character').onchange=action(()=>change('character',{character:Number($('character').value)}));
 $('seat').onchange=action(()=>change('seat',{seat:Number($('seat').value)}));
 for(const key of ['rank','spares','bombs','language','rollback','players'])$(key).onchange=action(()=>change('settings',{

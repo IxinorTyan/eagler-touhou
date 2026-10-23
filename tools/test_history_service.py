@@ -181,7 +181,7 @@ class Tests(unittest.TestCase):
             return request('POST', '/api/'+action, {'protocol': server.PROTOCOL, **data})
         host = post('create', {})['body']
         guest = post('join', {'room': host['room']})['body']
-        auth = {'room': host['room'], 'generation': host['state']['generation'], 'token': host['token']}
+        auth = {'room': host['room'], 'generation': host['state']['generation'], 'token': host['token'], 'runId': 0}
         other = {**auth, 'token': guest['token']}
         settings = dict(server.ROOMS[host['room']]['settings'])
         self.assertEqual(post('settings', {**auth, **settings, 'stageWatch': True})['status'], 400)
@@ -189,8 +189,9 @@ class Tests(unittest.TestCase):
         before = copy.deepcopy(server.ROOMS[host['room']])
         self.assertEqual(post('watch', {'room': host['room']})['status'], 409)
         self.assertEqual(server.ROOMS[host['room']], before)
-        self.assertEqual(post('history-open', {**auth, 'header': header()})['status'], 400)
+        self.assertEqual(post('history-open', {**auth, 'header': header()})['status'], 409)
         post('ready', {**auth, 'ready': True});post('ready', {**other, 'ready': True});post('start', auth)
+        auth['runId'] = other['runId'] = 1
         self.assertEqual(post('history-open', {**other, 'header': header()})['status'], 403)
         bad = header();bad['config']['players'][0]['character'] = 3
         self.assertEqual(post('history-open', {**auth, 'header': bad})['status'], 400)

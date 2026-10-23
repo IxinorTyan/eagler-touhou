@@ -2,7 +2,7 @@
 // All authenticated sockets must be routed before any game handshake sends.
 export function createRelayChannel(identity){
   const url=new URL('/relay',location.href);url.protocol=location.protocol==='https:'?'wss:':'ws:';
-  for(const key of ['room','token','generation'])url.searchParams.set(key,identity[key]);
+  for(const key of ['room','token','generation','runId'])url.searchParams.set(key,identity[key]);
   const socket=new WebSocket(url);
   const channel={kind:'relay',ordered:true,maxRetransmits:null,maxPacketLifeTime:null,readyState:'connecting',
     onopen:null,onmessage:null,onclose:null,onerror:null,onpeerchange:null,
