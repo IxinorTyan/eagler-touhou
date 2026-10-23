@@ -268,20 +268,21 @@ export class NetSession{
       const now=performance.now();
       if(now-this.lastAdvance>30000)throw Error('等待队友输入超过 30 秒，请重开房间');
       this.recordWait(now);
-      if(document.hidden)return;
       this.waitKind=null;
       let budget=4;const started=performance.now();
       while(now>=this.nextTick&&budget-->0&&(budget===3||performance.now()-started<6)){
         // Do not consume short taps while this immutable frame is already sampled.
         if(!this.queue.lanes[this.slot].has(this.queue.frame+this.queue.delay)){
-          const packet=this.queue.capture(this.buttons());if(packet)this.send(packet);
+          // Keep authority flowing while hidden; already published frames stay
+          // immutable, and background pages never consume live device edges.
+          const packet=this.queue.capture(document.hidden?0:this.buttons());if(packet)this.send(packet);
         }
         // Hashes normally compare in the background. Stop only at the bounded
         // horizon; still publish this frame's immutable input for slower peers.
         this.waitHash=this.queue.frame-this.lastHash>=HASH_WINDOW;
-        if(this.waitHash){this.waitKind='hash';this.nextTick=Math.max(this.nextTick,now-TICK);break;}
+        if(this.waitHash){this.waitKind='hash';this.nextTick=Math.max(this.nextTick,now);break;}
         const inputs=this.queue.peek();
-        if(!inputs){this.waitKind='input';this.nextTick=Math.max(this.nextTick,now-TICK);break;}
+        if(!inputs){this.waitKind='input';this.nextTick=Math.max(this.nextTick,now);break;}
         const recordedFrame=this.queue.frame;
         if(this.game.asyncExecution)await this.game.execute(inputs,recordedFrame);else this.game.step(inputs);
         if(this.closed)return;
@@ -296,8 +297,10 @@ export class NetSession{
           this.send(checksum);this.checkHashes();
         }
       }
-      this.game.requestPresent?.();
-      if(now-(this.renderAt||0)>150){this.renderAt=now;this.render(this);}
+      if(!document.hidden){
+        this.game.requestPresent?.();
+        if(now-(this.renderAt||0)>150){this.renderAt=now;this.render(this);}
+      }
     }catch(error){this.fail(error);}finally{this.pumping=false;}
   }
   recordWait(now){
@@ -329,7 +332,7 @@ export class NetSession{
     }
   }
   waitingText(){
-    if(document.hidden)return '页面隐藏，等待恢复…';
+    if(document.hidden)return '页面隐藏，继续同步（本机中性输入）…';
     const interrupted=[...this.peers].filter(([,p])=>p.disconnectTimer!=null).map(([r])=>`P${this.room.seats[r]+1}`);
     if(interrupted.length)return `等待队友 ${interrupted.join(' / ')} 的 UDP 连接恢复（最多 10 秒）…`;
     if(this.waitHash){

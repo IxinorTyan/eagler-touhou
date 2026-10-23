@@ -19,7 +19,7 @@
     "netplay/runtime-core.js": "268424763862882c6e7b63fcf3bba008c6b459ddb58179a8d3e3d76fdc7f5fb8",
     "netplay/runtime-worker-client.js": "4a0c4da6380d1a70634d0bbb1ab309f4d51e44cb4dc5d611d6637cced0ad30c2",
     "netplay/runtime.js": "bbd98dbc1c906ce61b2215b0847e23e9b48c00e340776d9e9c43bd4a0498b0a0",
-    "netplay/session.js": "0765e1d3cc27f29b015c6f18ef1cab2714eb4e949ccab88750c3923f328a5093",
+    "netplay/session.js": "b3600634233a76f827b473d2a173b7376d61c5177598921b0c8f433117949d16",
     "netplay/sha256.js": "9cb7be2bc039bcea2a4d727ef98bcd9047a78dfd4c11950355723147423e1f43",
     "netplay/simulation-worker.js": "353897a1f799600f2b71b59860ffb4cf2141ab186edf782c082b48d4330b83ac",
     "netplay/udp-config.js": "6a04c0244c0912b8c6235dbca15d0943eda0218a5f281be688dec41191af0a5f",
