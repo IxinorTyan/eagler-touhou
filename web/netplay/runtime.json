@@ -22,7 +22,7 @@
     "netplay/network-mode.js": "b20d401de873b0930dff3c971fdb7b7f13f3969879976e4bfd6cc2c50fd5c533",
     "netplay/relay.js": "967e09da2690df2a733ce2e7f8393a16620cb263a447fa4df192657927a12d50",
     "netplay/sha256.js": "9cb7be2bc039bcea2a4d727ef98bcd9047a78dfd4c11950355723147423e1f43",
-    "netplay/app.js": "639205e7f07b1b06bba4871a4607fd017626ab57c727bbf1fd3000ec874f2f8d",
+    "netplay/app.js": "7557211c68cb8361f6d463d0617831d04e5554f2c22f5840fc08d1a546a5a782",
     "netplay/audio.js": "a308a202d78f749dc2249d2b77ef8314514a883db15aacc4364db37d5b73259c",
     "netplay/renderer.js": "c168aa8ac078b9144b57ef4323cb3cebc5ab091120ba99cc807bf9ec41427ea2",
     "netplay/simulation-worker.js": "353897a1f799600f2b71b59860ffb4cf2141ab186edf782c082b48d4330b83ac",

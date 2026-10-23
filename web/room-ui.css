@@ -59,6 +59,11 @@ body.shell.unified-room #lobby .room-ui-notice :is(#status,#lan-status){margin:0
 .unified-room .room-ui-stage{grid-column:1;grid-row:2;position:relative;align-self:start;min-width:0;overflow:hidden;border:1px solid var(--line);border-radius:8px;background:#080908;min-height:0}
 .unified-room .room-ui-waiting{display:flex;align-items:center;justify-content:center;gap:36px;aspect-ratio:8/5;padding:32px;background:#10110f}
 .unified-room .room-ui-cover{display:block;width:28%;max-height:260px;height:auto;object-fit:contain;border:1px solid #ffffff24;border-radius:3px}
+.unified-room .room-ui-waiting{position:relative}
+.unified-room .room-ui-title-canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;image-rendering:pixelated;pointer-events:none;visibility:hidden;background:#000}
+.unified-room .room-ui-title-ready{padding:0;background:#000}
+.unified-room .room-ui-title-ready .room-ui-title-canvas{visibility:visible}
+.unified-room .room-ui-title-ready>:is(.room-ui-cover,.room-ui-waiting-caption){visibility:hidden}
 .unified-room .room-ui-waiting-caption{max-width:55%;min-width:0}
 .unified-room .room-ui-eyebrow{font:600 11px/1.5 system-ui;color:var(--muted)}
 .unified-room .room-ui-waiting-caption h2{font-size:27px;line-height:1.4;margin:10px 0}

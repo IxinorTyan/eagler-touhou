@@ -52,6 +52,9 @@ async function post(action,data={}){
 }
 function showRoom(value){
   room=value;const host=identity.role==='host',lobby=room.phase==='lobby';
+  $('lobby').dataset.roomPhase=room.phase;
+  $('lobby').dataset.roomLanguage='jp';
+  if(!lobby)$('lobby').dispatchEvent(new Event('room-preview-stop'));
   if(lobby)prepareRoomAssets(room).catch(()=>{});
   editing=editing&&lobby;$('entry').hidden=!editing;$('lobby').hidden=false;
   $('room-title').textContent=`合作房间 · P${room.seats[identity.role]+1}${host?'（房主）':''}`;$('room-code').textContent=room.room;
