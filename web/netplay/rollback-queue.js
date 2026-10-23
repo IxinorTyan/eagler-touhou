@@ -10,11 +10,12 @@ export function rollbackRttForSamples(samples){
   return [...samples].sort((a,b)=>a-b)[1];
 }
 // Sample all directed links after native loading, before gameplay starts.
-// Keep low-RTT play immediate; give WAN input one transit plus a scheduling step.
+// Keep low-RTT play immediate; reserve one-way transit. The existing bounded
+// predictor absorbs scheduling jitter instead of delaying every local sample.
 export function rollbackInputDelayForRtt(rtt){
   if(!Number.isFinite(rtt)||rtt<0)throw Error('无效网络延迟');
   if(rtt<=20)return 0;
-  return Math.min(MAX_ROLLBACK_INPUT_DELAY,Math.ceil(rtt/2/TICK_MS)+1);
+  return Math.min(MAX_ROLLBACK_INPUT_DELAY,Math.ceil(rtt/2/TICK_MS));
 }
 // One-way transit plus one scheduling step. The three-player host includes
 // all directed peer measurements; using a whole RTT doubles ordinary delay.

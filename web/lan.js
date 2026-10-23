@@ -745,6 +745,7 @@ function pump(){try{
   if(membership){reportMembership();return;}
   if(channel.bufferedAmount>65536){for(const role of remoteRoles())suspect(role,'网络发送暂时积压');setActivity('network-wait');schedule(16);return;}
   const now=performance.now();accumulator=Math.min(accumulator+Math.max(0,now-lastNow),TICK_MS*4);lastNow=now;
+  if(queue.retryFrame===queue.frame&&queue.frame>=replayUntil&&queue.dirty===null)accumulator=Math.min(accumulator,TICK_MS);
   if(queue.frame<replayUntil&&accumulator>=TICK_MS&&capture(replayUntil))earlyInputs++;
   if(queue.dirty!==null){
     // Publish due live input before costly restore, never from a history frame.
@@ -763,7 +764,8 @@ function pump(){try{
   // Capture/broadcast the due local input before pacing, so a waiting peer
   // still receives what it needs to advance its confirmed prefix.
   capture();const pair=nextInputs(queue,runtimePolicy.canPredict);
-  if(!pair){waits++;setActivity('network-wait');schedule(16);return;}
+  if(!pair){queue.retryFrame=queue.frame;accumulator=Math.min(accumulator,TICK_MS);waits++;setActivity('network-wait');schedule(16);return;}
+  queue.retryFrame=null;
   accumulator-=TICK_MS;busy=true;setActivity('worker');pendingKind='step';inflight=pair;
   worker.postMessage({type:'step',frame:queue.frame,pair,predicted:queue.active&&queue.frame>=queue.confirmed,offlineMask:queue.offlineMask()});
 }catch(error){finish(error.message);}}

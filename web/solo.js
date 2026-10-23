@@ -29,7 +29,7 @@ function release(){
   held.clear();pulses.clear();menuBits=menuUntil=0;player.reset();applyButtons(0);
   emulator?.inputs({generation:emulator.readState()?.generation,points:points(),touch:null});
 }
-function pulse(bit){pulses.set(bit,performance.now()+110);}
+function pulse(bit){pulses.set(bit,performance.now()+110);syncButtons();}
 function context(){
   const state=emulator?.readState(),game=state?.mode===1;
   player.setActive(emulator?.state==='running');
@@ -45,13 +45,17 @@ function pause(){
   release();emulator.gamePause();$('canvas').focus();
 }
 for(const type of ['keydown','keyup'])window.addEventListener(type,event=>{
-  if(!emulator||!(event.code in keys)||event.ctrlKey||event.metaKey||event.altKey)return;
+  if(!emulator||!(event.code in keys))return;
+  if(type==='keydown'&&(event.ctrlKey||event.metaKey||event.altKey))return;
   if(form(event.target)&&!held.has(event.code))return;
   if(emulator.state!=='running')return;
   event.preventDefault();
   if(type==='keydown'){
     held.add(event.code);enableSound();
   }else held.delete(event.code);
+  // Native keyboard state can reach the Worker before the next display tick.
+  // Sampling here never packs/consumes touch displacement or advances pulses.
+  syncButtons();
 });
 for(const button of document.querySelectorAll('[data-key]')){
   button.onclick=()=>{if(emulator?.state==='running'){enableSound();pulse(keys[button.dataset.key]);}};
@@ -62,11 +66,7 @@ document.addEventListener('visibilitychange',()=>{
     if(document.hidden){release();if(emulator?.state==='running'&&emulator.readState()?.mode===1)emulator.gamePause({onlyPause:true});}
 });
 window.addEventListener('pagehide',()=>{disposed=true;release();clearRecorder();emulator?.stop();});
-function tick(now){
-  if(disposed)return;
-  const state=context();
-  if(emulator){$('pause').disabled=![1,2].includes(state?.mode);$('pause').textContent=state?.mode===2?'继续游戏':'暂停游戏';}
-  if(emulator?.state==='running'){
+function sampleButtons(now,state){
     const game=state?.mode===1;
     let base=0;for(const key of held)base|=keys[key];
     let value=player.sample(base);
@@ -82,6 +82,17 @@ function tick(now){
     }
     for(const [bit,until]of pulses)if(now<until)value|=bit;else pulses.delete(bit);
     if((value&3)===3)value&=~3;if((value&12)===12)value&=~12;
+    return value;
+}
+function syncButtons(){
+  if(emulator?.state==='running')applyButtons(sampleButtons(performance.now(),context()));
+}
+function tick(now){
+  if(disposed)return;
+  const state=context();
+  if(emulator){$('pause').disabled=![1,2].includes(state?.mode);$('pause').textContent=state?.mode===2?'继续游戏':'暂停游戏';}
+  if(emulator?.state==='running'){
+    const game=state?.mode===1,value=sampleButtons(now,state);
     applyButtons(value);
     const touch=unpackTouch(player.pack(value));
     const command={generation:state?.generation,points:points(),touch:game&&!state.flags?touch:null};

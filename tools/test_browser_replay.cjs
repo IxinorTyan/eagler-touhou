@@ -3,6 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const {chromium}=require('C:/Users/14915/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const root=path.resolve(__dirname,'..'),web=path.join(root,'web'),base='http://127.0.0.1:9877',language=process.env.TH05_LANGUAGE||'cn';
 const fault=process.env.TH05_RECORD_FAULT==='1';
+const reportStem=process.env.QA_REPORT_NAME||`browser-replay-${language}${fault?'-fault':''}`;
 (async()=>{
  const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
  const report={date:new Date().toISOString(),language,fault,requests:[],errors:[]};
@@ -10,7 +11,8 @@ const fault=process.env.TH05_RECORD_FAULT==='1';
   const context=await browser.newContext({acceptDownloads:true});
   await context.route(base+'/**',route=>{
    const name=decodeURIComponent(new URL(route.request().url()).pathname);report.requests.push(name);
-   const file=path.resolve(web,'.'+name);
+   const file=name==='/solo.js'&&process.env.QA_SOLO_SOURCE?path.resolve(process.env.QA_SOLO_SOURCE):path.resolve(web,'.'+name);
+   if(name==='/solo.js'&&process.env.QA_SOLO_SOURCE)return route.fulfill({path:file,contentType:'text/javascript'});
    if(!file.startsWith(web+path.sep)||!fs.existsSync(file))return route.fulfill({status:404,body:''});
    return route.fulfill({path:file,contentType:({'.js':'text/javascript','.mjs':'text/javascript','.json':'application/json','.html':'text/html','.css':'text/css','.wasm':'application/wasm'})[path.extname(file)]||'application/octet-stream'});
   });
@@ -42,7 +44,7 @@ const fault=process.env.TH05_RECORD_FAULT==='1';
   await page.waitForTimeout(150);
   await page.evaluate(()=>{const s=coreStates.at(-1);coreWorkers.at(-1).postMessage({type:'input',input:{generation:s.generation,points:1,touch:null}});});
   await page.click('#pause');await page.waitForFunction(()=>coreStates.at(-1)?.mode===2,null,{timeout:10000});await page.waitForTimeout(250);
-  report.pause=await read();await page.locator('#canvas').screenshot({path:path.join(root,'reports/browser-record-pause.png')});
+  report.pause=await read();await page.locator('#canvas').screenshot({path:path.join(root,'reports',`${reportStem}-pause.png`)});
   await tap('Enter',300);report.resumed=await read();await page.waitForFunction(()=>coreStates.at(-1)?.mode===1,null,{timeout:10000});
   if(fault){
    await page.evaluate(()=>storageWorkers.at(-1).dispatchEvent(new ErrorEvent('error',{message:'injected compressor failure'})));
@@ -60,7 +62,7 @@ const fault=process.env.TH05_RECORD_FAULT==='1';
   assert.equal(await page.locator('#record-save').isDisabled(),false,await page.locator('#record-status').innerText());
   const download=page.waitForEvent('download');
   await page.click(await page.locator('#replay-save-dialog').isVisible()?'#replay-prompt-save':'#record-save');
-  const file=path.join(root,'reports',`browser-replay-${language}.th05r`);await (await download).saveAs(file);report.fileBytes=fs.statSync(file).size;
+  const file=path.join(root,'reports',`${reportStem}.th05r`);await (await download).saveAs(file);report.fileBytes=fs.statSync(file).size;
   report.ended=await read();const before=await read();
   if(process.env.TH05_RECORD_QUIT!=='1'){
    await tap('ArrowRight',600);const after=await read();assert(after.ticks>before.ticks);assert(after.x>before.x);report.playerContinued={before,after};
@@ -73,14 +75,19 @@ const fault=process.env.TH05_RECORD_FAULT==='1';
    return {events:replay.header.events.length,touch:commands.filter(c=>c.type==='input'&&c.input.touch?.active).length,keys:commands.filter(c=>c.type==='key').length,clockCount:replay.header.result.clockCount};
   },Array.from(fs.readFileSync(file)));
   assert(report.commands.touch>0);assert(report.commands.keys>0);
-  await viewer.click('#play');await viewer.waitForFunction(()=>th05BrowserReplayQA.read().state?.externalReplay?.boundary>20||th05BrowserReplayQA.read().status.includes('失败'),null,{timeout:60000});
+  await viewer.click('#play');await viewer.waitForFunction(()=>th05BrowserReplayQA.read().result||th05BrowserReplayQA.read().state?.externalReplay?.boundary>20||th05BrowserReplayQA.read().status.includes('失败'),null,{timeout:60000});
+  report.playback=await viewer.evaluate(()=>th05BrowserReplayQA.read());
+  if(report.playback.result){assert.equal(report.playback.result.matches,true,report.playback.status);}
+  else{
   await viewer.click('#hold');await viewer.waitForTimeout(150);const held=await viewer.evaluate(()=>th05BrowserReplayQA.read().state.externalReplay.boundary);
   await viewer.waitForTimeout(200);assert.equal(await viewer.evaluate(()=>th05BrowserReplayQA.read().state.externalReplay.boundary),held);
   await viewer.locator('#canvas').focus();await viewer.keyboard.press('ArrowLeft');await viewer.click('#hold');
   await viewer.waitForFunction(()=>th05BrowserReplayQA.read().result||th05BrowserReplayQA.read().status.includes('失败'),null,{timeout:120000});
+  }
   report.playback=await viewer.evaluate(()=>th05BrowserReplayQA.read());assert.equal(report.playback.result?.matches,true,report.playback.status);
   report.specialRequests=report.requests.filter(name=>/(?:patch-stage-|th05-stage-|stage-runtime|wdosbox-x-stage|frame-replay-(?:core|ending|cn|jp)|\/frame-replay\.json)/.test(name));
   assert.deepEqual(report.specialRequests,[]);assert.deepEqual(report.errors,[]);report.passed=true;
   console.log('PASS browser-only record, touch/pause, player continues, independent import/playback and final guest SHA',language,report.fileBytes);
- }finally{report.finalPages=[];for(const context of browser.contexts())for(const page of context.pages())report.finalPages.push(await page.evaluate(()=>({url:location.href,state:globalThis.coreStates?.at(-1),status:document.getElementById('status')?.textContent,recordStatus:document.getElementById('record-status')?.textContent})).catch(()=>null));fs.writeFileSync(path.join(root,'reports',`browser-replay-${language}${fault?'-fault':''}.json`),JSON.stringify(report,null,2));await browser.close();}
+ }catch(error){report.passed=false;report.failure=error.stack;throw error;}
+ finally{report.finalPages=[];for(const context of browser.contexts())for(const page of context.pages())report.finalPages.push(await page.evaluate(()=>({url:location.href,state:globalThis.coreStates?.at(-1),status:document.getElementById('status')?.textContent,recordStatus:document.getElementById('record-status')?.textContent})).catch(()=>null));fs.writeFileSync(path.join(root,'reports',`${reportStem}.json`),JSON.stringify(report,null,2));await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
