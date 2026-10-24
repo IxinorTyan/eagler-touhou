@@ -1,3 +1,4 @@
+import {mountHorizontalTouch,mountTouchPreferences} from './th01-touch.js';
 import {loadMusicTrack} from './bgm-track.js';
 import {onBgmVersion} from './bgm-version.js';
 import {populateStages,stageLabel,stageSelection,applyStage} from './stage-select.js';
@@ -112,12 +113,22 @@ const image=new ImageData(640,400),context=$('game').getContext('2d',{alpha:fals
 const phases=['等待开球','游戏中','关卡完成','全员阵亡'];
 const players=()=>solo?1:Number($('players').value)||2;
 
+let touchMenuBits=0;
+const horizontalTouch=mountHorizontalTouch($('game'),{
+  allowed:()=>started&&!configuring&&!document.hidden&&!$('solo-replay-dialog')?.open,
+  gameplay:()=>!!core&&!core.th_get(50,0)&&core.th_get(0,0)<=1&&!core.th_get(117,0),
+  menu:()=>!!core?.th_get(50,0),
+  gesture:()=>{void unlockEffects();void startMusic();},
+  change:()=>{const bits=horizontalTouch.menuBits;if(bits&&bits!==touchMenuBits&&core?.th_get(50,0))menuInput({1:0,2:1,4:2,8:3}[bits]);touchMenuBits=bits;},
+  pulse:bit=>{if(bit===128){setPaused(!paused);return;}if(core?.th_get(50,0)){menuInput(bit===16?5:4);return;}if(bit===256&&core?.th_get(0,0)===2){core.th_continue();updatePhase();}},
+});
+mountTouchPreferences($('player').querySelector('.toolbar'),horizontalTouch);
 function buttons(){
   const result=keys.map(row=>row.reduce((mask,key,i)=>mask|((held.has(key)||pressed.has(key))?1<<i:0),0));
   for(const {slot,bit} of touchOwners.values()) if(slot<players())result[slot]|=bit;
-  return result;
+  const slot=Number($('touchSlot').value);result[slot]=horizontalTouch.pack(result[slot]);return result;
 }
-function release(){held.clear();pressed.clear();touchOwners.clear();for(const b of document.querySelectorAll('[data-bit]'))b.classList.remove('active');}
+function release(){horizontalTouch.reset();touchMenuBits=0;held.clear();pressed.clear();touchOwners.clear();for(const b of document.querySelectorAll('[data-bit]'))b.classList.remove('active');}
 function previewBoss(stage=5,route=0){
   if(!core)return;
   core.th_stage_command(14,0,stage,route,0,0);paused=false;core.th_set_pause_overlay(0);
@@ -191,7 +202,7 @@ function loop(now){
   if(!paused&&!document.hidden)accumulator+=elapsed;
   let budget=8;
   while(accumulator>=tick&&budget-->0&&!paused){
-    const input=buttons(),start=performance.now();core.th_step(...input);pressed.clear();logicMs+=performance.now()-start;
+    const input=buttons(),start=performance.now();core.th_step(...input);horizontalTouch.consume();pressed.clear();logicMs+=performance.now()-start;
     playEffects();
     accumulator-=tick;++steps;
   }

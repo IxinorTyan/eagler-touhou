@@ -42,7 +42,7 @@ export class NativeSimulation{
         else e.th_stage_command(15,0,0,0,0,0);
       }
     }
-    if(!handled)e.th_step(...[0,1,2].map(i=>(inputs[i]||0)&15|((inputs[i]||0)&4096?16:0)));
+    if(!handled)e.th_step(...[0,1,2].map(i=>((inputs[i]||0)&15|((inputs[i]||0)&4096?16:0)|((inputs[i]||0)&0xffff8000))>>>0));
     this.previous=inputs.slice();this.frame++;
 
   }

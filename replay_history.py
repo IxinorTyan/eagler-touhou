@@ -55,7 +55,7 @@ def row_valid(row, header, frame):
     if not isinstance(row['proof'], str) or len(row['proof']) > 8192 or ((frame + 1) % 120 == 0) != (row['hash'] is not None):
         return False
     if game != '03':
-        return all(integer(n, 0, 2 ** 44 - 1) and not (row['offlineMask'] & (1 << i) and n != 0) for i, n in enumerate(inputs))
+        return all(integer(n, 0, 2 ** 45 - 1) and not (row['offlineMask'] & (1 << i) and n != 0) for i, n in enumerate(inputs))
     if row['offlineMask']:
         return False
     actions = {'up', 'down', 'left', 'right', 'shot', 'rapid', 'attack', 'focus'}

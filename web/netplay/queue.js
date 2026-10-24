@@ -1,5 +1,5 @@
 export const PROTOCOL='th01-native-lockstep/1';
-export const VALID_INPUT=32767;
+export const VALID_INPUT=4294967295;
 // Every input is immutable once sampled. No prediction or wall-clock game state.
 export class FrameQueue{
   constructor(slot,delay,count=2){
@@ -10,7 +10,7 @@ export class FrameQueue{
   capture(buttons){
     const frame=this.frame+this.delay,lane=this.lanes[this.slot];
     if(lane.has(frame))return null;
-    const packet={type:'input',frame,slot:this.slot,buttons:buttons&VALID_INPUT};
+    const packet={type:'input',frame,slot:this.slot,buttons:buttons>>>0};
     lane.set(frame,packet.buttons);return packet;
   }
   receive(frame,buttons,slot){

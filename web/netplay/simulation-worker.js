@@ -62,7 +62,7 @@ onmessage=({data})=>{
     if(data.type==='init')result=await init(data);
     else if(!simulation)throw Error('联机模拟线程尚未初始化');
     else if(data.type==='execute'){
-      if(data.frame!==simulation.frame||!Array.isArray(data.inputs)||data.inputs.length!==settings.players||data.inputs.some(n=>!Number.isInteger(n)||n<0||n>32767))throw Error('联机模拟输入边界无效');
+      if(data.frame!==simulation.frame||!Array.isArray(data.inputs)||data.inputs.length!==settings.players||data.inputs.some(n=>!Number.isInteger(n)||n<0||n>4294967295))throw Error('联机模拟输入边界无效');
       simulation.step(data.inputs);result={...summary(),audio:audio()};
       const revision=core.th_get(110,0);
       if(revision!==scoreRevision){scoreRevision=revision;result.scores=new Uint8Array(core.memory.buffer,core.th_score_data(),core.th_score_size()).slice();}

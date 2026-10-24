@@ -1,3 +1,4 @@
+import {mountHorizontalTouch,mountTouchPreferences} from '../th01-touch.js';
 import {bgmVersion,onBgmVersion} from '../bgm-version.js';
 import {populateStages,stageLabel} from '../stage-select.js';
 import {NetSession} from './session.js';
@@ -32,8 +33,17 @@ function help(){
 }
 for(const id of ['startStage','players','rank','count','life-compensation','network','transport','ice','delay'])$(id).onchange=help;help();
 const wake=()=>session?.pump();
-function sample(){let v=taps|commands;for(const key of keys)v|=keyBits[key];for(const bit of touches.values())v|=bit;taps=commands=0;return v;}
-function clear(){keys.clear();touches.clear();taps=commands=0;for(const b of document.querySelectorAll('[data-bit]'))b.classList.remove('active');wake();}
+const horizontalTouch=mountHorizontalTouch($('canvas'),{
+  bombBit:4096,
+  allowed:()=>!!session&&!session.closed&&!document.hidden,
+  gameplay:()=>{const s=session?.game.state();return !!s&&!s.menu&&s.phase<=1&&!s.entrance;},
+  menu:()=>!!session?.game.state()?.menu&&identity?.role==='host',
+  gesture:()=>{void session?.game.unlockAudio().catch(()=>{});},
+  change:wake,pulse:bit=>tap(bit===16?8:bit===256?64:bit),
+});
+mountTouchPreferences($('music-volume').closest('label'),horizontalTouch);
+function sample(){let v=taps|commands;for(const key of keys)v|=keyBits[key];for(const bit of touches.values())v|=bit;taps=commands=0;v=horizontalTouch.pack(v);horizontalTouch.consume();return v;}
+function clear(){horizontalTouch.reset();keys.clear();touches.clear();taps=commands=0;for(const b of document.querySelectorAll('[data-bit]'))b.classList.remove('active');wake();}
 function tap(bit){taps|=bit;wake();}
 addEventListener('keydown',event=>{
   if(!session||session.closed||event.target.closest('input,select,textarea')||!keyBits[event.code])return;
