@@ -66,8 +66,8 @@ function clear(){
   else if(coop)coop.clear();
   else if(mailbox>=0)queueAssist({address:mailbox,generation:new DataView(emulator.module.HEAPU8.buffer).getUint16(mailbox+24,true),points:0,touch:null});
 }
-function update(){
-  if(!emulator)return;
+function update(force=false){
+  if(!emulator||emulator.practiceStandby&&!force)return;
   const now=performance.now();
   if(now-lastInput>750)clear();
   const h=emulator.module.HEAPU8;
@@ -94,6 +94,8 @@ async function dispatch(message){
     emulator=await NP21.create({...setup.config,artPatch:game==='04coop'?patch:null,canvas:setup.canvas,workerRuntime:true,nativeSoloAudio:false,
       applyReplayInput:applyAssist,
       ...(externalReplay?{externalReplay:{...externalReplay,onChunk:value=>postReplay('chunk',value),onEnd:value=>postReplay('end',value),onError:error=>postReplay('error',error),onRecordingError:error=>postReplay('error',error)}}:{}),
+      onPracticeParked:practice=>{const at=emulator.practice.debug.csBase+patch.mailbox_cs_offset;seen.set(at,{ticks:0,changed:performance.now()});awaitingSnapshot=false;update(true);postMessage({type:'practice-parked',practice});},
+      onError:error=>postMessage({type:'error',message:error.message}),
       onDiskChange:()=>postMessage({type:'diskChange'}),onExit:()=>{clear();postMessage({type:'exit'});}});
     if(game==='03'){
       const {NativePause}=await import('./native-pause.js');bridge=new NativePause(()=>emulator,patch);
@@ -106,6 +108,7 @@ async function dispatch(message){
     return {heapBytes:emulator.module.HEAPU8.length,runtime:emulator.module.mobileRuntime};
   }
   if(method==='snapshotAck'){awaitingSnapshot=false;return;}
+  if(method==='practiceActivate'){lastInput=performance.now();emulator.activatePractice(args[0]);awaitingSnapshot=false;update(true);return;}
   if(method==='practiceOptions'){emulator.practiceOptions(args[0]);return;}
   if(method==='audio')return emulator.state==='running'?(emulator.readAudio?.()||environment.audio()):null;
   if(method==='key'){

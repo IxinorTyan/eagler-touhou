@@ -9,7 +9,7 @@ export class WorkerNP21 {
   constructor(config,setup){
     this.config=config;this.setup=setup;this.state='loading';this.isWorker=true;
     this.pending=new Map();this.serial=0;this.closed=false;this.sources=new Set();this.audioEnd=0;this.audioEpoch=0;
-    this.snapshot={state:null,markers:[]};
+    this.snapshot={state:null,markers:[]};this.practiceParked=false;this.prepared=new Promise((resolve,reject)=>{this.resolvePrepared=resolve;this.rejectPrepared=reject;});this.prepared.catch(()=>{});
     this.context=new AudioContext();this.context.resume().catch(()=>{});
     this.module={heapBytes:0,SDL2:{audioContext:this.context},executionThread:'worker'};
     this.worker=new Worker(new URL('./solo-worker.js',import.meta.url),{type:'module',name:'TH'+setup.game+' simulation'});
@@ -30,7 +30,7 @@ export class WorkerNP21 {
   }
   async initialize(){
     if(!supportsSoloWorker())throw Error('浏览器不支持后台模拟，请选择兼容模式');
-    const {canvas,onDiskChange,onExit,applyReplayInput,...config}=this.config;
+    const {canvas,onDiskChange,onExit,onError:configOnError,onPracticeParked,applyReplayInput,...config}=this.config;
     const replay=config.externalReplay;this.externalReplayCallbacks=replay||null;
     if(replay)config.externalReplay={mode:replay.mode,boundaryMode:replay.boundaryMode,endReason:replay.endReason,endPhase:replay.endPhase,timeline:replay.timeline,lifecycle:replay.lifecycle,
       ...(replay.clocks?{clocks:replay.clocks.slice()}:{}),...(replay.events?{events:replay.events}:{}),...(replay.endBoundary!==undefined?{endBoundary:replay.endBoundary}:{})};
@@ -52,6 +52,7 @@ export class WorkerNP21 {
   send(method,args=[]){if(!this.closed)this.worker.postMessage({method,args});}
   receive(data){
     if(this.closed)return;
+    if(data.type==='practice-parked'){this.practiceParked=true;this.snapshot.practice=data.practice;this.resolvePrepared(data.practice);return;}
     if(data.type==='external-replay-chunk'){this.externalReplayCallbacks?.onChunk?.(data.chunk);return;}
     if(data.type==='external-replay-end'){this.externalReplayCallbacks?.onEnd?.(data.result);return;}
     if(data.type==='external-replay-error'){(this.externalReplayCallbacks?.onError||this.externalReplayCallbacks?.onRecordingError)?.(Error(data.message));return;}
@@ -116,13 +117,14 @@ export class WorkerNP21 {
   }
   clearInput(){this.queuedInput=null;this.send('clear');}
   finishReplay(){this.send('externalReplayFinish');}
+  async activatePractice(options){await this.call('practiceActivate',[options]);this.practiceParked=false;this.config.practiceStandby=false;this.state='running';this.context.resume().catch(()=>{});}
   practiceOptions(options){this.send('practiceOptions',[options]);}
   fastForwardReplay(value){this.send('externalReplayFast',[!!value]);}
   stopBrowserRecording(){this.send('externalReplayDisable');}
   pauseReplay(value){this.state=value?'paused':'running';this.send('externalReplayPause',[!!value]);if(value){this.flushAudio();this.context.suspend().catch(()=>{});}else this.context.resume().catch(()=>{});}
   fail(error){if(this.closed)return;console.error(error);this.failedError=error;this.dispose();this.setup.onError?.(error);}
   dispose(){
-    if(this.closed)return;this.closed=true;this.state='exited';clearInterval(this.audioTimer);this.flushAudio();this.worker.terminate();
+    if(this.closed)return;this.closed=true;this.rejectPrepared(Error('模拟线程已关闭'));this.state='exited';clearInterval(this.audioTimer);this.flushAudio();this.worker.terminate();
     for(const pending of this.pending.values()){clearTimeout(pending.timeout);pending.reject(this.failedError||Error('模拟线程已关闭'));}this.pending.clear();
     for(const type of ['keydown','keyup','keypress'])this.config.canvas.removeEventListener(type,this.onKey);
     document.removeEventListener('visibilitychange',this.onVisibility);window.removeEventListener('pagehide',this.onPageHide);

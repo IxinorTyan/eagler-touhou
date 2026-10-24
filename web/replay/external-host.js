@@ -12,7 +12,7 @@ export function inspectExternalMemory(module){
 }
 
 export function createExternalReplayHost({mode,clocks,events=[],endBoundary,endReason='sleep',endPhase='after-input',timeline,boundaryMode='sleep',onChunk=()=>{},onEnd=()=>{},onError=()=>{},
-  onRecordingError=onError,applyInput=()=>{},inspect,observe,maxClockBytes=512*1024*1024,clock,onBoundary=()=>{}}={}){
+  onRecordingError=onError,applyInput=()=>{},inspect,observe,maxClockBytes=512*1024*1024,clock,onBoundary=()=>{},shouldHold}={}){
   if(!['record','playback'].includes(mode)||!['sleep','clock'].includes(boundaryMode))throw Error('无效的单人 Replay 主机配置');
   let module=null,boundary=0,count=0,eventCursor=0,queued=[],buffer=new Uint8Array(CLOCK_BYTES*CLOCK_CHUNK),used=0;
   let stopped=false,ending=false,held=false,wake=null,timer=null,lastWake=0,recording=mode==='record',finished=false,extraClockReads=0,detached=false;
@@ -115,6 +115,8 @@ export function createExternalReplayHost({mode,clocks,events=[],endBoundary,endR
       if(mode==='record'){
         try{if(observeRun())return;}catch(error){disable(error);}
       }else if(endPhase==='before-input'&&endReason!=='exit'&&boundary===endBoundary){finish();return;}
+      // Park only after observing native entry pause, before delivering input.
+      if(mode==='record'&&shouldHold?.()){held=true;return;}
       if(mode==='record'){
         const batch=queued;queued=[];apply(batch);recordCommands(batch,boundary);
       }else{
