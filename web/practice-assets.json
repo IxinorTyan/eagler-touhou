@@ -4,8 +4,8 @@
   "languages": {
     "cn": {
       "url": "practice-cn.exe.gz",
-      "sha256": "ec5342a92fd119494762a2fe0d7af26d7b5e6bdb32f98cc0341944c0611ea807",
-      "size": 158882,
+      "sha256": "8487f8d5c19519824799cf78de3b3165d3beea30c66ef5dacb791e8ed3bd1977",
+      "size": 158930,
       "sourceMainSha256": "039e00e3d1b022a6af853a0663fe922414010b0b8dfa2b994dcaa6a3604318b3",
       "patch": {
         "version": 1,
@@ -36,11 +36,11 @@
             "payload_bytes_added": 0
           }
         ],
-        "sha256": "ec5342a92fd119494762a2fe0d7af26d7b5e6bdb32f98cc0341944c0611ea807",
+        "sha256": "8487f8d5c19519824799cf78de3b3165d3beea30c66ef5dacb791e8ed3bd1977",
         "insert_image_offset": 78048,
-        "insert_size": 2624,
+        "insert_size": 2672,
         "code_segment": 2735,
-        "data_segment": 8664,
+        "data_segment": 8667,
         "mailbox_cs_offset": 34306,
         "signature": "TH04SOLOINPUTv1!",
         "entries": [
@@ -217,10 +217,10 @@
           "GENSO/VMAP.COM": "1ded169f4a2365be734bd06a092d5e23990e1778e357049af1501105c95376a7",
           "GENSO/ZMAP.COM": "355bc258da34ebdcce5442e23b1571a66a6e998f9302d0d49a24d553d05f95fd",
           "GENSO/ZUN.COM": "0a12e9a489d3b704a77cf04ca3062ee48f298a9df6d237dc7dad46986e2d116e",
-          "GENSO/東方幻想.郷": "4da4d24fec56333542ed01fd0bb8a1e91131ef194a28bf5de477c7b9e09f779a",
-          "GENSO/幻想郷.TXT": "b38889f0d7871263ca2ebc2fc9be0d8109cdb0ea122e078f15fa4a9e045ad738",
-          "GENSO/幻想郷_1.TXT": "1cbeac1348c1c64a608129293cf2ab181100f5f9404165deec11dc9a384e81f6",
-          "GENSO/幻想郷ED.DAT": "2aefd46cd9134582d163fa1e2ed11ed4939cf5bc9e161ece60534f4b33469aa6",
+          "GENSO/\u6771\u65b9\u5e7b\u60f3.\u90f7": "4da4d24fec56333542ed01fd0bb8a1e91131ef194a28bf5de477c7b9e09f779a",
+          "GENSO/\u5e7b\u60f3\u90f7.TXT": "b38889f0d7871263ca2ebc2fc9be0d8109cdb0ea122e078f15fa4a9e045ad738",
+          "GENSO/\u5e7b\u60f3\u90f7_1.TXT": "1cbeac1348c1c64a608129293cf2ab181100f5f9404165deec11dc9a384e81f6",
+          "GENSO/\u5e7b\u60f3\u90f7ED.DAT": "2aefd46cd9134582d163fa1e2ed11ed4939cf5bc9e161ece60534f4b33469aa6",
           "AUTOEXEC.BAT": "6e27a461e800c4047fdc892417a676c017a0b48b20469a09fa9a85f4a05d7f37",
           "COMMAND.COM": "fb2ccff4ad1531b72657a237a3717ac35d4095e0d2bc566ac6724bd34d58a340",
           "CONFIG.SYS": "35bb4183d20423395b5dc75f16424db523c1745823c6afa590529f5b3fcd2545",
@@ -255,33 +255,34 @@
         "practice": {
           "version": 1,
           "entries": {
-            "load": 36495,
-            "frame": 36507,
-            "player": 36559,
-            "world": 36585,
-            "entryPause": 36428,
-            "hold": 36429,
-            "targetPractice": 36430,
-            "lockLives": 36431,
-            "unlimitedBombs": 36432,
-            "enemyLock": 36433,
-            "respawnLives": 36621,
-            "bombGate": 36645,
-            "bombConsume": 36666,
-            "livesZero": 36679,
-            "bombsZero": 36708,
-            "shotsReturn": 36737,
-            "dialogRun": 36755,
-            "resourceDirty": 36434
+            "load": 36497,
+            "frame": 36509,
+            "player": 36561,
+            "world": 36587,
+            "entryPause": 36430,
+            "hold": 36431,
+            "targetPractice": 36432,
+            "lockLives": 36433,
+            "unlimitedBombs": 36434,
+            "enemyLock": 36435,
+            "respawnLives": 36665,
+            "bombGate": 36689,
+            "bombConsume": 36710,
+            "livesZero": 36723,
+            "bombsZero": 36752,
+            "shotsReturn": 36781,
+            "dialogRun": 36799,
+            "resourceDirty": 36436,
+            "boss": 36623
           },
-          "bytes": 528
+          "bytes": 576
         }
       }
     },
     "jp": {
       "url": "practice-jp.exe.gz",
-      "sha256": "36da6bbeac0ea89be38579cd39d10247f6d6268f7928cd4b004ffc3bfbb7fe10",
-      "size": 158882,
+      "sha256": "a784199549e20cbf9736a4302c12b51586f5eba8e5dc8f160d95795e05dd3763",
+      "size": 158930,
       "sourceMainSha256": "72009d521ba986ae10ca60a4bd12ba027328cc7420e8458ed42276da459aba62",
       "patch": {
         "version": 1,
@@ -312,11 +313,11 @@
             "payload_bytes_added": 0
           }
         ],
-        "sha256": "36da6bbeac0ea89be38579cd39d10247f6d6268f7928cd4b004ffc3bfbb7fe10",
+        "sha256": "a784199549e20cbf9736a4302c12b51586f5eba8e5dc8f160d95795e05dd3763",
         "insert_image_offset": 78048,
-        "insert_size": 2624,
+        "insert_size": 2672,
         "code_segment": 2735,
-        "data_segment": 8664,
+        "data_segment": 8667,
         "mailbox_cs_offset": 34306,
         "signature": "TH04SOLOINPUTv1!",
         "entries": [
@@ -491,9 +492,9 @@
           "GENSO/README.TXT": "5eb1661e8a5e774cf439bdd3f35832eb875dfdf9f4a07661818cb154e76dbd5f",
           "GENSO/RESET.BAT": "2ae8491d71a9dc194d668507a4749b48fa8e9641e1b77e5080f1f45fa82dffca",
           "GENSO/ZUN.COM": "0a12e9a489d3b704a77cf04ca3062ee48f298a9df6d237dc7dad46986e2d116e",
-          "GENSO/幻想郷.TXT": "b38889f0d7871263ca2ebc2fc9be0d8109cdb0ea122e078f15fa4a9e045ad738",
-          "GENSO/幻想郷ED.DAT": "ca787b8ff66f7b3f10c97b3ecc77cd466772767e3e9e8cf5a0c71dd612b1c8d7",
-          "GENSO/東方幻想.郷": "f971298bab7d4418573d55f5f0e8d8c2444e452ab6000ea5cdd185eb609e03f1",
+          "GENSO/\u5e7b\u60f3\u90f7.TXT": "b38889f0d7871263ca2ebc2fc9be0d8109cdb0ea122e078f15fa4a9e045ad738",
+          "GENSO/\u5e7b\u60f3\u90f7ED.DAT": "ca787b8ff66f7b3f10c97b3ecc77cd466772767e3e9e8cf5a0c71dd612b1c8d7",
+          "GENSO/\u6771\u65b9\u5e7b\u60f3.\u90f7": "f971298bab7d4418573d55f5f0e8d8c2444e452ab6000ea5cdd185eb609e03f1",
           "AUTOEXEC.BAT": "6e27a461e800c4047fdc892417a676c017a0b48b20469a09fa9a85f4a05d7f37",
           "COMMAND.COM": "fb2ccff4ad1531b72657a237a3717ac35d4095e0d2bc566ac6724bd34d58a340",
           "CONFIG.SYS": "35bb4183d20423395b5dc75f16424db523c1745823c6afa590529f5b3fcd2545",
@@ -528,26 +529,27 @@
         "practice": {
           "version": 1,
           "entries": {
-            "load": 36495,
-            "frame": 36507,
-            "player": 36559,
-            "world": 36585,
-            "entryPause": 36428,
-            "hold": 36429,
-            "targetPractice": 36430,
-            "lockLives": 36431,
-            "unlimitedBombs": 36432,
-            "enemyLock": 36433,
-            "respawnLives": 36621,
-            "bombGate": 36645,
-            "bombConsume": 36666,
-            "livesZero": 36679,
-            "bombsZero": 36708,
-            "shotsReturn": 36737,
-            "dialogRun": 36755,
-            "resourceDirty": 36434
+            "load": 36497,
+            "frame": 36509,
+            "player": 36561,
+            "world": 36587,
+            "entryPause": 36430,
+            "hold": 36431,
+            "targetPractice": 36432,
+            "lockLives": 36433,
+            "unlimitedBombs": 36434,
+            "enemyLock": 36435,
+            "respawnLives": 36665,
+            "bombGate": 36689,
+            "bombConsume": 36710,
+            "livesZero": 36723,
+            "bombsZero": 36752,
+            "shotsReturn": 36781,
+            "dialogRun": 36799,
+            "resourceDirty": 36436,
+            "boss": 36623
           },
-          "bytes": 528
+          "bytes": 576
         }
       }
     }

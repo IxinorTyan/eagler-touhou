@@ -67,6 +67,49 @@ for(const [stage,phase,counter,limit,frameCap]of [[0,2,0xbced,16,0],[1,2,0x53df,
   const t=instance('target',{stage:5,entry:'boss',phase:16});t.signal(0x7fe0);t.w(0xbcd0,0x6013);t.b(0x53d9,14);t.w(0x53d6,1200);t.w(0x53e0,0);t.signal(0x7fe1);
   assert.equal(t.engine.status.bossHp,0);t.b(0x53d9,16);t.signal(0x7fe1);assert(t.engine.status.ready);assert.equal(t.engine.status.bossHp,1200);checks++;
 }
+// Arrival is synchronous after the native Boss/midboss state change, before
+// delayed emitters update. Clear live flags once, retaining native templates
+// and Boss entities needed by the selected attack.
+const pools=[['bullets',0x5a22,26,440],['lasers',0x42f0,24,2],['gather',0x9292,42,16],['items',0xaf34,20,32],['circles',0x9594,10,16],['custom',0xb204,26,32]];
+for(const setup of [
+  {stage:0,entry:'boss',phase:3}, {stage:1,entry:'boss',phase:5},
+  {stage:3,entry:'boss',phase:2,character:0}, {stage:3,entry:'boss',phase:4,character:2},
+  {stage:5,entry:'boss',phase:4}, {stage:5,entry:'boss',phase:8},
+  {stage:5,entry:'boss',phase:16}, {stage:6,entry:'boss',phase:7,branch:'gengetsu'},
+  {stage:0,entry:'mid',phase:3}
+]){
+  const t=instance('target',setup);t.signal(0x7fe0);t.signal(0x7fe5);assert.equal(t.engine.debug.entryCleanup,null);
+  t.signal(0x7fe1);
+  for(const [,offset,stride,count]of pools)for(let i=0;i<count;i++){t.b(offset+i*stride,1+i%3);t.b(offset+i*stride+1,0x5a);}
+  t.b(0xbcb9,12);t.b(0xbcba,45);t.b(0x42d8,0x6b);t.b(0x5a08,0x7c);
+  t.w(setup.entry==='mid'?0x46b6:0xbcd0,setup.branch==='gengetsu'?0xc7da:0x6013);
+  t.b(setup.entry==='mid'?0x53c5:0x53d9,setup.phase);t.w(setup.entry==='mid'?0x53c2:0x53d6,1200);
+  t.signal(0x7fe5);assert(t.engine.status.ready&&t.engine.status.waiting);assert.equal(t.engine.status.outcome,null);
+  assert.equal(t.engine.status[setup.entry==='mid'?'midHp':'bossHp'],1200);
+  for(const [name,offset,stride,count]of pools){
+    let cleared=0;
+    for(let i=0;i<count;i++){
+      const keep=name==='custom'&&setup.stage===3&&setup.character===0&&i<4;
+      assert.equal(t.h[d+offset+i*stride],keep?1+i%3:0,`${JSON.stringify(setup)} ${name} ${i}`);
+      assert.equal(t.h[d+offset+i*stride+1],0x5a,'Only flags may be cleared');if(!keep)cleared++;
+    }
+    assert.equal(t.engine.debug.entryCleanup[name],cleared);
+  }
+  assert.equal(t.h[d+0xbcb9],0);assert.equal(t.h[d+0xbcba],0);assert.equal(t.h[d+0x42d8],0x6b);assert.equal(t.h[d+0x5a08],0x7c);
+  assert(t.h.subarray(d+0x4700,d+0x4d40).every(n=>n===1));
+  t.b(0x5a22,1);t.b(0x9292,1);
+  for(let frame=0;frame<3;frame++){
+    t.h.fill(0,d+0x4700,d+0x4d40);t.signal(0x7fe1);
+    assert(t.h.subarray(d+0x4700,d+0x4d40).every(n=>n===(frame<2?1:0)),'Both VRAM pages must be invalidated, then stop');
+    t.signal(0x7fe2);t.signal(0x7fe5);t.signal(0x7fe4);
+    assert.equal(t.h[d+0x5a22],1);assert.equal(t.h[d+0x9292],1,'New attack emitters must survive');
+  }
+  checks++;
+}
+for(const mode of ['full','target']){
+  const t=instance(mode,{entry:'stage'});t.signal(0x7fe0);t.b(0x5a22,1);t.signal(0x7fe1);t.signal(0x7fe5);
+  assert.equal(t.h[d+0x5a22],1);assert.equal(t.engine.debug.entryCleanup,null);checks++;
+}
 assert.throws(()=>normalizePractice({version:PRACTICE_VERSION,mode:'target',setup:{entry:'mid',stage:6}}));
 {
   const t=instance('target',{entry:'boss'});t.signal(0x7fe0);t.signal(0x7fe1);

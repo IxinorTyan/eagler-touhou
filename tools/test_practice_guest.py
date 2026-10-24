@@ -45,16 +45,38 @@ def main():
             assert u.mem_read(db+0x5392,1)==bytes([answer])
             for r,v in regs.items():assert u.reg_read(r)==v+(2 if r==UC_X86_REG_SP else 0)
             checked+=1
+        # The arrival callback must run after the far native Boss update and
+        # before a redraw of this page. Full play never emits this callback.
+        for target,pause in ((0,0),(0,1),(1,0),(1,1)):
+            u,_=guest(spec);regs=init(u);order=[];native=0x60;redraw=0x70
+            u.mem_write(cb+native,b'\xcb');u.mem_write(cb+redraw,b'\xc3')
+            u.mem_write(db+0xbcd0,struct.pack('<HH',native,cs))
+            u.mem_write(db+0x4268,struct.pack('<H',redraw))
+            u.mem_write(cb+e['targetPractice'],bytes([target]))
+            def boss_order(uc,at,size,data):
+                if at==cb+native:order.append('boss')
+                if at==cb+redraw:order.append('redraw')
+            def arrival(uc,port,size,value,data):
+                assert (port,size,value)==(0x7fe5,4,ds<<16|cs)
+                order.append('arrival');uc.mem_write(cb+e['entryPause'],bytes([pause]))
+            u.hook_add(UC_HOOK_CODE,boss_order)
+            u.hook_add(UC_HOOK_INSN,arrival,None,1,0,UC_X86_INS_OUT)
+            u.emu_start(cb+e['boss'],cb+0xfff0,count=1000)
+            assert order==['boss']+(['arrival']+(['redraw'] if pause else []) if target else []),(lang,target,pause,order)
+            for reg,value in regs.items():assert u.reg_read(reg)==value+(2 if reg==UC_X86_REG_SP else 0),(lang,'boss',reg)
+            checked+=1
         # Execute the real power updater, not a JS mirror of its byte value.
         # A fake loaded character table lets us verify the selected function
         # and all thresholds without depending on DOS-loaded shot resources.
         levels=[6,12,16,24,32,48,72,96,128]
         for power in (1,5,6,12,16,31,32,48,64,72,96,127,128):
-            for hook,port in [('frame',0x7fe1),('player',0x7fe2),('player',0x7fe3),('world',0x7fe4)]:
+            for hook,port in [('frame',0x7fe1),('player',0x7fe2),('player',0x7fe3),('world',0x7fe4),('boss',0x7fe5)]:
                 u,_=guest(spec);regs=init(u);seen=[];native=0x50
                 for ip in (native,p['entries'][1],p['entries'][7]):u.mem_write(cb+ip,b'\xc3')
                 for at in (0xf0a5,0xf07a):u.mem_write(BASE*16+at,b'\xcb')
                 u.mem_write(db+0x428a,struct.pack('<H',native))
+                u.mem_write(cb+0x60,b'\xcb');u.mem_write(db+0xbcd0,struct.pack('<HH',0x60,cs))
+                u.mem_write(cb+e['targetPractice'],b'\x01')
                 u.mem_write(db+0x449c,struct.pack('<H',0x1000))
                 u.mem_write(db+0x1000,struct.pack('<10H',*[0x2000+2*i for i in range(10)]))
                 def change(uc,current,size,value,data):

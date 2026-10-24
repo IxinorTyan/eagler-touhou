@@ -14,7 +14,10 @@ const resourceProbe=`function(type){
   }
   const table=v.getUint16(d+0x449c,true),level=h[d+0x4665],shots=[];
   for(let i=0;i<68;i++){const a=d+0xb55e+i*18;if(h[a])shots.push({flag:h[a],damage:h[a+16],pat:v.getUint16(a+14,true)});}
-  return {power:h[d+0x4664],level,shotFunction:v.getUint16(d+0x449a,true),expectedShotFunction:v.getUint16(d+table+2*level,true),dream:v.getUint16(d+0xbccc,true)*10,dreamItems:h[d+0x4676],shots};
+  const hazards={};for(const [name,offset,stride,count]of [['bullets',0x5a22,26,440],['lasers',0x42f0,24,2],['gather',0x9292,42,16],['items',0xaf34,20,32],['circles',0x9594,10,16],['custom',0xb204,26,32]]){
+    hazards[name]=[];for(let i=0;i<count;i++)if(h[d+offset+stride*i])hazards[name].push(i);
+  }
+  return {power:h[d+0x4664],level,shotFunction:v.getUint16(d+0x449a,true),expectedShotFunction:v.getUint16(d+table+2*level,true),dream:v.getUint16(d+0xbccc,true)*10,dreamItems:h[d+0x4676],shots,hazards,cleanup:emulator.practice.debug.entryCleanup,phaseFrame:v.getUint16(d+0x53da,true),midFrame:v.getUint16(d+0x53c6,true)};
 }`;
 const report={runtime,language,entry,stage,phase,character,branch,power,record,passed:false,errors:[]},stem=`practice-${runtime}-${language}-${stage}-${entry}-${phase}-${character}-${branch}${record?'-rep':''}${process.env.OUTCOME?'-'+process.env.OUTCOME:''}${process.env.CPU_CYCLES?'-cpu'+process.env.CPU_CYCLES:''}${process.env.HELPERS?'-helpers':''}${process.env.SPEED_TEST?'-speed':''}${process.env.RETRY?'-retry':''}${process.env.LAYOUT_TEST?'-layout':''}${process.env.TIMELOCK_TEST?'-timelock':''}${process.env.INPUT_TEST?'-input':''}${process.env.POWER?'-power'+power:''}${process.env.RESOURCE_TEST?'-resources':''}`;
 const mime={'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.wasm':'application/wasm','.json':'application/json','.css':'text/css','.bmp':'image/bmp','.png':'image/png'};
@@ -53,13 +56,36 @@ const mime={'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript'
   assert.equal(report.resources.power,power);assert.equal(report.resources.level,[6,12,16,24,32,48,72,96,128].filter(n=>power>=n).length);
   assert.equal(report.resources.shotFunction,report.resources.expectedShotFunction);assert(report.resources.shotFunction>0);
   assert.equal(report.resources.dream,0);assert.equal(report.resources.dreamItems,0);
+  if(entry!=='stage'){
+    for(const pool of ['bullets','lasers','gather','items','circles'])assert.deepEqual(report.resources.hazards[pool],[],`Arrival must remove old ${pool}`);
+    const allowed=stage===3&&entry==='boss'&&character<2?[0,1,2,3]:[];
+    assert(report.resources.hazards.custom.every(i=>allowed.includes(i)),'Arrival must remove old custom emitters');
+    assert(report.resources.cleanup,'Arrival cleanup callback must have run');
+  }
   if(process.env.ARRIVAL_ONLY){report.passed=true;console.log('PASS arrival',stem);return;}
+  if(process.env.HAZARD_TEST)await page.evaluate(()=>practiceQA.core().practiceOptions({invincible:true,enemyInvincible:true,lockTime:true}));
   await page.locator('canvas').focus();await page.keyboard.press('z',{delay:140});
   await page.waitForFunction(()=>practiceQA.read().state?.mode===1&&!practiceQA.read().practice.waiting,null,{timeout:15000});
   report.resumed=await page.evaluate(()=>practiceQA.read());
   assert.equal(report.resumed.practice.invincibility,0);
   await page.waitForFunction(()=>{const m=practiceQA.read().music;return m?.rate===1&&m.context==='running';},null,{timeout:30000});
   report.music=await page.evaluate(()=>practiceQA.read().music);assert.equal(report.music.context,'running');
+  if(process.env.HAZARD_TEST){
+    assert(!record,'Hazard observation uses assisted play, not the REP flow');
+    for(let i=0;i<180;i++){
+      report.attackResources=await page.evaluate(()=>practiceQA.resources());
+      const h=report.attackResources.hazards;
+      if(process.env.ENTITY_TEST?(stage===3?h.custom.length===4:h.custom.includes(31)):h.bullets.length+h.lasers.length+h.gather.length+h.custom.filter(i=>!(stage===3&&character<2&&i<4)).length)break;
+      await page.waitForTimeout(200);
+    }
+    const h=report.attackResources.hazards;
+    assert(h.bullets.length+h.lasers.length+h.gather.length+h.custom.filter(i=>!(stage===3&&character<2&&i<4)).length>0,'Selected attack must produce its own native projectiles after resume');
+    if(process.env.ENTITY_TEST)assert(stage===3?h.custom.length===4:h.custom.includes(31),'Native Boss entities must still spawn');
+    report.attack=await page.evaluate(()=>practiceQA.read());assert.equal(report.attack.practice.outcome,null);
+    if(phase)assert.equal(entry==='mid'?report.attack.practice.midPhase:report.attack.practice.phase,phase);
+    await page.locator('canvas').screenshot({path:path.join(root,'reports',stem+'-attack.png')});
+    assert.deepEqual(report.errors,[]);report.passed=true;console.log('PASS clean entry and native attack',JSON.stringify({cleanup:report.resources.cleanup,arrival:report.resources.hazards,attack:h}));return;
+  }
   if(process.env.RESOURCE_TEST){
     assert(!record,'Native pickup injection is not a recorded gameplay test');
     await page.evaluate(()=>practiceQA.core().practiceOptions({invincible:true,enemyInvincible:true,lockTime:true}));

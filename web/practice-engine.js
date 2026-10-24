@@ -9,6 +9,7 @@ export function createPracticeEngine({mod,patch,config,clock,onComplete=()=>{}})
   let base=-1,d=-1,csBase=-1,resident=-1,initialized=false,ready=false,preparing=targeted,waiting=false,outcome=null,error=null;
   let frames=0,elapsed=0,misses=0,bombsUsed=0,lastNativeBombs=0,lockedPower=null,warped=false,prepareFrames=0,seenBoss=false,selectedPhase=0,pendingHitCounted=false,seekFinalHp=0,idleBoundaries=0,observedFrames=-1;
   let effectiveKeys=0,effectiveFocus=0;
+  let entryCleanup=null,redrawFrames=0;
   const heap=()=>mod.HEAPU8,view=()=>new DataView(heap().buffer),u8=n=>heap()[d+n],u16=n=>view().getUint16(d+n,true),i16=n=>view().getInt16(d+n,true),w8=(n,x)=>{heap()[d+n]=x;},w16=(n,x)=>view().setUint16(d+n,x,true);
   const e=patch.practice.entries,flag=(name,value)=>{heap()[csBase+e[name]]=Number(!!value);};
   function locate(packed){
@@ -45,6 +46,23 @@ export function createPracticeEngine({mod,patch,config,clock,onComplete=()=>{}})
     w8(0x4662,0);w8(0x4663,0);w8(0x4669,0);w8(0x466a,0);w8(0xbcca,0);w8(0xbcba,0);
     w16(0x4656,0);w16(0x4658,0);w16(0x3974,0);
   }
+  function clearEntryProjectiles(){
+    // Clear live instances only. Templates and native phase initialization
+    // remain owned by the selected attack; delayed gather emitters must go too.
+    entryCleanup={};
+    const pools=[['bullets',0x5a22,26,440],['lasers',0x42f0,24,2],['gather',0x9292,42,16],['items',0xaf34,20,32],['circles',0x9594,10,16]];
+    // Marisa's four bits are part of the Boss, not stray projectiles.
+    // Yuuka's safety circle is created inside phase 4, not on entry; an old
+    // circle must be cleared too. Gengetsu's column coordinates have no live
+    // flag and remain intact; only his current pattern reads those positions.
+    const start=setup.stage===3&&setup.entry==='boss'&&setup.character<2?4:0;
+    pools.push(['custom',0xb204+start*26,26,32-start]);
+    for(const [name,offset,stride,count]of pools){
+      let cleared=0;for(let i=0;i<count;i++){const at=offset+i*stride;if(u8(at))cleared++;w8(at,0);}entryCleanup[name]=cleared;
+    }
+    w8(0xbcb9,0);w8(0xbcba,0);
+    heap().fill(1,d+0x4700,d+0x4d40);redrawFrames=2;
+  }
   function locks(){
     stocks();if(options.lockPower&&ready){lockedPower??=u8(0x4664);setPower(lockedPower);}
     if(options.lockRank){const [a,b]=limits[u8(0x4348)]||limits[1];w8(0x5395,Math.max(a,Math.min(b,setup.rank)));}
@@ -70,6 +88,18 @@ export function createPracticeEngine({mod,patch,config,clock,onComplete=()=>{}})
     if(cap&&i16(0x53da)>=cap-2)w16(0x53da,0);
     if(count&&u8(counter)>=Math.max(1,count-2))w8(counter,0);
   }
+  function arrive(){
+    const type=active(),phase=u8(type==='mid'?0x53c5:0x53d9),gengetsu=setup.stage===6&&u16(0xbcd0)===0xc7da;
+    const wantedGen=setup.stage===6&&setup.branch==='gengetsu';
+    const minimum=type==='mid'?(setup.stage===0?3:1):setup.stage===2?3:2;
+    if(!(setup.entry==='stage'||type===setup.entry&&(!wantedGen||gengetsu)&&(setup.phase?phase===setup.phase:phase>=minimum)))return false;
+    // Preserve the real final-survival HP carried through the preceding kill.
+    if(type==='boss'&&setup.phase&&i16(0x53d6)<=0&&seekFinalHp>0)w16(0x53d6,seekFinalHp);
+    if(setup.entry!=='stage')clearEntryProjectiles();
+    ready=true;preparing=false;waiting=true;selectedPhase=phase;resources();refreshResources(3);clearEntry();
+    if(setup.hp&&type){const at=type==='mid'?0x53c2:0x53d6,max=i16(at),min=type==='mid'?0:i16(0x53e0);w16(at,Math.max(min+1,Math.min(max,setup.hp)));}
+    flag('entryPause',1);elapsed=misses=bombsUsed=0;lastNativeBombs=heap()[resident+50];clock?.setSpeed(options.speed);return true;
+  }
   function prepare(){
     if(++prepareFrames>40000){error='目标准备超时，请改选关卡开头';preparing=false;flag('hold',1);return;}
     if(!warped){
@@ -84,17 +114,7 @@ export function createPracticeEngine({mod,patch,config,clock,onComplete=()=>{}})
     }
     const type=active(),phase=u8(type==='mid'?0x53c5:0x53d9),gengetsu=setup.stage===6&&u16(0xbcd0)===0xc7da;
     const wantedGen=setup.stage===6&&setup.branch==='gengetsu';
-    const minimum=type==='mid'?(setup.stage===0?3:1):setup.stage===2?3:2;
-    const reached=setup.entry==='stage'||type===setup.entry&&(!wantedGen||gengetsu)&&(setup.phase?phase===setup.phase:phase>=minimum);
-    if(reached){
-      // Yuuka/Mugetsu/Gengetsu have a final survival attack that native HP
-      // defeat can skip. Keep the HP observed before the preceding kill,
-      // rather than inventing a health constant or treating zero HP as no boss.
-      if(type==='boss'&&setup.phase&&i16(0x53d6)<=0&&seekFinalHp>0)w16(0x53d6,seekFinalHp);
-      ready=true;preparing=false;waiting=true;selectedPhase=phase;resources();refreshResources(3);clearEntry();
-      if(setup.hp&&type){const at=type==='mid'?0x53c2:0x53d6,max=i16(at),min=type==='mid'?0:i16(0x53e0);w16(at,Math.max(min+1,Math.min(max,setup.hp)));}
-      flag('entryPause',1);elapsed=misses=bombsUsed=0;lastNativeBombs=heap()[resident+50];clock?.setSpeed(options.speed);return;
-    }
+    if(arrive())return;
     resources();w8(0x4662,2);w8(0x4669,0);w8(0x466a,0);
     if(type==='boss'){
       // Elly's prelude uses an absolute stage-frame deadline.
@@ -142,6 +162,7 @@ export function createPracticeEngine({mod,patch,config,clock,onComplete=()=>{}})
         // deadline and spawn the unrelated midboss on top of the Boss.
         if(targeted&&setup.entry==='boss')w16(0x53c0,(u16(0x538a)-1)&65535);
         if(preparing){if(!prepareFrames&&setup.entry!=='stage')clock?.setSpeed(8);prepare();}
+        if(redrawFrames){heap().fill(1,d+0x4700,d+0x4d40);redrawFrames--;}
         if(ready&&!waiting&&!outcome)elapsed++;
         inputs();locks();
       }
@@ -173,7 +194,10 @@ export function createPracticeEngine({mod,patch,config,clock,onComplete=()=>{}})
           if(targeted&&!outcome&&complete())finish('clear');
         }
       }
+      // The state machine has changed phase, but the selected attack has not
+      // updated yet. Retire old emitters before gather/items/render run.
+      if(port===0x7fe5&&preparing&&warped&&setup.entry!=='stage')arrive();
     },
-    get status(){return status();},get debug(){return {base,d,csBase,resident,prepareFrames};}
+    get status(){return status();},get debug(){return {base,d,csBase,resident,prepareFrames,entryCleanup};}
   };
 }

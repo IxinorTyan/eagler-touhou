@@ -6,8 +6,9 @@ sys.path.insert(0,str(ROOT.parent/'tools'))
 from build_native_boss_hud import mz_parts,insert_bridge,mz_finish
 from disk_image import Fat12
 sha=lambda b:hashlib.sha256(b).hexdigest()
-SOURCES={'cn':'0316908acbdda9d155122947f2a0afea88304adbf1fa85546655e61eaf2467b2',
-         'jp':'18d9269ad06cbf730ba9e183d41ec312cae40f6013df41fac715b7a4b3617485'}
+# Published guest-EMS HUD revisions, including the audited native divide guards.
+SOURCES={'cn':'039e00e3d1b022a6af853a0663fe922414010b0b8dfa2b994dcaa6a3604318b3',
+         'jp':'72009d521ba986ae10ca60a4bd12ba027328cc7420e8458ed42276da459aba62'}
 
 def main():
     out=ROOT/'build/practice';out.mkdir(parents=True,exist_ok=True)
@@ -44,8 +45,8 @@ def main():
         nasm=ROOT/'tools/nasm-2.16.03/nasm.exe'
         subprocess.run([str(nasm),'-f','bin','-I',str(out)+'/',str(ROOT/'patches/practice.asm'),'-o',str(out/'practice.bin')],check=True)
         code=(out/'practice.bin').read_bytes();assert code[:8]==b'T04PRA01'
-        names=('load','frame','player','world','entryPause','hold','targetPractice','lockLives','unlimitedBombs','enemyLock','respawnLives','bombGate','bombConsume','livesZero','bombsZero','shotsReturn','dialogRun','resourceDirty')
-        entries=dict(zip(names,struct.unpack_from('<18H',code,8)))
+        names=('load','frame','player','world','entryPause','hold','targetPractice','lockLives','unlimitedBombs','enemyLock','respawnLives','bombGate','bombConsume','livesZero','bombsZero','shotsReturn','dialogRun','resourceDirty','boss')
+        entries=dict(zip(names,struct.unpack_from('<19H',code,8)))
         gap=(len(code)+15)&~15;assert gap<=1024 and insert-cs*16+gap<65536
         insert_bridge(h,image,rel,insert,gap);image[insert:insert+len(code)]=code
         edits=[]
@@ -58,6 +59,7 @@ def main():
         near(0xaf10,bytes.fromhex('e8f0fd'),'load')
         near(0xabba,bytes.fromhex('ff168a42'),'frame')
         near(0xabe1,b'\xe8'+struct.pack('<H',(cs*16+p['entries'][1]-0xabe4)&65535),'player')
+        near(0xabf5,bytes.fromhex('ff1ed0bc'),'boss')
         # After all bullet/enemy/boss/item collisions; before the next update.
         near(0xacf4,b'\xe8'+struct.pack('<H',(cs*16+p['entries'][7]-0xacf7)&65535),'world')
         near(0x10a8f,bytes.fromhex('26807f0b017621'),'respawnLives',0xe9)

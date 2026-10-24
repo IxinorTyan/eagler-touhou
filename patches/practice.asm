@@ -9,6 +9,7 @@ dw target_practice,lock_lives,unlimited_bombs,enemy_lock
 dw respawn_lives,bomb_gate,bomb_consume,lives_zero,bombs_zero,shots_return
 dw dialog_run_fast
 dw resource_dirty
+dw boss_hook
 entry_pause: db 0
 hold: db 0
 target_practice: db 0
@@ -105,6 +106,26 @@ world_hook:
     je .done
     call (0xaaf2-0xaaf0) ; wait for native vsync, no extra game update
     jmp .wait
+.done:
+    pop es
+    popad
+    popf
+    ret
+boss_hook:
+    call far [0xbcd0]
+    pushf
+    pushad
+    push es
+    cmp byte [cs:target_practice],0
+    je .done
+    mov dx,0x7fe5
+    call signal
+    call refresh_resources
+    cmp byte [cs:entry_pause],0
+    je .done
+    ; Redraw this VRAM page before any foreground entity is rendered.
+    ; The other page is marked dirty by the arrival callback too.
+    call word [0x4268]
 .done:
     pop es
     popad
