@@ -70,6 +70,10 @@ export class SoloMusic {
       this.report(this.player.status+'；游戏继续，可重启选择原声模式');
     });
   }
+  async attachReplay(){
+    const response=await fetch('solo-music.json',{cache:'no-store'});if(!response.ok)throw Error('Replay 音乐桥读取失败');
+    this.reader=new NativeMusic(await response.json());
+  }
   exportDisk(data) {
     if(this.coopEdits){const copy=new Uint8Array(data);for(const edit of this.coopEdits)for(let i=0;i<edit.targets.length;i++)copy[edit.targets[i]]=edit.expected[i];return copy;}
     const copy=new Uint8Array(data),fat=new Fat12(copy);
@@ -78,8 +82,8 @@ export class SoloMusic {
     fat.replace(entry,new Uint8Array());copy[entry]=0xe5;
     return copy;
   }
-  poll(heap,now) {
-    if(this.closed||!this.reader||now-this.lastPoll<50)return;
+  poll(heap,now,boundary=false) {
+    if(this.closed||!this.reader||!boundary&&now-this.lastPoll<50)return;
     this.lastPoll=now;
     try {
       for(const [ax,hash] of this.reader.read(heap))this.player.command(ax,hash);

@@ -8,6 +8,7 @@ export async function loadExternalDosboxFactory({vendor,module,host,wasmBinary})
   const compiled=await WebAssembly.compile(wasmBinary||await wasmResponse.arrayBuffer());
   module.instantiateWasm=(imports,receive)=>{
     host.attach(module,imports);
+    if(module.practiceSignal)imports.env.th04_practice=module.practiceSignal;
     // Compilation is already asynchronous above. Throwing an instantiation
     // error here rejects Emscripten's factory promise instead of leaving its
     // callback promise pending forever.

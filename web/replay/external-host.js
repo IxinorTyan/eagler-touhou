@@ -12,7 +12,7 @@ export function inspectExternalMemory(module){
 }
 
 export function createExternalReplayHost({mode,clocks,events=[],endBoundary,endReason='sleep',endPhase='after-input',timeline,boundaryMode='sleep',onChunk=()=>{},onEnd=()=>{},onError=()=>{},
-  onRecordingError=onError,applyInput=()=>{},inspect,observe,maxClockBytes=512*1024*1024}={}){
+  onRecordingError=onError,applyInput=()=>{},inspect,observe,maxClockBytes=512*1024*1024,clock,onBoundary=()=>{}}={}){
   if(!['record','playback'].includes(mode)||!['sleep','clock'].includes(boundaryMode))throw Error('无效的单人 Replay 主机配置');
   let module=null,boundary=0,count=0,eventCursor=0,queued=[],buffer=new Uint8Array(CLOCK_BYTES*CLOCK_CHUNK),used=0;
   let stopped=false,ending=false,held=false,wake=null,timer=null,lastWake=0,recording=mode==='record',finished=false,extraClockReads=0,detached=false;
@@ -59,7 +59,7 @@ export function createExternalReplayHost({mode,clocks,events=[],endBoundary,endR
     if(mode==='playback'&&boundaryMode==='clock')consumeClockEvents();
     let value;
     if(mode==='record'){
-      value=kind===1?realPerformance.now():RealDate.now();
+      value=kind===1?(clock?clock.now():realPerformance.now()):(clock?clock.date():RealDate.now());
       if(recording){
         if((count+1)*CLOCK_BYTES>maxClockBytes)disable(Error('Replay 时钟超过容量，录像停止；游戏继续'));
         else{const view=new DataView(buffer.buffer);view.setUint8(used,kind);view.setFloat64(used+1,value,true);used+=CLOCK_BYTES;if(used===buffer.length)flush();}
@@ -109,6 +109,7 @@ export function createExternalReplayHost({mode,clocks,events=[],endBoundary,endR
       // delivering commands that the DOS instance has not consumed yet.
       if(held){if(ending)finish(boundaryMode,'before-input');return;}
       if(detached){const next=wake;wake=null;next();return;}
+      onBoundary();
       // Seal before input delivery: a queued continue/confirmation belongs to
       // the live game after this run, never to its replay.
       if(mode==='record'){
@@ -156,7 +157,7 @@ export function createExternalReplayHost({mode,clocks,events=[],endBoundary,endR
             // Consume the unchanged tape during skips. Yield regularly so
             // browser pause/stop controls remain responsive.
             if(isFast()&&realNow()-fastYield<8)queueMicrotask(resume);
-            else{fastYield=realNow();timer=setTimeout(resume,isFast()?0:nonSkippable?Math.max(0,ms):0);}
+            else{fastYield=realNow();timer=setTimeout(resume,isFast()?0:nonSkippable?Math.max(0,ms)/(clock?.speed||1):0);}
           });
           lastWake=now;module.last_wakeup=now;module.nativeBurstStarted=realNow();
         });

@@ -141,3 +141,15 @@ th04-network-fault.json
 !/tools/test_idle_instruction_parity.cjs
 !/tools/test_prediction_pacing.cjs
 !/联机同时操作卡顿优化记录.md
+
+# Practice source and focused verification; generated audits stay local.
+!/TH04-PRACTICE-WEB.md
+!/patches/
+/patches/*
+!/patches/practice.asm
+!/patches/launch.asm
+!/tools/build_practice_assets.py
+!/tools/build_practice_core.mjs
+!/tools/test_practice_guest.py
+!/tools/test_practice_engine.mjs
+!/tools/test_practice_browser.cjs

@@ -116,6 +116,7 @@ export class WorkerNP21 {
   }
   clearInput(){this.queuedInput=null;this.send('clear');}
   finishReplay(){this.send('externalReplayFinish');}
+  practiceOptions(options){this.send('practiceOptions',[options]);}
   fastForwardReplay(value){this.send('externalReplayFast',[!!value]);}
   stopBrowserRecording(){this.send('externalReplayDisable');}
   pauseReplay(value){this.state=value?'paused':'running';this.send('externalReplayPause',[!!value]);if(value){this.flushAudio();this.context.suspend().catch(()=>{});}else this.context.resume().catch(()=>{});}

@@ -79,7 +79,7 @@ function update(){
     lastPublish=now;awaitingSnapshot=true;const events=pendingMusic;pendingMusic=[];
     const render=now-lastRenderPublish>=250?emulator.module.framePresenter?.info():undefined;
     if(render)lastRenderPublish=now;
-    postMessage({type:'snapshot',state,markers,events,costs,drawTimes,render,heapBytes:h.length,frames:emulator.module.localFrameCount||0,uploads:emulator.module.frameUploads||0});costs=[];drawTimes=[];
+    postMessage({type:'snapshot',state,practice:emulator.practice?.status,markers,events,costs,drawTimes,render,heapBytes:h.length,frames:emulator.module.localFrameCount||0,uploads:emulator.module.frameUploads||0});costs=[];drawTimes=[];
   }
 }
 async function dispatch(message){
@@ -99,11 +99,13 @@ async function dispatch(message){
     }
     if(game==='04coop'){const {createLocalWorkerState}=await import('./local-worker-state.js');coop=createLocalWorkerState(emulator,patch);}
     if(setup.music){const {NativeMusic}=await import(game==='03'?'./native-music.js':'./solo-native-music.js');music=new NativeMusic(setup.music);}
+    emulator.module.observeReplayBoundary=()=>{pendingMusic.push(...(music?.read(emulator.module.HEAPU8)||[]));};
     observeFrames();
     timer=setInterval(update,16);
     return {heapBytes:emulator.module.HEAPU8.length,runtime:emulator.module.mobileRuntime};
   }
   if(method==='snapshotAck'){awaitingSnapshot=false;return;}
+  if(method==='practiceOptions'){emulator.practiceOptions(args[0]);return;}
   if(method==='audio')return emulator.state==='running'?(emulator.readAudio?.()||environment.audio()):null;
   if(method==='key'){
     lastInput=performance.now();const event=args[0];

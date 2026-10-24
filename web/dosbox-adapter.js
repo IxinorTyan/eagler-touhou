@@ -8,6 +8,8 @@ import {installProjectileArt} from './projectile-art.js';
 import {createExternalReplayHost,inspectExternalMemory} from './replay/external-host.js';
 import {loadExternalDosboxFactory} from './replay/external-loader.js';
 import {createSoloReplayLifecycle} from './replay/external-lifecycle.js';
+import {createPracticeEngine} from './practice-engine.js';
+import {createPracticeClock} from './practice-config.js';
 const codes={ArrowUp:265,ArrowDown:264,ArrowLeft:263,ArrowRight:262,KeyZ:90,KeyX:88,ShiftLeft:340,ShiftRight:344,Escape:256,Enter:257,Space:32};
 export class DOSBoxPC98 {
   static async create(config){const emulator=new DOSBoxPC98(config);await emulator.initialize();return emulator;}
@@ -36,18 +38,26 @@ export class DOSBoxPC98 {
       sendMessageToServer:(name,props)=>this.module.messageHandler({data:{name,props}}),
       initMessageHandler:handler=>{receiver=handler;for(const [name,props]of queue)handler(name,props);queue.length=0;},exit:()=>{}};
     let factory;
-    if(this.config.externalReplay&&!net){
-      const replay=this.config.externalReplay;
+    if((this.config.externalReplay||this.config.practice)&&!net){
+      const replay=this.config.externalReplay||{mode:'record',boundaryMode:'sleep'};
+      if(this.config.practice){
+        this.practiceClock=createPracticeClock(this.config.practice.options.speed);
+        this.practice=createPracticeEngine({mod:this.module,patch:this.config.practicePatch,config:this.config.practice,clock:this.practiceClock});
+        this.module.practiceSignal=(port,packed)=>this.practice.signal(port,packed);
+      }
+      const lifecycle=replay.lifecycle?createSoloReplayLifecycle(replay.lifecycle,()=>this.module.HEAPU8):null;
       this.externalHost=createExternalReplayHost({...replay,
-        observe:replay.lifecycle?createSoloReplayLifecycle(replay.lifecycle,()=>this.module.HEAPU8):null,
+        clock:this.practiceClock,
+        onBoundary:()=>{this.practice?.observeBoundary();this.module.observeReplayBoundary?.();},
+        observe:()=>{const p=this.practice?.status;if(p?.outcome)return {active:true,stage:p.stage,paused:true,finish:p.outcome==='clear'?'clear':'game-over'};return lifecycle?.();},
         applyInput:command=>this.applyReplayInput(command),inspect:()=>inspectExternalMemory(this.module),
         onChunk:value=>replay.onChunk?.(value),onEnd:value=>replay.onEnd?.(value),
         onError:error=>{if(replay.onError)replay.onError(error);else this.config.onError?.(error);},
         onRecordingError:error=>replay.onRecordingError?.(error),
       });
-      try{factory=await loadExternalDosboxFactory({vendor,module:this.module,host:this.externalHost});}
+      try{factory=await loadExternalDosboxFactory({vendor,module:this.module,host:this.externalHost,wasmBinary:this.config.wasmBinary});if(!this.config.externalReplay)this.externalHost.disable();}
       catch(error){
-        if(replay.mode!=='record')throw error;
+        if(replay.mode!=='record'||this.config.practice)throw error;
         this.externalHost.dispose();this.externalHost=null;delete this.module.instantiateWasm;
         try{replay.onRecordingError?.(error);}catch{}
         factory=(await import('./vendor/dosbox-x/dosbox-jspi.mjs')).default;
@@ -76,7 +86,8 @@ export class DOSBoxPC98 {
   }
   key(code,down){if(this.externalHost){if(this.externalHost.status.mode==='playback')return;this.externalHost.queue({type:'key',code,down});return;}this.applyKey(code,down);}
   applyKey(code,down){const number=codes[code];if(number===undefined)return;if(down)this.keys.add(code);else this.keys.delete(code);if(this.config.lockstep)this.ci?.addKey(number,down,this.module.virtualNow);else if(this.externalHost)this.ci?.addKey(number,down,this.externalHost.keyTime());else this.ci?.sendKeyEvent(number,down);}
-  applyReplayInput(command){if(command.type==='key')this.applyKey(command.code,command.down);else if(command.type==='assist')this.config.applyReplayInput?.(command.input);else throw Error('单人 Replay 输入类型无效');}
+  applyReplayInput(command){if(command.type==='key')this.applyKey(command.code,command.down);else if(command.type==='assist')this.config.applyReplayInput?.(command.input);else if(command.type==='practice-options'&&this.practice)this.practice.configure(command.options);else throw Error('单人 Replay 输入类型无效');}
+  practiceOptions(options){if(!this.practice||this.externalHost?.status.mode==='playback')return;if(this.config.externalReplay&&this.externalHost.status.recording)this.externalHost.queue({type:'practice-options',options});else this.practice.configure(options);}
   assist(input){if(this.externalHost){if(this.externalHost.status.mode==='playback')return;this.externalHost.queue({type:'assist',input});}else this.config.applyReplayInput?.(input);}
   finishReplay(){this.externalHost?.finish();}
   fastForwardReplay(value){this.externalHost?.fastForward(value);}
@@ -86,10 +97,10 @@ export class DOSBoxPC98 {
   async setHdd(drive,name){
     if(drive!==0||!this.disks.has(name))throw Error('无效游戏磁盘');this.diskName=name;
     this.extracted=extractGame(this.disks.get(name));
-    const network=!!this.config.lockstep,launcher=prepareFastBoot(this.extracted,{network});
+    const network=!!this.config.lockstep,launcher=prepareFastBoot(this.extracted,{network,practice:!!this.config.practice});
     const init=[...this.extracted.files,launcher,{dosboxConf:dosboxConfig({network,fastBoot:true}),jsdosConf:{version:'8'}}];
     this.ci=await globalThis.emulators.backend(init,this.transport,{});
-    this.ci.events().onSoundPush(samples=>{this.module.audioPackets=(this.module.audioPackets||0)+1;if(this.externalHost?.status.fastForward||this.module.warmingBoot||this.config.externalEffects)return;if(this.config.workerRuntime){this.audioChunks.push(samples.slice());return;}if(this.frame!==null)this.outputs.get(this.frame)?.push(samples.slice());else this.audio.push([samples]);});
+    this.ci.events().onSoundPush(samples=>{this.module.audioPackets=(this.module.audioPackets||0)+1;const p=this.practice?.status;if(this.externalHost?.status.fastForward||this.module.warmingBoot||this.config.externalEffects||p&&(p.preparing||p.waiting||p.outcome))return;if(this.config.workerRuntime){this.audioChunks.push(samples.slice());return;}if(this.frame!==null)this.outputs.get(this.frame)?.push(samples.slice());else this.audio.push([samples]);});
     this.logs=[];this.ci.events().onMessage((type,...messages)=>{this.logs.push([type,...messages]);this.logs=this.logs.slice(-40);if(type==='error'&&messages.some(s=>String(s).includes('[panic]')))this.fail(Error(messages.join(' ')));});
     this.ci.events().onExit(()=>{if(this.disposed||this.resetting)return;if(this.state!=='failed')this.state='exited';this.config.onExit?.();});
     for(const code of this.keys)this.ci.sendKeyEvent(codes[code],true);
