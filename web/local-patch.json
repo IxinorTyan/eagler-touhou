@@ -250,19 +250,19 @@
   "disks": {
     "jp": {
       "file": "th02-local-jp.hdi.gz",
-      "sha256": "0e76cc4557ef5e1a674204e83944790282b9f860971b6697f0a992af9d1ee952",
-      "compressedSha256": "06dea5bd458097a5201459249f98dbd692b8159a88a1b593f0468f6d1a1d79ae",
+      "sha256": "c73ccf7fd56f166d7cab9cc1a46eeb7331bef312347224ced482b88a536cf6cf",
+      "compressedSha256": "3dbb8a2f2bb1151a4890512218ef94dd1c5cf2ed3ec71ef3184132a03085651d",
       "size": 21415936,
-      "mainSha256": "d3ecc5b708c27b44b596ef0353ca44d604c1c86a81f32bb0d57da792c74d4a3a",
+      "mainSha256": "b72c21077d8a0f0efbdbd870c0831f050d38e89e5fbe4200c8c859571eff898c",
       "opSha256": "e2022a3a4725cc53499eccfd46fd73816dda222a43d00c499b014852276f7731",
       "originalOpMD5": "9fb2839db50f38119d0b98d4fb70cd0e"
     },
     "cn": {
       "file": "th02-local-cn.hdi.gz",
-      "sha256": "fd46abb34621549d9e788616ce5cadfd3d0bc82bef0b913297d8df3cafe90f42",
-      "compressedSha256": "5f125e6f2a308a169b07dd73730bb786c0df49dac930236b80b2ae2c4e13fe4a",
+      "sha256": "bc617ab52361c881b6527a522def2bf453d909da73a4b7dd2b49af310a794301",
+      "compressedSha256": "a54c11035dd72c1acf243f5362c8b24db65270fcfbbf12e462feb82a6deca7fa",
       "size": 21415936,
-      "mainSha256": "53e5782ec9c5280b596ca782c8f31d0ad2a9bac3d99d391dfebf024b91ff1956",
+      "mainSha256": "7ac951caa523b2ed9291dcfebc749af8767ccd0ce6589340f1207e5feedc5776",
       "opSha256": "4260d79cd3287b750283b3a4d0f7a7588e902203834b43b86d0cbafee7dccd41",
       "originalOpMD5": "b17105388f7289e08dd80815f82ab0bb"
     }

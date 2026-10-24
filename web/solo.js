@@ -86,6 +86,7 @@ function applyAssist(input){
   const touch=base+patch.entries.touch;
   if(input.touchAction==='add'){
     const clamp=n=>Math.max(-8192,Math.min(8191,n));
+    if(input.begin){v.setInt32(touch+2,0,true);v.setInt32(touch+8,0,true);}
     v.setUint16(touch,input.unlimited?3:1,true);
     v.setInt16(touch+2,clamp(v.getInt16(touch+2,true)+input.x),true);
     v.setInt16(touch+4,clamp(v.getInt16(touch+4,true)+input.y),true);
@@ -105,7 +106,7 @@ function syncInput(motion=false){
     const state=readSoloState(),inGame=enabled&&state?.mode===1&&!state.hit,m=motion?unpackTouch(player.pack(bits)):null;
     const command={address:mailbox,generation:state?.generation,currentInput:enabled&&(bits&64)?0x100:0,focusEnabled:$('focus-enabled').checked&&!p?.options.disableFocus,points:pointMask()|(player.alwaysPoint()||p?.options.alwaysPoint?8:0),
       touchAction:motion?(inGame&&m.active?'add':'clear'):(!inGame||!player.moving()?'clear':'keep'),
-      unlimited:!!m?.unlimited,x:m?.x||0,y:m?.y||0};
+      begin:!!m?.begin,unlimited:!!m?.unlimited,x:m?.x||0,y:m?.y||0};
     const encoded=JSON.stringify(command),moving=command.touchAction==='add'&&(command.x||command.y);
     if(!recorder||moving||encoded!==lastAssist)emulator.assist(command);
     lastAssist=encoded;
@@ -141,7 +142,7 @@ function tick(now){
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
-const replaySources=['../solo.js','../dosbox-adapter.js','../dosbox-disk.js','../frame-presenter.js','../solo-patch.json','../vendor/dosbox-x/wdosbox-x-fast.wasm','../vendor/dosbox-x/emulators.js','../vendor/dosbox-x/dosbox-jspi.mjs',
+const replaySources=['../direct-drag.js','../player-ui.js','../solo.js','../dosbox-adapter.js','../dosbox-disk.js','../frame-presenter.js','../solo-patch.json','../vendor/dosbox-x/wdosbox-x-fast.wasm','../vendor/dosbox-x/emulators.js','../vendor/dosbox-x/dosbox-jspi.mjs',
   '../touch-input.js','../control-settings.js','./external-host.js','./external-loader.js','./external-codec.js','./external-recorder.js','./external-ui.js','./external-lifecycle.js',
   '../practice-config.js','../practice-engine.js','../practice-assets.js','../practice-assets.json','../practice-core.json','../practice-start.com','../practice-cn.exe.gz','../practice-jp.exe.gz','../vendor/dosbox-x/wdosbox-x-practice.wasm',
   '../solo-music.js','../solo-music.json','../solo-music.com','../solo-native-music.js','../netplay/local-bgm.js','../bgm/manifest.json'];

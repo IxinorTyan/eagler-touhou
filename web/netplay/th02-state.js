@@ -29,6 +29,7 @@ export function writeInputs(heap,mailbox,patch,inputs,players,settings={}){
   heap[mailbox+patch.focus.percentOffsets[slot]]=50;
   const motion=unpackTouch(value),at=cb+patch.entries.touch_state+slot*patch.touch.stride;
   const allowed=!blocked&&motion.active;
+  if(motion.begin){v.setInt32(at+2,0,true);v.setInt32(cb+patch.entries.touch_remainder+slot*4,0,true);}
   v.setUint16(at,allowed?(motion.unlimited?3:1):0,true);
   const clamp=x=>Math.max(-8192,Math.min(8191,x));
   v.setInt16(at+2,allowed?clamp(v.getInt16(at+2,true)+motion.x):0,true);

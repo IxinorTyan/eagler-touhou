@@ -4,7 +4,7 @@
     "jp": {
       "file": "th02-solo-jp.hdi.gz",
       "size": 21415936,
-      "sha256": "cee071982eac6c7190bfc1e5aed769fe2afb9596b96d9ba72e644a1717e83ad8",
+      "sha256": "5e8655f87ea862ed9796b02b0d1ec97286b5919b9dc8d51d3aba167fce471b3f",
       "signature": "TH02SOLOINPUTv1!",
       "entries": {
         "stage": 19053,
@@ -22,7 +22,7 @@
       "dataSegment": 7705,
       "gap": 1824,
       "originalMainSha256": "9e9a323781e793738c8e3a5b575d99c0cb6a71bac8c3d581178976b4977f0a92",
-      "mainSha256": "a23cdbbb957beaf7338a866b1487bb4881f4aaea8e3ee49a440f02e91fb45a59",
+      "mainSha256": "eec57979b004fc9ecb356d8f96202b6f98749e1d7ed30738e04650983f732302",
       "hooks": [
         {
           "offset": 46619,
@@ -60,7 +60,7 @@
           "entry": "exit"
         }
       ],
-      "compressedSha256": "77c74bfe34a6c49ebf8b4ca423d6b05fa523005e5b39534b35ac17112584f8ba",
+      "compressedSha256": "49a79a57c29fb6d8351d0cd70fe1fc22c3912b082c94ba4e5020468f858ad92f",
       "nativeBossHud": {
         "schema": 1,
         "implementation": "guest-ems",
@@ -85,7 +85,7 @@
     "cn": {
       "file": "th02-solo-cn.hdi.gz",
       "size": 21415936,
-      "sha256": "ad105a4cbff46bf2fc02de77fe5f054e9900453cc847d7b9fa336d653a28b6b9",
+      "sha256": "6fcaa00ea239c69e1a0e3fd12588fe61536a33a5a418cc009254fcee7163329d",
       "signature": "TH02SOLOINPUTv1!",
       "entries": {
         "stage": 19053,
@@ -103,7 +103,7 @@
       "dataSegment": 7705,
       "gap": 1824,
       "originalMainSha256": "d54640c76acab16c3f0bdf34774c5153468172d7ca132426ab845ef2a1c8dce8",
-      "mainSha256": "00eea3318ad14818c1429be55c9ba250a8af0576379adc03c58716e7e9d36168",
+      "mainSha256": "74a315562d6f37ee1ff4b4bd229e98937a3ca4c989becdc51e101798d52f8f5d",
       "hooks": [
         {
           "offset": 46619,
@@ -141,7 +141,7 @@
           "entry": "exit"
         }
       ],
-      "compressedSha256": "2b005df5c3deb052a6a7b639363ec438f386a77de8203da36032fd94861c069c",
+      "compressedSha256": "48802484c63e8e0b1ef5754cd34116a9d6ecfc948f4d0b4eb4dd3034c9c21ba4",
       "nativeBossHud": {
         "schema": 1,
         "implementation": "guest-ems",
