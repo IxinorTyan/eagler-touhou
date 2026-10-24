@@ -1,0 +1,228 @@
+{
+  "schema": 1,
+  "version": "th05-browser-practice/4",
+  "languages": {
+    "cn": {
+      "url": "practice-cn.exe.gz",
+      "sha256": "bd08d39ce429b2afb0444330a512cf46fab95868219a8f2ff2ed44a922713dc6",
+      "size": 151590,
+      "sourceMainSha256": "8260d43414f557b0f123f82c52431a6fc6ee07ef55e740d0c64bc89c1f152e90",
+      "patch": {
+        "signature": "TH05SOLOINPUTv1!",
+        "mailbox_size": 36,
+        "code_segment": 2785,
+        "data_segment": 8447,
+        "mailbox_cs_offset": 40124,
+        "entries": {
+          "init_hook": 40249,
+          "update_hook": 40272,
+          "touch_move": 40340,
+          "pause_hook": 40287,
+          "world_hook": 40325,
+          "mailbox": 40124
+        },
+        "insert_size": 1568,
+        "hooks": [
+          {
+            "name": "init_hook",
+            "image_offset": 45833,
+            "original": "e84e02",
+            "entry": 40249
+          },
+          {
+            "name": "update_hook",
+            "image_offset": 44793,
+            "original": "e8411d",
+            "entry": 40272
+          },
+          {
+            "name": "touch_move",
+            "image_offset": 52442,
+            "original": "e8f5fd",
+            "entry": 40340
+          },
+          {
+            "name": "pause_hook",
+            "image_offset": 44747,
+            "original": "e86907",
+            "entry": 40287
+          },
+          {
+            "name": "world_hook",
+            "image_offset": 44684,
+            "original": "e81700",
+            "entry": 40325
+          }
+        ],
+        "source_main_md5": "553eee5ff79429f45284913870380549",
+        "main_sha256": "bd08d39ce429b2afb0444330a512cf46fab95868219a8f2ff2ed44a922713dc6",
+        "changed_files": [
+          "KAIKI/MAIN.EXE",
+          "KAIKI/\u602a\u7dba\u8ac71.DAT",
+          "KAIKI/\u602a\u7dba\u8ac72.DAT",
+          "CNFONT.BMP",
+          "KAIKI/OP.EXE"
+        ],
+        "native_boss_hud": {
+          "schema": 1,
+          "implementation": "guest-ems",
+          "module": "A:\\NBHUD.BIN",
+          "moduleSha256": "8255355c30dcf4b948d1077ab28a72a9a323965d31bdf85c2a6160d7a5f45974",
+          "moduleBytes": 5176,
+          "emsPages": 1,
+          "conventionalBytesAdded": 512,
+          "bridge": {
+            "entry": 40656,
+            "cleanup": 40740,
+            "handle": 40765,
+            "status": 40767,
+            "pointer": 40768
+          },
+          "hp": true,
+          "phaseCuts": true,
+          "timer": "native audited deadlines; unavailable deadlines blank",
+          "browserOverlay": false
+        },
+        "practice": {
+          "version": 4,
+          "entries": {
+            "load": 41245,
+            "frame": 41257,
+            "player": 41320,
+            "world": 41340,
+            "enemyLock": 41220,
+            "damageMain": 41351,
+            "damageSecond": 41366,
+            "damageMid": 41381,
+            "shotsReturn": 41396,
+            "dialogRun": 41414,
+            "livesZero": 41540,
+            "bombsZero": 41561,
+            "entryPause": 41221,
+            "lockLives": 41222,
+            "unlimitedBombs": 41223,
+            "respawnLives": 41582,
+            "bombGate": 41606,
+            "bombConsume": 41627,
+            "clearOverlay": 41219,
+            "targetPractice": 41218,
+            "dialogFade": 41640
+          },
+          "bytes": 496
+        }
+      }
+    },
+    "jp": {
+      "url": "practice-jp.exe.gz",
+      "sha256": "1aff18e7b30bf77f859341f1beb149ab56b56ff36a85fc3366b8ee5d1aa5cc3f",
+      "size": 151590,
+      "sourceMainSha256": "74e94382fa57f93d7d41dce03c706ac3bdba31ae9ea5bf1ed12cad964070efa4",
+      "patch": {
+        "signature": "TH05SOLOINPUTv1!",
+        "mailbox_size": 36,
+        "code_segment": 2785,
+        "data_segment": 8447,
+        "mailbox_cs_offset": 40124,
+        "entries": {
+          "init_hook": 40249,
+          "update_hook": 40272,
+          "touch_move": 40340,
+          "pause_hook": 40287,
+          "world_hook": 40325,
+          "mailbox": 40124
+        },
+        "insert_size": 1568,
+        "hooks": [
+          {
+            "name": "init_hook",
+            "image_offset": 45833,
+            "original": "e84e02",
+            "entry": 40249
+          },
+          {
+            "name": "update_hook",
+            "image_offset": 44793,
+            "original": "e8411d",
+            "entry": 40272
+          },
+          {
+            "name": "touch_move",
+            "image_offset": 52442,
+            "original": "e8f5fd",
+            "entry": 40340
+          },
+          {
+            "name": "pause_hook",
+            "image_offset": 44747,
+            "original": "e86907",
+            "entry": 40287
+          },
+          {
+            "name": "world_hook",
+            "image_offset": 44684,
+            "original": "e81700",
+            "entry": 40325
+          }
+        ],
+        "source_main_md5": "952585e02435c3b3b111975a78b05983",
+        "main_sha256": "1aff18e7b30bf77f859341f1beb149ab56b56ff36a85fc3366b8ee5d1aa5cc3f",
+        "changed_files": [
+          "KAIKI/MAIN.EXE"
+        ],
+        "native_boss_hud": {
+          "schema": 1,
+          "implementation": "guest-ems",
+          "module": "A:\\NBHUD.BIN",
+          "moduleSha256": "8255355c30dcf4b948d1077ab28a72a9a323965d31bdf85c2a6160d7a5f45974",
+          "moduleBytes": 5176,
+          "emsPages": 1,
+          "conventionalBytesAdded": 512,
+          "bridge": {
+            "entry": 40656,
+            "cleanup": 40740,
+            "handle": 40765,
+            "status": 40767,
+            "pointer": 40768
+          },
+          "hp": true,
+          "phaseCuts": true,
+          "timer": "native audited deadlines; unavailable deadlines blank",
+          "browserOverlay": false
+        },
+        "practice": {
+          "version": 4,
+          "entries": {
+            "load": 41245,
+            "frame": 41257,
+            "player": 41320,
+            "world": 41340,
+            "enemyLock": 41220,
+            "damageMain": 41351,
+            "damageSecond": 41366,
+            "damageMid": 41381,
+            "shotsReturn": 41396,
+            "dialogRun": 41414,
+            "livesZero": 41540,
+            "bombsZero": 41561,
+            "entryPause": 41221,
+            "lockLives": 41222,
+            "unlimitedBombs": 41223,
+            "respawnLives": 41582,
+            "bombGate": 41606,
+            "bombConsume": 41627,
+            "clearOverlay": 41219,
+            "targetPractice": 41218,
+            "dialogFade": 41640
+          },
+          "bytes": 496
+        }
+      }
+    }
+  },
+  "launcher": {
+    "url": "practice-start.com",
+    "sha256": "723802cfec96848cf02964d6aa4b1bbb0b48c546608f74611d9be416d658842b",
+    "size": 299,
+    "signature": "TH05WEBSTARTv1!"
+  }
+}

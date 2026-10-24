@@ -1,13 +1,15 @@
 import {HOST_VERSION,CLOCK_BYTES} from './external-replay-host.js';
 import {sha256} from './netplay/sha256.js';
+import {normalizePractice,validatePracticeOptions} from './practice-config.js';
 // Browser storage only: clock and input tapes are independently compressed.
 const MAGIC=new TextEncoder().encode('T05EXT02'),LIMIT=128*1024*1024,HEADER_LIMIT=64*1024;
 export const MAX_CLOCK_BYTES=512*1024*1024,MAX_EVENT_BYTES=32*1024*1024;
 export function validateReplayHeader(h,clockBytes){
-  if(h?.version!==HOST_VERSION||h.mode!=='solo'||!['cn','jp'].includes(h.language)||h.independentMusic!==false)throw Error('不支持的 Replay 类型');
+  if(h?.version!==HOST_VERSION||h.mode!=='solo'||!['cn','jp'].includes(h.language)||typeof h.independentMusic!=='boolean')throw Error('不支持的 Replay 类型');
   if(!Number.isSafeInteger(h.result?.boundary)||h.result.boundary<1||!Number.isSafeInteger(h.result.clockCount)||h.result.clockCount<1||h.result.clockCount*CLOCK_BYTES!==clockBytes||clockBytes>MAX_CLOCK_BYTES)throw Error('Replay 长度不匹配');
   if(typeof h.identity!=='string'||!h.identity.match(/^[a-f0-9]{64}$/)||typeof h.result.guestHash!=='string'||!h.result.guestHash.match(/^[a-f0-9]{8}$/)||typeof h.result.guestSha256!=='string'||!h.result.guestSha256.match(/^[a-f0-9]{64}$/))throw Error('Replay 版本身份或最终内存校验缺失，无法生成有效录像');
   if(!Array.isArray(h.events))throw Error('Replay 输入缺失');
+  if(h.practice)normalizePractice(h.practice);
   let last=0,total=0;
   for(const event of h.events){
     if(!Number.isSafeInteger(event.boundary)||event.boundary<1||event.boundary<=last||event.boundary>h.result.boundary||!Array.isArray(event.commands)||!event.commands.length)throw Error('Replay 输入顺序无效');
@@ -20,7 +22,8 @@ export function validateReplayHeader(h,clockBytes){
         const i=c.input,t=i?.touch;
         if(!i||i.generation!==undefined&&(!Number.isInteger(i.generation)||i.generation<0||i.generation>65535)||!Number.isInteger(i.points)||i.points<0||i.points>9)throw Error('Replay 触控命令无效');
         if(t!==null&&t!==undefined&&(!t||typeof t.active!=='boolean'||typeof t.unlimited!=='boolean'||!Number.isFinite(t.x)||!Number.isFinite(t.y)||Math.abs(t.x)>8192||Math.abs(t.y)>8192))throw Error('Replay 触控命令无效');
-      }else throw Error('Replay 输入命令无效');
+      }else if(c.type==='practice-options'&&h.practice){validatePracticeOptions(c.options,true);}
+      else throw Error('Replay 输入命令无效');
     }
   }
 }

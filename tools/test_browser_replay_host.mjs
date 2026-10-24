@@ -34,6 +34,14 @@ try{
  assert.deepEqual(terminalInputs,[continued],'terminal input still reaches the live guest at its original boundary');
  assert.equal(terminalChunks.flatMap(chunk=>chunk.events||[]).length,0,'continue confirmation is excluded from the terminal replay');
  assert.equal(terminalEnd?.endReason,'clear','terminal reason reaches the saved replay metadata');
+ // Practice endings hold the same host boundary until the user chooses again.
+ for(const outcome of ['clear','failed']){
+  let result=null,resumed=false;const pending=[];
+  const attempt=createExternalReplayHost({mode:'record',holdOnPracticeEnd:true,observe:()=> 'practice-'+outcome,onChunk(){},onEnd:r=>result=r,onError:e=>errors.push(e),applyInput:c=>pending.push(c)});
+  const imp={env:{initTimeoutSyncSleep(){},__asyncjs__syncSleep(){}}};attempt.attach({},imp);imp.env.initTimeoutSyncSleep();attempt.queue({type:'key',code:90,down:true});
+  imp.env.__asyncjs__syncSleep(0,1).then(()=>resumed=true);await new Promise(resolve=>setTimeout(resolve,10));
+  assert.equal(result.endReason,'practice-'+outcome);assert(attempt.status.held);assert.equal(resumed,false);assert.deepEqual(pending,[]);
+ }
  const playbackClocks=new Uint8Array(18),clockView=new DataView(playbackClocks.buffer);
  for(let n=0;n<2;n++){clockView.setUint8(n*9,2);clockView.setFloat64(n*9+1,1000+n*24,true);}
  let observed=0,played=null;

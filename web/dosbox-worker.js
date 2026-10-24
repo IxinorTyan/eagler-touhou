@@ -6,6 +6,7 @@ let presentationActive=true,frameProof=null,frameProofHolding=false;
 let viewSlot=0;
 let soloMode=false,soloInput=null;
 let externalHost=null;
+let practiceEngine=null,practiceClock=null,practicePlayback=false,practiceAudioDrops=0,practiceAudioDelivered=0;
 let frameBridge=null,replayBootAudioDrops=0;
 let replayGuestBase=-1,replayMailbox=-1,replayRun=null;
 function observeReplayRun(){
@@ -18,6 +19,7 @@ function observeReplayRun(){
       send('external-replay-run',{run:replayRun});
     }
   }
+  if(replayRun&&practiceEngine?.status.outcome)return 'practice-'+practiceEngine.status.outcome;
   if(!replayRun||replayMailbox<0)return false;
   // Mailbox mode 0 also appears between stages. Q_NEXT_STAGE (2) must
   // continue the same replay; Q_QUIT_TO_OP (1) ends the run.
@@ -64,7 +66,7 @@ function nativeStatus(){
 function exitSession(){if(exited)return;exited=true;paused=true;ci?.pause();send('game-exit');}
 function state(){
   if(soloMode)return {solo:true,...(soloInput?.snapshot||{mode:0}),program:mod.UTF8ToString(mod._emGetRunningProgram()).toUpperCase(),
-    core:'DOSBox-X JSPI',executionThread:'worker',frames,render:mod.framePresenter,audioPackets,audioEnergy,paused,nativePaused:nativeStatus().paused,...(frameBridge?{frameReplay:{...frameBridge.status,mutedAudioPackets:replayBootAudioDrops}}:{}),...(externalHost?{externalReplay:externalHost.status}:{})};
+    core:'DOSBox-X JSPI',executionThread:'worker',frames,render:mod.framePresenter,audioPackets,audioEnergy,paused,nativePaused:nativeStatus().paused,...(practiceEngine?{practice:{...practiceEngine.status,audioDrops:practiceAudioDrops,audioDelivered:practiceAudioDelivered}}:{}),...(frameBridge?{frameReplay:{...frameBridge.status,mutedAudioPackets:replayBootAudioDrops}}:{}),...(externalHost?{externalReplay:externalHost.status}:{})};
   if(mailbox<0)return null;const h=mod.HEAPU8,v=new DataView(h.buffer),at=mailbox,p=patch.mailbox_offsets;
   if(h[at+39]&1)return null;
   const d=at-patch.mailbox_cs_offset+(patch.data_segment-patch.code_segment)*16;
@@ -80,12 +82,15 @@ function state(){
     heapBytes:h.length,frames,render:mod.framePresenter,audioPackets,audioEnergy,paused,nativePaused:nativeStatus().paused,bombActive:!!h[d+0x4206],rank:h[d+0x576f],
     ...(qaEnabled?{itemPickups:layout.players.map((_,i)=>v.getUint32(at-patch.mailbox_cs_offset+patch.items.pickup_counts+i*4,true))}:{})};
 }
-function publish(){if(fatal||exited||!ci)return;scan();if(nativeStatus().exit){exitSession();return;}inputs();if(musicReader&&(soloMode||mailbox>=0)){if(!soloMode&&musicReader.at<0){const v=new DataView(mod.HEAPU8.buffer),segment=v.getUint16(guestBase+0x60*4+2,true);musicReader.at=guestBase+segment*16+musicReader.patch.mailbox_com_offset;}const events=musicReader.read(mod.HEAPU8);if(events.length)send('music',{events});}if(statePending)return;const s=state();if(s){statePending=true;send('state',{state:s});}}
+function publishMusic(){if(musicReader&&(soloMode||mailbox>=0)){if(!soloMode&&musicReader.at<0){const v=new DataView(mod.HEAPU8.buffer),segment=v.getUint16(guestBase+0x60*4+2,true);musicReader.at=guestBase+segment*16+musicReader.patch.mailbox_com_offset;}const events=musicReader.read(mod.HEAPU8);if(events.length)send('music',{events});}}
+function publish(){if(fatal||exited||!ci)return;scan();if(nativeStatus().exit&&!practiceEngine?.status.outcome){exitSession();return;}inputs();publishMusic();if(statePending)return;const s=state();if(s){statePending=true;send('state',{state:s});}}
 const config=(cycles,core)=>`[dosbox]\nmachine=pc98\nmemsize=16\n[cpu]\ncore=${core}\ncputype=386\ncycles=${cycles}\n[render]\nframeskip=0\nscaler=none\naspect=false\n[sblaster]\nsbtype=none\n[pc98]\npc-98 fm board=board86\n[mixer]\nrate=44100\nblocksize=512\nprebuffer=20\n[autoexec]\n@echo off\nmount a /home/web_user/game\na:\ncd KAIKI\nFAST.BAT\n`;
 async function boot(data){
   if(data.frameReplay&&data.frameReplay.mode!=='playback'&&!data.qa)throw Error('旧单人 Replay 仅允许播放，录制请使用浏览器方案');
   soloMode=!!data.solo;
+  if(data.practice&&(!soloMode||data.frameReplay||!data.patch.practice))throw Error('练习资源与运行模式不符');
   const dependency=name=>import(new URL(name,data.base).href);
+  if(data.practice){const {createPracticeClock,normalizePractice}=await dependency('practice-config.js');data.practice=normalizePractice(data.practice);practiceClock=createPracticeClock(data.practice.options.speed);practicePlayback=data.externalReplay?.mode==='playback';}
   const [locator,{writeNativeTouch,nativeHitPoints},{NativeMusic},players,{createPersonalHud,compositePersonalHudRgb},solo,art]=await Promise.all([
     dependency('game-locator.js'),dependency('native-touch.js'),dependency('solo-native-music.js'),dependency('native-players.js'),dependency('personal-hud.js'),
     soloMode?dependency('solo-input.js'):null,soloMode?null:dependency('afterimage-art.js'),
@@ -106,23 +111,28 @@ async function boot(data){
   importScripts(new URL('sidebar-background.js',data.base).href,new URL('frame-presenter.js',data.base).href,new URL('emulators.js',vendor).href);
   let factory;
   if(data.externalReplay){
-    if(!soloMode||data.musicPatch)throw Error('浏览器 Replay 使用单人原版模拟音源');
+    if(!soloMode)throw Error('浏览器 Replay 仅支持单人');
     const [{createExternalReplayHost},{loadVerifiedBytes},response]=await Promise.all([dependency('external-replay-host.js'),dependency('startup-assets.js'),fetch(new URL('runtime.json',vendor),{cache:'no-store'})]);
     if(!response.ok)throw Error('Replay 核心清单读取失败');
     const manifest=await response.json();
     externalHost=createExternalReplayHost({...data.externalReplay,
+      clock:practiceClock,
+      holdOnPracticeEnd:!!data.practice,
       applyInput:command=>dispatch({data:{...command,externalSource:true}}),
       observe:()=>{if(ci&&!fatal){
         frames=mod.messageFrame||frames;
         if(data.externalReplay.mode==='playback'){
           // Refresh display/mailbox ownership at recorded host boundaries.
           // Never clear touch input or apply live inputs while playing back.
-          scan();
+          scan();publishMusic();
           if(!statePending){const s=state();if(s){statePending=true;send('state',{state:s});}}
         }else publish();
         return observeReplayRun();
       }},
       inspect:async()=>{
+        // Notify at the sealed boundary, before optional hashing/compression.
+        // The attempt panel must remain usable if exporting the REP fails.
+        if(!practicePlayback&&practiceEngine?.status.outcome)send('practice-complete',{outcome:practiceEngine.status.outcome});
         const h=mod.HEAPU8;
         // The DOS memory allocation survives MAIN returning to OP, while
         // SoloInput deliberately drops inactive game mailboxes.
@@ -142,6 +152,10 @@ async function boot(data){
     // Lexically scope clocks to this loader only; the rest of the browser keeps
     // its real wall clock. Source is verified before evaluation, never from a replay.
     factory=new Function('Date','performance',source+';return WDOSBOXXJSPI;')(externalHost.Date,externalHost.performance);
+  }else if(practiceClock){
+    const {loadVerifiedBytes}=await dependency('startup-assets.js');const response=await fetch(new URL('runtime.json',vendor),{cache:'no-store'});const manifest=await response.json();
+    const source=new TextDecoder().decode(await loadVerifiedBytes(new URL('wdosbox-x-jspi.js',vendor),manifest.files['wdosbox-x-jspi.js']));
+    factory=new Function('Date','performance',source+';return WDOSBOXXJSPI;')(practiceClock.Date,practiceClock.performance);
   }else{importScripts(new URL('wdosbox-x-jspi.js',vendor).href);factory=WDOSBOXXJSPI;}
   onmessage=dispatch;
   const compiledCore=await compiledTask;
@@ -150,9 +164,11 @@ async function boot(data){
   const init=[...data.files,{dosboxConf,jsdosConf:{version:'8'}}];
   const sessionId=externalHost?'th05-external-replay-v1':'th05-fast-'+Date.now(),queue=[];let receiver;
   const audioPort={postMessage:(message,transfer)=>{if(message instanceof Float32Array){audioPackets++;for(let i=0;i<message.length;i+=32)audioEnergy+=Math.abs(message[i]);}if(message instanceof Float32Array&&data.frameReplay?.mode==='playback'&&(!frameBridge?.started||paused)){replayBootAudioDrops++;return;}
+    if(message instanceof Float32Array&&data.practice){const practice=practiceEngine?.status;if(data.practice.mode==='target'&&(!practice?.ready||practice.waiting)){practiceAudioDrops++;return;}practiceAudioDelivered++;}
     data.audioPort.postMessage(message,transfer||[]);}};
   mod={canvas:data.canvas,audioPort,instantiateWasm:(imports,receive)=>{
       externalHost?.attach(mod,imports);
+      if(data.practice)imports.env.th05_practice=(port,packed)=>{try{practiceEngine.signal(port,packed);}catch(error){emitError(error);throw error;}};
       if(frameBridge)imports.env.th05_replay=new WebAssembly.Suspending((port,packed)=>{
         try{frameBridge.signal(port,packed);}catch(e){emitError(e);throw e;}
         // Ordinary frames return synchronously. Suspend only at EOF so the
@@ -176,6 +192,9 @@ async function boot(data){
       onEnd:result=>setTimeout(()=>{if(data.frameReplay.mode==='record')for(const code of [265,264,263,262,88,90,340,256,257])ci.sendKeyEvent(code,false);paused=true;ci.pause();send('frame-replay-end',{result});},0),
     });
   }
+  if(data.practice){const {createPracticeEngine}=await dependency('practice-engine.js');practiceEngine=createPracticeEngine({mod,patch,config:data.practice,clock:practiceClock,
+    onComplete:result=>{if(!externalHost||!externalHost.status.recording&&!practicePlayback)setTimeout(()=>{paused=true;ci.pause();publish();send('practice-complete',{outcome:result.outcome});},0);},
+  });}
   const transport={sessionId,module:mod,net:null,sendMessageToServer:(name,props)=>mod.messageHandler({data:{name,props}}),
     initMessageHandler:handler=>{receiver=handler;for(const [name,props]of queue)handler(name,props);queue.length=0;},exit:()=>{}};
   await factory(mod);mod.callMain([sessionId]);
@@ -190,14 +209,16 @@ async function boot(data){
   // The protocol helper otherwise stamps keys with its unrelated real Date.
   // Stamp them from the same observed clock tape, including deferred key-ups.
   if(externalHost)ci.sendKeyEvent=(code,down)=>ci.addKey(code,down,externalHost.keyTime());
+  else if(practiceClock)ci.sendKeyEvent=(code,down)=>ci.addKey(code,down,practiceClock.date()-ci.startedAt);
   if(!soloMode){
     mod.afterimageArt=await art.installAfterimageArt(mod,patch,await afterimageTask);
     mod.afterimageArt?.view(viewSlot);
   }
   presentationActive=data.presentationActive!==false;
   mod.getSidebarBackground=()=>{
-    if(mailbox<0)return null;
-    const d=mailbox-patch.mailbox_cs_offset+(patch.data_segment-patch.code_segment)*16;
+    const at=soloMode?(soloInput?.snapshot?.at??-1):mailbox;
+    if(at<0||(soloMode&&!soloInput.valid(mod.HEAPU8,at)))return null;
+    const d=at-patch.mailbox_cs_offset+(patch.data_segment-patch.code_segment)*16;
     return sidebarBackground(mod.HEAPU8.subarray(d+0x264a,d+0x267a));
   };
   mod.getHitPoints=()=>soloMode?soloInput.markers(mod.HEAPU8):nativeStatus().paused?[]:nativeHitPoints(mod.HEAPU8,mailbox,patch,input.touch||[0,0]);
@@ -236,6 +257,7 @@ onmessage=async({data})=>{try{
   if(data.type==='external-replay-disable'){externalHost?.disable();return;}
   if(data.type==='external-replay-pause'){if(frameBridge){paused=!!data.value;if(paused){soloInput?.clear(mod.HEAPU8);ci.pause();}else ci.resume();}else externalHost?.pause(data.value);return;}
   if(externalHost&&!data.externalSource){
+    if(data.type==='practice-options'){if(!practicePlayback)externalHost.queue({type:'practice-options',options:data.options});return;}
     if(data.type==='key'){externalHost.queue({type:'key',code:data.code,down:!!data.down});return;}
     if(data.type==='input'){externalHost.queue({type:'input',input:data.input});return;}
     if(data.type==='game-pause'){
@@ -245,6 +267,7 @@ onmessage=async({data})=>{try{
     if(['pause','resume','qa'].includes(data.type))return;
   }
   if(data.type==='ack'){statePending=false;return;}
+  if(data.type==='practice-options'){if(practiceEngine&&(!practicePlayback||data.externalSource))practiceEngine.configure(data.options);return;}
   if(data.type==='frame-ack'){frameTransfers.delete(data.seq);return;}
   if(data.type==='view-slot'&&Number.isInteger(data.slot)&&data.slot>=0&&data.slot<3){viewSlot=data.slot;mod.afterimageArt?.view(viewSlot);mod.framePresenter?.flush();return;}
   if(data.type==='presentation-active'){presentationActive=!!data.value;return;}

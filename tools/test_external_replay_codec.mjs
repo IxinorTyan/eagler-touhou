@@ -6,6 +6,8 @@ const compressed=new Uint8Array(await new Response(new Blob([clocks]).stream().p
 const header={version:HOST_VERSION,mode:'solo',language:'cn',independentMusic:false,identity:'a'.repeat(64),events:[{boundary:1,commands:[{type:'key',code:90,down:true}]}],result:{boundary:1,clockCount:2,guestHash:'12345678',guestSha256:'b'.repeat(64)}};
 const blob=await encodeReplay(header,{chunks:[compressed],rawBytes:18}),decoded=await decodeReplay(blob);
 assert.deepEqual(decoded.clocks,clocks);assert.deepEqual(decoded.header.events,header.events);
+const musicReplay=await decodeReplay(await encodeReplay({...header,independentMusic:true},{chunks:[compressed],rawBytes:18}));assert.equal(musicReplay.header.independentMusic,true);assert.deepEqual(musicReplay.clocks,clocks);
+await assert.rejects(()=>encodeReplay({...header,independentMusic:'true'},{chunks:[compressed],rawBytes:18}),/类型/);
 const bytes=new Uint8Array(await blob.arrayBuffer());bytes[bytes.length-1]^=1;
 await assert.rejects(()=>decodeReplay(new Blob([bytes])),/损坏/);
 await assert.rejects(()=>decodeReplay(blob.slice(0,20)),/文件头/);

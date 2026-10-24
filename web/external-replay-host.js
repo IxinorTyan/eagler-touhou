@@ -3,7 +3,7 @@
 export const HOST_VERSION='th05-external-jspi/2';
 export const CLOCK_BYTES=9, CLOCK_CHUNK=4096;
 const RealDate=Date,realNow=()=>performance.now();
-export function createExternalReplayHost({mode,clocks,events=[],endBoundary,endReason,onChunk,onEnd,onError,onRecordingError=onError,applyInput,observe,inspect,maxClockBytes=512*1024*1024}){
+export function createExternalReplayHost({mode,clocks,events=[],endBoundary,endReason,onChunk,onEnd,onError,onRecordingError=onError,applyInput,observe,inspect,maxClockBytes=512*1024*1024,clock,holdOnPracticeEnd=false}){
   if(!['record','playback'].includes(mode))throw Error('无效的外部 replay 模式');
   let mod,boundary=0,count=0,eventCursor=0,queued=[],buffer=new Uint8Array(CLOCK_BYTES*CLOCK_CHUNK),used=0;
   let stopped=false,ending=false,held=false,wake=null,timer=null,observerMs=0,clockMs=0,lastWake=0,epoch,recording=mode==='record',finished=false;
@@ -15,7 +15,7 @@ export function createExternalReplayHost({mode,clocks,events=[],endBoundary,endR
   function time(kind){
     const at=realNow();let value;
     if(mode==='record'){
-      value=kind===1?performance.now():RealDate.now();
+      value=kind===1?(clock?clock.now():performance.now()):(clock?clock.date():RealDate.now());
       if(recording){
         if((count+1)*CLOCK_BYTES>maxClockBytes)disable(Error('录像时钟超过容量，游戏继续'));
         else{const view=new DataView(buffer.buffer);view.setUint8(used,kind);view.setFloat64(used+1,value,true);used+=CLOCK_BYTES;
@@ -47,6 +47,7 @@ export function createExternalReplayHost({mode,clocks,events=[],endBoundary,endR
     // inspect copies the guest bytes synchronously at this boundary. Hashing,
     // compression and the save dialog must never hold the player's continuation.
     const inspected=inspect?.();
+    if(mode==='record'&&holdOnPracticeEnd&&['practice-clear','practice-failed'].includes(reason))held=true;
     Promise.resolve(inspected).then(extra=>onEnd({...result,...extra})).catch(mode==='record'?onRecordingError:onError);
   }
   function resume(){
@@ -62,6 +63,7 @@ export function createExternalReplayHost({mode,clocks,events=[],endBoundary,endR
         const ended=!!terminal&&recording;
         if(ended){
           const batch=queued;queued=[];finish(typeof terminal==='string'?terminal:'end');
+          if(held)return;
           for(const command of batch)applyInput(command);
           const next=wake;wake=null;next();return;
         }
@@ -97,7 +99,7 @@ export function createExternalReplayHost({mode,clocks,events=[],endBoundary,endR
         if(namespace.__asyncjs__syncSleep)namespace.__asyncjs__syncSleep=new WebAssembly.Suspending(async(ms,nonSkippable)=>{
           const now=time(2);if(!nonSkippable&&now-lastWake<24)return;
           mod.sleep_count++;if(nonSkippable)mod.nonskippable_sleep_count++;
-          await new Promise(resolve=>{boundary++;wake=resolve;timer=setTimeout(resume,nonSkippable?Math.max(0,ms):0);});
+          await new Promise(resolve=>{boundary++;wake=resolve;timer=setTimeout(resume,nonSkippable?Math.max(0,ms)/(clock?.speed||1):0);});
           lastWake=now;mod.last_wakeup=now;
         });
       }

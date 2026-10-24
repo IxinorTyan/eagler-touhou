@@ -19,6 +19,7 @@ const reportStem=process.env.QA_REPORT_NAME||`browser-replay-${language}${fault?
   await context.addInitScript(()=>{
    // Routing cannot intercept AudioWorklet fetches; use existing audio fallback.
    globalThis.AudioWorkletNode=undefined;
+   const AC=AudioContext;window.musicSources=[];globalThis.AudioContext=class extends AC{createBufferSource(){const source=super.createBufferSource(),start=source.start.bind(source);source.start=(...args)=>{if(source.buffer?.duration>5)musicSources.push(source);return start(...args);};return source;}};
    const NativeWorker=Worker;window.coreStates=[];window.coreBoots=[];window.coreWorkers=[];window.storageWorkers=[];
    window.Worker=class extends NativeWorker{
     constructor(url,...args){super(url,...args);if(String(url).includes('dosbox-worker'))coreWorkers.push(this);if(String(url).includes('external-replay-store-worker'))storageWorkers.push(this);this.addEventListener('message',({data})=>{if(data.type==='state')coreStates.push(data.state);if(coreStates.length>200)coreStates.shift();});}
@@ -35,9 +36,24 @@ const reportStem=process.env.QA_REPORT_NAME||`browser-replay-${language}${fault?
   const read=()=>page.evaluate(()=>coreStates.at(-1));
   const tap=async(key,ms=150)=>{await page.locator('#canvas').focus();await page.keyboard.down(key);await page.waitForTimeout(ms);await page.keyboard.up(key);await page.waitForTimeout(200);};
   for(let i=0;i<40;i++){if((await read())?.mode===1)break;await tap('z');await page.waitForTimeout(300);}
-  await page.waitForFunction(()=>coreStates.at(-1)?.mode===1,null,{timeout:30000});
+  await page.waitForFunction(()=>coreStates.at(-1)?.mode===1&&coreStates.at(-1)?.practice?.ready,null,{timeout:30000});
   report.entered=await read();assert.equal(report.entered.externalReplay.recording,true);
+  assert.equal(report.entered.practice.mode,'full');assert.equal(report.entered.practice.waiting,false);assert.equal(report.entered.practice.options.lockPower,false);assert(report.entered.practice.lives>0);assert(report.entered.practice.bombs>0);
+  // Record guarded helper events and verify them during independent playback.
+  await page.locator('#canvas').focus();await page.keyboard.press('F1');await page.waitForTimeout(150);assert.equal((await read()).practice.options.invincible,false);
+  await page.keyboard.press('Backspace');await page.keyboard.press('F1');await page.waitForFunction(()=>coreStates.at(-1)?.practice?.options.invincible);await page.keyboard.press('Backspace');await page.keyboard.press('F1');await page.waitForTimeout(150);assert.equal((await read()).practice.options.invincible,true);
   assert.deepEqual(await page.evaluate(()=>coreBoots),[{frameReplay:false,externalReplay:'record',qa:false,solo:true}]);
+  if(process.env.TH05_BGM_SPEED_CHECKS){
+   await page.waitForFunction(()=>{try{return musicSources.length>0&&/^本地音乐：st\d\d-/.test(JSON.parse(document.querySelector('#diagnostics').textContent).music);}catch{return false;}},null,{timeout:20000});report.musicSpeeds=[];
+   const sample=()=>page.evaluate(()=>{const s=musicSources.at(-1);return {sources:musicSources.length,rate:s.playbackRate.value,detune:s.detune.value,audio:s.context.currentTime,wall:performance.now(),frames:coreStates.at(-1).practice.frames};});
+   const original=await sample();report.originalMusic=original;
+   for(const speed of [.5,2,1]){
+    await page.locator('#canvas').focus();await page.keyboard.press('F12');await page.waitForFunction(()=>coreStates.at(-1)?.mode===2);await page.selectOption('[data-practice=speed]',String(speed));await page.waitForFunction(speed=>coreStates.at(-1)?.practice?.options.speed===speed,speed);await page.click('[data-close-practice]');await page.waitForTimeout(500/speed);await tap('Enter',1000/speed);await page.waitForFunction(()=>coreStates.at(-1)?.mode===1);
+    const before=await sample();await page.waitForTimeout(1600);const after=await sample(),ratio=(after.audio-before.audio)*1000/(after.wall-before.wall),gameFrames=after.frames-before.frames;
+    assert.equal(after.rate,1);assert.equal(after.detune,0);assert.equal(after.sources,original.sources,'changing game speed must not restart BGM');assert(Math.abs(ratio-1)<.12,'BGM must advance in real time at game speed '+speed);report.musicSpeeds.push({speed,before,after,ratio,gameFrames});
+   }
+   assert(report.musicSpeeds[1].gameFrames>report.musicSpeeds[0].gameFrames*2,'game speed must change while BGM stays at 1x');
+  }
   await tap('ArrowRight',550);await tap('ArrowLeft',450);await tap('Shift',250);await tap('z',500);await tap('x');
   // Exercise the same ordinary touch mailbox API, with no guest test mutation.
   await page.evaluate(()=>{const s=coreStates.at(-1);coreWorkers.at(-1).postMessage({type:'input',input:{generation:s.generation,points:9,touch:{active:true,unlimited:false,x:80,y:-32}}});});
@@ -72,9 +88,11 @@ const reportStem=process.env.QA_REPORT_NAME||`browser-replay-${language}${fault?
   report.commands=await viewer.evaluate(async fileBytes=>{
    const {decodeReplay}=await import('/external-replay-codec.js');const replay=await decodeReplay(new Blob([new Uint8Array(fileBytes)]));
    const commands=replay.header.events.flatMap(e=>e.commands);
-   return {events:replay.header.events.length,touch:commands.filter(c=>c.type==='input'&&c.input.touch?.active).length,keys:commands.filter(c=>c.type==='key').length,clockCount:replay.header.result.clockCount};
+   return {independentMusic:replay.header.independentMusic,events:replay.header.events.length,touch:commands.filter(c=>c.type==='input'&&c.input.touch?.active).length,keys:commands.filter(c=>c.type==='key').length,helpers:commands.filter(c=>c.type==='practice-options').length,clockCount:replay.header.result.clockCount};
   },Array.from(fs.readFileSync(file)));
   assert(report.commands.touch>0);assert(report.commands.keys>0);
+  assert(report.commands.helpers>0);
+  assert.equal(report.commands.independentMusic,true);
   await viewer.click('#play');await viewer.waitForFunction(()=>th05BrowserReplayQA.read().result||th05BrowserReplayQA.read().state?.externalReplay?.boundary>20||th05BrowserReplayQA.read().status.includes('失败'),null,{timeout:60000});
   report.playback=await viewer.evaluate(()=>th05BrowserReplayQA.read());
   if(report.playback.result){assert.equal(report.playback.result.matches,true,report.playback.status);}
@@ -85,6 +103,7 @@ const reportStem=process.env.QA_REPORT_NAME||`browser-replay-${language}${fault?
   await viewer.waitForFunction(()=>th05BrowserReplayQA.read().result||th05BrowserReplayQA.read().status.includes('失败'),null,{timeout:120000});
   }
   report.playback=await viewer.evaluate(()=>th05BrowserReplayQA.read());assert.equal(report.playback.result?.matches,true,report.playback.status);
+  await viewer.waitForFunction(()=>musicSources.length>0,null,{timeout:15000});report.playbackMusic=await viewer.evaluate(()=>({sources:musicSources.length,rate:musicSources.at(-1).playbackRate.value,detune:musicSources.at(-1).detune.value}));assert.equal(report.playbackMusic.rate,1);assert.equal(report.playbackMusic.detune,0);
   report.specialRequests=report.requests.filter(name=>/(?:patch-stage-|th05-stage-|stage-runtime|wdosbox-x-stage|frame-replay-(?:core|ending|cn|jp)|\/frame-replay\.json)/.test(name));
   assert.deepEqual(report.specialRequests,[]);assert.deepEqual(report.errors,[]);report.passed=true;
   console.log('PASS browser-only record, touch/pause, player continues, independent import/playback and final guest SHA',language,report.fileBytes);

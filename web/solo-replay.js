@@ -18,10 +18,11 @@ async function play(){
     const [identity,response]=await Promise.all([browserReplayIdentity(language),fetch('solo-disks.json',{cache:'no-store'})]);
     if(!response.ok)throw Error('磁盘清单读取失败');
     if(identity!==loaded.header.identity||Intl.DateTimeFormat().resolvedOptions().timeZone!==loaded.header.timeZone)throw Error('录像与当前资源版本或时区不一致');
-    const item=(await response.json()).languages[language],coreTask=prepareFastCore();coreTask.catch(()=>{});
+    const item=(await response.json()).languages[language],coreTask=prepareFastCore(!!loaded.header.practice);coreTask.catch(()=>{});
     const disk=await loadVerifiedBytes(new URL(item.url,import.meta.url),item.sha256,{gzip:true,size:item.size});
+    if(loaded.header.practice){const response=await fetch('practice-assets.json',{cache:'no-store'});if(!response.ok)throw Error('练习资源缺失');const p=(await response.json()).languages[language];if(p.sourceMainSha256!==item.inputPatch.main_sha256)throw Error('练习资源已过期');item.inputPatch=p.patch;item.practiceExe=await loadVerifiedBytes(new URL(p.url,import.meta.url),p.sha256,{gzip:true,size:p.size});}
     const canvas=$('canvas');canvas.replaceWith(canvas.cloneNode(false));
-    const booted=await createFastCore({canvas:$('canvas'),disk,patch:item.inputPatch,solo:true,independentMusic:false,coreTask,externalReplay:{
+    const booted=await createFastCore({canvas:$('canvas'),disk,patch:item.inputPatch,solo:true,independentMusic:loaded.header.independentMusic,coreTask,practice:loaded.header.practice,practiceExe:item.practiceExe,externalReplay:{
       mode:'playback',clocks:loaded.clocks.slice(),events:loaded.header.events,endBoundary:loaded.header.result.boundary,
       onEnd:value=>{
         if(owner!==epoch)return;

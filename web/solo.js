@@ -3,6 +3,7 @@ import {loadVerifiedBytes} from './startup-assets.js';
 import {mountPlayer} from './player-ui.js';
 import {unpackTouch} from './touch-input.js';
 import {createBrowserRecorder} from './browser-replay-recorder.js';
+import {mountPractice} from './practice-ui.js';
 
 const $=id=>document.getElementById(id);
 let emulator=null,busy=false,disposed=false,oldButtons=0,lastInfo=0,menuBits=0,menuUntil=0;
@@ -16,15 +17,24 @@ const nativeCodes=[[1,265],[2,264],[4,263],[8,262],[16,88],[32,90],[64,340],[128
 const player=mountPlayer($('player'),{solo:true,onGesture:enableSound});
 $('screen').classList.add('screen');player.stage.append($('screen'));
 player.setLabel('原版单人');player.note('启动后使用原版标题菜单；触屏可开启触屏操作。');
+const practiceUI=mountPractice({host:$('player'),onChange:value=>{if(value)emulator?.practiceOptions(value);},onStart:value=>start({practiceConfig:value}),onRetry:retryPractice,onSave:()=>$('record-save').click(),onPause:()=>{if(emulator?.readState()?.mode===1)pause();},onFocus:()=>$('canvas').focus()});
+let activePractice=null,practiceCompleted=false;
+function finishPractice(outcome='clear'){
+  if(activePractice?.mode!=='target'||practiceCompleted)return;practiceCompleted=outcome;
+  if(recorder)emulator?.pauseReplay(true);else emulator?.pause();
+  release();status((outcome==='clear'?'练习成功':'练习失败')+' · 可保存本次 REP 或继续练习。');
+  practiceUI.complete({outcome,recording:!!recorder,ready:!!recordBlob,failed:recorder?.state.failed});
+}
+function retryPractice(){if(activePractice?.mode!=='target'||busy)return;start({retry:true});}
 const status=text=>{$('status').textContent=text;};
 const form=target=>target?.closest?.('select,input,textarea,button,a');
-function enableSound(){if(emulator?.state==='running')return emulator.audio?.resume();}
+function enableSound(){const practice=emulator?.readState()?.practice;if(activePractice?.mode==='target'&&(!practice?.ready||practice.waiting))return;if(emulator?.state==='running')return emulator.audio?.resume();}
 function applyButtons(value){
   if(!emulator)return;
   for(const [bit,code]of nativeCodes)if((value^oldButtons)&bit)emulator.key(code,!!(value&bit));
   oldButtons=value;
 }
-function points(){return ($('focus-point').checked?1:0)|(player.alwaysPoint()?8:0);}
+function points(){return ($('focus-point').checked?1:0)|((player.alwaysPoint()||activePractice&&practiceUI.options.alwaysPoint)?8:0);}
 function release(){
   held.clear();pulses.clear();menuBits=menuUntil=0;player.reset();applyButtons(0);
   emulator?.inputs({generation:emulator.readState()?.generation,points:points(),touch:null});
@@ -90,7 +100,8 @@ function syncButtons(){
 function tick(now){
   if(disposed)return;
   const state=context();
-  if(emulator){$('pause').disabled=![1,2].includes(state?.mode);$('pause').textContent=state?.mode===2?'继续游戏':'暂停游戏';}
+  if(activePractice){practiceUI.update(state);if(state?.practice?.error)status(state.practice.error);else if(activePractice.mode==='target'&&state?.practice?.ready&&!practiceCompleted)status(state.practice.waiting?'练习入口已就绪 · 原版暂停中，按 Enter / Esc 继续。':'单人练习运行中 · 入口已就绪。');}
+  if(emulator){$('pause').disabled=practiceCompleted||![1,2].includes(state?.mode);$('pause').textContent=state?.mode===2?'继续游戏':'暂停游戏';}
   if(emulator?.state==='running'){
     const game=state?.mode===1,value=sampleButtons(now,state);
     applyButtons(value);
@@ -111,46 +122,56 @@ function tick(now){
 }
 requestAnimationFrame(tick);
 
-async function readDisk(language){
+async function readDisk(language,practice){
   const manifestResponse=await fetch('solo-disks.json',{cache:'no-store'});
   if(!manifestResponse.ok)throw Error('原版磁盘清单读取失败');
   const item=(await manifestResponse.json()).languages[language];
   if(!item.inputPatch)throw Error('原版单人触摸资源需要更新，请重新生成单人磁盘');
   const disk=await loadVerifiedBytes(new URL(item.url,import.meta.url),item.sha256,{gzip:true,size:item.size});
-  return {disk,patch:item.inputPatch};
+  if(!practice)return {disk,patch:item.inputPatch};
+  const response=await fetch('practice-assets.json',{cache:'no-store'});if(!response.ok)throw Error('练习资源清单读取失败');const spec=(await response.json()).languages[language];
+  if(spec.sourceMainSha256!==item.inputPatch.main_sha256)throw Error('练习资源与单人程序不一致，请重建练习资源');
+  const practiceExe=await loadVerifiedBytes(new URL(spec.url,import.meta.url),spec.sha256,{gzip:true,size:spec.size});
+  return {disk,patch:spec.patch,practiceExe};
 }
 function failure(error){
   clearRecorder();
+  practiceUI.setRunning(false);
   release();if(emulator&&!['failed','stopped'].includes(emulator.state))emulator.stop();emulator=null;player.setActive(false);
   status('启动或运行失败：'+error.message);player.note('请查看错误原因，调整后重新开始。');
   $('start').disabled=false;$('pause').disabled=true;$('capture').disabled=true;$('sound').disabled=true;
 }
 function endSession(){
   clearRecorder();
+  practiceUI.setRunning(false);
   emulator?.stop();emulator=null;held.clear();pulses.clear();oldButtons=0;player.setActive(false);player.exit();
   const canvas=$('canvas');canvas.replaceWith(canvas.cloneNode(false));
   for(const id of ['pause','capture','sound'])$(id).disabled=true;
   $('start').disabled=false;$('restart').disabled=false;status('已退出模拟器，本局结束。可重新启动原版。');
 }
-async function start(){
+async function start({retry=false,practiceConfig=null}={}){
   if(busy||disposed)return;busy=true;
   release();emulator?.stop();emulator=null;
+  practiceCompleted=false;
   clearRecorder();discardRecording();
   for(const id of ['start','restart','pause','capture','sound'])$(id).disabled=true;
   player.setActive(false);status('正在载入原版磁盘…');
   const canvas=document.createElement('canvas');canvas.id='canvas';canvas.width=640;canvas.height=400;canvas.tabIndex=0;canvas.setAttribute('aria-label','怪绮谈原版单人游戏画面');
   $('canvas').replaceWith(canvas);canvas.onpointerdown=()=>canvas.focus();
   const language=$('language').value,recordEnabled=!!$('record-enabled')?.checked;
-  const independentMusic=!recordEnabled&&$('audio-mode').value==='independent';
+  // Music always uses the browser's real audio clock, including recorded runs.
+  const independentMusic=true;
   $('bgm-control').hidden=!independentMusic;
   try{
-    const coreTask=prepareFastCore();coreTask.catch(()=>{});
-    const {disk,patch}=await readDisk(language);if(disposed)return;
+    activePractice=practiceConfig||(retry&&activePractice?{...activePractice,options:practiceUI.options}:practiceUI.configuration());practiceUI.setRunning(false);
+    const coreTask=prepareFastCore(!!activePractice);coreTask.catch(()=>{});
+    const {disk,patch,practiceExe}=await readDisk(language,activePractice);if(disposed)return;
     if(recordEnabled){
-      try{recorder=await createBrowserRecorder({language,onStatus:recordingStatus,
+      try{recorder=await createBrowserRecorder({language,practice:activePractice,independentMusic,onStatus:text=>{recordingStatus(text);if(practiceCompleted&&recorder?.state.failed)practiceUI.complete({outcome:practiceCompleted,failed:true});},
         onRun:()=>{$('record-finish').disabled=false;},
         onResult:()=>{$('record-finish').disabled=true;},
         onFile:(blob,result)=>{recordBlob=blob;$('record-save').disabled=false;$('record-discard').disabled=false;
+          if(['practice-clear','practice-failed'].includes(result.endReason)){const outcome=result.endReason==='practice-clear'?'clear':'failed';finishPractice(outcome);practiceUI.complete({outcome,ready:true});return;}
           $('replay-save-title').textContent='本局结束，保存单人 Replay？';
           $('replay-save-summary').textContent=`${result.endReason==='clear'?'已通关。':'录像已封存。'}只包含首次续关前的操作，不包含续关和后续操作。`;
           $('replay-save-dialog').showModal();}});
@@ -158,14 +179,15 @@ async function start(){
       if(disposed){clearRecorder();return;}
     }else recordingStatus('本次启动不录制。');
     status('正在启动 PC-98 原版游戏…');
-    const core=await createFastCore({canvas,disk,patch,solo:true,independentMusic,coreTask,externalReplay:recorder?.config});
+    const core=await createFastCore({canvas,disk,patch,solo:true,independentMusic,coreTask,externalReplay:recorder?.config,practice:activePractice,practiceExe});
     if(disposed){core.stop();return;}emulator=core;emulator.onError=failure;emulator.onExit=endSession;
     recorder?.attach(core);
+    practiceUI.setRunning(!!activePractice,activePractice);core.onPracticeRetry=retryPractice;core.onPracticeComplete=finishPractice;
     if(recordEnabled&&recorder&&!recorder.state.failed)recordingStatus('浏览器已记录启动流程，等待进入关卡。');
     emulator.bgm?.setVolume(Number($('bgm-volume').value)/100);
     $('pause').disabled=false;$('capture').disabled=false;$('sound').disabled=false;
     $('pause').textContent='暂停游戏';player.setLabel(`${language==='cn'?'汉化版':'日文版'} · 原版单人`);
-    status('原版单人运行中 · 请在标题菜单选择角色与难度。');
+    status(activePractice?.mode==='target'?'单人练习运行中 · 正在准备所选入口。':'原版单人运行中 · 请在标题菜单选择角色与难度。');
     player.note('方向键选择，Z / Enter 确认，X 返回。Esc 打开原版暂停菜单。');
     canvas.focus();if(document.hidden)pause();
   }catch(error){if(!disposed)failure(error);}
@@ -175,7 +197,7 @@ $('start').onclick=start;$('restart').onclick=start;$('pause').onclick=pause;
 if($('record-finish'))$('record-finish').onclick=()=>recorder?.finish();
 if($('record-save'))$('record-save').onclick=()=>{
   if(!recordBlob)return;const url=URL.createObjectURL(recordBlob),link=document.createElement('a');
-  link.href=url;link.download='th05-solo-browser.th05r';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  link.href=url;link.download=practiceCompleted?'th05-practice.th05r':'th05-solo-browser.th05r';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   $('replay-save-dialog')?.close();
 };
 if($('record-discard'))$('record-discard').onclick=()=>{discardRecording();recordingStatus('录像已丢弃，游戏继续。');};

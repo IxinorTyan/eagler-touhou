@@ -6,7 +6,9 @@ import {createReplayStore} from './external-replay-store.js';
 export async function browserReplayIdentity(language){
   const names=['solo-disks.json','vendor/dosbox-x/runtime.json','external-replay-host.js','external-replay-codec.js',
     'dosbox-runtime.js','dosbox-worker.js','disk-files.js','solo-input.js','game-locator.js','native-players.js',
-    'native-touch.js','touch-input.js','frame-presenter.js','sidebar-background.js','personal-hud.js'];
+    'native-touch.js','touch-input.js','frame-presenter.js','sidebar-background.js','personal-hud.js',
+    'practice-config.js','practice-engine.js','practice-assets.json','practice-core.json',
+    'music-files.js','music-patch.json','solo-native-music.js'];
   const sources=await Promise.all(names.map(async name=>{
     const response=await fetch(new URL(name,import.meta.url),{cache:'no-store'});
     if(!response.ok)throw Error('浏览器 Replay 资源身份读取失败');
@@ -15,10 +17,11 @@ export async function browserReplayIdentity(language){
   return sha256(new TextEncoder().encode(JSON.stringify({version:HOST_VERSION,language,sources})));
 }
 
-export async function createBrowserRecorder({language,onStatus=()=>{},onFile=()=>{},onRun=()=>{},onResult=()=>{}}){
+export async function createBrowserRecorder({language,practice,independentMusic=false,onStatus=()=>{},onFile=()=>{},onRun=()=>{},onResult=()=>{}}){
   const identity=await browserReplayIdentity(language);
   let core=null,store=null,failed=false,disposed=false,ending=false,events=[],eventBytes=2,bytes=0,run=null,result=null,file=null;
-  const metadata={version:HOST_VERSION,mode:'solo',language,independentMusic:false,identity,timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone};
+  const metadata={version:HOST_VERSION,mode:'solo',language,independentMusic,identity,timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone};
+  if(practice)metadata.practice=structuredClone(practice);
   function fail(error){
     if(failed||disposed)return;failed=true;file=null;events=[];store?.dispose();store=null;core?.stopBrowserRecording();
     onStatus('录像已停止：'+error.message+'；游戏继续。重新启动游戏后可重新录制。');
