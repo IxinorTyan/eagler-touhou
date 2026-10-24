@@ -1,0 +1,256 @@
+{
+  "schema": 1,
+  "version": "th02-browser-practice/1",
+  "languages": {
+    "jp": {
+      "url": "practice-jp.exe.gz",
+      "size": 137238,
+      "sha256": "1fd4abd812a9b4f99e9cc415bf94b81e2ddc9ebcb7eeec6ea77f83d1e96a74e8",
+      "sourceMainSha256": "a23cdbbb957beaf7338a866b1487bb4881f4aaea8e3ee49a440f02e91fb45a59",
+      "patch": {
+        "file": "th02-solo-jp.hdi.gz",
+        "size": 21415936,
+        "sha256": "cee071982eac6c7190bfc1e5aed769fe2afb9596b96d9ba72e644a1717e83ad8",
+        "signature": "TH02SOLOINPUTv1!",
+        "entries": {
+          "stage": 19053,
+          "update": 19076,
+          "move": 19091,
+          "pause": 19105,
+          "render": 19132,
+          "exit": 19149,
+          "mailbox": 18862,
+          "touch": 19628,
+          "currentInput": 18970
+        },
+        "headerSize": 6656,
+        "codeSegment": 2838,
+        "dataSegment": 7746,
+        "gap": 2480,
+        "originalMainSha256": "9e9a323781e793738c8e3a5b575d99c0cb6a71bac8c3d581178976b4977f0a92",
+        "mainSha256": "1fd4abd812a9b4f99e9cc415bf94b81e2ddc9ebcb7eeec6ea77f83d1e96a74e8",
+        "hooks": [
+          {
+            "offset": 46619,
+            "original": "e8920f",
+            "entry": "stage"
+          },
+          {
+            "offset": 47531,
+            "original": "e8020c",
+            "entry": "stage"
+          },
+          {
+            "offset": 48588,
+            "original": "e80934",
+            "entry": "update"
+          },
+          {
+            "offset": 62203,
+            "original": "5657e8c3fb",
+            "entry": "move"
+          },
+          {
+            "offset": 48643,
+            "original": "e8dcfb",
+            "entry": "pause"
+          },
+          {
+            "offset": 48616,
+            "original": "e84b31",
+            "entry": "render"
+          },
+          {
+            "offset": 50551,
+            "original": "e8d01c",
+            "entry": "exit"
+          }
+        ],
+        "compressedSha256": "77c74bfe34a6c49ebf8b4ca423d6b05fa523005e5b39534b35ac17112584f8ba",
+        "nativeBossHud": {
+          "schema": 1,
+          "implementation": "guest-ems",
+          "module": "A:\\NBHUD.BIN",
+          "moduleSha256": "4784b2e9688b3b8cbb7be80c86f444531ae2556eba63127a23a611a91e258aa0",
+          "moduleBytes": 1993,
+          "emsPages": 1,
+          "conventionalBytesAdded": 512,
+          "bridge": {
+            "entry": 20096,
+            "cleanup": 20174,
+            "handle": 20199,
+            "status": 20201,
+            "pointer": 20202
+          },
+          "hp": true,
+          "phaseCuts": true,
+          "timer": "native audited deadlines; unavailable deadlines blank",
+          "browserOverlay": false
+        },
+        "practice": {
+          "version": 1,
+          "entries": {
+            "load": 20701,
+            "frame": 20713,
+            "miss": 20796,
+            "world": 20818,
+            "entryPause": 20672,
+            "hold": 20673,
+            "targetPractice": 20674,
+            "lockLives": 20675,
+            "unlimitedBombs": 20676,
+            "enemyLock": 20677,
+            "deathGate": 20835,
+            "lifeConsume": 20856,
+            "bombGate": 20869,
+            "bombConsume": 20890,
+            "livesZero": 20903,
+            "bombsZero": 20924,
+            "shotsReturn": 20945,
+            "dialogBox": 21084,
+            "dialogPre": 21108,
+            "dialogPost": 21128,
+            "powerDirty": 20678,
+            "lockTime": 20679,
+            "timeMid1": 20965,
+            "timeMid2": 20987,
+            "timeMid3": 21009,
+            "timeMid4": 21030,
+            "timeMima": 21051,
+            "transition": 21070
+          },
+          "bytes": 656,
+          "descriptor": "T02PRA01"
+        }
+      }
+    },
+    "cn": {
+      "url": "practice-cn.exe.gz",
+      "size": 137238,
+      "sha256": "c7c90066b87e7707c1859a8e52f012b80aeeb8904528efc7796a12c8f5f13eaa",
+      "sourceMainSha256": "00eea3318ad14818c1429be55c9ba250a8af0576379adc03c58716e7e9d36168",
+      "patch": {
+        "file": "th02-solo-cn.hdi.gz",
+        "size": 21415936,
+        "sha256": "ad105a4cbff46bf2fc02de77fe5f054e9900453cc847d7b9fa336d653a28b6b9",
+        "signature": "TH02SOLOINPUTv1!",
+        "entries": {
+          "stage": 19053,
+          "update": 19076,
+          "move": 19091,
+          "pause": 19105,
+          "render": 19132,
+          "exit": 19149,
+          "mailbox": 18862,
+          "touch": 19628,
+          "currentInput": 18970
+        },
+        "headerSize": 6656,
+        "codeSegment": 2838,
+        "dataSegment": 7746,
+        "gap": 2480,
+        "originalMainSha256": "d54640c76acab16c3f0bdf34774c5153468172d7ca132426ab845ef2a1c8dce8",
+        "mainSha256": "c7c90066b87e7707c1859a8e52f012b80aeeb8904528efc7796a12c8f5f13eaa",
+        "hooks": [
+          {
+            "offset": 46619,
+            "original": "e8920f",
+            "entry": "stage"
+          },
+          {
+            "offset": 47531,
+            "original": "e8020c",
+            "entry": "stage"
+          },
+          {
+            "offset": 48588,
+            "original": "e80934",
+            "entry": "update"
+          },
+          {
+            "offset": 62203,
+            "original": "5657e8c3fb",
+            "entry": "move"
+          },
+          {
+            "offset": 48643,
+            "original": "e8dcfb",
+            "entry": "pause"
+          },
+          {
+            "offset": 48616,
+            "original": "e84b31",
+            "entry": "render"
+          },
+          {
+            "offset": 50551,
+            "original": "e8d01c",
+            "entry": "exit"
+          }
+        ],
+        "compressedSha256": "2b005df5c3deb052a6a7b639363ec438f386a77de8203da36032fd94861c069c",
+        "nativeBossHud": {
+          "schema": 1,
+          "implementation": "guest-ems",
+          "module": "A:\\NBHUD.BIN",
+          "moduleSha256": "4784b2e9688b3b8cbb7be80c86f444531ae2556eba63127a23a611a91e258aa0",
+          "moduleBytes": 1993,
+          "emsPages": 1,
+          "conventionalBytesAdded": 512,
+          "bridge": {
+            "entry": 20096,
+            "cleanup": 20174,
+            "handle": 20199,
+            "status": 20201,
+            "pointer": 20202
+          },
+          "hp": true,
+          "phaseCuts": true,
+          "timer": "native audited deadlines; unavailable deadlines blank",
+          "browserOverlay": false
+        },
+        "practice": {
+          "version": 1,
+          "entries": {
+            "load": 20701,
+            "frame": 20713,
+            "miss": 20796,
+            "world": 20818,
+            "entryPause": 20672,
+            "hold": 20673,
+            "targetPractice": 20674,
+            "lockLives": 20675,
+            "unlimitedBombs": 20676,
+            "enemyLock": 20677,
+            "deathGate": 20835,
+            "lifeConsume": 20856,
+            "bombGate": 20869,
+            "bombConsume": 20890,
+            "livesZero": 20903,
+            "bombsZero": 20924,
+            "shotsReturn": 20945,
+            "dialogBox": 21084,
+            "dialogPre": 21108,
+            "dialogPost": 21128,
+            "powerDirty": 20678,
+            "lockTime": 20679,
+            "timeMid1": 20965,
+            "timeMid2": 20987,
+            "timeMid3": 21009,
+            "timeMid4": 21030,
+            "timeMima": 21051,
+            "transition": 21070
+          },
+          "bytes": 656,
+          "descriptor": "T02PRA01"
+        }
+      }
+    }
+  },
+  "launcher": {
+    "url": "practice-start.com",
+    "sha256": "b94cfabfa1623819b0841675619dee9a81d097237cefa1fc30c48b9edbd560ac",
+    "size": 301,
+    "signature": "TH02PRASTARTv1!"
+  }
+}

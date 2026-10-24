@@ -44,6 +44,12 @@ export class SoloMusic {
     fat.replace(entry,new Uint8Array());copy[entry]=0xe5;
     return copy;
   }
+  async attachReplay(data){
+    const r=await fetch('solo-music.json',{cache:'no-store'});if(!r.ok)throw Error('Replay 音乐桥读取失败');
+    const meta=await r.json(),fat=new Fat12(data),bytes=fat.read(fat.find('HUMAROKU/WEBMUSIC.COM'));
+    if(bytes.length!==meta.bytes||await sha256(bytes)!==meta.sha256)throw Error('Replay 音乐载荷不匹配');
+    this.reader=new NativeMusic(meta);await this.player.load({warmOpening:false});
+  }
   poll(heap,now) {
     if(this.closed||!this.reader||now-this.lastPoll<50)return;
     this.lastPoll=now;

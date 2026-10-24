@@ -1,5 +1,6 @@
 import {HOST_VERSION,CLOCK_BYTES} from './external-host.js';
 import {sha256} from './sha256.js';
+import {normalizePractice,validatePracticeOptions} from '../practice-config.js';
 const MAGIC=new TextEncoder().encode('P98EXT02'),LEGACY_MAGIC=new TextEncoder().encode('P98EXT01'),HEADER_LIMIT=64*1024,FILE_LIMIT=256*1024*1024;
 export const MAX_CLOCK_BYTES=512*1024*1024,MAX_EVENT_BYTES=32*1024*1024,MAX_DISK_BYTES=128*1024*1024;
 export const MAX_DISK_DELTA_BYTES=8*1024*1024;
@@ -25,6 +26,8 @@ function validAssist(game,input){
     typeof touch.active==='boolean'&&typeof touch.unlimited==='boolean'&&Number.isSafeInteger(touch.x)&&Number.isSafeInteger(touch.y));
 }
 function validate(header,clockBytes,diskBytes,eventBytes,events){
+  if(header?.practice){if(header.game!=='02')throw Error('练习作品不匹配');normalizePractice(header.practice);}
+  if(header?.audioMode!==undefined&&!['original','independent'].includes(header.audioMode))throw Error('Replay 音乐模式无效');
   if(header?.version!==HOST_VERSION||!['02','03','04'].includes(header.game)||header.mode!=='solo'||!['cn','jp'].includes(header.language)||
     !['sleep','clock'].includes(header.boundaryMode)||!['main','worker','worker-np2'].includes(header.runtime)||!Number.isSafeInteger(header.endBoundary)||header.endBoundary<1||
     !Number.isSafeInteger(header.clockCount)||header.clockCount<1||header.clockCount*CLOCK_BYTES!==clockBytes||clockBytes>MAX_CLOCK_BYTES||
@@ -56,6 +59,7 @@ function validate(header,clockBytes,diskBytes,eventBytes,events){
       if(++total>1000000)throw Error('Replay 输入超过容量');
       if(command?.type==='key'){if(typeof command.code!=='string'||!/^[A-Za-z0-9]{1,24}$/.test(command.code)||typeof command.down!=='boolean')throw Error('Replay 按键命令无效');}
       else if(command?.type==='assist'){if(!validAssist(header.game,command.input))throw Error('Replay 辅助输入无效');}
+      else if(command?.type==='practice-options'&&header.game==='02'&&header.practice)validatePracticeOptions(command.options,true);
       else throw Error('Replay 命令类型无效');
     }
   }
