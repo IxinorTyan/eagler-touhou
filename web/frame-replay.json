@@ -3,7 +3,7 @@
   "languages": {
     "cn": {
       "url": "frame-replay-cn.exe.gz",
-      "sha256": "ca99038e7e05c834a7c30b2881f40637bc01e3bacf6358376b6d7571f31dcf84",
+      "sha256": "e26962937b718ea972c7a6f8dafb991faf38651aebc10d30d02dc3852c462645",
       "size": 150678,
       "patch": {
         "signature": "TH05SOLOINPUTv1!",
@@ -61,7 +61,7 @@
       "tests": {
         "good": {
           "url": "frame-replay-cn-test-good.exe.gz",
-          "sha256": "950805ef84fcffbafb6df69d19819779cd7efb3d5f894aebbc6837d29395135b",
+          "sha256": "b9e22c470ae7af4b3370adb58ccf7c7553f70407a08e61ac95a0f4c889187352",
           "size": 150694,
           "patch": {
             "signature": "TH05SOLOINPUTv1!",
@@ -119,7 +119,7 @@
         },
         "bad": {
           "url": "frame-replay-cn-test-bad.exe.gz",
-          "sha256": "882887ab8c850168ffe7c552d7f450ff897306b04de5d52ca3e37e8e15c5a025",
+          "sha256": "3fd54335597b3b26af28f61dcfd9d9b375ece62c0481e527f6ee66374e5ec3cf",
           "size": 150710,
           "patch": {
             "signature": "TH05SOLOINPUTv1!",
@@ -177,7 +177,7 @@
         },
         "extra": {
           "url": "frame-replay-cn-test-extra.exe.gz",
-          "sha256": "8ebe1f77c869850fb9dd3361e16b183b57fe3665f7cf1d372f483d5abec16b2a",
+          "sha256": "0c8b5b13e693e223c3f9af17a36b88e246d8215ca688dd203f1b0ae858274bd0",
           "size": 150726,
           "patch": {
             "signature": "TH05SOLOINPUTv1!",
@@ -237,7 +237,7 @@
     },
     "jp": {
       "url": "frame-replay-jp.exe.gz",
-      "sha256": "73bc6ad1414b28d5ff341cfc13e621520ac7797233b01faace116e063c8326a3",
+      "sha256": "1f793206ad5358405a339a7f817bb0200122fd47a6c5b2bc9f37b464ee27eacb",
       "size": 150678,
       "patch": {
         "signature": "TH05SOLOINPUTv1!",
@@ -295,7 +295,7 @@
       "tests": {
         "good": {
           "url": "frame-replay-jp-test-good.exe.gz",
-          "sha256": "8e37cf9d6f12db8ecde49ac4fbba76bf5ebc7216567f0cf51da5c0d5dc3b44eb",
+          "sha256": "6dd75b9ee35447bb3b9fc07286297299ffcf37154fe999a637dcb2b11b4a0ce2",
           "size": 150694,
           "patch": {
             "signature": "TH05SOLOINPUTv1!",
@@ -353,7 +353,7 @@
         },
         "bad": {
           "url": "frame-replay-jp-test-bad.exe.gz",
-          "sha256": "b0f96bb200489dd8224b07e22854f01677b56f2f308b12430ac737692f0c29b3",
+          "sha256": "9443a9731dfbcb95b8cb81677cd86cfd6d4cb70d5605c4c8716673bee4d5103e",
           "size": 150710,
           "patch": {
             "signature": "TH05SOLOINPUTv1!",
@@ -411,7 +411,7 @@
         },
         "extra": {
           "url": "frame-replay-jp-test-extra.exe.gz",
-          "sha256": "c310c4aaa83ea6ad61c2d79d99d44bb917a0d5c32fb9981ec58bd27f0435fd21",
+          "sha256": "bd027cdd8813732ac229a9f55ee59c26834b68e543ee19651e0300735a152bc8",
           "size": 150726,
           "patch": {
             "signature": "TH05SOLOINPUTv1!",

@@ -110,7 +110,7 @@ class HistoryService:
                 fmt = '<' + 'd' * players + 'BIII'
                 for n, row in enumerate(struct.iter_unpack(fmt, raw)):
                     pair, offline, native_hash = row[:players], row[players], row[-1]
-                    if offline >= 1 << players or any(not value.is_integer() or not 0 <= value <= 2**44 - 1 for value in pair) or any(value and offline & (1 << seat) for seat, value in enumerate(pair)) or ((first + n + 1) % 120 and native_hash):
+                    if offline >= 1 << players or any(not value.is_integer() or not 0 <= value <= 2**45 - 1 for value in pair) or any(value and offline & (1 << seat) for seat, value in enumerate(pair)) or ((first + n + 1) % 120 and native_hash):
                         raise ValueError('旁观输入字段无效')
                 a['raw'].extend(raw)
                 a['frames'] += count

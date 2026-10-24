@@ -18,6 +18,7 @@ export function writeNativeTouch(heap,mailbox,patch,inputs,blocked=false){
     const at=base+slot*8,touch=unpackTouch(inputs[slot]||0);
     if(blocked||!touch.active){view.setUint16(at,0,true);view.setInt32(at+2,0,true);continue;}
     const clamp=v=>Math.max(-8192,Math.min(8191,v));
+    if(touch.begin)view.setInt32(at+2,0,true);
     view.setUint16(at,touch.unlimited?3:1,true);
     view.setInt16(at+2,clamp(view.getInt16(at+2,true)+touch.x),true);
     view.setInt16(at+4,clamp(view.getInt16(at+4,true)+touch.y),true);

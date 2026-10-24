@@ -68,7 +68,7 @@ def main():
     out.mkdir(exist_ok=True)
     touch = (ROOT / 'patches/touch.asm').read_text(encoding='utf-8')
     touch = touch[touch.index('touch_move:'):touch.index('; Discard pending movement')]
-    old = '    movzx ebx,byte [cs:active_player]\n    shl bx,3'
+    old = '    movzx bx,byte [cs:active_player]\n    shl bx,3'
     assert touch.count(old) == 1
     touch = touch.replace(old, '    xor bx,bx\n    cmp byte [cs:mode],1\n    jne .clear\n    cmp byte [cs:flags],0\n    jne .clear')
     (out / 'solo-touch.inc').write_text(touch, encoding='utf-8')

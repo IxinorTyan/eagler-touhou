@@ -9,7 +9,7 @@ export function createFrameReplayBridge({mod,patch,config,onRun,onChunk,onEnd,on
   let buffer=new Uint8Array(FRAME_STRIDE*1024),checks=[];
   const playback=config.mode==='playback',source=config.inputs,expected=config.header;
   let cheat=false,unlimited=false,tainted=false,recordingStopped=false;
-  let touchMailbox=-1,touchLive=false,touchUnlimited=false,touchX=0,touchY=0,touchPoints=1,touchGeneration=-1,lastTouchInput=-Infinity;
+  let touchMailbox=-1,touchLive=false,touchBegin=false,touchUnlimited=false,touchX=0,touchY=0,touchPoints=1,touchGeneration=-1,lastTouchInput=-Infinity;
   const clamp=value=>Math.max(-8192,Math.min(8191,value));
   const totalFrames=playback?source.length/FRAME_STRIDE:0,sourceView=playback?new DataView(source.buffer,source.byteOffset,source.byteLength):null;
   function locate(packed){
@@ -81,7 +81,8 @@ export function createFrameReplayBridge({mod,patch,config,onRun,onChunk,onEnd,on
       const h=mod.HEAPU8,v=new DataView(h.buffer),at=touchMailbox;
       if(input.generation!==v.getUint16(at+24,true))return;
       lastTouchInput=performance.now();const t=input.touch;touchGeneration=input.generation;touchPoints=(input.points??1)&9;
-      if(paused||h[at+22]!==1||h[at+23]||!t?.active){touchLive=false;touchX=touchY=0;return;}
+      if(paused||h[at+22]!==1||h[at+23]||!t?.active){touchLive=false;touchBegin=false;touchX=touchY=0;return;}
+      if(t.begin){touchBegin=true;touchX=touchY=0;}
       touchLive=true;touchUnlimited=!!t.unlimited;
       if(touchUnlimited)invalidate();
       touchX=clamp(touchX+(Number.isFinite(t.x)?t.x:0));touchY=clamp(touchY+(Number.isFinite(t.y)?t.y:0));
@@ -96,7 +97,7 @@ export function createFrameReplayBridge({mod,patch,config,onRun,onChunk,onEnd,on
       if(done){
         if(playback||port!==0x7ff0)return;
         // A new MAIN launch starts another independent run in this emulator.
-        base=data=resident=touchMailbox=-1;touchLive=false;touchX=touchY=0;touchGeneration=-1;initial=null;started=done=dialog=false;frames=used=0;
+        base=data=resident=touchMailbox=-1;touchLive=false;touchBegin=false;touchX=touchY=0;touchGeneration=-1;initial=null;started=done=dialog=false;frames=used=0;
         pending=lastHash=lastState=null;checks=[];buffer=new Uint8Array(FRAME_STRIDE*1024);
         phase='battle';battleEnd=null;slowFrames=null;
         recordingStopped=false;tainted=cheat||unlimited;buffer=new Uint8Array(tainted?0:FRAME_STRIDE*1024);
@@ -146,10 +147,11 @@ export function createFrameReplayBridge({mod,patch,config,onRun,onChunk,onEnd,on
         const at=touchAt-28;
         h[at+26]=touchPoints;
         if(touchLive&&performance.now()-lastTouchInput<=750&&touchGeneration===v.getUint16(at+24,true)&&h[at+22]===1&&!h[at+23]){
+          if(touchBegin)v.setInt32(touchAt+2,0,true);
           v.setUint16(touchAt,touchUnlimited?3:1,true);
           v.setInt16(touchAt+2,clamp(v.getInt16(touchAt+2,true)+touchX),true);v.setInt16(touchAt+4,clamp(v.getInt16(touchAt+4,true)+touchY),true);
         }else{v.setUint16(touchAt,0,true);v.setInt32(touchAt+2,0,true);}
-        touchX=touchY=0;
+        touchX=touchY=0;touchBegin=false;
       }
       if(!playback&&(v.getUint16(touchAt,true)&2))invalidate();
       if(tainted){

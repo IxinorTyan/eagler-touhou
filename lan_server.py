@@ -28,7 +28,7 @@ def build_id():
     files = ['lan.js', 'lan-worker.js', 'lan.html', 'frame-presenter.js', 'host-yield.js', 'startup-assets.js', 'game-locator.js',
                'personal-hud.js', 'hud-digits.js', 'afterimage-art.js',
                'assets/yuuka-afterimages.bin', 'assets/yuuka-afterimages.json',
-             'player-ui.js', 'player-ui.css', 'touch-overlay.css', 'touch-layout.js', 'touch-input.js',
+             'player-ui.js', 'direct-drag.js', 'player-ui.css', 'touch-overlay.css', 'touch-layout.js', 'touch-input.js',
              'native-touch.js', 'native-players.js', 'dosbox-memory-diff.js', 'dosbox-snapshots.js', 'solo-native-music.js',
              'music-files.js', 'music-patch.json', 'bgm/manifest.json', 'bgm-version.js', 'bgm/akyu/manifest.json',
              'lan-music.com', 'lan-music-patch.json', 'sfx/manifest.json',

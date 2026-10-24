@@ -45,7 +45,7 @@ function inputs() {
     if(menu&&touchButtons){menuPulse=touchButtons;menuPulseUntil=performance.now()+80;}
     touchValue=player.pack(touchButtons);movement=touchValue;player.consume();
   }else{
-    const t=unpackTouch(touchValue);movement=packTouch(touchButtons,{...t,x:0,y:0,alwaysPoint:Math.floor(touchValue/ALWAYS_POINT)%2===1});
+    const t=unpackTouch(touchValue);movement=packTouch(touchButtons,{...t,begin:false,x:0,y:0,alwaysPoint:Math.floor(touchValue/ALWAYS_POINT)%2===1});
   }
   const sampled=player.sample(bits(mappings[touchSlot])|touchButtons|(menu&&performance.now()<menuPulseUntil?menuPulse:0),{rescueTap:touchButtons&64});
   movement=movement-movement%4096+sampled;

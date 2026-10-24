@@ -1,3 +1,4 @@
+import {createDirectDrag} from './direct-drag.js';
 import './bgm-version.js';
 // Presentation and local device state only. The caller samples once per tick.
 import {packTouch} from './touch-input.js';
@@ -23,13 +24,13 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},solo=false}={
   diagnosticButton.onclick=()=>{diagnosticPanel.hidden=!diagnosticPanel.hidden;diagnosticButton.setAttribute('aria-expanded',String(!diagnosticPanel.hidden));};
   const surface=document.createElement('div');surface.className='touch-surface';surface.setAttribute('aria-label','拖动移动，第二指低速');stage.append(surface);
   const unlimited=host.querySelector('[data-unlimited]'),sensitivity=host.querySelector('[data-sensitivity]'),alwaysPoint=host.querySelector('[data-always-point]'),doubleTap=host.querySelector('[data-double-tap]');
-  let drag=null,focusId=null,dx=0,dy=0,sampledX=0,sampledY=0;
+  let touchDrag;
   try{unlimited.checked=localStorage.getItem('th04.touch.mode')==='unlimited';sensitivity.value=String(Math.max(100,Math.min(300,Number(localStorage.getItem('th04.touch.sensitivity'))||150)));doubleTap.checked=localStorage.getItem('th04.touch.double-tap')==='on';}catch{}
   try{alwaysPoint.checked=localStorage.getItem('th04.touch.always-point')==='on';}catch{}
   const saveMovement=()=>{reset();host.querySelector('output').textContent=`${sensitivity.value}%`;try{localStorage.setItem('th04.touch.sensitivity',sensitivity.value);}catch{}};
   sensitivity.oninput=saveMovement;host.querySelector('output').textContent=`${sensitivity.value}%`;
   unlimited.onchange=()=>{try{localStorage.setItem('th04.touch.mode',unlimited.checked?'unlimited':'limited');}catch{};reset();notify();};
-  doubleTap.onchange=()=>{tapDown=lastTap=null;try{localStorage.setItem('th04.touch.double-tap',doubleTap.checked?'on':'off');}catch{};};
+  doubleTap.onchange=()=>{touchDrag?.clearTap();tapDown=lastTap=null;try{localStorage.setItem('th04.touch.double-tap',doubleTap.checked?'on':'off');}catch{};};
   alwaysPoint.onchange=()=>{try{localStorage.setItem('th04.touch.always-point',alwaysPoint.checked?'on':'off');}catch{};notify();};
   const full=host.querySelector('[data-full]'),touch=host.querySelector('[data-touch]'),autoButton=host.querySelector('[data-auto]');
   let touchLayout,touchGeometry=null;
@@ -57,7 +58,7 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},solo=false}={
   function notify(){onChange();}
   function renderTouch(){host.classList.toggle('has-touch',touchEnabled);touch.setAttribute('aria-pressed',String(touchEnabled));}
   function renderAuto(){autoButton.querySelector('strong').textContent='开火';autoButton.querySelector('small').textContent=auto?'已开启 · 点按关闭':'点按开启';autoButton.setAttribute('aria-pressed',String(auto));}
-  function reset({keepFire=false}={}){held.clear();drag=null;focusId=null;tapDown=lastTap=null;dx=dy=sampledX=sampledY=0;pulses=0;lastPulse=0;rescueQueue=rescueGap=rescuePulseTicks=rescueQuietTicks=0;sampledRescueTap=false;if(!keepFire)auto=false;host.querySelectorAll('.pressed').forEach(n=>n.classList.remove('pressed'));renderAuto();notify();}
+  function reset({keepFire=false}={}){held.clear();touchDrag?.reset();tapDown=lastTap=null;pulses=0;lastPulse=0;rescueQueue=rescueGap=rescuePulseTicks=rescueQuietTicks=0;sampledRescueTap=false;if(!keepFire)auto=false;host.querySelectorAll('.pressed').forEach(n=>n.classList.remove('pressed'));renderAuto();notify();}
   touchLayout=mountTouchLayout(host,{reset,solo});
   const rescueButton=host.querySelector('[data-rescue]');
   if(rescueButton)rescueButton.title='每次点按计一次；连按 5 次，间隔不超过 24 个游戏帧。';
@@ -134,30 +135,12 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},solo=false}={
       }
     });
   }
-  function move(event){
-    if(tapDown?.id===event.pointerId&&Math.hypot(event.clientX-tapDown.x,event.clientY-tapDown.y)>geometry().height*.05)tapDown.moved=true;
-    if(!drag||event.pointerId!==drag.id)return;
-    const {scale}=geometry();
-    if(scale>0&&gameplay){const gain=16*Number(sensitivity.value)/100/scale;dx=Math.max(-8192,Math.min(8191,dx+(event.clientX-drag.x)*gain));dy=Math.max(-8192,Math.min(8191,dy+(event.clientY-drag.y)*gain));}
-    drag.x=event.clientX;drag.y=event.clientY;notify();
-  }
-  surface.addEventListener('pointerdown',event=>{
-    if(!active||touchLayout.isEditing()||event.button!==0)return;event.preventDefault();gesture();
-    const now=performance.now();
-    // TH06 gives the Bomb tap its own gesture owner: it must not become a
-    // movement/second-finger focus press, including while another finger moves.
-    if(doubleTap.checked&&gameplay&&lastTap&&now-lastTap.time<=320&&Math.hypot(event.clientX-lastTap.x,event.clientY-lastTap.y)<=Math.min(geometry().width,geometry().height)*.08){pulses|=16;lastTap=tapDown=null;notify();return;}
-    else{lastTap=null;tapDown={x:event.clientX,y:event.clientY,time:now,id:event.pointerId,moved:false};}
-    if(!gameplay&&contextKey.endsWith(':menu')){pulses|=256;notify();return;}
-    surface.setPointerCapture(event.pointerId);
-    if(!drag){drag={id:event.pointerId,x:event.clientX,y:event.clientY};dx=dy=0;}
-    else if(focusId===null)focusId=event.pointerId;
-    notify();
+  touchDrag=createDirectDrag(surface,{
+    allowed:()=>active&&touchEnabled&&!document.hidden&&!touchLayout.isEditing(),
+    gameplay:()=>gameplay,menu:()=>contextKey.endsWith(':menu'),geometry,
+    sensitivity:()=>Number(sensitivity.value),doubleTap:()=>doubleTap.checked,
+    gesture,change:notify,pulse:bit=>{pulses|=bit;notify();},
   });
-  surface.addEventListener('pointermove',move);
-  surface.addEventListener('pointerup',event=>{move(event);const down=tapDown,now=performance.now();if(down?.id===event.pointerId){tapDown=null;lastTap=doubleTap.checked&&gameplay&&!down.moved&&now-down.time<=220?{x:event.clientX,y:event.clientY,time:now}:null;}if(drag?.id===event.pointerId){drag=null;focusId=null;}if(focusId===event.pointerId)focusId=null;notify();});
-  surface.addEventListener('pointercancel',()=>reset());
-  surface.addEventListener('lostpointercapture',event=>{if(drag?.id===event.pointerId||focusId===event.pointerId)reset();});
   host.addEventListener('contextmenu',event=>{if(event.target.closest('.touch-surface,[data-layout-control]'))event.preventDefault();});
   // Prevent virtual controls from taking focus away from an active pointer.
   host.addEventListener('pointerdown',event=>{if(event.target.closest('[data-layout-control]'))event.preventDefault();});
@@ -180,7 +163,7 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},solo=false}={
       host.classList.toggle('touch-menu',key.endsWith(':menu'));
       if(key!==contextKey){contextKey=key;reset({keepFire:true});}
       // Temporary injury/entry blocks output, never forgets a held finger.
-      if(gameplay!==play){dx=dy=sampledX=sampledY=0;pulses=lastPulse=0;tapDown=lastTap=null;rescueQueue=rescueGap=rescuePulseTicks=rescueQuietTicks=0;sampledRescueTap=false;}
+      if(gameplay!==play){touchDrag.clearMotion();pulses=lastPulse=0;tapDown=lastTap=null;rescueQueue=rescueGap=rescuePulseTicks=rescueQuietTicks=0;sampledRescueTap=false;}
       gameplay=play;
     },
     sample(base=0,{rescueTap}={}){
@@ -191,17 +174,18 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},solo=false}={
       let value=base|(pulses&~lastPulse),rescue=false;
       for(const v of held.values()){value|=v.bits;rescue||=v.rescue;}
       if(auto&&gameplay)value|=32;
-      if(focusId!==null&&gameplay)value|=64;
-      if(gameplay&&(drag!==null||dx||dy))value&=~15;
+      if(touchDrag.focused&&gameplay)value|=64;
+      if(gameplay&&touchDrag.dragging)value&=~15;
+      if(!gameplay)value|=touchDrag.menuBits;
       // Rescue deliberately suppresses firing/Bomb across all local devices.
       if(gameplay&&rescueQuietTicks>0){value&=~64;if(rescueTap===undefined?rescueQueue&&rescueGap===0:rescueTap){value|=64;if(rescueTap===undefined)sampledRescueTap=true;}}
       if(gameplay&&(rescueQuietTicks>0||rescue))value&=~(16|32);
       return value;
     },
     pack(buttons,{includePointPreference=true}={}){
-      sampledX=Math.trunc(dx);sampledY=Math.trunc(dy);
-      return packTouch(buttons,{x:sampledX,y:sampledY,active:active&&touchEnabled&&gameplay&&!touchLayout.isEditing()&&(drag!==null||sampledX!==0||sampledY!==0),unlimited:unlimited.checked,alwaysPoint:includePointPreference&&touchEnabled&&alwaysPoint.checked});
+      const motion=touchDrag.sample();
+      return packTouch(buttons,{x:motion.x,y:motion.y,begin:touchDrag.beginning,active:active&&touchEnabled&&gameplay&&!touchLayout.isEditing()&&motion.active,unlimited:unlimited.checked,alwaysPoint:includePointPreference&&touchEnabled&&alwaysPoint.checked});
     },
-    consume(){dx-=sampledX;dy-=sampledY;sampledX=sampledY=0;if(!drag)dx=dy=0;const emitted=pulses&~lastPulse;pulses&=~emitted;lastPulse=emitted;if(sampledRescueTap){if(++rescuePulseTicks===2){rescueQueue--;rescuePulseTicks=0;rescueGap=2;}}else if(rescueGap)rescueGap--;if(rescueQuietTicks)rescueQuietTicks--;sampledRescueTap=false;}
+    consume(){touchDrag.consume();const emitted=pulses&~lastPulse;pulses&=~emitted;lastPulse=emitted;if(sampledRescueTap){if(++rescuePulseTicks===2){rescueQueue--;rescuePulseTicks=0;rescueGap=2;}}else if(rescueGap)rescueGap--;if(rescueQuietTicks)rescueQuietTicks--;sampledRescueTap=false;}
   };
 }

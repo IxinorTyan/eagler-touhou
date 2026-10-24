@@ -6,7 +6,7 @@
     "cn": {
       "url": "th05-solo-cn.hdi.gz",
       "size": 21415936,
-      "sha256": "ca0faf81db8ac0684a2dc2ebf19d75f36bb0cdbea5f33c02065e9ff0289e51a9",
+      "sha256": "94b2925e50be04ddec6bf31376d4eba1902702db9e2758feb97b73fdcc897620",
       "source": "baseline/5-cn.hdi.gz",
       "inputPatch": {
         "signature": "TH05SOLOINPUTv1!",
@@ -56,7 +56,7 @@
           }
         ],
         "source_main_md5": "553eee5ff79429f45284913870380549",
-        "main_sha256": "8260d43414f557b0f123f82c52431a6fc6ee07ef55e740d0c64bc89c1f152e90",
+        "main_sha256": "93ee144d49f51e1000d47243d2c74acd041896782982f3bf6103d438257de1c6",
         "changed_files": [
           "KAIKI/MAIN.EXE",
           "KAIKI/怪綺談1.DAT",
@@ -89,7 +89,7 @@
     "jp": {
       "url": "th05-solo-jp.hdi.gz",
       "size": 21415936,
-      "sha256": "462e34bcb478764f75ea3e827343f7dfae8fe687865fb0f7bcd0d9cde91632a7",
+      "sha256": "85f317a87430d9cd29f395773b5ec216e69b4412c14d2c92d111a17fe6b7a808",
       "source": "baseline/5-jp.hdi.gz",
       "inputPatch": {
         "signature": "TH05SOLOINPUTv1!",
@@ -139,7 +139,7 @@
           }
         ],
         "source_main_md5": "952585e02435c3b3b111975a78b05983",
-        "main_sha256": "74e94382fa57f93d7d41dce03c706ac3bdba31ae9ea5bf1ed12cad964070efa4",
+        "main_sha256": "a4bf493cd29a5e830eaef7895b0e90cfe69fae5764a429703dc1032d790875e0",
         "changed_files": [
           "KAIKI/MAIN.EXE"
         ],

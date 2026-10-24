@@ -111,7 +111,7 @@ class Tests(unittest.TestCase):
         watch = service.open(owner, header(3))['watch']
         # Exercise the complete supported capacity, including late-reader
         # pagination and retries near the bound, without running an emulator.
-        raw = struct.pack('<dddBIII', 2**44-1, 0, 32, 2, 123, 456, 0) * 60
+        raw = struct.pack('<dddBIII', 2**45-1, 0, 32, 2, 123, 456, 0) * 60
         encoded = base64.b64encode(raw).decode()
         for first in range(0, MAX_FRAMES, 60):
             self.assertEqual(service.push(owner, watch, first, encoded)['frames'], first+60)
@@ -140,14 +140,14 @@ class Tests(unittest.TestCase):
         h['config']['rank'] = 4
         self.assertEqual(service.read(watch, 0)['header']['config']['rank'], 1)
         self.assertRaises(ValueError, service.open, owner, h)
-        raw = struct.pack('<dddBIII', 2**44-1, 0, 32, 2, 1, 123, 0)
+        raw = struct.pack('<dddBIII', 2**45-1, 0, 32, 2, 1, 123, 0)
         encoded = base64.b64encode(raw).decode()
         self.assertEqual(service.push(owner, watch, 0, encoded)['frames'], 1)
         self.assertEqual(service.push(owner, watch, 0, encoded)['frames'], 1)
         self.assertRaises(PermissionError, service.push, ('room', 'run', 'wrong'), watch, 1, '')
         self.assertRaises(ValueError, service.push, owner, watch, 2, encoded)
         self.assertRaises(ValueError, service.push, owner, watch, 0, base64.b64encode(bytes(len(raw))).decode())
-        for pair, mask, native in [([float('nan'),0,0],0,0), ([0,1,0],2,0), ([0,0,0],0,1), ([2**44,0,0],0,0)]:
+        for pair, mask, native in [([float('nan'),0,0],0,0), ([0,1,0],2,0), ([0,0,0],0,1), ([2**45,0,0],0,0)]:
             bad = base64.b64encode(struct.pack('<dddBIII', *pair, mask, 1, 2, native)).decode()
             self.assertRaises(ValueError, service.push, owner, watch, 1, bad)
         self.assertRaises(ValueError, service.push, owner, watch, 1, '!')

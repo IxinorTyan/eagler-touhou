@@ -4,9 +4,9 @@
   "languages": {
     "cn": {
       "url": "practice-cn.exe.gz",
-      "sha256": "bd08d39ce429b2afb0444330a512cf46fab95868219a8f2ff2ed44a922713dc6",
+      "sha256": "b2ea4acf8e2a833b06c2cf193dbcb5b6a2476f9e9aa09ef001762f1699823b9a",
       "size": 151590,
-      "sourceMainSha256": "8260d43414f557b0f123f82c52431a6fc6ee07ef55e740d0c64bc89c1f152e90",
+      "sourceMainSha256": "93ee144d49f51e1000d47243d2c74acd041896782982f3bf6103d438257de1c6",
       "patch": {
         "signature": "TH05SOLOINPUTv1!",
         "mailbox_size": 36,
@@ -55,11 +55,11 @@
           }
         ],
         "source_main_md5": "553eee5ff79429f45284913870380549",
-        "main_sha256": "bd08d39ce429b2afb0444330a512cf46fab95868219a8f2ff2ed44a922713dc6",
+        "main_sha256": "b2ea4acf8e2a833b06c2cf193dbcb5b6a2476f9e9aa09ef001762f1699823b9a",
         "changed_files": [
           "KAIKI/MAIN.EXE",
-          "KAIKI/\u602a\u7dba\u8ac71.DAT",
-          "KAIKI/\u602a\u7dba\u8ac72.DAT",
+          "KAIKI/怪綺談1.DAT",
+          "KAIKI/怪綺談2.DAT",
           "CNFONT.BMP",
           "KAIKI/OP.EXE"
         ],
@@ -114,9 +114,9 @@
     },
     "jp": {
       "url": "practice-jp.exe.gz",
-      "sha256": "1aff18e7b30bf77f859341f1beb149ab56b56ff36a85fc3366b8ee5d1aa5cc3f",
+      "sha256": "2ec0b87f5ccdb9efc4bd9d863bd8099dc5adfbe7e52eadc0a3a783cd27131c86",
       "size": 151590,
-      "sourceMainSha256": "74e94382fa57f93d7d41dce03c706ac3bdba31ae9ea5bf1ed12cad964070efa4",
+      "sourceMainSha256": "a4bf493cd29a5e830eaef7895b0e90cfe69fae5764a429703dc1032d790875e0",
       "patch": {
         "signature": "TH05SOLOINPUTv1!",
         "mailbox_size": 36,
@@ -165,7 +165,7 @@
           }
         ],
         "source_main_md5": "952585e02435c3b3b111975a78b05983",
-        "main_sha256": "1aff18e7b30bf77f859341f1beb149ab56b56ff36a85fc3366b8ee5d1aa5cc3f",
+        "main_sha256": "2ec0b87f5ccdb9efc4bd9d863bd8099dc5adfbe7e52eadc0a3a783cd27131c86",
         "changed_files": [
           "KAIKI/MAIN.EXE"
         ],

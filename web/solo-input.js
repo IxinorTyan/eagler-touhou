@@ -49,6 +49,7 @@ export class SoloInput {
     this.lastInput=now;heap[at+26]=(input.points??1)&9;
     const t=input.touch;
     if(paused||heap[at+22]!==1||heap[at+23]||!t?.active){this.clear(heap);return;}
+    if(t.begin)v.setInt32(at+30,0,true);
     v.setUint16(at+28,t.unlimited?3:1,true);
     for(const [offset,delta]of [[30,t.x],[32,t.y]]){
       const pending=v.getInt16(at+offset,true)+(Number.isFinite(delta)?delta:0);
