@@ -19,7 +19,7 @@ function validAssist(game,input){
     integer(input.points,0,15)&&['add','keep','clear'].includes(input.touchAction)&&typeof input.unlimited==='boolean'&&
     Number.isSafeInteger(input.x)&&Number.isSafeInteger(input.y);
   if(game==='03')return integer(input.focus,0,3)&&Array.isArray(input.touch)&&input.touch.length===2&&
-    input.touch.every(value=>integer(value,0,2**43-1));
+    input.touch.every(value=>integer(value,0,2**45-1));
   const touch=input.touch;
   return integer(input.points,0,15)&&(touch==null||typeof touch==='object'&&!Array.isArray(touch)&&
     typeof touch.active==='boolean'&&typeof touch.unlimited==='boolean'&&Number.isSafeInteger(touch.x)&&Number.isSafeInteger(touch.y));

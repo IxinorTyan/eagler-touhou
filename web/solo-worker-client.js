@@ -103,14 +103,14 @@ export class WorkerNP21 {
     const touch=input.touch;
     const moving=Array.isArray(touch)?touch.some(value=>{const t=unpackTouch(value);return t.active&&(t.x||t.y);}):touch?.active&&(touch.x||touch.y);
     const sameTouch=Array.isArray(touch)?Array.isArray(previous?.touch)&&touch.length===previous.touch.length&&touch.every((value,i)=>value===previous.touch[i])
-      :!Array.isArray(previous?.touch)&&['active','unlimited','x','y'].every(key=>touch?.[key]===previous?.touch?.[key]);
+      :!Array.isArray(previous?.touch)&&['active','unlimited','begin','x','y'].every(key=>touch?.[key]===previous?.touch?.[key]);
     // Keep a bounded heartbeat for the worker's held-key watchdog. Repeated
     // movement deltas must always be accumulated, even when their values match.
     if(!moving&&previous&&input.generation===previous.generation&&input.focus===previous.focus
       &&(input.points||0)===(previous.points||0)&&sameTouch&&now-this.lastInputAt<250)return;
     const old=this.queuedInput;
     if(old&&old.generation===input.generation){
-      const merge=(a,b)=>b?.active&&a?.active&&a.unlimited===b.unlimited?{...b,x:a.x+b.x,y:a.y+b.y}:b;
+      const merge=(a,b)=>b?.active&&!b.begin&&a?.active&&a.unlimited===b.unlimited?{...b,begin:!!a.begin,x:a.x+b.x,y:a.y+b.y}:b;
       if(Array.isArray(input.touch))input.touch=input.touch.map((value,i)=>packTouch(value&4095,merge(unpackTouch(old.touch[i]||0),unpackTouch(value))));
       else input.touch=merge(old.touch,input.touch);
     }

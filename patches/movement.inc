@@ -51,69 +51,84 @@ move_hook:
 
 ; Bound the drag to the native field, then limit its vector to the current
 ; character's speed. Keep the remainder until the next native movement tick.
+; Same-size native touch replacement. Pending deltas stay in unfocused units;
+; focus scales requested distance AND maximum speed, as in TH06 Player.cpp.
+; Bounds use 16-bit arithmetic: positions + bounded signed wire deltas fit.
 touch_move:
+    
+    
+    mov si,[cs:touch_state+bx+2]
+    mov di,[cs:touch_state+bx+4]
+    xor cx,cx
+    test word [cs:touch_state+bx],2
+    jnz .ratio
+    movzx ax,byte [0x6590]
+    bt word [cs:focus_active],ax
+    jnc .ratio
+    inc cx
+.ratio:
+    sar si,cl
+    sar di,cl
     mov bp,[0x6588]
-    movsx esi,word [cs:touch_state+bx+2]
-    movsx edi,word [cs:touch_state+bx+4]
-    movsx eax,word [ds:bp]
-    add esi,eax
-    cmp esi,0x80
+    mov ax,[ds:bp]
+    add si,ax
+    cmp si,0x80
     jge .xmax
-    mov esi,0x80
+    mov si,0x80
 .xmax:
-    cmp esi,0x1180
+    cmp si,0x1180
     jle .xready
-    mov esi,0x1180
+    mov si,0x1180
 .xready:
-    sub esi,eax
-    movsx eax,word [ds:bp+2]
-    add edi,eax
-    cmp edi,0x180
+    sub si,ax
+    mov ax,[ds:bp+2]
+    add di,ax
+    cmp di,0x180
     jge .ymax
-    mov edi,0x180
+    mov di,0x180
 .ymax:
-    cmp edi,0x1600
+    cmp di,0x1600
     jle .yready
-    mov edi,0x1600
+    mov di,0x1600
 .yready:
-    sub edi,eax
-    mov [cs:touch_state+bx+2],si
-    mov [cs:touch_state+bx+4],di
+    sub di,ax
+    ; Keep the bounded request in raw units; guest precision is 1/16 pixel.
+    mov dx,si
+    shl dx,cl
+    mov [cs:touch_state+bx+2],dx
+    mov dx,di
+    shl dx,cl
+    mov [cs:touch_state+bx+4],dx
+    push cx
     test word [cs:touch_state+bx],2
     jnz .apply
+    movsx esi,si
+    movsx edi,di
     mov eax,esi
     imul eax,eax
     mov edx,edi
     imul edx,edx
     add eax,edx
-    xor ecx,ecx
-    mov ebp,16384
+    xchg eax,ecx
+    xor eax,eax
+    mov ebp,0x4000000
 .sqrt:
-    lea edx,[ecx+ebp]
-    shr edx,1
-    push edx
-    imul edx,edx
-    cmp edx,eax
-    pop edx
-    jb .lower
-    mov ebp,edx
-    jmp .next
-.lower:
-    lea ecx,[edx+1]
+    lea edx,[eax+ebp]
+    shr eax,1
+    cmp ecx,edx
+    jb .next
+    sub ecx,edx
+    add eax,ebp
 .next:
-    cmp ecx,ebp
-    jb .sqrt
+    shr ebp,2
+    jnz .sqrt
+    neg ecx
+    adc eax,0
     movzx ebp,byte [0x6582]
-    mov al,[0x6590]
-    mov dl,1
-    push cx
-    mov cl,al
-    shl dl,cl
     pop cx
-    test [cs:focus_active],dl
-    jz .speed
-    shr ebp,1
-.speed:
+    push cx
+    shr ebp,cl
+    xchg eax,ecx
     cmp ecx,ebp
     jbe .apply
     mov eax,esi
@@ -127,10 +142,14 @@ touch_move:
     idiv ecx
     mov edi,eax
 .apply:
+    pop cx
     mov bp,[0x6588]
     add [ds:bp],si
     add [ds:bp+2],di
+    shl si,cl
+    shl di,cl
     sub [cs:touch_state+bx+2],si
     sub [cs:touch_state+bx+4],di
+.done:
     ret
-
+    times 268-($-touch_move) nop

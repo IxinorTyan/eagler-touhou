@@ -37,11 +37,10 @@ export class Netplay {
     for(const action of actions)if(!this.localActions?.includes(action))this.localTaps.add(action);
     this.localActions=[...actions];this.localOptions=options;
     const next=unpackTouch(touch),old=this.localTouch;
-    const pending=!!(old?.active&&(old.x||old.y));
-    this.localTouch={...next,alwaysPoint:touch>=ALWAYS_POINT,active:next.active||pending,
-      unlimited:next.active?next.unlimited:!!(pending&&old.unlimited),
-      x:Math.max(-8192,Math.min(8191,(old?.active?old.x:0)+next.x)),
-      y:Math.max(-8192,Math.min(8191,(old?.active?old.y:0)+next.y))};
+    this.localTouch={...next,alwaysPoint:Math.floor(touch/ALWAYS_POINT)%2===1,active:next.active,begin:next.begin||!!(next.active&&old?.begin),
+      unlimited:next.unlimited,
+      x:next.active?Math.max(-8192,Math.min(8191,(old?.active&&!next.begin?old.x:0)+next.x)):0,
+      y:next.active?Math.max(-8192,Math.min(8191,(old?.active&&!next.begin?old.y:0)+next.y)):0};
   }
   command(value){this.commands??=[];if(this.commands.length<16)this.commands.push(value);}
   capture(){
@@ -57,7 +56,7 @@ export class Netplay {
     }
     const touch=this.localTouch,input={...neutral(),actions:[...actions],touch:touch?packTouch(0,touch):0,
     focusEnabled:this.localOptions?.focusEnabled??true,points:this.localOptions?.points??true,commands:this.commands?.splice(0)||[]};
-    this.localTaps?.clear();if(touch)touch.x=touch.y=0;return input;}
+    this.localTaps?.clear();if(touch){touch.x=touch.y=0;touch.begin=false;}return input;}
   sendPacket(packet){if(this.channel?.readyState!=='open')throw Error('同步通道未连接');
     if((this.channel.bufferedAmount||this.socket?.bufferedAmount||0)>524288)throw Error('联机发送队列拥塞，请结束后重新建房');
     this.channel.send(JSON.stringify({...packet,sync:SYNC_PROTOCOL}));}
@@ -151,11 +150,11 @@ export class Netplay {
     if(!Number.isSafeInteger(packed)||packed<0||packed>MAX_INPUT)return;
     this.lastRemote=message.seq;this.remote=new Set(message.actions.filter(value=>ACTIONS.includes(value)));
     const next=unpackTouch(packed),old=this.remoteTouch;
-    this.remoteTouch={...next,alwaysPoint:packed>=ALWAYS_POINT,
-      x:next.active?Math.max(-8192,Math.min(8191,(old?.active?old.x:0)+next.x)):0,
-      y:next.active?Math.max(-8192,Math.min(8191,(old?.active?old.y:0)+next.y)):0};
+    this.remoteTouch={...next,alwaysPoint:Math.floor(packed/ALWAYS_POINT)%2===1,begin:next.begin||!!(next.active&&old?.begin),
+      x:next.active?Math.max(-8192,Math.min(8191,(old?.active&&!next.begin?old.x:0)+next.x)):0,
+      y:next.active?Math.max(-8192,Math.min(8191,(old?.active&&!next.begin?old.y:0)+next.y)):0};
   }
-  takeTouch(){const touch=this.closed?null:this.remoteTouch;if(!touch)return 0;const value=packTouch(0,touch);touch.x=touch.y=0;return value;}
+  takeTouch(){const touch=this.closed?null:this.remoteTouch;if(!touch)return 0;const value=packTouch(0,touch);touch.x=touch.y=0;touch.begin=false;return value;}
   startRelay(){
     const url=new URL('/relay',location.href);url.protocol=location.protocol==='https:'?'wss:':'ws:';
     url.search=new URLSearchParams({room:this.room,token:this.token,runId:this.runId,role:this.role,protocol});

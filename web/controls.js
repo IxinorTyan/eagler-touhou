@@ -1,5 +1,5 @@
 import {FireControl} from './fire-control.js';
-import {limitTouch} from './touch-input.js';
+import {limitTouch,withoutPoint} from './touch-input.js';
 export const actions = ['up', 'down', 'left', 'right', 'shot', 'charge', 'attack', 'focus'];
 const labels = {up: '上', down: '下', left: '左', right: '右', shot: '连发（最高速）', charge: '蓄力', attack: 'Bomb', focus: '低速'};
 const defaults = [
@@ -95,7 +95,7 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
       const local=new Set([...target].filter(token=>token.startsWith('0:')).map(token=>token.slice(2)));
       if(target.has('confirm'))local.add('shot');
       // Display preferences never enter the shared simulation or input stream.
-      network.setLocal(local,touch % 2**42,{focusEnabled:getRoomFocus(),points:false,cancelled});
+      network.setLocal(local,withoutPoint(touch),{focusEnabled:getRoomFocus(),points:false,cancelled});
       return;
     }
     const touches = [touch, 0];

@@ -48,7 +48,7 @@ def valid_message(message):
         return kind == 'frame' and type(message.get('frame')) is int and message['frame'] >= 0 \
             and isinstance(value, dict) and isinstance(value.get('actions'), list) \
             and all(isinstance(a, str) and a in ACTIONS for a in value['actions']) \
-            and type(value.get('touch')) is int and 0 <= value['touch'] < 2**43 \
+            and type(value.get('touch')) is int and 0 <= value['touch'] < 2**45 \
             and type(value.get('focusEnabled')) is bool and type(value.get('points')) is bool \
             and isinstance(value.get('commands'), list) and len(value['commands']) <= 16 \
             and all(isinstance(c, str) and c in ('pause', 'resume', 'round', 'match', 'up', 'down', 'confirm', 'escape', 'hidden', 'visible') for c in value['commands'])
@@ -56,7 +56,7 @@ def valid_message(message):
         return False
     return message.get('type') == 'input' and type(message.get('seq')) is int \
         and isinstance(message.get('actions'), list) and all(isinstance(a, str) and a in ACTIONS for a in message['actions']) \
-        and type(message.get('touch', 0)) is int and 0 <= message.get('touch', 0) < 2**43
+        and type(message.get('touch', 0)) is int and 0 <= message.get('touch', 0) < 2**45
 
 class OutboundWriter:
     def __init__(self, sock):

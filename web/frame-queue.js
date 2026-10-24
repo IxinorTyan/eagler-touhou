@@ -5,7 +5,7 @@ const HELD=new Set(['shot','rapid','attack','focus']);
 const DIRECTIONS=new Set(['up','down','left','right']);
 export function validInput(input){
   return input&&Array.isArray(input.actions)&&input.actions.every(a=>['up','down','left','right','shot','rapid','attack','focus'].includes(a))
-    &&Number.isSafeInteger(input.touch)&&input.touch>=0&&input.touch<2**43
+    &&Number.isSafeInteger(input.touch)&&input.touch>=0&&input.touch<2**45
     &&typeof input.focusEnabled==='boolean'&&typeof input.points==='boolean'
     &&Array.isArray(input.commands)&&input.commands.length<=16
     &&input.commands.every(c=>['pause','resume','round','match','up','down','confirm','escape','hidden','visible'].includes(c));

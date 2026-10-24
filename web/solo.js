@@ -29,7 +29,7 @@ let emulator,lang,meta,database,dirty=0,saved=0,saveTask,timer,starting=false,as
 let recorder=null,recordBlob=null,loadedReplay=null,playback=false;
 const status=text=>{$('status').textContent=text;player.note(text);if(!cover.hidden)cover.textContent=text;};
 const report=error=>{console.error(error);status(`错误：${error.message}`);};
-const replaySources=['../solo.js','../solo-worker.js','../solo-worker-client.js','../dosbox-adapter.js','../solo-assist.js','../solo-assist.json',
+const replaySources=['../direct-drag.js','../player-ui.js','../solo.js','../solo-worker.js','../solo-worker-client.js','../dosbox-adapter.js','../solo-assist.js','../solo-assist.json',
   '../solo-save.js','../native-pause.js','../touch-input.js','../disks/manifest.json','../vendor/dosbox-x/runtime.json','../vendor/dosbox-x/dosbox-jspi.mjs',
   '../dosbox-disk.js','../frame-presenter.js','../solo-worker-environment.js','../vendor/dosbox-x/emulators.js','../vendor/dosbox-x/wdosbox-x-fast.wasm',
   './external-host.js','./external-loader.js','./external-codec.js','./external-recorder.js','./external-ui.js','./external-lifecycle.js'];
@@ -248,14 +248,10 @@ function poll(now){
     const shot=fire.sample(!!(bits&512),!!(bits&32),now);bits=(bits&~544)|(shot?32:0);
     const packed=player.pack(0),touch=unpackTouch(packed);player.consume();
     const focusValue=playing&&player.focusEnabled()&&((bits&64)||focusKeys.size)?1:0;
-    const touchValue=[playing&&touch.unlimited?packed:0,0];
+    const touchValue=[playing?packed:0,0];
     if(emulator.isWorker){bridge?.setFocus(focusValue);bridge?.setTouch(touchValue);}
     else emulator.assist({address:state?.at,generation:state?.generation,focus:focusValue,touch:touchValue});
-    const step=Math.min(100,now-last)*16*3/16.667;
-    dx=Math.max(-480,Math.min(480,dx+touch.x));dy=Math.max(-480,Math.min(480,dy+touch.y));
-    if(!touch.active||!playing||touch.unlimited)dx=dy=0;
-    if(Math.abs(dx)>8){bits|=dx<0?4:8;dx-=Math.sign(dx)*Math.min(Math.abs(dx),step);}
-    if(Math.abs(dy)>8){bits|=dy<0?1:2;dy-=Math.sign(dy)*Math.min(Math.abs(dy),step);}
+
   }else{dx=dy=0;physical.clear();tapped.clear();fire.reset();if(!playback){if(emulator?.isWorker){bridge?.setFocus(0,0);bridge?.setTouch([0,0]);}else if(emulator)emulator.assist({address:state?.at,generation:state?.generation,focus:0,touch:[0,0]});}}
   marker.hidden=true;
   if(playing)for(const point of bridge.markers())if(point.seat===0&&(player.alwaysPoint()||point.focused&&player.focusPoints())){

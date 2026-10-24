@@ -104,11 +104,12 @@ export class NativePause {
     let points=0;
     for(let slot=0;slot<2;slot++){
       const value=inputs[slot]||0,touch=unpackTouch(value),base=at+f.touch+slot*6;
-      if(value>=ALWAYS_POINT)points|=1<<slot;
+      if(Math.floor(value/ALWAYS_POINT)%2===1)points|=1<<slot;
       const data=at-this.meta.mailboxCsOffset+(this.meta.dataSegment-this.meta.codeSegment)*16;
       const player=data+0x65a6+slot*0x80;
       const blocked=heap[player+0x1f]||heap[player+0x11]||heap[player+0x15];
       if(!running||!touch.active||blocked){view.setUint16(base,0,true);view.setInt32(base+2,0,true);continue;}
+      if(touch.begin)view.setInt32(base+2,0,true);
       view.setUint16(base,touch.unlimited?3:1,true);
       for(const [offset,delta] of [[2,touch.x],[4,touch.y]])
         view.setInt16(base+offset,Math.max(-8192,Math.min(8191,view.getInt16(base+offset,true)+delta)),true);
