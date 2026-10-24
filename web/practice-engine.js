@@ -3,7 +3,7 @@ import {normalizePractice,validatePracticeOptions} from './practice-config.js';
 export function createPracticeEngine({mod,patch,config,clock}){
   const initial=normalizePractice(config),setup=initial.setup,targeted=initial.mode==='target';let options=initial.options;
   let base=-1,d=-1,csBase=-1,resident=-1,ready=false,preparing=targeted,waiting=false,outcome=null,error=null,warped=false;
-  let frames=0,elapsed=0,misses=0,bombsUsed=0,lastBombs=0,lockedPower=null,prepareFrames=0,selectedPhase=0,seenBoss=false,lastPort=0;
+  let frames=0,elapsed=0,misses=0,bombsUsed=0,lastBombs=0,lockedPower=null,prepareFrames=0,selectedPhase=0,seenBoss=false,lastPort=0,entryRedraw=0;
   const heap=()=>mod.HEAPU8,view=()=>new DataView(heap().buffer),u8=n=>heap()[d+n],u16=n=>view().getUint16(d+n,true),i16=n=>view().getInt16(d+n,true),u32=n=>view().getUint32(d+n,true),w8=(n,x)=>{heap()[d+n]=x;},w16=(n,x)=>view().setUint16(d+n,x,true),w32=(n,x)=>view().setUint32(d+n,x,true);
   const e=patch.practice.entries,flag=(name,value)=>{heap()[csBase+e[name]]=Number(!!value);};
   function locate(packed){
@@ -95,15 +95,26 @@ export function createPracticeEngine({mod,patch,config,clock}){
       if(port===0x7fd2&&ready&&!outcome&&!u8(0x2b99)){
         misses++;if(options.invincible)w8(0x2b94,0);else if(targeted&&!options.lockLives)finish('failed');
       }
-      if(port===0x7fd4){
-        // Retire preparation bullets through the game's F_REMOVE path. The
-        // next native back-page invalidation restores their tiles before the
-        // frame boundary can enter the arrival pause; never leave live shots
-        // from an earlier attack in the selected attack.
+      if(port===0x7fd5){
+        // After native Boss generation but before entity collision/rendering:
+        // F_REMOVE suppresses preparation entities now; next loop's native
+        // invalidators restore their tiles and release the slots before the
+        // input boundary can enter the arrival pause.
         if(preparing){
           for(let n=0x2c18;n<0x2c18+150*20;n+=20)if(u8(n)===1)w8(n,2);
           for(let n=0x3ce6;n<0x3ce6+20*16;n+=16)if(u8(n)===1)w8(n,2);
+          // TH02's delayed/firing lasers are a separate 12 x 12-byte pool.
+          // Their native invalidator also consumes F_REMOVE (2); clearing
+          // only the ordinary bullet pool leaves prior attacks armed.
+          for(let n=0x5f6c;n<0x5f6c+12*12;n+=12)if(u8(n)===1)w8(n,2);
         }
+      }
+      if(port===0x7fd4){
+        // Native Bomb cleanup uses this full-tile redraw flag on consecutive
+        // pages (E3E5). TM_NONE Bosses repaint their own background. The
+        // redraw after arrival never retires target shots or advances attacks.
+        if(preparing)entryRedraw=2;
+        if(entryRedraw){w8(0x52d8,1);entryRedraw--;}
         const bombs=u8(0xbde);if(ready&&!outcome)bombsUsed+=(bombs-lastBombs)&255;lastBombs=bombs;locks();
         if(ready&&!outcome&&options.invincible&&u8(0x2b94)&&!u8(0x2b95)&&!u8(0x2b96)&&!u8(0xaa7)){misses++;w8(0x2b94,0);}
         // Bullets update after player death processing in TH02. Prioritize a

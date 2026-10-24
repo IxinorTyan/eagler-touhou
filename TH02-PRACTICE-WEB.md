@@ -26,6 +26,8 @@ F12 面板支持鼠标／触屏点击；Tab／Shift+Tab 移动焦点，未编辑
 
 默认独立 BGM 在普通游玩、录制与回放中均保持真实音频时钟，25%–200% 游戏速度不改变音乐速率或重启当前曲目。声音选为“原版声音”时使用模拟器音源。低速、判定点、按键自定义、手柄与触控沿用现有单人实现。
 
+指定道中／关底／攻击的准备期间，在原生 Boss 更新之后、道具／激光／子弹更新和绘制之前，使用本作的移除标记清理普通弹丸、掉落物及独立激光池（包括蓄力中的激光）。下一循环由原生擦除函数释放对象；使用原生整场地重绘标记覆盖两个缓冲页，动态 Boss 背景保留自己的绘制流程。到达目标后停止清理，保留目标初始化和恢复后的正常出弹。完整流程和关卡开头不执行这项准备清理。此项为参照 TH05 修复记录对 TH02 的预防性审计，发现此前漏清独立激光，并非用户已在 TH02 实测复现。
+
 ## 练习目标与适配边界
 
 关卡开头覆盖一至五面与 Extra；一、二、三、四面及 Extra 的真实道中 Boss 均可直接进入，五面没有道中 Boss。所有六场关底 Boss 可整场练习。
@@ -48,7 +50,7 @@ F12 面板支持鼠标／触屏点击；Tab／Shift+Tab 移动焦点，未编辑
 仅单人使用独立 MAIN 覆盖和 `wdosbox-x-practice.wasm`，启动时安装到本次运行的磁盘副本。现有四张发行盘、多人入口、原生 EMS HUD 与根目录 HUD 基线保持原样。
 
 - `patches/practice.asm`、`tools/build_practice_assets.py`：固定中日文源 MAIN SHA、逐条核对 Hook 字节、MZ 重定位和空间预算，生成 `practice-{cn,jp}.exe.gz`、启动器与清单。
-- `tools/build_practice_core.mjs`：核对源核心 SHA，在 OUT32 分发中同步接入 `0x7fd0` 加载、`0x7fd1` 输入前、`0x7fd2` 原生死亡前、`0x7fd3` 魅魔／玄爷换段比较前、`0x7fd4` 碰撞后边界。描述符为 `T02PRA01`，28 个 16 位条目。
+- `tools/build_practice_core.mjs`：核对源核心 SHA，在 OUT32 分发中同步接入 `0x7fd0` 加载、`0x7fd1` 输入前、`0x7fd2` 原生死亡前、`0x7fd3` 魅魔／玄爷换段比较前、`0x7fd4` 碰撞后及 `0x7fd5` Boss 更新后、实体更新前边界。描述符为 `T02PRA01`，29 个 16 位条目。
 - `web/practice-{config,assets,engine,ui}.js`：本作配置与目标表、身份校验、同步状态控制和界面。原生内存写入只在上述同步回调完成。
 - `web/solo.js`、`dosbox-adapter.js` 与 `replay/external-*.js`：整合单人重启、辅助／变速事件、结果边界、独立音乐与 REP。成功／失败在普通宿主 sleep 边界封存，每次重启单独录制；新页面恢复同一磁盘覆盖与音乐桥，校验完整终态客体内存 SHA。
 
@@ -63,6 +65,7 @@ python tools/test_practice_guest.py
 node tools/test_practice_browser.cjs
 node tools/test_practice_menu.cjs
 node tools/test_practice_helpers.cjs
+node tools/test_practice_entry.cjs
 $env:PHASES='1'; node tools/test_practice_matrix.cjs
 node tools/test_practice_replay.cjs
 $env:OUTCOME='clear'; node tools/test_practice_replay.cjs
@@ -71,7 +74,9 @@ python ../tools/verify_native_boss_hud_release.py
 
 ## 验证范围
 
-原生 Unicorn 测试覆盖中日文 26 组分支、寄存器、段、栈、F2／F3、F5 超时比较及原生对话跳过。真实浏览器入口矩阵覆盖中日文 66 项：12 个关卡开头、10 个道中、12 个整场关底及 32 个独立攻击，检查目标入场、原生标题清除、暂停恢复、0／0 库存、满火力射击等级与准备弹幕清理。另检查默认完整单人、原有键盘重映射、手柄／触控与窄屏布局。辅助功能 QA 明确使用同步边界的弹丸／道具夹具，不能当作自然游玩或 REP 证据。
+原生 Unicorn 测试覆盖中日文 28 组分支、寄存器、段、栈、F2／F3、F5 超时比较、原生对话跳过及新增实体前回调的近返回 ABI。真实浏览器入口矩阵覆盖中日文 66 项：12 个关卡开头、10 个道中、12 个整场关底及 32 个独立攻击，检查目标入场、原生标题清除、暂停恢复、0／0 库存、满火力射击等级，以及普通弹丸、激光和道具池完全释放。另检查默认完整单人、原有键盘重映射、手柄／触控与窄屏布局。辅助功能 QA 明确使用同步边界的弹丸／道具夹具，不能当作自然游玩或 REP 证据。
+
+`tools/test_practice_entry.cjs` 在中日文里香第 3 攻击、玄爷第 3 阶段中，明确注入普通弹丸、道具、蓄力激光和发射激光，核验其在绘制前标记移除、原生更新不再处理、入场前完全释放，并等待恢复后的自然出弹，确认清理和整页重绘均不会持续。`LEGACY=1` 为预期失败的反向对照：仅去掉激光清理，同样夹具会保持存活并进入暂停。该夹具报告不是自然 REP 证据。
 
 成功与失败 REP 另用自然射击／自然中弹生成，在新页面导入重播，核验终态内存 SHA；同时检查默认开启录制下 50%／200%／100% 切速的独立音乐速率、曲目代数和音频时钟连续性。报告保存在开发机 `reports/practice-*.json`，应结合各报告的资源身份与对应代码阅读。
 
