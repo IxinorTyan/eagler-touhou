@@ -25,6 +25,7 @@ function applyAssist(value){
   h[at+26]=value.points||0;
   const t=value.touch;
   if(emulator.state==='running'&&h[at+22]===1&&!h[at+23]&&t?.active){
+    if(t.begin)v.setInt32(at+30,0,true);
     v.setUint16(at+28,t.unlimited?3:1,true);
     for(const [offset,delta]of [[30,t.x],[32,t.y]])v.setInt16(at+offset,Math.max(-8192,Math.min(8191,v.getInt16(at+offset,true)+delta)),true);
   }else h.fill(0,at+28,at+36);

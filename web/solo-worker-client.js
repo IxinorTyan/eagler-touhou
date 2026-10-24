@@ -102,7 +102,7 @@ export class WorkerNP21 {
   setInput(input){
     const old=this.queuedInput;
     if(old&&old.generation===input.generation){
-      const merge=(a,b)=>b?.active&&a?.active&&a.unlimited===b.unlimited?{...b,x:a.x+b.x,y:a.y+b.y}:b;
+      const merge=(a,b)=>b?.active&&!b.begin&&a?.active&&a.unlimited===b.unlimited?{...b,begin:!!a.begin,x:a.x+b.x,y:a.y+b.y}:b;
       if(Array.isArray(input.touch))input.touch=input.touch.map((value,i)=>packTouch(value&4095,merge(unpackTouch(old.touch[i]||0),unpackTouch(value))));
       else input.touch=merge(old.touch,input.touch);
     }

@@ -29,7 +29,7 @@ export function validateRow(row,h,frame){
     if(!row||!Array.isArray(row.inputs)||row.inputs.length!==1||!validNativeCommand(row.inputs[0])||row.offlineMask!==0||typeof row.proof!=='string'||row.proof.length>8192||((frame+1)%120===0)!==(row.hash!==null))throw Error('原生命令录像输入无效');return;
   }
   if(!row||!Array.isArray(row.inputs)||row.inputs.length!==h.players||
-    row.inputs.some(n=>h.game==='03'?!validBattleInput(n):!Number.isSafeInteger(n)||n<0||n>=2**44)||
+    row.inputs.some(n=>h.game==='03'?!validBattleInput(n):!Number.isSafeInteger(n)||n<0||n>=2**45)||
     !Number.isInteger(row.offlineMask)||row.offlineMask<0||row.offlineMask>=2**h.players||
     (h.game==='03'?row.offlineMask!==0:row.inputs.some((n,i)=>(row.offlineMask&(1<<i))&&n!==0))||
     typeof row.proof!=='string'||row.proof.length>8192||
@@ -37,7 +37,7 @@ export function validateRow(row,h,frame){
 }
 function validBattleInput(v){
   return v&&Array.isArray(v.actions)&&v.actions.length<=16&&v.actions.every(a=>['up','down','left','right','shot','rapid','attack','focus'].includes(a))&&
-    Number.isSafeInteger(v.touch)&&v.touch>=0&&v.touch<2**43&&typeof v.focusEnabled==='boolean'&&typeof v.points==='boolean'&&
+    Number.isSafeInteger(v.touch)&&v.touch>=0&&v.touch<2**45&&typeof v.focusEnabled==='boolean'&&typeof v.points==='boolean'&&
     Array.isArray(v.commands)&&v.commands.length<=16&&v.commands.every(c=>['pause','resume','round','match','up','down','confirm','escape','hidden','visible'].includes(c));
 }
 export class ConfirmedTape{

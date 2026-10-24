@@ -16,6 +16,7 @@ export function writeNativeTouch(heap,mailbox,patch,inputs,blocked=false){
     // Accumulate only until a native player update consumes the movement.
     // Bounds are applied by native code with the correct player bank active.
     const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+    if(touch.begin)view.setInt32(at+2,0,true);
     view.setUint16(at,touch.unlimited?3:1,true);
     view.setInt16(at+2,clamp(view.getInt16(at+2,true)+touch.x,-8192,8191),true);
     view.setInt16(at+4,clamp(view.getInt16(at+4,true)+touch.y,-8192,8191),true);

@@ -18,18 +18,18 @@
   "generated_js_sha256": "b86ffabafe90b43c0e12745ebd2d03e0da3353a53f765ad50a2008d12e291e8e",
   "mobile_wasm_sha256": "8ffae60df479b5df896233466520f4a3cfb3eb5564082823b652658e19f85048",
   "presentation_sha256": "a18b948eaeedb999b76e57a560f04f5083c64ef7c954b26dd7ed42672f213eb9",
-  "clock_sha256": "7b1b33fb6ed1c661592725b2dedf106584e069d8fab3f80eafe3b838fb46def5",
+  "clock_sha256": "6266a806e5b75b927730633bb202f7fb316c2e6c67d430661212f1b1a98f1413",
   "audio_output_sha256": "18760a612db5dfff8a8dd63bef48f12df51c62474a7cd465084ffbe0fc90a214",
   "rollback_queue_sha256": "d372383e96cb6ec0b428763ce84a485d34f271a8172a890b4a00503570973bd5",
   "native_snapshots_sha256": "3177a64596787f223909473751ae55e3853fb07d9826fa54a5c2085819f81c34",
-  "game_adapter_sha256": "9e015d1c2eacd8c08bab056f864f7722306174b6a8d85838544b70016e81f18b",
+  "game_adapter_sha256": "ec3859cc4613982f528d3b2fe6a08017d38dc683a3e0ea3ca9bfee2e2abc38d7",
   "room_sha256": "a9f3a18277078c6bc5e23d8d0e805e8e83ef90f1681e0cb19f2169ef1ec39c76",
   "membership_sha256": "a84a5b38066e29a876db2c900e2411f3d4168f329bcb83fb44a81226a88e6fca",
   "startup_sha256": "8f2aa760e7f1aeb74faf3808af64eba158c536b1721c5ea3b6a9dc2dff15b0aa",
   "controls_sha256": "45488e160ccd0025de6861b70a661e923c773aac55f3eade39d4ea86c2bbd879",
   "pause_sha256": "92977ae14ace41e7d47a27a565cd9786fa71b236e97fe510b33bd7ae1a44ccb3",
   "native_sound": {
-    "disk_sha256": "bf178e2d3f90732cfa840ea2ed4192abc4abe673116534db2b2561899281c068",
+    "disk_sha256": "67ce94e2853cf2be8a95e3707604c4163be31f3d04ef8dca04624bada0319fd8",
     "bgm": 0,
     "se": 1,
     "schema": 2,
@@ -139,7 +139,7 @@
   },
   "native_sound_by_language": {
     "cn": {
-      "disk_sha256": "bf178e2d3f90732cfa840ea2ed4192abc4abe673116534db2b2561899281c068",
+      "disk_sha256": "67ce94e2853cf2be8a95e3707604c4163be31f3d04ef8dca04624bada0319fd8",
       "bgm": 0,
       "se": 1,
       "schema": 2,
@@ -248,7 +248,7 @@
       }
     },
     "jp": {
-      "disk_sha256": "3291109ed7ff0efbbb61ef0419f0b5a14b20cd4ef9113f107194a5a92ea6fcf2",
+      "disk_sha256": "8e9b6bbb2dd8e695d0623ca0f799bb4d1d786c1e46fb0c64656d179b9e34caa1",
       "bgm": 0,
       "se": 1,
       "schema": 2,
@@ -357,13 +357,13 @@
       }
     }
   },
-  "dosbox_adapter_sha256": "7b1b33fb6ed1c661592725b2dedf106584e069d8fab3f80eafe3b838fb46def5",
-  "dosbox_disk_sha256": "237d653fe1e469290d02fd612227b6f3404c19bc7a0a64f8f3f121fb39eab9c1",
+  "dosbox_adapter_sha256": "6266a806e5b75b927730633bb202f7fb316c2e6c67d430661212f1b1a98f1413",
+  "dosbox_disk_sha256": "13d484ce805060f88dbc156308a1cd2d14c612de283c8e1f4c85d524bdc9d277",
   "dosbox_memory_diff_sha256": "6535b9a4fc957af4112ca9bccec0da4341acc0d0c8c945a2c366b46c95ff0724",
   "snapshot_diff_wasm_sha256": "20235d6360a49d633f2db03832ef5ad3fbe6daffd4f44e4d7f8e790875a4662f",
   "frame_presenter_sha256": "7377affceceead631a9ab9258bc9aad0917b7fcf71f8c8f94522cc51100e614c",
   "cpu_cycles": 30000,
-  "local_worker_sha256": "4e0dc0304013c6c1cd6301114f2f5c259faf5132c0c4e32c82a2583fe53a6668",
+  "local_worker_sha256": "860df488382ca3ddc14a81f957f5b29eff39f2ee32380e9010e3bf491198d9c1",
   "fault_sha256": "9c1469b44d1dd156b4811f514bbf761ffccb010510d57a96548257e7de67d2e0",
   "write_journal": {
     "schema": 1,
@@ -375,7 +375,7 @@
   "projectile_art_sha256": "7465bfdfdd38367a559cec8b825012242d396027a68e040b082d82f45c753ac8",
   "external_sound_by_language": {
     "cn": {
-      "disk_sha256": "bf178e2d3f90732cfa840ea2ed4192abc4abe673116534db2b2561899281c068",
+      "disk_sha256": "67ce94e2853cf2be8a95e3707604c4163be31f3d04ef8dca04624bada0319fd8",
       "bgm": 0,
       "se": 1,
       "schema": 3,
@@ -581,7 +581,7 @@
       }
     },
     "jp": {
-      "disk_sha256": "3291109ed7ff0efbbb61ef0419f0b5a14b20cd4ef9113f107194a5a92ea6fcf2",
+      "disk_sha256": "8e9b6bbb2dd8e695d0623ca0f799bb4d1d786c1e46fb0c64656d179b9e34caa1",
       "bgm": 0,
       "se": 1,
       "schema": 3,

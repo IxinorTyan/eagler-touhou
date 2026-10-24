@@ -27,7 +27,7 @@
       "payload_bytes_added": 0
     }
   ],
-  "sha256": "18d9269ad06cbf730ba9e183d41ec312cae40f6013df41fac715b7a4b3617485",
+  "sha256": "72009d521ba986ae10ca60a4bd12ba027328cc7420e8458ed42276da459aba62",
   "insert_image_offset": 78048,
   "insert_size": 2096,
   "code_segment": 2735,
@@ -184,7 +184,7 @@
     "main_md5": "06d74719b6f72b11014a392fd34d5f57"
   },
   "disk": {
-    "sha256": "310ecb0948980504270657b18b51e1032705c383c9d6bfa1b6803926cebd8311",
+    "sha256": "1925ba3270ee00eefa7a3a5b4d0866719db9acea06867da4b2b11e875da626d3",
     "size": 21415936
   },
   "unchanged_files": {

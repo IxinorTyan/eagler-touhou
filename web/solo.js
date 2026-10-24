@@ -35,7 +35,7 @@ let recorder=null,recordBlob=null,loadedReplay=null,playback=false,lastAssist=''
 let committedPractice=null,practiceCompleted=false,nativePauseTimer=null;
 const keys=new Set(),seen=new Map();
 const signature=new TextEncoder().encode('TH04SOLOINPUTv1!');
-const replaySources=['../solo.js','../solo-worker.js','../solo-worker-client.js','../dosbox-adapter.js','../game-version.js','../solo-native-music.js',
+const replaySources=['../direct-drag.js','../player-ui.js','../solo.js','../solo-worker.js','../solo-worker-client.js','../dosbox-adapter.js','../game-version.js','../solo-native-music.js',
   '../touch-input.js','../vendor/dosbox-x/runtime.json','../vendor/dosbox-x/dosbox-jspi.mjs','../vendor/dosbox-x/wdosbox-x-fast.wasm',
   '../dosbox-disk.js','../frame-presenter.js','../solo-worker-environment.js','../solo-patch.json','../solo-patch-jp.json','../vendor/dosbox-x/emulators.js',
   './external-host.js','./external-loader.js','./external-codec.js','./external-recorder.js','./external-ui.js','./external-lifecycle.js',
@@ -93,6 +93,7 @@ function applySoloAssist(value){
   if(Number.isInteger(value.generation)&&value.generation!==v.getUint16(at+24,true))return;
   h[at+26]=value.points||0;const t=value.touch;
   if(emulator.state==='running'&&h[at+22]===1&&!h[at+23]&&t?.active){
+    if(t.begin)v.setInt32(at+30,0,true);
     v.setUint16(at+28,t.unlimited?3:1,true);
     for(const [offset,delta]of [[30,t.x],[32,t.y]])v.setInt16(at+offset,Math.max(-8192,Math.min(8191,v.getInt16(at+offset,true)+delta)),true);
   }else h.fill(0,at+28,at+36);
