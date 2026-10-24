@@ -30,7 +30,7 @@
     "control-settings.css": "8428afa28a1f29d46d5d4bf73da25066a87e6e1714a91405a30661446345e54c",
     "control-settings.js": "4eba3f22cd132473274d44147efe2633e10b388eea402de53074025623b73517",
     "direct-drag.js": "b6f65fcf3f22989cb2a7325dddf2f3f695c502e9e1b9674cac41b9d391cae63b",
-    "dosbox-adapter.js": "f59a38358d5fd05d5c20fa9e0c67c22a0593f64107100d972bf39a209e014c9e",
+    "dosbox-adapter.js": "11e05201982b81de5bb69497da3b804c2f7528332c9ae1a51bd636be66bfc169",
     "dosbox-disk.js": "b8789f6a6f8da303b213f6912c9c5466da2c6623c821fcc977c9cbba7dba1578",
     "dosbox-memory-diff.js": "fc79756a862c8bfcbf335428ba329dc8ed71b784987d2c7766985c975d894d92",
     "dosbox-snapshots.js": "98cc7f7a1772561c88bed319661c0c3769292fc1db6f20ca1158e61e746548c3",
@@ -76,17 +76,18 @@
     "player-ui.css": "336426049fe26ab7dc605359bf230b081a2625a9905fc6bff7a4fcc671cc9a80",
     "player-ui.js": "7750363c3a6af36f1df831066376cf5f0c50019892dd346e83802dc70f2c3c77",
     "practice-assets.js": "896bf7740c326463ba451bb8976fa1f0edae6762ae116a1274db0927b20377e5",
-    "practice-config.js": "34d306487a3df2c026df797b8f2462e2f0508dd2dcad466ddb581e3eccd5254a",
+    "practice-attempt.js": "577aa205dc31e80cf5d03371e370268b951445bac087e221f6ca90d72cb4d82d",
+    "practice-config.js": "aea53bfbc4bf8d7c165d08786167f513cbf0a969dbe599dc8329930e8a1cdece",
     "practice-engine.js": "1058617071efbe923c73814900d8ec8b4e1971823002c2d46fce3ef91c75c614",
     "practice-start.com": "b94cfabfa1623819b0841675619dee9a81d097237cefa1fc30c48b9edbd560ac",
     "practice-ui.css": "b88438ac45d79e405a4e0c6aa2f78fc9afc12005978b6caf547fd404001a7213",
-    "practice-ui.js": "dd38cc713a957a8e604195e8bcb396f7ee8321624c7f7c1f52ea63fda9acb290",
+    "practice-ui.js": "b5d9df59b1e8f4b2b35f185bd5da045659cf05e81fd9eb678a96c862daae2bd3",
     "preload-cache.js": "784b8c73642dea4b848770a687c443f9f5a16fd4acca086a49d316cd6864d4f0",
     "replay.html": "7c0870f87db2e8e318b4b2e9ab0f81b49ed1899445bef2775429a11ba5d227e9",
     "replay/audio.js": "c74a2541b4d011802768502f049e6bf772bb70b1e3fcd3c4b2d0f39ea593549a",
     "replay/builder.js": "3cad8ac213d1373d7860284bc48d69980b2a8a2209fe60e815090df847215748",
     "replay/external-codec.js": "839d288cd4874b6ab52664c7695f3e31a845a051ff78c7890f890eee765de03a",
-    "replay/external-host.js": "f68d83c2b388ad55e814be4603eb3b24dd94175e93d0607e0153c816cb1caa8f",
+    "replay/external-host.js": "11ee3a356a10db1787d05c674d60b04ec442ce387c6bc1dd02aba6a0eceacc6a",
     "replay/external-lifecycle.js": "f82f1bdabe52ccd3d81178edbfbeaabc0286374d94d720ff1f479e6c9a7b58d8",
     "replay/external-loader.js": "dcfa7183db0f8a5afff80d2a3c6688ae36c2018ee659198e21322ee37584008e",
     "replay/external-recorder.js": "e8ccce5b63644b89ffa26cd1ed6928c6146901164d4cb36b877429fd920476e8",
@@ -124,7 +125,7 @@
     "solo-patch.json": "3f373054cfcb24d9eb5151c1c432edfe96d31eb8eba7e088e22815768c1a57af",
     "solo.css": "348bdd46f831a57d883e515313b21d30abed88b0f4caee5236e8784fe1812e03",
     "solo.html": "1e1d810666110ec08f65ee86de8672355ac108683cf87fe1be984466bc98c98c",
-    "solo.js": "f76fc39cd113ce8ce5564ce83d2b639f3822fc9cd157c2afb9ea7abead1a27d4",
+    "solo.js": "d89b8e3b40ad63a1e24db9c243ab2a2a7d3e7142e586fa8d821158dce8f0ce70",
     "touch-input.js": "a0f4fb6ab1842412a7520a5f067bea872a27556f3fe8e1f1623a9fd71b242c99",
     "touch-layout.js": "603e3fe17007e2dcc09d01cf281811901e2eda64d1da6ed6eeeb6619ecf3813d",
     "touch-overlay.css": "3ea83605ef5ce049ab10dff288e3a49e752d7a590f5b0e8f8cfc4117c1e35da9",
@@ -145,5 +146,5 @@
       "sha256": "4f3e9d6205cd1f1c9eee0a4a768e09f3ba6073e71c3706a274ba4fa6e22213e9"
     }
   },
-  "build": "c23285198f002384d50a71a7bc7dd805c9fda4d99d7deccebeeecfe976f6e900"
+  "build": "21b1568baae247e4bc0f162e248a9a91518c2cdeab1a5fde00ada52b8465d2dc"
 }

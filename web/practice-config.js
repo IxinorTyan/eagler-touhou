@@ -1,6 +1,6 @@
 // TH02 native ranges: 80 power, spare lives, signed play-performance Rank.
 export const PRACTICE_VERSION='th02-browser-practice/1';
-export const PRACTICE_DEFAULTS=Object.freeze({invincible:false,lockLives:false,lockBombs:false,lockPower:false,lockTime:false,enemyInvincible:false,lockRank:false,disableBomb:false,disableFocus:false,disableShot:false,forceFocus:false,quickRetry:true,showKeys:false,showInfo:false,alwaysPoint:false,speed:1});
+export const PRACTICE_DEFAULTS=Object.freeze({invincible:false,lockLives:false,lockBombs:false,lockPower:false,lockTime:false,enemyInvincible:false,lockRank:false,disableBomb:false,disableFocus:false,disableShot:false,forceFocus:false,quickRetry:true,preparedRetry:true,showKeys:false,showInfo:false,alwaysPoint:false,speed:1});
 export const PRACTICE_SETUP=Object.freeze({stage:0,character:0,difficulty:1,entry:'stage',phase:0,lives:0,bombs:0,power:80,rank:0,hp:0});
 export const PRACTICE_PHASES=Object.freeze([[1,2,3],[1,2,3],[],[],[1,3,5,7,9],[1,3,5,7,9]]);
 export function phaseList(s){return s.entry==='boss'?PRACTICE_PHASES[s.stage]:[];}
@@ -37,10 +37,10 @@ export function normalizePractice(value){
 }
 
 export function createPracticeClock(initial=1){
-  let speed=initial,anchor=performance.now(),elapsed=anchor;const epoch=Date.now()-anchor,RealDate=Date;
-  const now=()=>elapsed+(performance.now()-anchor)*speed;
+  let speed=initial,anchor=performance.now(),elapsed=anchor,paused=false;const epoch=Date.now()-anchor,RealDate=Date;
+  const now=()=>elapsed+(paused?0:(performance.now()-anchor)*speed);
   function PracticeDate(...args){if(!new.target)return new RealDate(epoch+now()).toString();return Reflect.construct(RealDate,args.length?args:[epoch+now()],new.target);}
   Object.setPrototypeOf(PracticeDate,RealDate);PracticeDate.prototype=RealDate.prototype;PracticeDate.now=()=>Math.floor(epoch+now());
   const hostPerformance=new Proxy(performance,{get(t,k){if(k==='now')return now;const value=Reflect.get(t,k,t);return typeof value==='function'?value.bind(t):value;}});
-  return {Date:PracticeDate,performance:hostPerformance,now,date:()=>Math.floor(epoch+now()),get speed(){return speed;},setSpeed(value){if(![.25,.5,.75,1,1.5,2,8].includes(value))throw Error('无效变速');elapsed=now();anchor=performance.now();speed=value;}};
+  return {Date:PracticeDate,performance:hostPerformance,now,date:()=>Math.floor(epoch+now()),get speed(){return speed;},setPaused(value){elapsed=now();anchor=performance.now();paused=!!value;},setSpeed(value){if(![.25,.5,.75,1,1.5,2,8].includes(value))throw Error('无效变速');elapsed=now();anchor=performance.now();speed=value;}};
 }
