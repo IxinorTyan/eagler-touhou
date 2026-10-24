@@ -3,10 +3,10 @@
 export const HOST_VERSION='th05-external-jspi/2';
 export const CLOCK_BYTES=9, CLOCK_CHUNK=4096;
 const RealDate=Date,realNow=()=>performance.now();
-export function createExternalReplayHost({mode,clocks,events=[],endBoundary,endReason,onChunk,onEnd,onError,onRecordingError=onError,applyInput,observe,inspect,maxClockBytes=512*1024*1024,clock,holdOnPracticeEnd=false}){
+export function createExternalReplayHost({mode,clocks,events=[],endBoundary,endReason,onChunk,onEnd,onError,onRecordingError=onError,applyInput,observe,inspect,maxClockBytes=512*1024*1024,clock,holdOnPracticeEnd=false,record=true,shouldHold}){
   if(!['record','playback'].includes(mode))throw Error('无效的外部 replay 模式');
   let mod,boundary=0,count=0,eventCursor=0,queued=[],buffer=new Uint8Array(CLOCK_BYTES*CLOCK_CHUNK),used=0;
-  let stopped=false,ending=false,held=false,wake=null,timer=null,observerMs=0,clockMs=0,lastWake=0,epoch,recording=mode==='record',finished=false;
+  let stopped=false,ending=false,held=false,wake=null,timer=null,observerMs=0,clockMs=0,lastWake=0,epoch,recording=mode==='record'&&record,finished=false;
   const source=clocks?new DataView(clocks.buffer,clocks.byteOffset,clocks.byteLength):null;
   const started=realNow();
   function disable(error){if(!recording)return;recording=false;ending=false;used=0;try{onRecordingError?.(error);}catch{}}
@@ -68,6 +68,8 @@ export function createExternalReplayHost({mode,clocks,events=[],endBoundary,endR
           const next=wake;wake=null;next();return;
         }
       }else observe?.(boundary);
+      // Retain this instance's own JSPI continuation at the prepared entry.
+      if(mode==='record'&&shouldHold?.()){held=true;return;}
       if(mode==='record'){
         const batch=queued;queued=[];
         for(const command of batch)applyInput(command);

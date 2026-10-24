@@ -7,6 +7,7 @@ let viewSlot=0;
 let soloMode=false,soloInput=null;
 let externalHost=null;
 let practiceEngine=null,practiceClock=null,practicePlayback=false,practiceAudioDrops=0,practiceAudioDelivered=0;
+let practiceStandby=false,practiceParked=false;
 let frameBridge=null,replayBootAudioDrops=0;
 let replayGuestBase=-1,replayMailbox=-1,replayRun=null;
 function observeReplayRun(){
@@ -83,11 +84,11 @@ function state(){
     ...(qaEnabled?{itemPickups:layout.players.map((_,i)=>v.getUint32(at-patch.mailbox_cs_offset+patch.items.pickup_counts+i*4,true))}:{})};
 }
 function publishMusic(){if(musicReader&&(soloMode||mailbox>=0)){if(!soloMode&&musicReader.at<0){const v=new DataView(mod.HEAPU8.buffer),segment=v.getUint16(guestBase+0x60*4+2,true);musicReader.at=guestBase+segment*16+musicReader.patch.mailbox_com_offset;}const events=musicReader.read(mod.HEAPU8);if(events.length)send('music',{events});}}
-function publish(){if(fatal||exited||!ci)return;scan();if(nativeStatus().exit&&!practiceEngine?.status.outcome){exitSession();return;}inputs();publishMusic();if(statePending)return;const s=state();if(s){statePending=true;send('state',{state:s});}}
+function publish(){if(fatal||exited||!ci)return;scan();if(nativeStatus().exit&&!practiceEngine?.status.outcome){exitSession();return;}inputs();publishMusic();if(statePending||practiceStandby)return;const s=state();if(s){statePending=true;send('state',{state:s});}}
 const config=(cycles,core)=>`[dosbox]\nmachine=pc98\nmemsize=16\n[cpu]\ncore=${core}\ncputype=386\ncycles=${cycles}\n[render]\nframeskip=0\nscaler=none\naspect=false\n[sblaster]\nsbtype=none\n[pc98]\npc-98 fm board=board86\n[mixer]\nrate=44100\nblocksize=512\nprebuffer=20\n[autoexec]\n@echo off\nmount a /home/web_user/game\na:\ncd KAIKI\nFAST.BAT\n`;
 async function boot(data){
   if(data.frameReplay&&data.frameReplay.mode!=='playback'&&!data.qa)throw Error('旧单人 Replay 仅允许播放，录制请使用浏览器方案');
-  soloMode=!!data.solo;
+  soloMode=!!data.solo;practiceStandby=!!data.standby;
   if(data.practice&&(!soloMode||data.frameReplay||!data.patch.practice))throw Error('练习资源与运行模式不符');
   const dependency=name=>import(new URL(name,data.base).href);
   if(data.practice){const {createPracticeClock,normalizePractice}=await dependency('practice-config.js');data.practice=normalizePractice(data.practice);practiceClock=createPracticeClock(data.practice.options.speed);practicePlayback=data.externalReplay?.mode==='playback';}
@@ -118,6 +119,10 @@ async function boot(data){
     externalHost=createExternalReplayHost({...data.externalReplay,
       clock:practiceClock,
       holdOnPracticeEnd:!!data.practice,
+      shouldHold:()=>{
+        if(!practiceStandby||!practiceEngine?.status.ready||!practiceEngine.status.waiting||soloInput?.snapshot?.mode!==2)return false;
+        practiceClock.setPaused(true);practiceParked=true;send('practice-parked',{state:state()});return true;
+      },
       applyInput:command=>dispatch({data:{...command,externalSource:true}}),
       observe:()=>{if(ci&&!fatal){
         frames=mod.messageFrame||frames;
@@ -132,7 +137,7 @@ async function boot(data){
       inspect:async()=>{
         // Notify at the sealed boundary, before optional hashing/compression.
         // The attempt panel must remain usable if exporting the REP fails.
-        if(!practicePlayback&&practiceEngine?.status.outcome)send('practice-complete',{outcome:practiceEngine.status.outcome});
+        if(!practicePlayback&&practiceEngine?.status.outcome){statePending=false;publish();send('practice-complete',{outcome:practiceEngine.status.outcome});}
         const h=mod.HEAPU8;
         // The DOS memory allocation survives MAIN returning to OP, while
         // SoloInput deliberately drops inactive game mailboxes.
@@ -193,7 +198,7 @@ async function boot(data){
     });
   }
   if(data.practice){const {createPracticeEngine}=await dependency('practice-engine.js');practiceEngine=createPracticeEngine({mod,patch,config:data.practice,clock:practiceClock,
-    onComplete:result=>{if(!externalHost||!externalHost.status.recording&&!practicePlayback)setTimeout(()=>{paused=true;ci.pause();publish();send('practice-complete',{outcome:result.outcome});},0);},
+    onComplete:result=>{if(!externalHost||!externalHost.status.recording&&!practicePlayback)setTimeout(()=>{paused=true;if(externalHost)externalHost.pause(true);else ci.pause();statePending=false;publish();send('practice-complete',{outcome:result.outcome});},0);},
   });}
   const transport={sessionId,module:mod,net:null,sendMessageToServer:(name,props)=>mod.messageHandler({data:{name,props}}),
     initMessageHandler:handler=>{receiver=handler;for(const [name,props]of queue)handler(name,props);queue.length=0;},exit:()=>{}};
@@ -253,6 +258,11 @@ async function boot(data){
 }
 onmessage=async({data})=>{try{
   if(data.type==='boot'){await boot(data);return;}
+  if(data.type==='practice-activate'){
+    if(!practiceStandby||!practiceParked)throw Error('练习起点未停在预备边界');
+    externalHost.queue({type:'practice-options',options:data.options});
+    practiceStandby=false;practiceParked=false;practiceClock.setPaused(false);externalHost.pause(false);return;
+  }
   if(data.type==='external-replay-finish'){if(frameBridge)frameBridge.finish();else if(replayRun)externalHost?.finish();return;}
   if(data.type==='external-replay-disable'){externalHost?.disable();return;}
   if(data.type==='external-replay-pause'){if(frameBridge){paused=!!data.value;if(paused){soloInput?.clear(mod.HEAPU8);ci.pause();}else ci.resume();}else externalHost?.pause(data.value);return;}
@@ -264,7 +274,8 @@ onmessage=async({data})=>{try{
       if(data.onlyPause&&nativeStatus().paused)return;
       externalHost.queue({type:'key',code:256,down:true});setTimeout(()=>externalHost.queue({type:'key',code:256,down:false}),110);return;
     }
-    if(['pause','resume','qa'].includes(data.type))return;
+    if(data.type==='pause'||data.type==='resume'){paused=data.type==='pause';externalHost.pause(paused);return;}
+    if(data.type==='qa')return;
   }
   if(data.type==='ack'){statePending=false;return;}
   if(data.type==='practice-options'){if(practiceEngine&&(!practicePlayback||data.externalSource))practiceEngine.configure(data.options);return;}

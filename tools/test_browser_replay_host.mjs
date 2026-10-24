@@ -55,5 +55,13 @@ try{
  assert.equal(observed,1,'playback refreshes native display ownership before final inspection');
  assert.equal(played?.guestHash,'read-only');assert.equal(played?.clockCount,2);
  assert.deepEqual(errors,[]);
- console.log('PASS optional hashing never holds player continuation; terminal input stays live and outside the replay');
+ // A parked, unrecorded practice consumes neither clocks nor player input.
+ let parked=true,liveResumed=false;const warmInputs=[],warmErrors=[];
+ const warm=createExternalReplayHost({mode:'record',record:false,shouldHold:()=>parked,
+  onChunk:()=>assert.fail('unrecorded practice must not allocate tapes'),onError:e=>warmErrors.push(e),applyInput:c=>warmInputs.push(c)});
+ const warmImports={env:{initTimeoutSyncSleep(){},__asyncjs__syncSleep(){}}};warm.attach({},warmImports);warmImports.env.initTimeoutSyncSleep();
+ warm.queue({type:'key',code:262,down:true});warmImports.env.__asyncjs__syncSleep(0,1).then(()=>liveResumed=true);
+ await new Promise(resolve=>setTimeout(resolve,15));assert(warm.status.held);assert.equal(warm.status.clockCount,0);assert.equal(liveResumed,false);assert.deepEqual(warmInputs,[]);
+ parked=false;warm.pause(false);await new Promise(resolve=>setTimeout(resolve,15));assert(liveResumed);assert.equal(warmInputs.length,1);assert.deepEqual(warmErrors,[]);
+ console.log('PASS host failure isolation, terminal boundaries and prepared continuation without recording');
 }finally{if(NativeSuspending)WebAssembly.Suspending=NativeSuspending;else delete WebAssembly.Suspending;}

@@ -4,14 +4,14 @@
   "languages": {
     "cn": {
       "url": "practice-cn.exe.gz",
-      "sha256": "b2ea4acf8e2a833b06c2cf193dbcb5b6a2476f9e9aa09ef001762f1699823b9a",
-      "size": 151590,
+      "sha256": "56c22706241e3fe7867d7ec1fcc6219d2686b4d76735ed67b6beb79d5f6b9540",
+      "size": 151622,
       "sourceMainSha256": "93ee144d49f51e1000d47243d2c74acd041896782982f3bf6103d438257de1c6",
       "patch": {
         "signature": "TH05SOLOINPUTv1!",
         "mailbox_size": 36,
         "code_segment": 2785,
-        "data_segment": 8447,
+        "data_segment": 8449,
         "mailbox_cs_offset": 40124,
         "entries": {
           "init_hook": 40249,
@@ -21,7 +21,7 @@
           "world_hook": 40325,
           "mailbox": 40124
         },
-        "insert_size": 1568,
+        "insert_size": 1600,
         "hooks": [
           {
             "name": "init_hook",
@@ -55,11 +55,11 @@
           }
         ],
         "source_main_md5": "553eee5ff79429f45284913870380549",
-        "main_sha256": "b2ea4acf8e2a833b06c2cf193dbcb5b6a2476f9e9aa09ef001762f1699823b9a",
+        "main_sha256": "56c22706241e3fe7867d7ec1fcc6219d2686b4d76735ed67b6beb79d5f6b9540",
         "changed_files": [
           "KAIKI/MAIN.EXE",
-          "KAIKI/怪綺談1.DAT",
-          "KAIKI/怪綺談2.DAT",
+          "KAIKI/\u602a\u7dba\u8ac71.DAT",
+          "KAIKI/\u602a\u7dba\u8ac72.DAT",
           "CNFONT.BMP",
           "KAIKI/OP.EXE"
         ],
@@ -86,42 +86,43 @@
         "practice": {
           "version": 4,
           "entries": {
-            "load": 41245,
-            "frame": 41257,
-            "player": 41320,
-            "world": 41340,
-            "enemyLock": 41220,
-            "damageMain": 41351,
-            "damageSecond": 41366,
-            "damageMid": 41381,
-            "shotsReturn": 41396,
-            "dialogRun": 41414,
-            "livesZero": 41540,
-            "bombsZero": 41561,
-            "entryPause": 41221,
-            "lockLives": 41222,
-            "unlimitedBombs": 41223,
-            "respawnLives": 41582,
-            "bombGate": 41606,
-            "bombConsume": 41627,
-            "clearOverlay": 41219,
-            "targetPractice": 41218,
-            "dialogFade": 41640
+            "load": 41247,
+            "frame": 41259,
+            "player": 41322,
+            "world": 41342,
+            "enemyLock": 41222,
+            "damageMain": 41392,
+            "damageSecond": 41407,
+            "damageMid": 41422,
+            "shotsReturn": 41437,
+            "dialogRun": 41455,
+            "livesZero": 41581,
+            "bombsZero": 41602,
+            "entryPause": 41223,
+            "lockLives": 41224,
+            "unlimitedBombs": 41225,
+            "respawnLives": 41623,
+            "bombGate": 41647,
+            "bombConsume": 41668,
+            "clearOverlay": 41221,
+            "targetPractice": 41220,
+            "dialogFade": 41681,
+            "boss": 41353
           },
-          "bytes": 496
+          "bytes": 528
         }
       }
     },
     "jp": {
       "url": "practice-jp.exe.gz",
-      "sha256": "2ec0b87f5ccdb9efc4bd9d863bd8099dc5adfbe7e52eadc0a3a783cd27131c86",
-      "size": 151590,
+      "sha256": "4375f3e995cd45205495761fc371bbd38b50b2795f89c84ac50524dd9de896ff",
+      "size": 151622,
       "sourceMainSha256": "a4bf493cd29a5e830eaef7895b0e90cfe69fae5764a429703dc1032d790875e0",
       "patch": {
         "signature": "TH05SOLOINPUTv1!",
         "mailbox_size": 36,
         "code_segment": 2785,
-        "data_segment": 8447,
+        "data_segment": 8449,
         "mailbox_cs_offset": 40124,
         "entries": {
           "init_hook": 40249,
@@ -131,7 +132,7 @@
           "world_hook": 40325,
           "mailbox": 40124
         },
-        "insert_size": 1568,
+        "insert_size": 1600,
         "hooks": [
           {
             "name": "init_hook",
@@ -165,7 +166,7 @@
           }
         ],
         "source_main_md5": "952585e02435c3b3b111975a78b05983",
-        "main_sha256": "2ec0b87f5ccdb9efc4bd9d863bd8099dc5adfbe7e52eadc0a3a783cd27131c86",
+        "main_sha256": "4375f3e995cd45205495761fc371bbd38b50b2795f89c84ac50524dd9de896ff",
         "changed_files": [
           "KAIKI/MAIN.EXE"
         ],
@@ -192,29 +193,30 @@
         "practice": {
           "version": 4,
           "entries": {
-            "load": 41245,
-            "frame": 41257,
-            "player": 41320,
-            "world": 41340,
-            "enemyLock": 41220,
-            "damageMain": 41351,
-            "damageSecond": 41366,
-            "damageMid": 41381,
-            "shotsReturn": 41396,
-            "dialogRun": 41414,
-            "livesZero": 41540,
-            "bombsZero": 41561,
-            "entryPause": 41221,
-            "lockLives": 41222,
-            "unlimitedBombs": 41223,
-            "respawnLives": 41582,
-            "bombGate": 41606,
-            "bombConsume": 41627,
-            "clearOverlay": 41219,
-            "targetPractice": 41218,
-            "dialogFade": 41640
+            "load": 41247,
+            "frame": 41259,
+            "player": 41322,
+            "world": 41342,
+            "enemyLock": 41222,
+            "damageMain": 41392,
+            "damageSecond": 41407,
+            "damageMid": 41422,
+            "shotsReturn": 41437,
+            "dialogRun": 41455,
+            "livesZero": 41581,
+            "bombsZero": 41602,
+            "entryPause": 41223,
+            "lockLives": 41224,
+            "unlimitedBombs": 41225,
+            "respawnLives": 41623,
+            "bombGate": 41647,
+            "bombConsume": 41668,
+            "clearOverlay": 41221,
+            "targetPractice": 41220,
+            "dialogFade": 41681,
+            "boss": 41353
           },
-          "bytes": 496
+          "bytes": 528
         }
       }
     }

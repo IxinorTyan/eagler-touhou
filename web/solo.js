@@ -17,8 +17,8 @@ const nativeCodes=[[1,265],[2,264],[4,263],[8,262],[16,88],[32,90],[64,340],[128
 const player=mountPlayer($('player'),{solo:true,onGesture:enableSound});
 $('screen').classList.add('screen');player.stage.append($('screen'));
 player.setLabel('原版单人');player.note('启动后使用原版标题菜单；触屏可开启触屏操作。');
-const practiceUI=mountPractice({host:$('player'),onChange:value=>{if(value)emulator?.practiceOptions(value);},onStart:value=>start({practiceConfig:value}),onRetry:retryPractice,onSave:()=>$('record-save').click(),onPause:()=>{if(emulator?.readState()?.mode===1)pause();},onFocus:()=>$('canvas').focus()});
-let activePractice=null,practiceCompleted=false;
+const practiceUI=mountPractice({host:$('player'),onChange:value=>{if(value){emulator?.practiceOptions(value);if(value.preparedRetry===false)discardRetry();if(value.preparedRetry===true)retryBlocked=false;}},onStart:value=>start({practiceConfig:value}),onRetry:retryPractice,onSave:()=>$('record-save').click(),onPause:()=>{if(emulator?.readState()?.mode===1)pause();},onFocus:()=>$('canvas').focus()});
+let activePractice=null,practiceCompleted=false,activeAttempt=null,retrySlot=null,retryBlocked=false,lastRetry=null,warmAfter=0;
 function finishPractice(outcome='clear'){
   if(activePractice?.mode!=='target'||practiceCompleted)return;practiceCompleted=outcome;
   if(recorder)emulator?.pauseReplay(true);else emulator?.pause();
@@ -26,6 +26,47 @@ function finishPractice(outcome='clear'){
   practiceUI.complete({outcome,recording:!!recorder,ready:!!recordBlob,failed:recorder?.state.failed});
 }
 function retryPractice(){if(activePractice?.mode!=='target'||busy)return;start({retry:true});}
+function canvasForAttempt(){
+  const canvas=document.createElement('canvas');canvas.id='canvas';canvas.width=640;canvas.height=400;canvas.tabIndex=0;canvas.setAttribute('aria-label','怪绮谈原版单人游戏画面');canvas.onpointerdown=()=>canvas.focus();return canvas;
+}
+function discardRetry(){const previous=retrySlot;retrySlot=null;previous?.stop();}
+function attemptKey(language,recordEnabled,practice){return JSON.stringify([language,recordEnabled,practice.version,practice.mode,practice.setup]);}
+function makeAttempt({language,recordEnabled,practice,standby=false}){
+  const attempt={language,recordEnabled,practice,standby,canvas:canvasForAttempt(),core:null,recorder:null,foreground:false,cancelled:false,ready:false,abort:new AbortController(),
+    stop(){this.cancelled=true;this.foreground=false;this.abort.abort();this.recorder?.dispose();this.core?.stop();}};
+  attempt.key=attemptKey(language,recordEnabled,practice);
+  attempt.task=(async()=>{
+    try{
+      const coreTask=prepareFastCore(!!practice);coreTask.catch(()=>{});
+      const {disk,patch,practiceExe}=await readDisk(language,practice);if(attempt.cancelled)throw Error('练习已取消');
+      if(recordEnabled){
+        try{attempt.recorder=await createBrowserRecorder({language,practice,independentMusic:true,
+          onStatus:text=>{if(!attempt.foreground)return;recordingStatus(text);if(practiceCompleted&&attempt.recorder?.state.failed)practiceUI.complete({outcome:practiceCompleted,failed:true});},
+          onRun:()=>{if(attempt.foreground)$('record-finish').disabled=false;},
+          onResult:()=>{if(attempt.foreground)$('record-finish').disabled=true;},
+          onFile:(blob,result)=>{
+            if(!attempt.foreground)return;recordBlob=blob;$('record-save').disabled=false;$('record-discard').disabled=false;
+            if(['practice-clear','practice-failed'].includes(result.endReason)){const outcome=result.endReason==='practice-clear'?'clear':'failed';finishPractice(outcome);practiceUI.complete({outcome,ready:true});return;}
+            $('replay-save-title').textContent='本局结束，保存单人 Replay？';
+            $('replay-save-summary').textContent=`${result.endReason==='clear'?'已通关。':'录像已封存。'}只包含首次续关前的操作，不包含续关和后续操作。`;
+            $('replay-save-dialog').showModal();}});
+        }catch(error){attempt.recordingError=error.message;}
+      }
+      if(attempt.cancelled)throw Error('练习已取消');
+      const core=await createFastCore({canvas:attempt.canvas,disk,patch,solo:true,independentMusic:true,coreTask,externalReplay:attempt.recorder?.config,practice,practiceExe,standby,signal:attempt.abort.signal});
+      attempt.core=core;if(attempt.cancelled){core.stop();throw Error('练习已取消');}
+      attempt.recorder?.attach(core);
+      if(standby){const failed=()=>{attempt.stop();if(retrySlot===attempt){retrySlot=null;retryBlocked=true;}};core.onError=failed;core.onExit=failed;await core.prepared;}
+      attempt.ready=true;return attempt;
+    }catch(error){attempt.stop();throw error;}
+  })();
+  return attempt;
+}
+function prepareRetry(){
+  if(disposed||busy||retrySlot||retryBlocked||!practiceUI.options.preparedRetry||document.hidden||activePractice?.mode!=='target'||!activeAttempt||!emulator?.readState()?.practice?.ready||performance.now()<warmAfter)return;
+  const slot=makeAttempt({language:activeAttempt.language,recordEnabled:!!$('record-enabled')?.checked,practice:{...activePractice,options:practiceUI.options},standby:true});retrySlot=slot;
+  slot.task.catch(()=>{if(retrySlot===slot){retrySlot=null;retryBlocked=true;}});
+}
 const status=text=>{$('status').textContent=text;};
 const form=target=>target?.closest?.('select,input,textarea,button,a');
 function enableSound(){const practice=emulator?.readState()?.practice;if(activePractice?.mode==='target'&&(!practice?.ready||practice.waiting))return;if(emulator?.state==='running')return emulator.audio?.resume();}
@@ -75,7 +116,7 @@ document.addEventListener('focusin',event=>{if(form(event.target))release();});
 document.addEventListener('visibilitychange',()=>{
     if(document.hidden){release();if(emulator?.state==='running'&&emulator.readState()?.mode===1)emulator.gamePause({onlyPause:true});}
 });
-window.addEventListener('pagehide',()=>{disposed=true;release();clearRecorder();emulator?.stop();});
+window.addEventListener('pagehide',()=>{disposed=true;release();discardRetry();activeAttempt?.stop();clearRecorder();emulator?.stop();});
 function sampleButtons(now,state){
     const game=state?.mode===1;
     let base=0;for(const key of held)base|=keys[key];
@@ -99,8 +140,8 @@ function syncButtons(){
 }
 function tick(now){
   if(disposed)return;
-  const state=context();
-  if(activePractice){practiceUI.update(state);if(state?.practice?.error)status(state.practice.error);else if(activePractice.mode==='target'&&state?.practice?.ready&&!practiceCompleted)status(state.practice.waiting?'练习入口已就绪 · 原版暂停中，按 Enter / Esc 继续。':'单人练习运行中 · 入口已就绪。');}
+  const state=context();prepareRetry();
+  if(activePractice){practiceUI.update(state);if(activePractice.mode==='target'&&state?.practice?.ready&&retrySlot?.ready){const label=document.querySelector('[data-practice-status]');label.textContent+=' · 下次重试已就绪';}if(state?.practice?.error)status(state.practice.error);else if(activePractice.mode==='target'&&state?.practice?.ready&&!practiceCompleted)status(state.practice.waiting?'练习入口已就绪 · 原版暂停中，按 Enter / Esc 继续。':'单人练习运行中 · 入口已就绪。');}
   if(emulator){$('pause').disabled=practiceCompleted||![1,2].includes(state?.mode);$('pause').textContent=state?.mode===2?'继续游戏':'暂停游戏';}
   if(emulator?.state==='running'){
     const game=state?.mode===1,value=sampleButtons(now,state);
@@ -115,7 +156,7 @@ function tick(now){
   }
   if(emulator&&now-lastInfo>500){
     lastInfo=now;
-    const text=JSON.stringify({mode:'original-solo',status:emulator.state,music:emulator.bgm?.status||'PC-98',musicError:emulator.musicError,state:emulator.readState()},null,2);
+    const text=JSON.stringify({mode:'original-solo',status:emulator.state,music:emulator.bgm?.status||'PC-98',musicError:emulator.musicError,retryCache:{state:retrySlot?(retrySlot.ready?'ready':'preparing'):retryBlocked?'unavailable':'idle',last:lastRetry},state:emulator.readState()},null,2);
     $('diagnostics').textContent=text;player.diagnostics(text);
   }
   requestAnimationFrame(tick);
@@ -135,14 +176,14 @@ async function readDisk(language,practice){
   return {disk,patch:spec.patch,practiceExe};
 }
 function failure(error){
-  clearRecorder();
+  discardRetry();activeAttempt?.stop();activeAttempt=null;clearRecorder();
   practiceUI.setRunning(false);
   release();if(emulator&&!['failed','stopped'].includes(emulator.state))emulator.stop();emulator=null;player.setActive(false);
   status('启动或运行失败：'+error.message);player.note('请查看错误原因，调整后重新开始。');
   $('start').disabled=false;$('pause').disabled=true;$('capture').disabled=true;$('sound').disabled=true;
 }
 function endSession(){
-  clearRecorder();
+  discardRetry();activeAttempt?.stop();activeAttempt=null;clearRecorder();
   practiceUI.setRunning(false);
   emulator?.stop();emulator=null;held.clear();pulses.clear();oldButtons=0;player.setActive(false);player.exit();
   const canvas=$('canvas');canvas.replaceWith(canvas.cloneNode(false));
@@ -150,47 +191,42 @@ function endSession(){
   $('start').disabled=false;$('restart').disabled=false;status('已退出模拟器，本局结束。可重新启动原版。');
 }
 async function start({retry=false,practiceConfig=null}={}){
-  if(busy||disposed)return;busy=true;
-  release();emulator?.stop();emulator=null;
-  practiceCompleted=false;
-  clearRecorder();discardRecording();
-  for(const id of ['start','restart','pause','capture','sound'])$(id).disabled=true;
-  player.setActive(false);status('正在载入原版磁盘…');
-  const canvas=document.createElement('canvas');canvas.id='canvas';canvas.width=640;canvas.height=400;canvas.tabIndex=0;canvas.setAttribute('aria-label','怪绮谈原版单人游戏画面');
-  $('canvas').replaceWith(canvas);canvas.onpointerdown=()=>canvas.focus();
+  if(busy||disposed)return;busy=true;const retryStarted=performance.now();
   const language=$('language').value,recordEnabled=!!$('record-enabled')?.checked;
-  // Music always uses the browser's real audio clock, including recorded runs.
-  const independentMusic=true;
-  $('bgm-control').hidden=!independentMusic;
+  const nextPractice=practiceConfig||(retry&&activePractice?{...activePractice,options:practiceUI.options}:practiceUI.configuration());
+  let attempt=retry&&retrySlot?.key===attemptKey(language,recordEnabled,nextPractice)?retrySlot:null;
+  let cached=!!attempt;const cachedReady=!!attempt?.ready;
+  if(attempt)retrySlot=null;else discardRetry();
+  release();activeAttempt?.stop();activeAttempt=null;emulator?.stop();emulator=null;
+  practiceCompleted=false;clearRecorder();discardRecording();retryBlocked=false;
+  for(const id of ['start','restart','pause','capture','sound'])$(id).disabled=true;
+  player.setActive(false);status(cachedReady?'正在恢复练习起点…':cached?'正在完成练习起点准备…':'正在载入原版磁盘…');
+  $('bgm-control').hidden=false;
+  activePractice=nextPractice;practiceUI.setRunning(false);
   try{
-    activePractice=practiceConfig||(retry&&activePractice?{...activePractice,options:practiceUI.options}:practiceUI.configuration());practiceUI.setRunning(false);
-    const coreTask=prepareFastCore(!!activePractice);coreTask.catch(()=>{});
-    const {disk,patch,practiceExe}=await readDisk(language,activePractice);if(disposed)return;
-    if(recordEnabled){
-      try{recorder=await createBrowserRecorder({language,practice:activePractice,independentMusic,onStatus:text=>{recordingStatus(text);if(practiceCompleted&&recorder?.state.failed)practiceUI.complete({outcome:practiceCompleted,failed:true});},
-        onRun:()=>{$('record-finish').disabled=false;},
-        onResult:()=>{$('record-finish').disabled=true;},
-        onFile:(blob,result)=>{recordBlob=blob;$('record-save').disabled=false;$('record-discard').disabled=false;
-          if(['practice-clear','practice-failed'].includes(result.endReason)){const outcome=result.endReason==='practice-clear'?'clear':'failed';finishPractice(outcome);practiceUI.complete({outcome,ready:true});return;}
-          $('replay-save-title').textContent='本局结束，保存单人 Replay？';
-          $('replay-save-summary').textContent=`${result.endReason==='clear'?'已通关。':'录像已封存。'}只包含首次续关前的操作，不包含续关和后续操作。`;
-          $('replay-save-dialog').showModal();}});
-      }catch(error){recordingStatus('录像未能启动：'+error.message+'；游戏继续。');}
-      if(disposed){clearRecorder();return;}
-    }else recordingStatus('本次启动不录制。');
-    status('正在启动 PC-98 原版游戏…');
-    const core=await createFastCore({canvas,disk,patch,solo:true,independentMusic,coreTask,externalReplay:recorder?.config,practice:activePractice,practiceExe});
-    if(disposed){core.stop();return;}emulator=core;emulator.onError=failure;emulator.onExit=endSession;
-    recorder?.attach(core);
+    attempt??=makeAttempt({language,recordEnabled,practice:nextPractice});activeAttempt=attempt;
+    try{await attempt.task;}catch(error){
+      if(!cached||disposed)throw error;
+      cached=false;status('预备起点不可用，正在重新准备练习…');
+      attempt=makeAttempt({language,recordEnabled,practice:nextPractice});activeAttempt=attempt;await attempt.task;
+    }
+    if(disposed){attempt.stop();return;}
+    const core=attempt.core;
+    $('canvas').replaceWith(attempt.canvas);activeAttempt=attempt;attempt.foreground=true;
+    emulator=core;recorder=attempt.recorder;emulator.onError=failure;emulator.onExit=endSession;
     practiceUI.setRunning(!!activePractice,activePractice);core.onPracticeRetry=retryPractice;core.onPracticeComplete=finishPractice;
-    if(recordEnabled&&recorder&&!recorder.state.failed)recordingStatus('浏览器已记录启动流程，等待进入关卡。');
+    if(cached)core.activatePractice(practiceUI.options);
+    if(retry)lastRetry={cached,cachedReady,milliseconds:Math.round(performance.now()-retryStarted)};
+    warmAfter=performance.now()+400;
+    if(recorder){$('record-finish').disabled=!recorder.state.run;recordingStatus(recorder.state.run?'浏览器正在录制本次练习。':'浏览器已记录启动流程，等待进入关卡。');}
+    else recordingStatus(attempt.recordingError?'录像未能启动：'+attempt.recordingError+'；游戏继续。':'本次启动不录制。');
     emulator.bgm?.setVolume(Number($('bgm-volume').value)/100);
     $('pause').disabled=false;$('capture').disabled=false;$('sound').disabled=false;
     $('pause').textContent='暂停游戏';player.setLabel(`${language==='cn'?'汉化版':'日文版'} · 原版单人`);
-    status(activePractice?.mode==='target'?'单人练习运行中 · 正在准备所选入口。':'原版单人运行中 · 请在标题菜单选择角色与难度。');
+    status(activePractice?.mode==='target'?(cached?'练习起点已恢复 · 原版暂停中，按 Enter / Esc 继续。':'单人练习运行中 · 正在准备所选入口。'):'原版单人运行中 · 请在标题菜单选择角色与难度。');
     player.note('方向键选择，Z / Enter 确认，X 返回。Esc 打开原版暂停菜单。');
-    canvas.focus();if(document.hidden)pause();
-  }catch(error){if(!disposed)failure(error);}
+    attempt.canvas.focus();if(document.hidden)pause();
+  }catch(error){attempt?.stop();if(!disposed)failure(error);}
   finally{busy=false;if(!disposed)$('restart').disabled=false;}
 }
 $('start').onclick=start;$('restart').onclick=start;$('pause').onclick=pause;

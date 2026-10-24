@@ -1,7 +1,7 @@
 // Shared strict schema for UI, Worker and existing browser REP files.
 export const PRACTICE_VERSION='th05-browser-practice/4';
 export const PRACTICE_FIXED_OPTIONS=Object.freeze({lastLife:false,autoBomb:false,autoRetry:false});
-export const PRACTICE_DEFAULTS=Object.freeze({enabled:true,invincible:false,lockLives:false,lockBombs:false,lockPower:false,lockTime:false,enemyInvincible:false,lockRank:false,disableBomb:false,disableFocus:false,disableShot:false,forceFocus:false,quickRetry:true,showKeys:false,showInfo:false,alwaysPoint:false,speed:1,...PRACTICE_FIXED_OPTIONS});
+export const PRACTICE_DEFAULTS=Object.freeze({enabled:true,invincible:false,lockLives:false,lockBombs:false,lockPower:false,lockTime:false,enemyInvincible:false,lockRank:false,disableBomb:false,disableFocus:false,disableShot:false,forceFocus:false,quickRetry:true,preparedRetry:true,showKeys:false,showInfo:false,alwaysPoint:false,speed:1,...PRACTICE_FIXED_OPTIONS});
 export const PRACTICE_SETUP=Object.freeze({stage:0,character:0,difficulty:1,entry:'stage',phase:0,branch:'auto',lives:0,bombs:0,power:128,dream:0,rank:32,hp:0});
 export const PRACTICE_PHASES=Object.freeze([[2,3,4],[2,4,5,7],[3,5,6,8,9,11,12,14],[2],[2,4,5,7,8,10],[2,3,6,7,9,10,12],[2,4,6,8,10,12,14,16,17]]);
 const ranges={stage:[0,6],character:[0,3],difficulty:[0,4],phase:[0,17],lives:[0,8],bombs:[0,8],power:[1,128],dream:[0,128],rank:[0,64],hp:[0,30000]};
@@ -37,11 +37,11 @@ export function normalizePractice(value){
   return {version:PRACTICE_VERSION,mode,setup,options};
 }
 export function createPracticeClock(initial=1){
-  let speed=initial,anchor=performance.now(),elapsed=anchor;const epoch=Date.now()-anchor;
-  const now=()=>elapsed+(performance.now()-anchor)*speed;
+  let speed=initial,anchor=performance.now(),elapsed=anchor,paused=false;const epoch=Date.now()-anchor;
+  const now=()=>elapsed+(paused?0:(performance.now()-anchor)*speed);
   const RealDate=Date;
   function PracticeDate(...args){if(!new.target)return new RealDate(epoch+now()).toString();return Reflect.construct(RealDate,args.length?args:[epoch+now()],new.target);}
   Object.setPrototypeOf(PracticeDate,RealDate);PracticeDate.prototype=RealDate.prototype;PracticeDate.now=()=>Math.floor(epoch+now());
   const hostPerformance=new Proxy(performance,{get(t,k){if(k==='now')return now;const value=Reflect.get(t,k,t);return typeof value==='function'?value.bind(t):value;}});
-  return {Date:PracticeDate,performance:hostPerformance,now,date:()=>Math.floor(epoch+now()),get speed(){return speed;},setSpeed(value){if(![.25,.5,.75,1,1.5,2,8].includes(value))throw Error('无效变速');elapsed=now();anchor=performance.now();speed=value;}};
+  return {Date:PracticeDate,performance:hostPerformance,now,date:()=>Math.floor(epoch+now()),get speed(){return speed;},setPaused(value){elapsed=now();anchor=performance.now();paused=!!value;},setSpeed(value){if(![.25,.5,.75,1,1.5,2,8].includes(value))throw Error('无效变速');elapsed=now();anchor=performance.now();speed=value;}};
 }

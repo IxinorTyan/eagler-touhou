@@ -21,7 +21,7 @@ export function createPracticeEngine({mod,patch,config,onState=()=>{},onComplete
   const normalized=normalizePractice(config),setup=normalized.setup,targeted=normalized.mode==='target';let options=normalized.options;
   let base=-1,d=-1,csBase=-1,resident=-1,frames=0,ready=false,preparing=true,initialized=false,lastMiss=0,misses=0,bombsUsed=0,initialPending=true,error=null;
   let snapshot=null,elapsed=0,phaseKey='',phaseFrames=0,prepareFrames=0,lastBombing=false,warped=false;
-  let outcome=null,observedBoss=false,waiting=false,lastNativeBombs=0,lockedPower=null;
+  let outcome=null,observedBoss=false,waiting=false,lastNativeBombs=0,lockedPower=null,redrawFrames=0,entryCleanup=null;
   const h=()=>mod.HEAPU8,v=()=>new DataView(h().buffer),u8=n=>h()[d+n],u16=n=>v().getUint16(d+n,true),i16=n=>v().getInt16(d+n,true),w8=(n,x)=>{h()[d+n]=x;},w16=(n,x)=>v().setUint16(d+n,x,true);
   function locate(packed){
     const cs=packed&65535,ds=packed>>>16,heap=h();
@@ -65,6 +65,32 @@ export function createPracticeEngine({mod,patch,config,onState=()=>{},onComplete
     if(cap&&i16(frame)>=cap-2)w16(frame,0);
     if(limit&&u8(count)>=limit-1)w8(count,Math.max(0,limit-2));
   }
+  function clearEntryProjectiles(){
+    // Audited MAIN DS pools (CN and JP share the layout). Clear live flags,
+    // not templates, Boss state or the next attack's initialization data.
+    const pools=[['bullets',0x5f2a,32,400],['lasers',0x578c,24,32],
+      ['gather',0x9bfa,38,16],['curves',0xc0aa,82,7],['firewaves',0x4a90,6,2],['items',0xb084,20,40]];
+    // These slots are balls / swords / curve heads for the other bosses, but
+    // Alice uses the same memory for her two live, attack-defining puppets.
+    if(!(setup.stage===2&&setup.entry==='boss'))pools.push(['custom',0xb40e,26,63]);
+    entryCleanup={};
+    for(const [name,offset,stride,count]of pools){let cleared=0;for(let i=0;i<count;i++){const at=offset+i*stride;if(u8(at))cleared++;w8(at,0);}entryCleanup[name]=cleared;}
+    // A previous phase's clear countdown must not eat the target's first volley.
+    w8(0x3f96,0);w8(0x3f97,0);h().fill(1,d+0x4ada,d+0x511a);redrawFrames=2;
+  }
+  function arrive(){
+    const type=active(),target=setup.entry,phase=type==='mid'?u8(0x5ab5):u8(0x5ac9);
+    let reached=target==='stage'||type===target&&(setup.phase?phase===setup.phase:phase>=(type==='boss'?2:setup.stage===0?3:1));
+    if(setup.stage===3&&target==='boss'&&setup.branch!=='auto')reached=reached&&u16(0xc672)===(setup.branch==='mai'?0x42bb:0x3795);
+    if(!reached)return false;
+    if(target!=='stage')clearEntryProjectiles();
+    ready=true;preparing=false;waiting=true;h()[csBase+patch.practice.entries.entryPause]=1;resources();w8(0x36f3,0);w8(0x36f4,0);w8(0x36ef,0);w8(0x36ee,0);w8(0x41d5,32);
+    if(type&&target!=='stage'){
+      const bounds=type==='mid'?midHp[setup.stage]?.[phase]:setup.stage===3&&setup.branch!=='auto'?branchHp[setup.branch][phase]:bossHp[setup.stage]?.[phase];
+      if(bounds){const [max,min]=bounds;w16(type==='mid'?0x5ab2:0x5ac6,setup.hp?Math.max(min+1,Math.min(setup.hp,max)):max);}
+    }
+    elapsed=phaseFrames=0;capture();clock?.setSpeed(options.speed);onState(status());return true;
+  }
   function prepare(){
     if(ready)return;
     prepareFrames++;
@@ -89,16 +115,7 @@ export function createPracticeEngine({mod,patch,config,onState=()=>{},onComplete
       }
     }
     const type=active(),target=setup.entry,phase=type==='mid'?u8(0x5ab5):u8(0x5ac9);
-    let reached=target==='stage'||type===target&&(setup.phase?phase===setup.phase:phase>=(type==='boss'?2:setup.stage===0?3:1));
-    if(setup.stage===3&&target==='boss'&&setup.branch!=='auto')reached=reached&&u16(0xc672)===(setup.branch==='mai'?0x42bb:0x3795);
-    if(reached){
-      ready=true;preparing=false;waiting=true;h()[csBase+patch.practice.entries.entryPause]=1;resources();w8(0x36f3,0);w8(0x36f4,0);w8(0x36ef,0);w8(0x36ee,0);w8(0x41d5,32);
-      if(type&&target!=='stage'){
-        const bounds=type==='mid'?midHp[setup.stage]?.[phase]:setup.stage===3&&setup.branch!=='auto'?branchHp[setup.branch][phase]:bossHp[setup.stage]?.[phase];
-        if(bounds){const [max,min]=bounds;w16(type==='mid'?0x5ab2:0x5ac6,setup.hp?Math.max(min+1,Math.min(setup.hp,max)):max);}
-      }
-      elapsed=phaseFrames=0;capture();clock?.setSpeed(options.speed);onState(status());return;
-    }
+    if(arrive())return;
     w8(0x36ee,2);w8(0x36f3,0);resources();
     // Advance unwanted attacks through the original HP transition path.
     if(type==='mid'&&target==='boss')w16(0x5ab2,0);
@@ -135,12 +152,14 @@ export function createPracticeEngine({mod,patch,config,onState=()=>{},onComplete
         h()[resident+24]=setup.stage;h()[resident+25]=setup.power;
         h()[resident+13]=setup.lives+1;h()[resident+14]=setup.bombs;}
         h()[csBase+patch.practice.entries.targetPractice]=targeted?1:0;lockedPower=null;
-        lastNativeBombs=h()[resident+28];misses=bombsUsed=lastMiss=0;initialized=true;initialPending=true;ready=false;preparing=targeted;prepareFrames=0;warped=false;outcome=null;observedBoss=false;waiting=false;h()[csBase+patch.practice.entries.entryPause]=0;return;
+        lastNativeBombs=h()[resident+28];misses=bombsUsed=lastMiss=0;initialized=true;initialPending=true;ready=false;preparing=targeted;prepareFrames=0;warped=false;outcome=null;observedBoss=false;waiting=false;redrawFrames=0;entryCleanup=null;h()[csBase+patch.practice.entries.entryPause]=0;return;
       }
       if(!initialized||u8(0x576c)>2||u8(0x576c)===1&&port!==0x7ff3&&port!==0x7ff4)return;
       if(port===0x7ff1){
         frames++;if(initialPending){if(targeted)resources();else{ready=true;lastNativeBombs=h()[resident+28];}initialPending=false;}
         if(preparing){if(!prepareFrames&&setup.entry!=='stage')clock?.setSpeed(8);prepare();}
+        // Repaint both VRAM pages after removing previously drawn projectiles.
+        if(redrawFrames){h().fill(1,d+0x4ada,d+0x511a);redrawFrames--;}
         if(ready&&!waiting&&!outcome){elapsed++;const key=[u8(0x576e),active(),u8(0x5ac9),u8(0x5ab5),u16(0xc672)].join(':');if(key!==phaseKey){phaseKey=key;phaseFrames=0;}phaseFrames++;}
         if(options.lockTime&&ready)timeLock();
         let keys=u16(0x3064);
@@ -175,8 +194,11 @@ export function createPracticeEngine({mod,patch,config,onState=()=>{},onComplete
         capture();
         if(targeted&&ready&&!outcome&&completed()){outcome='clear';onComplete(status());}
       }
+      // Runs just after native midboss/Boss update, before entity rendering.
+      // A phase transition is now visible, but that attack has not updated yet.
+      if(port===0x7ff5&&preparing&&warped&&setup.entry!=='stage')arrive();
     },
     get status(){return status();},get options(){return {...options};},
-    get debug(){return {base,d,csBase,resident,initialized,prepareFrames,quit:d<0?null:u8(0x576c),residentBytes:resident<0?null:Array.from(h().subarray(resident,resident+40)),code:csBase<0?null:Array.from(h().subarray(csBase+patch.practice.entries.load,csBase+patch.practice.entries.load+20))};},
+    get debug(){return {base,d,csBase,resident,initialized,prepareFrames,entryCleanup,quit:d<0?null:u8(0x576c),residentBytes:resident<0?null:Array.from(h().subarray(resident,resident+40)),code:csBase<0?null:Array.from(h().subarray(csBase+patch.practice.entries.load,csBase+patch.practice.entries.load+20))};},
   };return api;
 }

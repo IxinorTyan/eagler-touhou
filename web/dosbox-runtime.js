@@ -12,10 +12,11 @@ export async function prepareFastCore(practice=false){
   const manifest=await response.json();
   return loadCompiledCore(new URL('wdosbox-x-fast.wasm',vendor),manifest.files['wdosbox-x-fast.wasm']);
 }
-export async function createFastCore({canvas,disk,patch,qa=false,core='simple',cycles,presentation='bitmap',viewSlot=0,solo=false,independentMusic=true,coreTask,externalReplay,frameReplay,practice,practiceExe}){
+export async function createFastCore({canvas,disk,patch,qa=false,core='simple',cycles,presentation='bitmap',viewSlot=0,solo=false,independentMusic=true,coreTask,externalReplay,frameReplay,practice,practiceExe,standby=false,signal}){
   // DOSBox's automatic cycle controller assumes a real wall clock. A scaled
   // practice clock otherwise drives it down to 200 cycles and stalls the guest.
   const targeted=!!practice&&practice.mode!=='full';
+  if(standby&&!targeted)throw Error('只能预备特定练习');
   cycles??=practice?'16000':'max 100%';
   if(practice&&(!solo||frameReplay||!patch.practice))throw Error('练习功能需要单人练习资源');
   if(frameReplay&&frameReplay.mode!=='playback'&&!qa)throw Error('旧单人 Replay 仅允许播放，录制请使用浏览器方案');
@@ -27,8 +28,14 @@ export async function createFastCore({canvas,disk,patch,qa=false,core='simple',c
   compiledTask.catch(()=>{});musicTask.catch(()=>{});
   let latest=null,resolveReady,rejectReady,stopped=false,practiceMuted=targeted;
   const worker=new Worker(new URL('./dosbox-worker.js',import.meta.url));
-  const ready=new Promise((a,b)=>{resolveReady=a;rejectReady=b;});
+  const ready=new Promise((a,b)=>{resolveReady=a;rejectReady=b;});ready.catch(()=>{});
+  let resolvePrepared,rejectPrepared;
+  const prepared=standby?new Promise((a,b)=>{resolvePrepared=a;rejectPrepared=b;}):null;
+  prepared?.catch(()=>{});
+  const preparedTimer=standby?setTimeout(()=>fail(Error('预备练习超时')),120000):null;
   const api={state:'starting',config:{core:'dosbox-x',cpuCore:core,cycles},onError:null,onExit:null,
+    prepared,
+    activatePractice(options){if(stopped||!standby||!latest?.practice?.ready)throw Error('练习起点尚未预备完成');standby=false;clearTimeout(preparedTimer);worker.postMessage({type:'practice-activate',options});},
     readState:()=>latest?{...latest,...(display?{presentation:{...display.metrics}}:{})}:null,key:(code,down)=>worker.postMessage({type:'key',code,down}),
     inputs:input=>worker.postMessage({type:'input',input}),
     practiceOptions:options=>worker.postMessage({type:'practice-options',options}),
@@ -43,13 +50,16 @@ export async function createFastCore({canvas,disk,patch,qa=false,core='simple',c
     pauseReplay:value=>{worker.postMessage({type:'external-replay-pause',value});api.state=value?'paused':'running';api.bgm?.setPaused(value);if(value){api.audioOutput?.flush();api.audio?.suspend();}else api.audio?.resume();},
     pause(){api.state='paused';worker.postMessage({type:'pause'});api.audioOutput?.flush();api.audio?.suspend();},
     run(){api.state='running';worker.postMessage({type:'resume'});api.audio?.resume();},
-    stop(){if(stopped)return;stopped=true;display?.stop();document.removeEventListener('visibilitychange',visibility);worker.terminate();api.bgm?.dispose();api.audioOutput?.disconnect();api.audioInput?.close();api.audioNode?.disconnect();api.audio?.close();api.state='stopped';for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error('游戏已停止'));}pending.clear();},
+    stop(){if(stopped)return;stopped=true;signal?.removeEventListener('abort',abort);rejectReady(Error('游戏已停止'));clearTimeout(preparedTimer);rejectPrepared?.(Error('预备练习已取消'));display?.stop();document.removeEventListener('visibilitychange',visibility);worker.terminate();api.bgm?.dispose();api.audioOutput?.disconnect();api.audioInput?.close();api.audioNode?.disconnect();api.audio?.close();api.state='stopped';for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error('游戏已停止'));}pending.clear();},
     capture(){if(display)return display.capture();const id=++serial;return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(id);reject(Error('画面保存超时'));},10000);pending.set(id,{resolve,reject,timer});worker.postMessage({type:'capture',id});});},
     async qa(action,props={}){if(!qa)throw Error('QA 未开启');const id=++serial;return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(id);reject(Error('QA 超时'));},10000);pending.set(id,{resolve,reject,timer});worker.postMessage({type:'qa',enabled:qa,id,action,...props});});},
   };
   let serial=0;const pending=new Map();
   let display;
-  const fail=error=>{if(stopped)return;api.stop();api.state='failed';rejectReady(error);api.onError?.(error);};
+  const fail=error=>{if(stopped)return;rejectReady(error);rejectPrepared?.(error);api.stop();api.state='failed';api.onError?.(error);};
+  const abort=()=>api.stop();
+  signal?.addEventListener('abort',abort,{once:true});
+  if(signal?.aborted){api.stop();throw Error('练习已取消');}
   function visibility(){if(!display)return;if(document.hidden)display.clear();worker.postMessage({type:'presentation-active',value:!document.hidden});}
   try{if(mode==='bitmap')display=createFrameDisplay(canvas,{release:(seq,presented)=>worker.postMessage({type:'frame-ack',seq,presented}),onError:fail});}catch(e){worker.terminate();throw e;}
   document.addEventListener('visibilitychange',visibility);
@@ -59,6 +69,7 @@ export async function createFastCore({canvas,disk,patch,qa=false,core='simple',c
     if(data.name==='ws-sync-sleep'){worker.postMessage({name:'wc-sync-sleep',props:data.props});return;}
     if(data.type==='frame'){if(display)display.receive(data);else data.bitmap.close();return;}
     if(data.type==='ready'){api.state='running';resolveReady();}
+    if(data.type==='practice-parked'){latest=data.state;clearTimeout(preparedTimer);resolvePrepared(data.state);}
     if(data.type==='game-exit'){api.stop();api.onExit?.();return;}
     if(data.type==='music'){for(const [ax,hash]of data.events)api.bgm?.command(ax,hash);}
     if(data.type==='state'){latest=data.state;if(practiceMuted&&latest.practice?.ready&&!latest.practice.waiting){practiceMuted=false;api.bgm?.setPaused(false);if(api.state==='running')api.audio?.resume();}worker.postMessage({type:'ack'});}
@@ -111,14 +122,15 @@ export async function createFastCore({canvas,disk,patch,qa=false,core='simple',c
     if(frameReplay){files.find(f=>f.path==='game/KAIKI/MAIN.EXE').contents=frameReplay.exe;files.find(f=>f.path==='game/KAIKI/MAINE.EXE').contents=frameReplay.endingExe;}
     const assets=await musicTask;
     if(independentMusic)musicPatch=await installMusicFiles(files,{solo:solo&&!targeted,assets});
-    compiledCore=await compiledTask;
+    compiledCore=await compiledTask;if(stopped)throw Error('练习已取消');
   }catch(e){api.stop();throw e;}
   const offscreen=mode==='bitmap'?new OffscreenCanvas(canvas.width,canvas.height):canvas.transferControlToOffscreen(),transfer=[offscreen,audioPort,...files.map(f=>f.contents.buffer)];
-  const replayConfig=externalReplay?{mode:externalReplay.mode,clocks:externalReplay.clocks,events:externalReplay.events,endBoundary:externalReplay.endBoundary}:null;
+  // Unrecorded target practice uses this boundary without allocating tapes.
+  const replayConfig=externalReplay?{mode:externalReplay.mode,clocks:externalReplay.clocks,events:externalReplay.events,endBoundary:externalReplay.endBoundary}:targeted?{mode:'record',record:false}:null;
   if(replayConfig?.clocks)transfer.push(replayConfig.clocks.buffer);
   const frameConfig=frameReplay?{mode:frameReplay.mode,header:frameReplay.header,inputs:frameReplay.inputs}:null;
   if(frameConfig?.inputs)transfer.push(frameConfig.inputs.buffer);
-  worker.postMessage({type:'boot',base:new URL('.',import.meta.url).href,canvas:offscreen,audioPort,files,patch,musicPatch,compiledCore,core,cycles,qa,presentation:mode,presentationActive:!document.hidden,viewSlot,solo,externalReplay:replayConfig,frameReplay:frameConfig,practice},transfer);
+  worker.postMessage({type:'boot',base:new URL('.',import.meta.url).href,canvas:offscreen,audioPort,files,patch,musicPatch,compiledCore,core,cycles,qa,presentation:mode,presentationActive:!document.hidden,viewSlot,solo,externalReplay:replayConfig,frameReplay:frameConfig,practice,standby},transfer);
   const timeout=setTimeout(()=>rejectReady(Error('PC-98 核心初始化超时')),30000);
   try{await ready;return api;}catch(e){api.stop();throw e;}finally{clearTimeout(timeout);}
 }
