@@ -1,5 +1,6 @@
 // Shared room chrome; controllers keep their original nodes and handlers.
 import {mountTitlePreview} from './room-title-preview.js';
+import {mountNetworkStatus} from './network-status.js';
 const games = {
   '01': '东方灵异传', '02': '东方封魔录', '03': '东方梦时空',
   '04': '东方幻想乡', '05': '东方怪绮谈',
@@ -57,6 +58,7 @@ function mountRoom(game) {
     leave.prepend(icon('room-caret-left')); header.append(leave);
   }
   header.append(heading, headerActions);
+  mountNetworkStatus(header);
   const stage = make('section', 'room-ui-stage'); stage.setAttribute('aria-label', `${games[game]}游戏画面`);
   const waiting = make('div', 'room-ui-waiting'), cover = make('img', 'room-ui-cover');
   cover.src = new URL('room-ui-assets/cover.jpg', import.meta.url).href; cover.alt = `${games[game]}封面`;
@@ -129,6 +131,7 @@ function mountRoom(game) {
   if (source) { source.classList.add('room-ui-source-info'); gamePanel.prepend(source); }
   if (resourceStatus) { resourceStatus.classList.add('room-ui-resource'); gamePanel.append(resourceStatus); }
   if (startup) networkPanel.append(startup);
+  mountNetworkStatus(networkPanel,{details:true});
   for (const node of connections) relocateInRoom(node, networkPanel);
   personalPanel.append(make('h2', '', '本机设置'));
   relocateInRoom(localMusic, personalPanel);
