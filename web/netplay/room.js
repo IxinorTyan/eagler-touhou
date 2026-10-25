@@ -1,3 +1,4 @@
+import {publishNetworkStatus,mountNetworkStatus} from '../network-status.js';
 import {startFrameLoop} from '../frame-limit.js';
 import {createInputChannel,acceptInputChannel} from './input-transport.js';
 import {readNetworkMode,networkUrl} from './network-mode.js';
@@ -115,7 +116,20 @@ function startupFailure(reason){
     fetch(`/api/events?${q}`,{signal:AbortSignal.timeout(5000)}).catch(()=>{});
   }
 }
+function publishConnectionStatus(){
+  const now=performance.now();
+  mountNetworkStatus($('game')?.querySelector('.player-toolbar'));
+  publishNetworkStatus({phase:!preparing&&!running?'idle':stopped?'stopped':running?'connected':'connecting',
+    bufferFrames:running?(queue.active?queue.inputDelay:queue.lockstepDelay):null,
+    bufferMs:running?(queue.active?queue.inputDelay:queue.lockstepDelay)*TICK_MS:null,serviceRetry:!!roomServiceError,
+    peers:[...peers.values()].map(p=>({name:`P${(state?.slots?.[p.role]??'?')==='?'?'?':state.slots[p.role]+1}`,path:p.path||(useRelay?'WebSocket 中继':''),
+      state:p.offline?'offline':p.suspectAt!=null?'recovering':p.channel?.readyState==='open'?'connected':'connecting',
+      rttMs:p.rtt,rttAgeMs:p.rttAt==null?null:now-p.rttAt,packetAgeMs:now-p.lastPacket,hidden:p.hidden,
+      remainingMs:p.suspectAt==null?null:Math.max(0,GRACE_MS-(now-p.suspectAt)),attempt:p.attempt,
+      recovery:useRelay?'等待中继恢复':'恢复设备连接',reason:p.suspectReason}))});
+}
 function showStartup(){
+  publishConnectionStatus();
   const panel=$('startup-progress');
   if(running){panel.hidden=true;return;}
   if(!preparing||stopped)return;
@@ -230,7 +244,7 @@ function pingPeer(peer){
 }
 function recordPong(peer,id){
   if(!peer.pings.has(id))return;
-  const ping=peer.pings.get(id);peer.rtt=performance.now()-ping.at;peer.pings.delete(id);
+  const ping=peer.pings.get(id);peer.rtt=performance.now()-ping.at;peer.rttAt=performance.now();peer.pings.delete(id);
   if(ping.startup&&(peer.timingSamples?.length||0)<3){
     (peer.timingSamples??=[]).push(peer.rtt);
     if(peer.timingSamples.length<3)pingPeer(peer);
@@ -302,6 +316,7 @@ returnButton.id='return-room';returnButton.className='room-ui-return';returnButt
 returnButton.onclick=()=>{if(state?.phase!=='lobby')void returnToRoom();};
 $('game').append(returnButton);
 function render(){
+  publishConnectionStatus();
   if(!session||!state)return;
   $('lobby').dataset.roomPhase=state.phase;
   returnButton.hidden=state.phase==='lobby';returnButton.disabled=!!returningTask;
@@ -978,6 +993,7 @@ function updateMetrics(now,waiting){
     costs=newCosts();lastMeasure=now;measureFrame=queue.frame;stepCost=stepCount=maxCost=0;
   }
   if(document.hidden||now-lastUi<250)return;lastUi=now;
+  publishConnectionStatus();
   const links=[...peers.values()].map(p=>p.offline?`${label(p.role)}：已离线`:`${label(p.role)}：往返 ${p.rtt==null?'—':p.rtt.toFixed(1)} ms · ${p.path||'路径待确认'} · 相同状态步 ${p.confirmed||'等待'}${p.hidden?' · 页面隐藏':''}`).join('\n');
   const c=measuredCosts,game=runtime.snapshot();
   const own=game?.players?.[queue.slot];player.setLabel(`你操作 P${queue.slot+1}${own?' · 团队分数 '+own.score.toLocaleString('zh-CN'):''}`);
