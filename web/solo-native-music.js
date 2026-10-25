@@ -67,7 +67,7 @@ export class NativeMusic {
     const name=/^(st\d\d[bc]?|end[12]|staff|name|op|logo)\./.exec(filename.toLowerCase())?.[1];
     const changed=sequence!==this.sequence,events=[];
     if(name){const hash=p.trackHashes[name];if(hash===undefined)throw Error('缺少合作音乐：'+name);
-      if(!this.track){events.push([0,hash]);if(changed&&(ax>>>8)!==0)events.push([ax,hash]);}
+      if(name!==this.track){events.push([0,hash]);if(changed&&(ax>>>8)!==0)events.push([ax,hash]);}
       else if(changed)events.push([ax,hash]);
       this.track=name;
     }else if(changed&&this.track)events.push([ax,p.trackHashes[this.track]]);

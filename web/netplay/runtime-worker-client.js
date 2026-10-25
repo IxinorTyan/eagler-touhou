@@ -10,7 +10,7 @@ if(!bitmapContext)ctx.imageSmoothingEnabled=false;
 let worker,serial=0,stopped=false,settings,configuration=[0,0,2],volume=.7,blocked=false,listener=()=>{},keys=new Set();
 let context,se,bgm,musicTask,musicError='',seError='',pendingMusic=[],cache={},check=null,queuedFrame=null,preparedFrame=null,raf=0,presentPending=false;
 let raw=false,points={focus:true,always:false},lastPoints='',acknowledgedPrefix=0,sentPrefix=0,stagedMode=false,preparedReady=false,bootPromise,lastFaultCpu=null;
-let drawn=0,replaced=0,lastDraw=0,intervals=[],executionMs=0;
+let drawn=0,replaced=0,lastDraw=0,intervals=[],executionMs=0,stoppedMusic=null;
 const rpcMetrics={renderer:bitmapContext?'bitmaprenderer':'2d',displayMs:0,expired:0,hiddenDiscarded:0,queuedConfirmations:0,presentationRpcs:0};
 const requests=new Map();
 function request(type,args=[],extra={}){
@@ -37,6 +37,7 @@ function draw(){
  catch(error){fatal(error.message);}
  finally{releaseFrame(frame);}
 }
+function musicInfo(){return {...cache.fault?.music,error:musicError||cache.fault?.music?.error,status:bgm?.status,track:bgm?.active?.id,requested:bgm?.requested?.id};}
 function music(event){
  pendingMusic.push([event.ax,event.name]);if(pendingMusic.length>64)pendingMusic.splice(0,pendingMusic.length-64);
  if(bgm?.manifest){for(const [ax,name]of pendingMusic.splice(0))bgm.commandTrack(ax,name);return;}
@@ -83,7 +84,7 @@ const sync={
  configure(...value){configuration=value;},load:value=>bootPromise??=load(value),
  start(){stagedMode=true;fire('start');canvas.focus();},
  stop(){
-  if(stopped)return;stopped=true;clearKeys();discardFrames();
+  if(stopped)return;stoppedMusic=musicInfo();stopped=true;clearKeys();discardFrames();
   worker?.terminate();for(const p of requests.values())p.reject(Error('TH04 Worker 已停止'));requests.clear();
   bgm?.dispose();se?.dispose();context?.close().catch(()=>{});
  },
@@ -113,7 +114,7 @@ const sync={
  renderInfo:()=>({...cache.render,worker:true,pageDrawn:drawn,replaced,pending:!!queuedFrame,lastExecutionMs:executionMs,pageIntervals:intervals.slice(),pageRpc:{...rpcMetrics}}),
  soundInfo:()=>({...se?.info(),error:seError}),
  diagnosticText:()=>`${(cache.diagnostics||'TH04 启动中').split('\n').slice(0,2).join('\n')}\nWorker 独立模拟 · 核心固定 30000 cycles\n${seError||se?.status||'浏览器音效：等待'}\n浏览器音乐：${musicError||bgm?.status||'等待确认关卡'}`,
- faultReport:()=>({...cache.fault,cpu:lastFaultCpu,settings,worker:true,render:sync.renderInfo(),sound:sync.soundInfo(),music:{error:musicError,status:bgm?.status,track:bgm?.active?.id}}),
+ faultReport:()=>({...cache.fault,cpu:lastFaultCpu,settings,worker:true,render:sync.renderInfo(),sound:sync.soundInfo(),music:stoppedMusic??musicInfo()}),
  async collectFaultReport(){
   if(stopped)return sync.faultReport();
   const fault=await request('faultReport');lastFaultCpu=fault.cpu;

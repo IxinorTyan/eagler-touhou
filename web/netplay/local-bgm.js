@@ -70,10 +70,14 @@ export class LocalBgm {
     return this.decoded.get(cacheKey);
   }
   setVolume(value){this.volume.gain.setTargetAtTime(value,this.context.currentTime,0.015);}
+  holdGain(param,now){
+    if(typeof param.cancelAndHoldAtTime==='function')param.cancelAndHoldAtTime(now);
+    else{const value=param.value;param.cancelScheduledValues(now);param.setValueAtTime(value,now);}
+  }
   retire(){
     const item=this.active;if(!item)return;
     const now=this.context.currentTime;
-    item.gain.gain.cancelAndHoldAtTime(now);
+    this.holdGain(item.gain.gain,now);
     item.gain.gain.linearRampToValueAtTime(0,now+0.015);
     item.source.stop(now+0.016);this.active=null;
   }
@@ -117,7 +121,7 @@ export class LocalBgm {
     item.fade=speed;
     if(!item.gain)return;
     const now=this.context.currentTime;
-    item.gain.gain.cancelAndHoldAtTime(now);
+    this.holdGain(item.gain.gain,now);
     if(!speed)return;
     // PMD changes fade level every eight 9.216 ms Timer A interrupts. Use local
     // audio time for the envelope; a stalled network must not stall the fade.

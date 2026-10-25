@@ -58,7 +58,10 @@ function peerTiming(now){
   return onlinePeers().map(peer=>({role:peer.role,slot:state.slots[peer.role],hidden:!!peer.hidden,
     rttMs:peer.rtt??null,lastPacketAgeMs:Math.round(now-peer.lastPacket),
     lastInputFrame:peer.lastInputFrame??null,lastInputAgeMs:peer.lastInputAt==null?null:Math.round(now-peer.lastInputAt),
-    bufferedBytes:peer.channel?.bufferedAmount??0,inputTransport:peer.channel?.transportStats??null}));
+    bufferedBytes:peer.channel?.bufferedAmount??0,inputTransport:peer.channel?.transportStats??null,
+    channelState:peer.channel?.readyState??null,connectionState:peer.pc?.connectionState??null,
+    iceState:peer.pc?.iceConnectionState??null,suspectReason:peer.suspectReason??null,
+    suspectAgeMs:peer.suspectAt==null?null:Math.round(now-peer.suspectAt),failureReason:peer.failureReason??null}));
 }
 function recordStall(kind,durationMs,detail=''){
   const now=performance.now();
@@ -181,7 +184,7 @@ function closeDisconnected(reason){
   stopped=true;running=false;clearInput();runtime?.stop();
   clearTimers();disconnect();render();status(`${reason}。本局已停止，保留最后画面，可下载故障信息。`);
 }
-function suspect(peer){
+function suspect(peer,reason='连接状态异常'){
   if(stopped||peer.offline||peers.get(peer.role)!==peer)return;
   if(!running){
     // Membership/eviction only exists after the shared run gate. During boot,
@@ -190,7 +193,10 @@ function suspect(peer){
     showStartup();
     return;
   }
-  peer.suspectAt??=performance.now();
+  if(peer.suspectAt==null){
+    peer.suspectAt=performance.now();peer.suspectReason=reason;
+    recordStall('connection-suspect',0,`${label(peer.role)}：${reason}`);
+  }
   status(`${label(peer.role)}连接中断，等待恢复（5 秒）…`);
 }
 function reportDeparture(role){
@@ -244,10 +250,10 @@ async function request(action,data={}){
 function signal(peer,message){if(stopped||peers.get(peer.role)!==peer)return Promise.resolve();return request('signal',{to:peer.role,message});}
 function send(peer,message){
   if(!peer||peer.offline)return;
-  if(peer.channel?.readyState!=='open'){suspect(peer);return;}
-  if(peer.channel.bufferedAmount>262144){suspect(peer);return;}
+  if(peer.channel?.readyState!=='open'){suspect(peer,'玩家数据通道未打开');return;}
+  if(peer.channel.bufferedAmount>262144){suspect(peer,'本机发送积压超过 256 KiB');return;}
   try{peer.channel.send(JSON.stringify({...message,protocol:PROTOCOL,generation:state.generation,runId:state.runId}));}
-  catch{suspect(peer);}
+  catch(error){suspect(peer,'发送失败：'+String(error.message||error).slice(0,300));}
 }
 function broadcast(message){for(const peer of onlinePeers())send(peer,message);}
 function pingPeer(peer){
@@ -404,7 +410,7 @@ function update(value){
   if(state&&value.revision<=state.revision)return;
   state=value;render();
   if(state.phase==='ended'){closeDisconnected('房主已离开');return;}
-  if(running)for(const peer of onlinePeers())if(!state.present[peer.role])suspect(peer);
+  if(running)for(const peer of onlinePeers())if(!state.present[peer.role])suspect(peer,'房间服务报告该玩家离开');
   if(state.phase==='loading'&&!preparing){
     preparing=true;
     // Every browser enters the same TH06-style immersive layout. Only the
@@ -490,7 +496,7 @@ function attachChannel(peer,channel){
       if(typeof event.data!=='string'||event.data.length>65536)throw Error('无效同步消息');
       const m=JSON.parse(event.data);
       if(m.protocol!==PROTOCOL||m.generation!==state.generation||m.runId!==state.runId)throw Error('同步消息不属于本局');
-      peer.lastPacket=performance.now();peer.suspectAt=null;
+      peer.lastPacket=performance.now();peer.suspectAt=null;peer.suspectReason=null;
       if(stopped&&m.type!=='end'&&m.type!=='end-ack')return;
       switch(m.type){
         case 'hello':
@@ -559,13 +565,13 @@ function attachChannel(peer,channel){
           if(!running){fail(Error(`${label(peer.role)}启动失败：${String(m.reason).slice(0,600)}`));return;}
           peer.failureReason=String(m.reason).slice(0,600);
           if(peer.role==='host'){closeDisconnected(`房主已停止游戏：${peer.failureReason}`);return;}
-          suspect(peer);break;
+          suspect(peer,'对方运行失败：'+peer.failureReason);break;
         default:throw Error('未知同步消息');
       }
     }catch(error){fail(error);}
   };
-  channel.onclose=()=>{if(peers.get(peer.role)!==peer)return;if(stopped||peer.offline)peer.pc.close();else suspect(peer);};
-  channel.onerror=()=>{if(peers.get(peer.role)===peer)suspect(peer);};
+  channel.onclose=()=>{if(peers.get(peer.role)!==peer)return;if(stopped||peer.offline)peer.pc.close();else suspect(peer,'玩家数据通道关闭');};
+  channel.onerror=event=>{if(peers.get(peer.role)===peer)suspect(peer,'玩家数据通道错误：'+String(event?.error?.message||'未提供详情').slice(0,300));};
 }
 function makePeer(role,rtcConfiguration){
   const pc=new RTCPeerConnection(rtcConfiguration);
@@ -578,7 +584,7 @@ function makePeer(role,rtcConfiguration){
   pc.onconnectionstatechange=()=>{
     if(!current())return;
     showStartup();
-    if(['failed','disconnected'].includes(pc.connectionState))suspect(peer);
+    if(['failed','disconnected'].includes(pc.connectionState))suspect(peer,'WebRTC 状态：'+pc.connectionState);
   };
   pc.oniceconnectionstatechange=showStartup;
   pc.onsignalingstatechange=showStartup;
@@ -735,7 +741,7 @@ async function beginGame(){
         if(!useRelay)void refreshRtcPath(peer);
         // Connecting/loading have their own 30 s / 10 min deadlines. A mobile
         // browser compiling WASM must not be evicted by the in-game watchdog.
-        if(running&&now-peer.lastPacket>3000)suspect(peer);
+        if(running&&now-peer.lastPacket>3000)suspect(peer,'超过 3 秒未收到玩家数据');
         if(running&&peer.suspectAt!=null&&now-peer.suspectAt>=GRACE_MS){
           if(peer.role==='host'){closeDisconnected('主机连接已断开');return;}
           if(!membership?.roles.includes(peer.role))reportDeparture(peer.role);
@@ -781,7 +787,7 @@ function maybeRun(){
   queue.setPredictionLead(runPolicy.predictionLead);
   inputPolicy=Object.freeze({...inputPolicy,...runPolicy});
   clearTimeout(loadTimer);runtime.start();running=true;player.setActive(true);
-  for(const peer of onlinePeers()){peer.lastPacket=performance.now();peer.suspectAt=null;}
+  for(const peer of onlinePeers()){peer.lastPacket=performance.now();peer.suspectAt=null;peer.suspectReason=null;}
   lastNow=lastMeasure=performance.now();measureFrame=queue.frame;accumulator=0;
   status(`${state.settings.players} 人已同步开局，你操作 P${queue.slot+1}。`);raf=startFrameLoop(tick);
   showStartup();

@@ -26,7 +26,7 @@ let emulator,patch,soundPolicy,bgm,musicTask,closed=false,bootPromise,oldP1=0,ti
 let guestMemoryBase=-1,residentAddress=-1,gameplaySeen=false;
 const residentSignature=new TextEncoder().encode('HUMAConfig\0');
 let musicStatus='浏览器音乐：等待游戏开始后加载',musicError=false,lastMusicSequence=null;
-let pendingMusic=[],lastMusicName='',musicSettings,musicReady=false;
+let pendingMusic=[],lastMusicName='',musicSettings,musicReady=false,stoppedMusic=null;
 let pauseMenu,localSlot,menuAction=()=>{},blocked=[0,0],emulatedTicks=0,playerCount=2;
 const rollbackStates=new Map(),effects=new Map();
 let confirmedPrefix=0,replaying=false,currentEffect;
@@ -37,7 +37,7 @@ function reportRuntimeFailure(kind,error){
   if(runtimeFailure||closed)return;
   const message=String(error?.message||error);
   runtimeFailure={kind,message,tick:ticks,emulatedTicks};
-  enabled=false;closed=true;bgm?.dispose();localSe?.dispose();details.textContent=message;
+  stoppedMusic??=musicInfo();enabled=false;closed=true;bgm?.dispose();localSe?.dispose();details.textContent=message;
   notifyParent({protocol:'th04-rollback/4',event:'runtime-error',message,kind});
 }
 let controlsBlocked=false;
@@ -392,8 +392,10 @@ function observeMusic({name,sequence,ax,mode}){
   const changed=lastMusicSequence!==sequence;
   if(name){
     // The current filename remains observable even with native BGM OFF.
-    // On the first frame, restore the current song then apply its latest event.
-    if(!lastMusicName){deliverMusic(0,name);if(changed&&(ax>>>8)!==0)deliverMusic(ax,name);}
+    // Start can be followed by volume/fade within one emulated step. The
+    // observer retains only the last command, so a new filename must start
+    // its song before that command is applied, even if the sequence wrapped.
+    if(name!==lastMusicName){deliverMusic(0,name);if(changed&&(ax>>>8)!==0)deliverMusic(ax,name);}
     else if(changed)deliverMusic(ax,name);
     lastMusicName=name;
   }else if(changed&&lastMusicName)deliverMusic(ax,lastMusicName);
@@ -454,9 +456,11 @@ async function replayLoad(bytes,baseBytes,identity){
  return {frame:ticks,proof:h.proof,check:h.check};
 }
 
+function musicInfo(){return {observedTrack:lastMusicName,sequence:lastMusicSequence,error:musicError?musicStatus:null,status:bgm?.status??musicStatus,track:bgm?.active?.id,requested:bgm?.requested?.id};}
 const sync={
   faultReport({cpu=true}={}){return {settings:musicSettings,game:snapshot(),runtimeFailure,
     sound:{...localSe?.info(),error:seError},
+    music:stoppedMusic??musicInfo(),
     emulator:emulator?{state:emulator.state,error:emulator.failedError?.message??null,logs:emulator.logs??[]}:null,
     pause:pauseMenu?{paused:pauseMenu.paused,selection:pauseMenu.selection,exited:pauseMenu.exited,hostSlot:pauseMenu.hostSlot}:null,
     cpu:cpu&&emulator?readSoloFault(emulator.module.HEAPU8,emulator.module):null,diagnostics:details.textContent};},
@@ -491,7 +495,7 @@ const sync={
   load(config){if(!bootPromise)bootPromise=boot(config);return bootPromise;},
   onInput(callback){inputListener=callback;},
   start(){emulator.run();enabled=true;details.textContent='启动进度：全员已同步开局，正在启动 DOS 和游戏。';canvas.focus?.();},
-  stop(){enabled=false;closed=true;clearKeys();bgm?.dispose();localSe?.dispose();if(emulator){emulator.module.netFlushAudio();emulator.pause();}},
+  stop(){stoppedMusic??=musicInfo();enabled=false;closed=true;clearKeys();bgm?.dispose();localSe?.dispose();if(emulator){emulator.module.netFlushAudio();emulator.pause();}},
   replayProof:()=>JSON.stringify([ticks,emulatedTicks,oldP1,mailbox,guestMemoryBase,residentAddress,gameplaySeen,blocked,pauseMenu.previous,pauseMenu.paused,pauseMenu.selection,pauseMenu.exited,snapshot()]),
   replayScene(){
     if(!mailboxOwned(mailbox,guestMemoryBase,residentAddress))return null;
