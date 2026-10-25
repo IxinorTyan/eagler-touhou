@@ -114,6 +114,7 @@ export class NetSession{
   recordPong(role,time){
     const peer=this.peers.get(role);
     if(!Number.isFinite(time)||!peer?.pings?.delete(time))return;
+    peer.rttAt=performance.now();
     const sample=performance.now()-time;if(sample<0||sample>10000)return;
     const previous=peer.rtt;
     peer.jitter=previous==null?0:(peer.jitter||0)*0.75+Math.abs(sample-previous)*0.25;
@@ -371,6 +372,14 @@ export class NetSession{
       (this.performanceRates?` · ${this.game.renderBackend==='worker'?'独立绘图线程':'主线程绘图'} · 主线程绘图占用 ${(this.game.mainRenderCost||0).toFixed(1)} ms`:'')+
       (canRecommend&&recommendation>this.queue.delay?`\n下次开房建议缓冲 ${recommendation} 帧${recommendation===12?'；较高延迟仍可能需要等待':''}`:
         canRecommend&&recommendation<this.queue.delay&&this.waitPercent!=null&&this.waitPercent<1?`\n下次开房可选自动或 ${recommendation} 帧，减少操作等待`:'');
+  }
+  networkStatus(){
+    const now=performance.now();
+    return {phase:this.closed?'stopped':this.running?'connected':'connecting',bufferFrames:this.queue.delay,bufferMs:this.queue.delay*TICK,
+      peers:[...this.peers].map(([role,p])=>({name:`P${this.room.seats[role]+1}`,path:this.room.transport==='ws'?'WebSocket 中继':p.path,
+        state:p.disconnectTimer!=null?'recovering':p.channel?.readyState==='open'?'connected':'connecting',
+        rttMs:p.samples?p.rtt:null,rttAgeMs:p.rttAt==null?null:now-p.rttAt,
+        remainingMs:p.disconnectedAt==null?null:Math.max(0,DISCONNECT_GRACE-(now-p.disconnectedAt)),recovery:'等待网络自行恢复'}))};
   }
   connectionText(){
     const mode=describeNetwork({...this.room.settings,transport:this.room.transport});

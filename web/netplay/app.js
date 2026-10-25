@@ -1,3 +1,4 @@
+import {publishNetworkStatus,mountNetworkStatus} from '../network-status.js';
 import {mountHorizontalTouch,mountTouchPreferences} from '../th01-touch.js';
 import {bgmVersion,onBgmVersion} from '../bgm-version.js';
 import {populateStages,stageLabel} from '../stage-select.js';
@@ -62,6 +63,7 @@ async function post(action,data={}){
   const value=await response.json();if(!response.ok)throw Error(value.error||'房间请求失败');return value;
 }
 function showRoom(value){
+  if(value.phase==='lobby')publishNetworkStatus({phase:'idle'});
   room=value;const host=identity.role==='host',lobby=room.phase==='lobby';
   $('lobby').dataset.roomPhase=room.phase;
   $('lobby').dataset.roomLanguage='jp';
@@ -106,6 +108,8 @@ async function prepareRoomAssets(value){
   return roomPreloadPromise;
 }
 function render(current){
+  mountNetworkStatus($('player').querySelector('.toolbar'));
+  publishNetworkStatus(current.networkStatus());
   const state=current.game.state();$('connection').textContent=current.connectionText();
   $('runtime').textContent=`确认步 ${current.queue.frame} · 最近一致摘要 ${current.lastHash}\n${state?`第 ${state.stage} 关 · ${state.entrance?'过场':state.menu?'菜单 '+state.menu:['等待开球','游戏中','关卡完成','全员阵亡'][state.phase]} · 倒计时 ${state.timer}`:'加载中'}`;
   $('menu-touch').hidden=!state?.menu||identity.role!=='host';
@@ -115,7 +119,7 @@ function render(current){
   if(current.game.scoreSaveError)$('menu-note').textContent+=' 本机成绩保存失败，本局可继续。';
   $('coop-hud').replaceChildren(...(state?.players||[]).map((p,i)=>{const el=document.createElement('span');el.textContent=`P${i+1}${i===current.slot?'（你）':''} · ${p.ghost?'幽灵':`残机 ${p.lives} / Bomb ${p.bombs}`} · 获救 ${p.rescues}`;return el;}));
 }
-function failure(reason,current){if(current!==session||returningTask)return;clear();status(reason);$('connection').textContent=current.connectionText();void returnToRoom(reason);}
+function failure(reason,current){if(current!==session||returningTask)return;publishNetworkStatus(current.networkStatus());clear();status(reason);$('connection').textContent=current.connectionText();void returnToRoom(reason);}
 async function accept(value){
   if(returningTask)return;
   if(identity&&value.phase==='lobby'&&room?.phase==='loading'){await returnToRoom('本局已结束，可重新准备。',value);return;}
