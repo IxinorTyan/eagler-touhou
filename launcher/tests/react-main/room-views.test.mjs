@@ -123,6 +123,14 @@ async function mountRoom(f, extra = {}, options = {}) {
     onOpenSettings: () => intents.push(['settings']), settingsOpen: false, panel: null, onOpenPanel: (...args) => intents.push(['panel', ...args]), onClosePanel: () => intents.push(['close']), ...extra}, {locale: f.locale, ...options}); return {m, intents};
 }
 const click = (selector, scope) => act(() => n(selector, scope).click());
+
+for (const product of ['th01mp','th02mp','th03mp','th075mp','th09mp'])
+test(`room heading follows the declared gameplay mode: ${product}`,async()=>{
+  const config=owners.multiplayerConfigForProduct(product);
+  const f=await fixture({product}).live({adonisMode:1,predictionLimit:config.inputTiming?.sendPredictionLimit??8});
+  await mountRoom(f);
+  assert.equal(n('#mpRoomMode').textContent,t('en',config.gameplay==='versus'?'room.versus':'room.coop',{count:2}));
+});
 test('TH09 local charge rule defaults on, restores native Replay by room agreement, and locks during play', async () => {
   const f=await fixture({product:'th09mp',locale:'zh-CN'}).live();await mountRoom(f,{panel:{kind:'game'}});
   const toggle=n('#mpDisableLocalChargePriority');
@@ -385,7 +393,7 @@ for (const locale of ['zh-CN', 'en']) test(`Synthetic network metrics match exec
 
 test('Measured rollback button routes through real room owner without overwriting selected delay; applied running value wins', async () => {
   const product = owners.PRODUCT_IDS.find(id => owners.isMultiplayerProductId(id) && owners.multiplayerConfigForProduct(id).inputTiming?.measuredStartup);
-  assert.ok(product, 'Measured product must exist'); const f = await fixture({product}).live(); await mountRoom(f);
+  assert.ok(product, 'Measured product must exist'); const f = await fixture({product}).live({adonisMode:0,timingChoice:'auto'}); await mountRoom(f);
   assert.equal(f.service.getSnapshot().rollbackEnabled,true);await click('#mpRollbackToggle');
   await act(() => f.service.setTimingChoice(7)); await click('#mpRollbackToggle'); assert.equal(f.service.getSnapshot().rollbackEnabled, true); assert.equal(f.service.getSnapshot().timingChoice, 7);
   assert.equal(n('#mpRollbackToggle').getAttribute('aria-checked'), 'true'); await click('#mpRollbackToggle'); assert.equal(f.service.getSnapshot().rollbackEnabled, false);
@@ -528,9 +536,15 @@ for (const locale of ['zh-CN', 'en']) test(`compact room delay stepper retains h
     assert.equal(n('#mpRoomSettings').contains(value),true);assert.equal(n('#mpInputTiming').contains(value),false);
     assert.equal(n('#mpRoomSettings').contains(n('#mpRollbackToggle')),true);
     assert.equal(all('#mpInputDelayHint').length,0);
-    assert.equal(n('#mpInputDelaySetting').hidden,!!config.inputTiming?.measuredStartup&&policy.rollback);
+    assert.equal(n('#mpInputDelaySetting').hidden,!!config.inputTiming?.runtimeTiming || !!config.inputTiming?.measuredStartup&&policy.rollback&&config.inputTiming?.rollbackDefault!==false);
     assert.ok(n('#mpRollbackToggle').compareDocumentPosition(n('#mpInputDelaySetting')) & env.window.Node.DOCUMENT_POSITION_FOLLOWING);
-    if(config.inputTiming){
+    if(config.inputTiming?.runtimeTiming){
+      assert.equal(n('#mpRollbackToggle').hidden,!policy.rollback);
+      assert.equal(n('#mpRollbackToggle').getAttribute('aria-checked'),'false');
+      if(policy.rollback){await click('#mpRollbackToggle');assert.equal(f.service.getSnapshot().rollbackEnabled,true);assert.equal(n('#mpInputDelaySetting').hidden,true);}
+      await f.receive({phase:'running',adonisMode:policy.rollback?0:1,predictionLimit:policy.predictionLimit});
+      assert.equal(n('#mpRollbackToggle').disabled,true);assert.equal(n('#mpInputDelaySetting').hidden,true);
+    }else if(config.inputTiming){
       if(policy.rollback){await act(()=>f.service.setRollbackEnabled(false));assert.equal(n('#mpInputDelaySetting').hidden,false);assert.equal(all('#mpInputDelayHint').length,0);}
       await act(()=>f.service.setTimingChoice(0));assert.equal(value.textContent,'0f');assert.equal(n('#mpInputDelayMinus').disabled,true);
       await click('#mpInputDelayPlus');assert.equal(f.service.getSnapshot().timingChoice,1);assert.equal(value.textContent,'1f');

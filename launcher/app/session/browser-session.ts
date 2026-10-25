@@ -415,7 +415,7 @@ export function createBrowserSession({document, window, baseUrl: configuredBaseU
   async function requestRuntimeClose({nativeExit = false, leaveRoom = false}: {nativeExit?: boolean; leaveRoom?: boolean} = {}): Promise<boolean> {
     const owner = requiredRuntime();
     const currentRoom = roomSession?.service.getSnapshot();
-    if (!nativeExit && !leaveRoom && (owner.getSnapshot().launched || owner.getSnapshot().roomPreview) && !snapshot.replayViewer && currentRoom?.room &&
+    if (!nativeExit && !leaveRoom && owner.getSnapshot().roomReturnSupported && (owner.getSnapshot().launched || owner.getSnapshot().roomPreview) && !snapshot.replayViewer && currentRoom?.room &&
         (!snapshot.th09NetworkOverlayOpen || owner.getSnapshot().runtimeVariant === 'multiplayer' && owner.getSnapshot().roomReturnSupported)) {
       try {if (owner.getSnapshot().launched) await owner.returnToRoom();}
       catch (error) {reportError(error); return false;}

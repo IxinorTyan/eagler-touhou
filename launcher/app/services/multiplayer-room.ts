@@ -759,7 +759,7 @@ export function createMultiplayerRoom(ports: MultiplayerRoomPorts) {
     state.spectatorRequested = spectatorEntry || !!saved?.spectatorRequested;
     state.roomSettingsOpen = !!saved?.roomSettingsOpen;
     state.timingChoice = 'auto';
-    state.rollbackEnabled = multiplayerInputTimingPolicy(config).rollback;
+    state.rollbackEnabled = multiplayerInputTimingPolicy(config).rollback && config.inputTiming?.rollbackDefault !== false;
     ports.routes.restore({ product: restoredProduct, code, fromDirectory: state.fromDirectory });
     publish();
     connect();
@@ -776,7 +776,7 @@ export function createMultiplayerRoom(ports: MultiplayerRoomPorts) {
     autoSeat = false;
     state.fromDirectory = false;
     state.timingChoice = 'auto';
-    state.rollbackEnabled = multiplayerInputTimingPolicy(policy()).rollback;
+    state.rollbackEnabled = multiplayerInputTimingPolicy(policy()).rollback && policy()?.inputTiming?.rollbackDefault !== false;
     room = {
       code,
       playerCount: policy()!.playerCounts[0],
@@ -999,6 +999,7 @@ export function createMultiplayerRoom(ports: MultiplayerRoomPorts) {
     )
       return;
     const config = policy()!;
+    if(patch.challengeMode === true && config.challengeMode === false)return;
     const chapterThreshold =
       product === "th15mp"
         ? (patch.chapterThreshold ??
@@ -1084,7 +1085,7 @@ export function createMultiplayerRoom(ports: MultiplayerRoomPorts) {
     if (
       !ownerLocal() ||
       room?.phase !== 'lobby' ||
-      !policy()?.inputTiming?.measuredStartup ||
+      !(policy()?.inputTiming?.measuredStartup || policy()?.inputTiming?.runtimeTiming) ||
       !multiplayerInputTimingPolicy(policy()).rollback
     )
       return;
@@ -1105,7 +1106,7 @@ export function createMultiplayerRoom(ports: MultiplayerRoomPorts) {
     const timingPolicy = multiplayerInputTimingPolicy(policy());
     const rollback = timingPolicy.rollback && state.rollbackEnabled;
     const measured = timingPolicy.measuredStartup,
-      adonisMode = measured ? (rollback ? 0 : 1) : 0;
+      adonisMode = measured || timing.runtimeTiming ? (rollback ? 0 : 1) : 0;
     const automatic = !rollback && measured && state.timingChoice === 'auto';
     const selected = Number(state.timingChoice);
     const inputDelay =
@@ -1118,8 +1119,8 @@ export function createMultiplayerRoom(ports: MultiplayerRoomPorts) {
           : timingRecommendation().inputDelay;
     send({
       type: 'start',
-      inputDelay,
-      ...(measured ? { adonisMode, inputDelayAuto: automatic, predictionReserve: 2 } : {}),
+      inputDelay: timing.runtimeTiming ? 0 : inputDelay,
+      ...(timing.runtimeTiming ? {adonisMode} : measured ? { adonisMode, inputDelayAuto: automatic, predictionReserve: 2 } : {}),
       ...(!timingPolicy.rollback || timing.sendPredictionLimit != null
         ? { predictionLimit: timingPolicy.predictionLimit }
         : {}),
@@ -1167,6 +1168,7 @@ export function createMultiplayerRoom(ports: MultiplayerRoomPorts) {
         seed: Number.parseInt(room.code, 10) & 0xffff,
         difficulty: Math.max(0, Math.min(config.difficulties.length - 1, room.difficulty)),
         ...(config.inputTiming ? { inputDelay: Number(room.inputDelay) || 0 } : {}),
+        ...(config.inputTiming?.runtimeTiming ? {adonisMode: Number(room.adonisMode) || 0} : {}),
         ...(config.inputTiming?.measuredStartup
           ? {
               inputDelayAuto: room.inputDelayAuto ?? false,
@@ -1193,7 +1195,7 @@ export function createMultiplayerRoom(ports: MultiplayerRoomPorts) {
         ...(product === 'th15mp' ? {
           chapterThreshold: room.chapterThreshold ?? defaultTh15ChapterThreshold(room.playerCount),
         } : {}),
-        ...(config.gameplay === 'cooperative'
+        ...(config.gameplay === 'cooperative' && config.challengeMode !== false
           ? { challengeMode: room.challengeMode === true }
           : {}),
         iceServers: ports.settings().iceServers,

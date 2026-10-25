@@ -1,0 +1,16 @@
+{
+  "schema": "eagler-touhou/managed-import-preview/1",
+  "game": "th03",
+  "directory": "ports/th03",
+  "currentMode": "external-source-adapter-preview",
+  "upstream": "https://github.com/IxinorTyan/th03-netplay-lab",
+  "upstreamCommit": "63d8c211c131ab52a43e706f8b5ad7718ba7858f",
+  "sourceDirectory": "../th03-netplay-lab",
+  "subtreeConnection": null,
+  "exportBase": null,
+  "sourceHistoryStatus": "pending-source-import",
+  "builder": "ports/th03/scripts/build-eagler.mjs",
+  "inputIdentityRecord": "ports/th03/content/source.json",
+  "normalAndMultiplayer": "DOSBox-X adapter with native versus selection and main-room transport",
+  "record": "docs/migration/th03-eagler-20261025.md"
+}

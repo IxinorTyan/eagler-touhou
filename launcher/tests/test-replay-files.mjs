@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import {
+import {build} from 'esbuild';
+import {fileURLToPath} from 'node:url';
+const compiled=await build({entryPoints:[fileURLToPath(new URL('../src/launcher/replay-files.mts',import.meta.url))],bundle:true,write:false,format:'esm',platform:'node'});
+const {
   allocateReplayName,
   createReplayArchiveExtractionGuard,
   createReplayMutationQueue,
@@ -12,9 +15,16 @@ import {
   ReplayArchiveScanError,
   replayImportAccept,
   selectReplayExportPaths,
-} from "../.cache/build/browser/assets/launcher/replay-files.mjs";
+} = await import('data:text/javascript;base64,'+Buffer.from(compiled.outputFiles[0].contents).toString('base64'));
 
-assert.equal(replayImportAccept, ".zip,.rpy,.rpyx,.rep");
+assert.equal(replayImportAccept, ".zip,.rpy,.rpyx,.th01r,.th02r,.th03r,.th04r,.th05r,.rep");
+assert.equal(isReplayImportFileName('recorded.th05r'),true);
+assert.equal(isValidReplayName('th05','recorded.th05r'),true);
+assert.equal(isValidReplayName('th05','recorded.th04r'),false);
+assert.equal(isReplayImportFileName('recorded.th04r'),true);
+assert.equal(isValidReplayName('th04','recorded.th04r'),true);
+assert.equal(isValidReplayName('th04','th6_01.rpy'),false);
+assert.equal(allocateReplayName('th04',[],'recorded match.th04r'),'recorded_match.th04r');
 assert.equal(isReplayFilePath("replay/replay000.rep"), true);
 assert.equal(isValidReplayName("th075", "replay000.rep"), true);
 assert.equal(isValidReplayName("th075", "../replay000.rep"), false);

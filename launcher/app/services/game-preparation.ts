@@ -112,6 +112,7 @@ async function initialGamePlan(input: GamePreparationInput, acquired: PackageAcq
 function effectiveMusic(input: GamePreparationInput, generation: InstalledPackageGeneration | null, host: SiteManifest | null) {
   const {settings, acquisition} = input, hosted = host?.games[settings.gameId];
   return resolveEffectiveMusicMode({audio: settings.context.musicAvailability.audio,
+    embeddedOgg: settings.context.musicAvailability.embeddedOgg,
     midiAvailable: PRODUCT_GAMES[settings.gameId].musicCapabilities.midi && hosted?.music.midi.supported !== false,
     importServer: host?.shared.resourceMode === 'import', remoteOggAdvertised: !!hosted?.music.ogg,
     remoteRevision: acquisition.getMetadata().releaseCatalog?.games[settings.gameId]?.revision ?? null,

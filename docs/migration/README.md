@@ -11,6 +11,11 @@
 | [stb-vorbis-provenance.json](stb-vorbis-provenance.json) | stb_vorbis 来源 |
 | [th12-eagler-20261020.json](th12-eagler-20261020.json) | th12 导入身份与子树基点 |
 | [th12-subtree-20261024.md](th12-subtree-20261024.md) | th12 子树继承与独立导出 |
+| [th01-eagler-20261025.md](th01-eagler-20261025.md) | th01 原生 WASM 主项目适配预览 |
+| [th02-eagler-20261025.md](th02-eagler-20261025.md) | th02 DOSBox-X 主项目适配预览 |
+| [th03-eagler-20261025.md](th03-eagler-20261025.md) | th03 DOSBox-X 主项目适配预览 |
+| [th04-eagler-20261025.md](th04-eagler-20261025.md) | th04 主启动器与房间适配预览 |
+| [th05-eagler-20261025.md](th05-eagler-20261025.md) | th05 主启动器与房间适配预览 |
 
 搬迁当时的验收原文见[旧文档去向表](../history/INDEX.md)。继续开发使用[工作区说明](../../WORKSPACE.md)与各组件开发指南。
 

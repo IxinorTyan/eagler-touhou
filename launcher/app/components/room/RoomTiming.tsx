@@ -6,7 +6,7 @@ import {OptionSwitch} from '../settings/TouchSettingsFields';
 
 export function RoomTiming({state, service, settings = false}: {state: RoomOwnerSnapshot; service: MultiplayerRoomService; settings?: boolean}) {
   const {t} = useLocale(), {room, ready, owner, config} = roomPresentation(state, t)!;
-  const policy = multiplayerInputTimingPolicy(config), supported = !!config.inputTiming?.measuredStartup && policy.rollback;
+  const policy = multiplayerInputTimingPolicy(config), supported = !!(config.inputTiming?.measuredStartup || config.inputTiming?.runtimeTiming) && policy.rollback;
   const rollback = supported && (room.phase === 'lobby' ? state.rollbackEnabled : room.adonisMode !== 1);
   const editable = ready && owner && room.phase === 'lobby' && !!config.inputTiming;
   const advice = service.timingRecommendation();
@@ -25,7 +25,7 @@ export function RoomTiming({state, service, settings = false}: {state: RoomOwner
       <span>{t('room.enableRollback')}</span><i aria-hidden="true"/>
     </button>
     </>}
-    {settings && <section className="mp-room-delay" id="mpInputDelaySetting" hidden={rollback}>
+    {settings && <section className="mp-room-delay" id="mpInputDelaySetting" hidden={rollback || config.inputTiming?.runtimeTiming}>
       <span id="mpInputDelayLabel">{t('room.inputDelay')}：</span>
       <div className="mp-delay-stepper" role="group" aria-labelledby="mpInputDelayLabel">
         <button id="mpInputDelayMinus" className="mp-delay-step" type="button" disabled={!manualEditable || value <= 0}

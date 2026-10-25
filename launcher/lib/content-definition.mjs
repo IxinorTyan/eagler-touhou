@@ -13,6 +13,36 @@ const TH06_ARCHIVES = Object.freeze([
 // Product content shape only. This file declares names and Runtime mounts, but
 // never points at a workstation build, asset directory, or generated identity.
 export const PRODUCT_CONTENT = Object.freeze({
+  th01: Object.freeze({
+    original:Object.freeze({files:Object.freeze(['th01.data']),preparedAlternative:Object.freeze({directory:'content',markerFiles:Object.freeze(['th01.data'])})}),
+    dataLayout:'sha256-967f66a7de83b3e5580afa2bc0db41aac8b8c41ec90eb4b6767286570d76a579',
+    music:Object.freeze({}),
+    hostPreparation:Object.freeze({artwork:Object.freeze({kind:'prepared-artwork'}),preparedContent:Object.freeze({directory:'content',markerFiles:Object.freeze(['th01.data']),script:'scripts/prepare-th01-content.mjs'}),dataAssets:Object.freeze({kind:'prepared-content'})}),
+  }),
+  th02: Object.freeze({
+    original:Object.freeze({files:Object.freeze(['th02.data']),preparedAlternative:Object.freeze({directory:'content',markerFiles:Object.freeze(['th02.data'])})}),
+    dataLayout:'sha256-967f66a7de83b3e5580afa2bc0db41aac8b8c41ec90eb4b6767286570d76a579',
+    music:Object.freeze({}),
+    hostPreparation:Object.freeze({artwork:Object.freeze({kind:'prepared-artwork'}),preparedContent:Object.freeze({directory:'content',markerFiles:Object.freeze(['th02.data']),script:'scripts/prepare-th02-content.mjs'}),dataAssets:Object.freeze({kind:'prepared-content'})}),
+  }),
+  th03: Object.freeze({
+    original:Object.freeze({files:Object.freeze(['th03.data']),preparedAlternative:Object.freeze({directory:'content',markerFiles:Object.freeze(['th03.data'])})}),
+    dataLayout:'sha256-967f66a7de83b3e5580afa2bc0db41aac8b8c41ec90eb4b6767286570d76a579',
+    music:Object.freeze({}),
+    hostPreparation:Object.freeze({artwork:Object.freeze({kind:'prepared-artwork'}),preparedContent:Object.freeze({directory:'content',markerFiles:Object.freeze(['th03.data']),script:'scripts/prepare-th03-content.mjs'}),dataAssets:Object.freeze({kind:'prepared-content'})}),
+  }),
+  th04: Object.freeze({
+    original:Object.freeze({files:Object.freeze(['th04.data']),preparedAlternative:Object.freeze({directory:'content',markerFiles:Object.freeze(['th04.data'])})}),
+    dataLayout:'sha256-967f66a7de83b3e5580afa2bc0db41aac8b8c41ec90eb4b6767286570d76a579',
+    music:Object.freeze({}),
+    hostPreparation:Object.freeze({artwork:Object.freeze({kind:'prepared-artwork'}),preparedContent:Object.freeze({directory:'content',markerFiles:Object.freeze(['th04.data']),script:'scripts/prepare-th04-content.mjs'}),dataAssets:Object.freeze({kind:'prepared-content'})}),
+  }),
+  th05: Object.freeze({
+    original:Object.freeze({files:Object.freeze(['th05.data']),preparedAlternative:Object.freeze({directory:'content',markerFiles:Object.freeze(['th05.data'])})}),
+    dataLayout:'sha256-967f66a7de83b3e5580afa2bc0db41aac8b8c41ec90eb4b6767286570d76a579',
+    music:Object.freeze({}),
+    hostPreparation:Object.freeze({artwork:Object.freeze({kind:'prepared-artwork'}),preparedContent:Object.freeze({directory:'content',markerFiles:Object.freeze(['th05.data']),script:'scripts/prepare-th05-content.mjs'}),dataAssets:Object.freeze({kind:'prepared-content'})}),
+  }),
   th06: Object.freeze({
     original: Object.freeze({
       files: TH06_ARCHIVES,

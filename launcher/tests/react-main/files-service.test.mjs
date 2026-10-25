@@ -86,6 +86,25 @@ function fixture({ready = true, launched = false, confirm = true, corrupt = fals
 }
 const save = () => new File([new Uint8Array([3, 7, 9])], 'any.dat');
 
+for(const [game,name,extension] of [['th01','scores.dat','.dat'],['th02','HUUHI.DAT','.dat'],['th03','YUME.NEM','.nem']])
+for(const product of [game,game+'mp'])test(`${product} imports and exports its native score filename`,async()=>{
+  const f=fixture();await f.actions.importFile('save',new File([new Uint8Array([3,7,9])],name),product);
+  assert.deepEqual(f.stored.get(name),[3,7,9]);assert(f.events.includes('read:'+name));
+  await f.actions.run('export-save',product);assert.equal(f.downloads.at(-1).name,name);
+  const picker=fixture();await picker.actions.run('import-save',product);assert(picker.events.includes('pick:'+extension));
+});
+
+for(const product of ['th04','th04mp'])test(`${product} preserves native SCR scores and TH04R replay identity`,async()=>{
+ const f=fixture();
+ await f.actions.importFile('save',new File([new Uint8Array([3,7,9])],'GENSOU.SCR'),product);
+ assert.deepEqual(f.stored.get('GENSOU.SCR'),[3,7,9]);
+ assert(f.events.includes('read:GENSOU.SCR'),'score import verifies the persisted file after reopening');
+ await f.actions.run('export-save',product);assert.equal(f.downloads.at(-1).name,'GENSOU.SCR');
+ const g=fixture();await g.actions.importFile('replay',new File([new Uint8Array([8])],'recorded match.th04r'),product);
+ assert.deepEqual(g.stored.get('replay/recorded_match.th04r'),[8]);
+ const picker=fixture();await picker.actions.run('import-save',product);assert(picker.events.includes('pick:.scr'));
+});
+
 for (const product of ['th15','th15mp']) test(`${product} save archive round-trips score and every Pointdevice slot`,async()=>{
  const f=fixture({launched:true});f.stored.set('scoreth15.dat',[1,2,3]);
  for(let character=0;character<4;character++)for(let difficulty=0;difficulty<5;difficulty++)f.stored.set(`autosave/save${character}_${difficulty}.dat`,[character,difficulty,7]);

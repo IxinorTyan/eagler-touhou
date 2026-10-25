@@ -79,7 +79,8 @@ async function openLobby(port, room, clientId, policy = '') {
   assert.equal(initial.room.prankMode, false, 'prank mode stays disabled at room creation');
   const initialPolicy = multiplayerInputTimingPolicy(multiplayerConfigForProduct(room.split('-')[0]));
   assert.equal(initial.room.predictionLimit, initialPolicy.predictionLimit, `${room}: initial prediction policy`);
-  assert.equal(initial.room.adonisMode, initialPolicy.rollback ? 0 : 1, `${room}: initial timing mode`);
+  const config = multiplayerConfigForProduct(room.split('-')[0]);
+  assert.equal(initial.room.adonisMode, initialPolicy.rollback && config?.inputTiming?.rollbackDefault !== false ? 0 : 1, `${room}: initial timing mode`);
   return socket;
 }
 
@@ -142,13 +143,13 @@ async function verifyGenericRoom(port) {
 
 async function verifyModes(port, product) {
   const capability = multiplayerConfigForProduct(product);
-  const challengeSupported = capability.gameplay === "cooperative";
+  const challengeSupported = capability.gameplay === "cooperative" && capability.challengeMode !== false;
   const timingPolicy = multiplayerInputTimingPolicy(capability);
   const room = `${product}-modes${Date.now().toString(36)}`;
   const host = await openLobby(port, room, 'modes_host', 'intent=create&prankMode=1'), guest = await openLobby(port, room, 'modes_guest');
   try {
     await sendAndMatch(host, {type:'take-seat',seat:0,loadout:0}, r => r.room?.seats[0]);
-    await sendAndMatch(guest, {type:'take-seat',seat:1,loadout:1}, r => r.room?.seats[1]);
+    await sendAndMatch(guest, {type:'take-seat',seat:1,loadout:Math.min(1,capability.loadouts.length-1)}, r => r.room?.seats[1]);
     await sendAndMatch(host, {type:'set-ready',ready:true}, r => r.room?.seats[0]?.ready);
     await sendAndMatch(guest, {type:'set-ready',ready:true}, r => r.room?.seats[1]?.ready);
     await sendAndMatch(guest, {type:'settings',challengeMode:true,prankMode:true}, r => r.type==='error');
@@ -160,7 +161,14 @@ async function verifyModes(port, product) {
       await sendAndMatch(host, {type:'set-ready',ready:true}, r => r.room?.seats[0]?.ready);
       await sendAndMatch(guest, {type:'set-ready',ready:true}, r => r.room?.seats[1]?.ready);
     }
+    if (!timingPolicy.rollback) {
+      for (const predictionLimit of [-1,1]) {
+        const rejected=await sendAndMatch(host,{type:'start',adonisMode:1,predictionLimit},r=>r.type==='error');
+        assert.match(rejected.error,/input timing/);
+      }
+    }
     const started = await sendAndMatch(host, {type:'start', ...(!timingPolicy.rollback ? {adonisMode:1,predictionLimit:0} : {})}, r => r.type==='start');
+    if (!timingPolicy.rollback) assert.equal(started.room.predictionLimit,0);
     assert.equal(started.room.challengeMode, challengeSupported);
     await sendAndMatch(host, {type:'settings',challengeMode:false,prankMode:false}, r => r.type==='error');
     const locked = await sendAndMatch(host, {type:'start'}, r => r.type==='state');

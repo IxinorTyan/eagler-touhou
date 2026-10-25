@@ -29,6 +29,7 @@ import {
   hasPendingSpectators,
   appendSpectatorHistory,
   validRelayControlMessage,
+  relayGameplayPayload,
 } from './relay-flow-control.mjs';
 
 import {
@@ -381,7 +382,7 @@ function getRoom(id, socket) {
         inputDelay: 0,
         timingChoice: 'auto',
         startedAt: 0,
-        adonisMode: multiplayerInputTimingPolicy(multiplayer).rollback ? 0 : 1,
+        adonisMode: multiplayerInputTimingPolicy(multiplayer).rollback && multiplayer?.inputTiming?.rollbackDefault !== false ? 0 : 1,
         inputDelayAuto: false,
         predictionReserve: 2,
         timing: null,
@@ -955,7 +956,7 @@ function handleLobbyConnection(socket, roomId, clientId, memberId, intent, initi
     room.lobby.visibility = initialPolicy?.visibility === 'private' ? 'private' : 'public';
     room.lobby.disableCheatMovement = initialPolicy?.disableCheatMovement === true;
     if(room.id.startsWith('th09mp-'))room.lobby.disableLocalChargePriority=initialPolicy?.disableLocalChargePriority===true;
-    const modesSupported = room.multiplayer?.gameplay === 'cooperative';
+    const modesSupported = room.multiplayer?.gameplay === 'cooperative' && room.multiplayer.challengeMode !== false;
     room.lobby.challengeMode = modesSupported && initialPolicy?.challengeMode === true;
     room.lobby.prankMode = false;
     if (validPlayerCount(room.multiplayer, initialPolicy?.playerCount))
@@ -1456,7 +1457,7 @@ function handleLobbyConnection(socket, roomId, clientId, memberId, intent, initi
         sendLobby(socket,{type:'error',error:'invalid local charge priority setting'});return;
       }
       const disableLocalChargePriority=message.disableLocalChargePriority ?? room.lobby.disableLocalChargePriority;
-      const modesSupported = room.multiplayer?.gameplay === 'cooperative';
+      const modesSupported = room.multiplayer?.gameplay === 'cooperative' && room.multiplayer.challengeMode !== false;
       const challengeMode =
         modesSupported &&
         (typeof message.challengeMode === 'boolean'
@@ -1585,7 +1586,8 @@ function handleLobbyConnection(socket, roomId, clientId, memberId, intent, initi
         predictionReserve < 1 ||
         predictionReserve > 2 ||
         (message.predictionReserve !== undefined && !adonisSupported) ||
-        (adonisMode !== 0 && !adonisSupported) ||
+        (adonisMode !== 0 && !adonisSupported && !(room.multiplayer?.inputTiming?.runtimeTiming && adonisMode === 1)) ||
+        (room.multiplayer?.inputTiming?.runtimeTiming && inputDelay !== 0) ||
         (!timingPolicy.rollback &&
           (adonisMode !== 1 ||
             (message.predictionLimit !== undefined && message.predictionLimit !== 0))) ||
@@ -1594,7 +1596,7 @@ function handleLobbyConnection(socket, roomId, clientId, memberId, intent, initi
         inputDelay > (adonisMode || timingPolicy.manualRollbackDelay ? timingPolicy.manualDelayLimit : 8) ||
         (configurablePredictionLimit != null &&
           (!Number.isInteger(predictionLimit) ||
-            predictionLimit < 1 ||
+            predictionLimit < (timingPolicy.rollback ? 1 : 0) ||
             predictionLimit > configurablePredictionLimit))
       ) {
         sendLobby(socket, { type: 'error', error: 'invalid input timing' });
@@ -2138,7 +2140,7 @@ server.on('connection', (socket, request) => {
       if (dropEvery > 0 && sequence % dropEvery === 0) continue;
       const spread = jitterMs > 0 ? ((sequence * 17) % (jitterMs * 2 + 1)) - jitterMs : 0;
       const wait = Math.max(0, delayMs + spread);
-      sendBounded(target, forwardedPayload, { binary: true, delayMs: wait });
+      sendBounded(target, relayGameplayPayload(multiplayerPolicyForRoomId(roomId), player, forwardedPayload), { binary: true, delayMs: wait });
     }
   });
 

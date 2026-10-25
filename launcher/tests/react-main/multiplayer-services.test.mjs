@@ -515,15 +515,16 @@ test('every playing or full directory room admits spectators even without mid-ru
   }
 });
 
-function preparationFixture({installed = true, worker = null, installError, noCatalog = false, network, prepareProgram} = {}) {
+function preparationFixture({installed = true, worker = null, installError, noCatalog = false, development = false, network, prepareProgram} = {}) {
   const events = [], progress = [], controller = new AbortController(); let onChange;
   let generation = installed ? {game: 'th06'} : null;
-  const host = {games: {th06: {multiplayerRuntime: 'runtime/th06/mp.html'}}, shared: {runtimeManifest: 'runtime-manifest.json'}};
+  const host = {games: {th06: {multiplayerRuntime: 'runtime/th06/mp.html'}}, shared: {runtimeManifest: 'runtime-manifest.json'}, ...(development?{profile:'web-development'}:{})};
   const acquisition = {fetchImpl: async () => {throw new Error('fixture must not fetch');}, catalogUrl: 'https://launcher.invalid/releases.json',
     getGameVersion: () => 'original',
     getPublication: async () => ({catalog: noCatalog ? null : {games: {th06: {}}}, catalogUrl: 'https://launcher.invalid/releases.json'}),
     getMetadata: () => ({siteManifest: host, releaseCatalog: noCatalog ? null : {games: {th06: {}}}}),
     readCurrent: async game => {events.push(['read', game]); return {generation};},
+    acquire: async options => {events.push(['acquire',options]);if(installError)throw installError;generation={game:'th06'};},
     installPublished: async (game, options) => {events.push(['install', game, options]); if (installError) throw installError; generation = {game};},
     refreshInstalled: async game => {events.push(['publish', game]);},
   };
@@ -548,6 +549,16 @@ test('room preparation uses canonical package-only install and verifies current 
   assert.equal(prepared.runtimeGeneration,hash);
   assert.equal(fixture.progress.at(-1).stage, 'runtime');
   assert.equal(fixture.progress.some(value => value.status === 'ready'), false, 'room owner alone publishes final readiness');
+});
+
+test('development rooms acquire an unpublished local package and verify the committed generation',async()=>{
+  const fixture=preparationFixture({installed:false,noCatalog:true,development:true});
+  await fixture.service.prepare(fixture.context,fixture.report);
+  const acquired=fixture.events.find(([kind])=>kind==='acquire');
+  assert.deepEqual(acquired[1],{productId:'th06mp',gameVersion:'original',music:'none',language:'ja',signal:fixture.context.signal});
+  assert.equal(fixture.events.some(([kind])=>kind==='install'),false);
+  assert.equal(fixture.events.filter(([kind])=>kind==='read').length,2);
+  assert.equal(fixture.events.find(([kind])=>kind==='runtime')[2].requireCurrent,true);
 });
 
 test('room preparation verifies the current generation with its real worker and ignores aborted tracker callbacks', async () => {
@@ -929,4 +940,17 @@ test('existing local nickname migrates only after the moderation handshake witho
  assert.deepEqual(socket.sent.at(-1),{type:'set-name',name:'Alice Wonder'});
  assert.equal(f.service.getSnapshot().nickname.status,'reviewing');
  f.service.dispose();
+});
+
+for (const [product,counts,modes] of [['th01mp',[2,3],[1]],['th02mp',[2,3],[0,1]],['th03mp',[2],[0,1]]])
+test(`${product} forwards the selected native timing from lobby to Runtime`, async () => {
+  for (const playerCount of counts) for (const adonisMode of modes) {
+    const f=roomFixture(); f.service.enterRoom(product,'1234',true); await flush();
+    const socket=f.sockets[0]; socket.open(); const id=f.identity.lobbyClientId(product);
+    const seats=Array.from({length:playerCount},(_,i)=>({clientId:i?`peer-seat${i}`:id,name:'A',loadout:0,ready:true}));
+    socket.message({type:'state',room:roomState(id,{playerCount,seats,phase:'running',adonisMode,predictionLimit:product==='th01mp'?0:6,inputDelay:0})});
+    const options=f.service.runtimeOptions(); assert.equal(options.netplayAdonisMode,adonisMode);
+    assert.equal(options.netplayPlayerCount,playerCount); assert.equal(options.netplayPredictionLimit,product==='th01mp'?0:6);
+    f.service.dispose();
+  }
 });
