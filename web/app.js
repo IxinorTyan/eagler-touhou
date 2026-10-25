@@ -18,6 +18,7 @@ import {createFrameGate} from './frame-limit.js';
 import {LocalBgm} from './local-bgm.js';
 import {LocalSfx} from './local-sfx.js';
 import {installNetworkAudio} from './network-audio.js';
+import {publishNetworkStatus,mountNetworkStatus} from './network-status.js';
 import {NativeMusic, ConfirmedMusic} from './native-music.js';
 import {createNetworkHistory,mountNetworkPerformance,readNativeCoreDiagnostics} from './network-performance.js';
 
@@ -126,6 +127,7 @@ const inGameplay = () => !!nativeState?.phase;
 const screenChildren = [...$('screen').children];
 const player = mountPlayer($('screen'), {solo: true,network:online, onGesture: () => { clearEscape(); resumeAudio(); },
   onFullscreenExit: () => { if(pauseSeat===null)openPause(0); }});
+if(online)mountNetworkStatus($('screen').querySelector('.player-toolbar'));
 if(embedded){
   const back=document.createElement('button');back.type='button';back.className='room-return-current-run';back.textContent='返回房间';
   back.onclick=returnRoom;$('screen').append(back);
@@ -623,6 +625,13 @@ $('start').addEventListener('click', async () => {
     if(roomHost?.stopped)throw Error('房间已结束');
     if (online) {
       netplay = new Netplay({room: netQuery.get('room'), token: netQuery.get('token'), role: netQuery.get('role'), mode: netQuery.get('net'),runId:Number(netQuery.get('runId')),sampleLocal:controls.sampleLocal,
+        onMetrics: snapshot => {
+          if(sync?.queue){snapshot.bufferFrames=sync.queue.active?sync.queue.inputDelay:sync.queue.bootDelay;snapshot.bufferMs=snapshot.bufferFrames*1000/60;}
+          publishNetworkStatus(snapshot);
+          const message={protocol:'th03-lan/1',event:'network-status',snapshot};
+          if(roomHost)roomHost.notify(message);
+          else if(embedded)window.parent.postMessage(message,location.origin);
+        },
         onState: message => {
           $('connection-path').hidden=false;$('connection-path').textContent=`本机连接：${message}`;
           if(roomHost)roomHost.notify({protocol:'th03-lan/1',event:'connection',message});

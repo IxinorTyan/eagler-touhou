@@ -5,8 +5,9 @@ import {loadRtcConfiguration,hasTurn,describeRtcPath} from './netplay/udp-config
 import {SYNC_PROTOCOL,RTT_SAMPLES,validInputReport,validInputPolicy,chooseInputPolicy} from './netplay/input-policy.js';
 const ACTIONS=['up','down','left','right','shot','rapid','attack','focus'], protocol='th03-lan/1';
 export class Netplay {
-  constructor({room,token,role,mode,runId=0,sampleLocal,onState=()=>{},onError=()=>{}}){this.room=room;this.runId=runId;this.token=token;this.role=role;this.mode=mode;this.sampleLocal=sampleLocal;this.localSeat=role==='host'?0:1;this.onState=onState;this.onError=onError;this.remote=new Set();this.seq=0;this.lastRemote=-1;this.socket=null;this.pc=null;this.rtcPoll=null;this.rtcTimer=null;this.rtcResolve=null;this.rtcReject=null;this.pendingIce=[];this.remoteDescriptionReady=false;}
+  constructor({room,token,role,mode,runId=0,sampleLocal,onMetrics=()=>{},onState=()=>{},onError=()=>{}}){this.room=room;this.runId=runId;this.token=token;this.role=role;this.mode=mode;this.sampleLocal=sampleLocal;this.localSeat=role==='host'?0:1;this.onMetrics=onMetrics;this.onState=onState;this.onError=onError;this.remote=new Set();this.seq=0;this.lastRemote=-1;this.socket=null;this.pc=null;this.rtcPoll=null;this.rtcTimer=null;this.rtcResolve=null;this.rtcReject=null;this.pendingIce=[];this.remoteDescriptionReady=false;}
   async start(){
+    this.metricsTimer=setInterval(()=>this.observeConnection(),500);
     try{
       const state=await this.state();
       if(this.closed)throw Error('连接已关闭');
@@ -28,6 +29,22 @@ export class Netplay {
   fail(error){if(this.closed)return;this.rtcReject?.(error);this.relayReject?.(error);this.rtcResolve=this.rtcReject=this.relayReject=null;this.close();this.onState(error.message);this.onError(error);}
   get isLockstep(){return true;}
   get inputTransportStats(){return this.channel?.transportStats??null;}
+  connectionMetrics(){
+    const now=performance.now(),recovery=this.disconnectedAt!=null;
+    const frames=this.inputPolicy?(this.inputPolicy.rollbackEnabled?this.inputPolicy.inputDelay:2):null;
+    return {phase:this.closed?'stopped':this.synchronized?'connected':'connecting',bufferFrames:frames,bufferMs:frames===null?null:frames*1000/60,
+      peers:[{name:`P${(this.localSeat^1)+1}`,path:this.mode==='relay'?'WebSocket 中继':this.path||'WebRTC',
+        state:recovery?'recovering':this.channel?.readyState==='open'?'connected':'connecting',
+        rttMs:this.liveRtt,rttAgeMs:this.rttAt==null?null:now-this.rttAt,packetAgeMs:this.lastPacketAt==null?null:now-this.lastPacketAt,
+        remainingMs:recovery?Math.max(0,10000-(now-this.disconnectedAt)):null,recovery:'等待网络自行恢复'}]};
+  }
+  observeConnection(){
+    this.onMetrics?.(this.connectionMetrics());
+    if(this.closed||!this.synchronized||this.channel?.readyState!=='open'||this.metricProbe||performance.now()-(this.lastMetricProbe??-Infinity)<2000)return;
+    this.metricProbe=true;this.lastMetricProbe=performance.now();
+    // Reuse the existing ping/pong; this sample never renegotiates game input.
+    this.probeRtt().then(()=>{},()=>{}).finally(()=>{this.metricProbe=false;});
+  }
   clearLocal(){this.localActions=[];this.localTaps=new Set();this.localTouch=null;}
   setLocal(actions,touch=0,options={}){
     // Retain short presses observed between accepted network frames. A fresh
@@ -118,6 +135,7 @@ export class Netplay {
   }
   send(value,touch=0){const message=JSON.stringify({type:'input',seq:this.seq++,actions:[...value],touch});if(this.channel?.readyState==='open')this.channel.send(message);}
   receive(message){
+    this.lastPacketAt=performance.now();
     if(message.sync&&message.sync!==SYNC_PROTOCOL)throw Error('双方同步协议版本不同，请更新服务、刷新页面后重新建房');
     if(message.sync===SYNC_PROTOCOL){
       if(message.type==='sync-ready'){
@@ -127,7 +145,7 @@ export class Netplay {
       if(message.type==='buffer-ping'||message.type==='buffer-pong'){
         if(!Number.isSafeInteger(message.id)||message.id<1)throw Error('延迟采样消息无效');
         if(message.type==='buffer-ping')this.sendPacket({type:'buffer-pong',id:message.id});
-        else{const pending=this.probes?.get(message.id);if(pending){this.probes.delete(message.id);clearTimeout(pending.timer);pending.resolve(Math.max(0,performance.now()-pending.at));}}
+        else{const pending=this.probes?.get(message.id);if(pending){this.probes.delete(message.id);clearTimeout(pending.timer);this.rttAt=performance.now();this.liveRtt=Math.max(0,this.rttAt-pending.at);pending.resolve(this.liveRtt);}}
         return;
       }
       if(message.type==='buffer-report'){
@@ -210,9 +228,11 @@ export class Netplay {
       const state=this.pc.connectionState;
       if(state==='failed'||state==='closed')this.fail(Error(this.rtcFailure()));
       else if(state==='disconnected'){
+        this.disconnectedAt??=performance.now();
         this.onState('网络暂时中断，正在等待恢复');
         this.disconnectTimer??=setTimeout(()=>this.fail(Error(this.rtcFailure())),10000);
       }else if(state==='connected'){
+        this.disconnectedAt=null;
         clearTimeout(this.disconnectTimer);this.disconnectTimer=null;this.refreshPath();
       }
     };
@@ -262,7 +282,7 @@ export class Netplay {
   async refreshPath(){
     if(this.closed||!this.pc||this.pathPending)return;
     this.pathPending=true;
-    try{const stats=await this.pc.getStats();if(!this.closed&&this.pc.connectionState==='connected'&&this.channel?.readyState==='open')this.onState(describeRtcPath(stats));}
+    try{const stats=await this.pc.getStats();if(!this.closed&&this.pc.connectionState==='connected'&&this.channel?.readyState==='open'){this.path=describeRtcPath(stats).replace(/ · RTT .*$/,'');this.onState(describeRtcPath(stats));}}
     catch{}finally{this.pathPending=false;}
   }
   async readSignals(){
@@ -293,5 +313,5 @@ export class Netplay {
     this.rtcProgress();
   }
   closeRtc(){clearTimeout(this.rtcPoll);clearTimeout(this.rtcTimer);clearTimeout(this.disconnectTimer);clearInterval(this.pathTimer);this.rtcAbort?.abort();this.rtcPoll=null;this.rtcTimer=null;}
-  close(){if(this.closed)return;this.closed=true;for(const pending of this.probes?.values()??[]){clearTimeout(pending.timer);pending.reject(Error('同步连接已关闭'));}this.probes?.clear();this.pendingPackets=[];this.rtcReject?.(Error('WebRTC 连接已结束'));this.relayReject?.(Error('TCP 连接已结束'));this.rtcResolve=this.rtcReject=this.relayReject=null;this.remote.clear();clearInterval(this.heartbeat);clearTimeout(this.relayTimer);this.closeRtc();this.socket?.close();this.channel?.close?.();this.pc?.close();}
+  close(){if(this.closed)return;this.closed=true;clearInterval(this.metricsTimer);this.onMetrics?.(this.connectionMetrics());for(const pending of this.probes?.values()??[]){clearTimeout(pending.timer);pending.reject(Error('同步连接已关闭'));}this.probes?.clear();this.pendingPackets=[];this.rtcReject?.(Error('WebRTC 连接已结束'));this.relayReject?.(Error('TCP 连接已结束'));this.rtcResolve=this.rtcReject=this.relayReject=null;this.remote.clear();clearInterval(this.heartbeat);clearTimeout(this.relayTimer);this.closeRtc();this.socket?.close();this.channel?.close?.();this.pc?.close();}
 }

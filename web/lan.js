@@ -4,11 +4,12 @@ import {supportsNetworkWorker} from './netplay/simulation-client.js';
 import {loadNetworkAssets,loadVerifiedBytes} from './startup-assets.js';
 import {preloadOpeningMusic} from './local-bgm.js';
 import {bgmVersion,onBgmVersion} from './bgm-version.js';
+import {publishNetworkStatus} from './network-status.js';
 const roomIds={start:'room-start',language:'room-language',difficulty:'room-difficulty',clock:'room-clock','connection-path':'room-connection-path'};
 for(const [source,target]of Object.entries(roomIds)){const node=document.getElementById(source);if(node)node.id=target;}
 const $ = id => document.getElementById(roomIds[id]||id), protocol = 'th03-lan/1';
 let session = null, timer = null, busy = false, state = null, runtime = null;
-let runtimeFrame=null,returningTask=null,runStopped=false;
+let runtimeFrame=null,returningTask=null,runStopped=false,leaving=false;
 let preloadKey='',preloadPromise=null,preloadGeneration=0,preloadRetryAt=0;
 onBgmVersion(()=>{if(session&&state&&!state.started)prepareRoomAssets(state).catch(()=>{});});
 const query = new URLSearchParams(location.search);
@@ -61,10 +62,11 @@ async function api(path, data = {}, method = 'POST') {
   return value;
 }
 function render(value) {
-  if (!session) return;
+  if (!session || leaving) return;
   if(returningTask)return;
   if(!value.started&&state?.started&&(runtime||runStopped)){void returnToRoom('本局已结束，可重新准备。',value);return;}
   state = value;
+  if(!state.started)publishNetworkStatus({phase:'idle'});
   $('lobby').dataset.roomPhase=state.started?'loading':'lobby';
   $('lobby').dataset.roomLanguage=state.settings.language;
   if(state.started)$('lobby').dispatchEvent(new Event('room-preview-stop'));
@@ -118,6 +120,7 @@ async function launch() {
   frame.src='local.html?'+params;const root=$('game');root.replaceChildren(frame);root.hidden=false;
 }
 async function returnToRoom(reason='本局已结束，可重新准备。',snapshot=null){
+  if(leaving)return;
   if(returningTask)return returningTask;
   const old=runtime,frame=runtimeFrame,runId=state.runId;
   busy=true;runStopped=true;clearTimeout(timer);
@@ -178,7 +181,7 @@ async function enter(kind) {
   finally { busy = false; $('create').disabled = $('join').disabled = false; }
 }
 async function poll() {
-  if (!session) return;
+  if (!session || leaving) return;
   try { if (!busy) {const next=await api('state', {}, 'GET');if(!busy&&next.revision>=state.revision)render(next);} }
   catch (error) {
     status(error.message, true);
@@ -205,13 +208,18 @@ $('ready').onclick = () => mutate('ready'); $('start').onclick = () => mutate('s
 for (const id of ['language', 'difficulty', 'clock', 'rollback', 'focus-enabled', 'touch-unlimited-allowed', 'host-seat-choice']) $(id).onchange = () => mutate('settings', {settings: {
   hostSeat: Number($('host-seat-choice').value), language: $('language').value, difficulty: Number($('difficulty').value), clock: Number($('clock').value), rollback: $('rollback').checked, focusEnabled: $('focus-enabled').checked, touchUnlimitedAllowed: $('touch-unlimited-allowed').checked}});
 $('leave').onclick = async () => {
+  if(leaving)return;
+  // Disposal rejects pending simulation work. Ignore its late progress/error
+  // callbacks so they cannot start a competing return-to-room transaction.
+  leaving=true;
   busy=true;clearTimeout(timer);runtimeFrame?.contentWindow?.th03EmbeddedRuntime?.stop();
   try { const recorder=runtimeFrame?.contentWindow?.th03Replay;recorder?.finish('玩家离开本局');await recorder?.seal(2000);await api('leave'); } catch {}
   runtime?.stop();
   location.href = `lan.html?${networkParams(connection)}`;
 };
 async function handleRuntimeMessage(value){
-  if(value?.protocol!==protocol||returningTask)return;
+  if(value?.protocol!==protocol||returningTask||leaving)return;
+  if(value.event==='network-status'){publishNetworkStatus(value.snapshot);return;}
   if(value.event==='room-menu'){void returnToRoom();return;}
   if(value.event==='view'){runtimeFrame?.classList.toggle('game-immersive',value.immersive===true);return;}
   if(value.event==='connection'){
@@ -222,11 +230,11 @@ async function handleRuntimeMessage(value){
   const ownedFrame=runtimeFrame,ownedRun=state.runId;
   try{
     const next=await api('progress',{message:value.message,loaded:value.loaded===true,error:value.error===true});
-    if(returningTask||runtimeFrame!==ownedFrame||state.runId!==ownedRun||next.revision<state.revision)return;
+    if(returningTask||leaving||runtimeFrame!==ownedFrame||state.runId!==ownedRun||next.revision<state.revision)return;
     render(next);
   }
-  catch(error){if(!returningTask&&runtimeFrame===ownedFrame&&state.runId===ownedRun)status(error.message,true);}
-  if(returningTask||runtimeFrame!==ownedFrame||state.runId!==ownedRun)return;
+  catch(error){if(!returningTask&&!leaving&&runtimeFrame===ownedFrame&&state.runId===ownedRun)status(error.message,true);}
+  if(returningTask||leaving||runtimeFrame!==ownedFrame||state.runId!==ownedRun)return;
   if(value.error){status(value.message,true);void returnToRoom(value.message);}else if(value.loaded)status('本机游戏已启动');
 }
 window.addEventListener('pagehide', () => {
