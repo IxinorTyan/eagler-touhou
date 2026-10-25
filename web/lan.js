@@ -1,3 +1,4 @@
+import {publishNetworkStatus,mountNetworkStatus} from './network-status.js';
 import {PROTOCOL,TICK_MS,PAUSE,RESUME,GameQueue,inputPolicy as makeInputPolicy,planReplay,nextInputs,PREDICTION_LEAD_LIMIT,ROLLBACK_ARM_AHEAD,MAX_ROLLBACK} from './netplay/protocol.js';
 import {createInputChannel,acceptInputChannel} from './netplay/input-transport.js';
 import {createFrameDisplay} from './frame-display.js';
@@ -122,8 +123,21 @@ function performanceInfo(){
     timePercent:Object.fromEntries(Object.entries(totals).map(([key,n])=>[key,Math.round(n*1000/elapsed)/10])),
     pollFailures};
 }
+function publishConnectionStatus(){
+  const now=performance.now();
+  mountNetworkStatus(document.querySelector('.game-column .player-toolbar'));
+  publishNetworkStatus({phase:running?'connected':endedReason?'stopped':auth&&room?.phase!=='lobby'?'connecting':'idle',
+    bufferFrames:running?(queue.active?queue.inputDelay:queue.lockstepDelay):null,
+    bufferMs:running?(queue.active?queue.inputDelay:queue.lockstepDelay)*TICK_MS:null,serviceRetry:pollFailures>0,
+    peers:[...peers].map(([role,p])=>({name:`P${(room?.slots?.[role]??'?')==='?'?'?':room.slots[role]+1}`,path:transport==='rtc'?'WebRTC':'WebSocket 中继',
+      state:offlineRoles.has(role)?'offline':p.suspectAt!=null?'recovering':p.channel?.readyState==='open'?'connected':'connecting',
+      rttMs:rtt.get(role),rttAgeMs:p.rttAt==null?null:now-p.rttAt,packetAgeMs:now-p.lastMessage,
+      remainingMs:p.suspectAt==null?null:Math.max(0,GRACE_MS-(now-p.suspectAt)),attempt:p.attempt,
+      recovery:transport==='rtc'?'恢复设备连接':'等待中继恢复'}))});
+}
 function diagnostics(){
   const now=performance.now();if(running&&now-lastDiagnosticAt<250)return;lastDiagnosticAt=now;
+  publishConnectionStatus();
   const perf=performanceInfo(),latencies=Object.values(perf.rttMs),networkMs=latencies.length?Math.max(...latencies):null;
   const number=value=>value===null?'…':value.toFixed(1);
   const reason={'boot':'等待队友输入','window':'等待预测帧确认','prediction-disabled':'等待菜单输入确认','local-input':'等待本机输入',
@@ -144,6 +158,7 @@ async function api(action,extra={},identity=auth){
   const data=await response.json();if(!response.ok)throw Error(data.error||'局域网服务请求失败');return data;
 }
 function render(){
+  publishConnectionStatus();
   historyUI();
   const lobby=auth&&room?.phase==='lobby',host=auth?.role==='host';
   const publicRoom=(room?.network||network)?.startsWith('public-');
@@ -414,7 +429,7 @@ function onPacket(event,source){try{
     if(message.to===auth.role){
       const pending=pings.get(message.id);
       if(pending?.roles.delete(role)){
-        const elapsed=performance.now()-pending.at;rtt.set(role,Math.round(elapsed*10)/10);
+        const elapsed=performance.now()-pending.at;rtt.set(role,Math.round(elapsed*10)/10);if(peer)peer.rttAt=performance.now();
         if(!running&&pending.startupRole===role){
           const samples=startupSamples.get(role);
           if(samples&&samples.length<3){samples.push(elapsed);if(samples.length<3)startupPing(role);tryGo();}

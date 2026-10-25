@@ -25,7 +25,7 @@ def active_roles(room):
 
 
 def build_id():
-    files = ['lan.js', 'lan-worker.js', 'lan.html', 'frame-presenter.js', 'host-yield.js', 'startup-assets.js', 'game-locator.js',
+    files = ['network-status.js', 'network-status.css', 'lan.js', 'lan-worker.js', 'lan.html', 'frame-presenter.js', 'host-yield.js', 'startup-assets.js', 'game-locator.js',
                'personal-hud.js', 'hud-digits.js', 'afterimage-art.js',
                'assets/yuuka-afterimages.bin', 'assets/yuuka-afterimages.json',
              'player-ui.js', 'direct-drag.js', 'player-ui.css', 'touch-overlay.css', 'touch-layout.js', 'touch-input.js',
