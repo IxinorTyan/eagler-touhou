@@ -1,5 +1,6 @@
 # TH05 主项目接入
 
+[适配检查](ADAPTATION.md) · [来源迁移](../../docs/migration/th05-eagler-20261025.md)
 [原仓库说明](README-UPSTREAM.md) · [来源与子树维护](../../docs/migration/th05-eagler-20261025.md)
 
 TH05 普通版与两人、三人合作模式共用主启动器的安装、文件与房间入口。主项目管理房间成员、选人、准备和开局；`th05-coop-lab` 的 DOSBox-X fast core 与确定性联机内核继续负责原版游戏、输入、音频和确认帧。
