@@ -250,19 +250,19 @@
   "disks": {
     "jp": {
       "file": "th02-local-jp.hdi.gz",
-      "sha256": "c73ccf7fd56f166d7cab9cc1a46eeb7331bef312347224ced482b88a536cf6cf",
-      "compressedSha256": "3dbb8a2f2bb1151a4890512218ef94dd1c5cf2ed3ec71ef3184132a03085651d",
+      "sha256": "588c6482e462668a73aa1aa1111f42a6cc8463d1d0147351c4995df6817ac289",
+      "compressedSha256": "0590dea962aec890502a72f0d9b709a58d7c9cb05facfa19d3d8db76bd1e3517",
       "size": 21415936,
-      "mainSha256": "b72c21077d8a0f0efbdbd870c0831f050d38e89e5fbe4200c8c859571eff898c",
+      "mainSha256": "6564aab376ddf45523be2aa33cc9c8e808f759bf5a8269f211d066606d1b8173",
       "opSha256": "e2022a3a4725cc53499eccfd46fd73816dda222a43d00c499b014852276f7731",
       "originalOpMD5": "9fb2839db50f38119d0b98d4fb70cd0e"
     },
     "cn": {
       "file": "th02-local-cn.hdi.gz",
-      "sha256": "bc617ab52361c881b6527a522def2bf453d909da73a4b7dd2b49af310a794301",
-      "compressedSha256": "a54c11035dd72c1acf243f5362c8b24db65270fcfbbf12e462feb82a6deca7fa",
+      "sha256": "5fe6b1d957f71131550f8370108e774ef9bb5bc67148678f3ce93b339e158c80",
+      "compressedSha256": "b06151564100431653ebee6e24b9102a1a45fc5e9c104a1b8f197122624637ab",
       "size": 21415936,
-      "mainSha256": "7ac951caa523b2ed9291dcfebc749af8767ccd0ce6589340f1207e5feedc5776",
+      "mainSha256": "affb7969bd8e32d1b35e759a96e1293dd460c80ab77fc24556dff56aebe12d18",
       "opSha256": "4260d79cd3287b750283b3a4d0f7a7588e902203834b43b86d0cbafee7dccd41",
       "originalOpMD5": "b17105388f7289e08dd80815f82ab0bb"
     }
@@ -1618,5 +1618,52 @@
     "phaseCuts": true,
     "timer": "native audited deadlines; unavailable deadlines blank",
     "browserOverlay": false
+  },
+  "hitClear": {
+    "version": 1,
+    "trigger": "new-hit",
+    "testInvincibility": true,
+    "pools": {
+      "bullets": 150,
+      "lasers": 12
+    },
+    "renderEntry": 29500,
+    "collisionAllowedEntry": 29583,
+    "edits": {
+      "jp": [
+        {
+          "codeOffset": 29496,
+          "expected": "6660803ef619010f850a0166a10c1a663b06101a0f85fd006685c00f84f6000fb61ef50883fb050f87ea0083fb027409803efa2b000f85dc002ec6067b7201d1e32e8b877c722ea3787283fb04746383fb08741783fb0a742c8b16ea2b85d2790231d229d07f6f31c0eb6b8b1ef89183fb0a7603bb0a00d1e32e8b8788722e8b8f9e72eb190fb61e427b83fb0a7603bb0a00d1e32e8b87b4",
+          "replacement": "3c738f739c6660803e942b007443803ea70a00753c803e962b007535803e952b0074082e803e2586007426be182cb99600803c017503c6040283c614e2f3be6c5fb90c00803c017503c6040283c60ce2f366619de947ca532e803ee2850074352e0fb61e27852e80bf2a85007527803e942b007520803ea70a007519803e443e007512803e952b0074082e803e25860074035bf8c35bf9c3"
+        },
+        {
+          "codeOffset": 20149,
+          "expected": "e81eef",
+          "replacement": "e88424"
+        },
+        {
+          "codeOffset": 20362,
+          "expected": "532e80",
+          "replacement": "e90224"
+        }
+      ],
+      "cn": [
+        {
+          "codeOffset": 29496,
+          "expected": "6660803ef619010f850a0166a10c1a663b06101a0f85fd006685c00f84f6000fb61ef50883fb050f87ea0083fb027409803efa2b000f85dc002ec6067b7201d1e32e8b877c722ea3787283fb04746383fb08741783fb0a742c8b16ea2b85d2790231d229d07f6f31c0eb6b8b1ef89183fb0a7603bb0a00d1e32e8b8788722e8b8f9e72eb190fb61e427b83fb0a7603bb0a00d1e32e8b87b4",
+          "replacement": "3c738f739c6660803e942b007443803ea70a00753c803e962b007535803e952b0074082e803e2586007426be182cb99600803c017503c6040283c614e2f3be6c5fb90c00803c017503c6040283c60ce2f366619de947ca532e803ee2850074352e0fb61e27852e80bf2a85007527803e942b007520803ea70a007519803e443e007512803e952b0074082e803e25860074035bf8c35bf9c3"
+        },
+        {
+          "codeOffset": 20149,
+          "expected": "e81eef",
+          "replacement": "e88424"
+        },
+        {
+          "codeOffset": 20362,
+          "expected": "532e80",
+          "replacement": "e90224"
+        }
+      ]
+    }
   }
 }

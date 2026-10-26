@@ -40,13 +40,13 @@
     "index.html": "efa7ae1750da73988a446f8d2cf53fc204df9c76204280332100063708a41e47",
     "lan.html": "2fab6156aa4efafd61cc9954abb6c299d05fa0463e2945ef538fb5c39e4e19a0",
     "lan.js": "b2b260e540b195ae8dd09812412f81aa653bff0493beaee6dc11623580a4a49d",
-    "local-patch.json": "26302fabb12a252de9d469b6a6c30ca7ef0646297c609340e34fe297bb8b6a85",
+    "local-patch.json": "7cae06c86a6fecc9f8b1f3b590742c3468b0ed7d29fceb6dcfd86ecb7d5ed264",
     "local.css": "657647d9b6798cbb21d09bb8a6ef2eddf163b631b7453598b0a6f913e24c2b52",
     "native-touch.js": "6f228d9fa8648437336338de2c270b4f10d4e9fed1e6c44b66160434ec6d50f2",
     "navigation.js": "4f6e4844cbf35442b6bacb4d7428eec4156ca90d61ab2377a5f0511f8432cc9d",
     "netplay/audio-output.js": "18760a612db5dfff8a8dd63bef48f12df51c62474a7cd465084ffbe0fc90a214",
     "netplay/boot-runner.js": "5155cb586bf6af5216fcb57004aacb6d78288da8fc895fbab2e0adbcf426ad49",
-    "netplay/bullet-bank-patch.json": "6dc3c95f768f7179f8cbce66b4a827c1dfc7ebc87135e62af7084734e8543b1f",
+    "netplay/bullet-bank-patch.json": "189fb78ea583c8082cbd2bb89bafa01674fedbbf085a2b98ad5a9ea2ce81cbea",
     "netplay/connection.js": "c80831eefae496c904a0a90ec7ecabb1df2435634d79d45d13dc12a94f9308bb",
     "netplay/controls.js": "8d645c2fdf06c11e6a18a4d8a3746c3e0ec7feb488b6d5e207a566af1c7880ca",
     "netplay/focus-display.js": "077df650a677d1ec25a7c07b6f9dad7b6e2a9db903c5ac93fd1df2a6bf84b282",
@@ -61,14 +61,14 @@
     "netplay/relay.js": "e10dda0a340ec7f96a6f78192e254a6214396f828a48f7b07b343732b4ec0fe1",
     "netplay/rollback-queue.js": "40683f65d63cde06c96575c494e7daf400ffd8dd37e7cb472ef52fbeb50606f2",
     "netplay/room.js": "9bec10c2da2c4c6bcf7d9d072088456a76d1e2936044c48a4319de40b529fdf3",
-    "netplay/row-copy-patch.json": "6b0245baa9a233765af8938800f73e587cd76005ad2e1a936c27ce5a7a8a3907",
+    "netplay/row-copy-patch.json": "3c508efc6479d9cf85a1e6757e7b596131d7965c4b02817d92edf071f56fb9d1",
     "netplay/runtime-worker-client.js": "fddfa037e223a2219cd819fbc11bd43b70b9678c7054ce7aa3fa35282952281a",
     "netplay/runtime-worker.js": "f5c43356d63a82343d8bd615c83a5c59b4d3f7d2abfdcfa9c7378e7a09176263",
     "netplay/runtime.html": "4d770aeb0e4efb5a4b1e1eb6f00e76e8cfec7f1411b7f6e656ef70957a2b928f",
     "netplay/runtime.js": "4c02d073b7eed16603fbe15ff7d777de5c3a810aa2742ef8f5c651c2698caea9",
     "netplay/sha256.js": "9cb7be2bc039bcea2a4d727ef98bcd9047a78dfd4c11950355723147423e1f43",
     "netplay/sound-patch.json": "18cf7b4164560a11ee6ff385196c3a09fe342527d43ee992ae749c569da42791",
-    "netplay/state-swap-patch.json": "b0bfeea8719839b111e38e3e9b985699319111d6b9082528bb7d5d12bd3965ab",
+    "netplay/state-swap-patch.json": "6a82abb129caa289abe3e96895ca8733ddc6e8f6add526cdfcabb6cd3fb37df7",
     "netplay/th02-launch.com": "956a4d9d9ea3ff08f0d98c793a35d03cfaf3aeb129cdbdf5b3dbcf70be9b6dd0",
     "netplay/th02-state.js": "2931ab6225411b1ba8571b1ae91cac99451fb2d3782b0713c03b978cc769c838",
     "netplay/udp-config.js": "244c1972f3d412455e007c01a7548375d43d38debe71cc077668ed2c977bdfa3",
@@ -148,5 +148,5 @@
       "sha256": "4f3e9d6205cd1f1c9eee0a4a768e09f3ba6073e71c3706a274ba4fa6e22213e9"
     }
   },
-  "build": "37dc3c08fd1dc13e1c1260569015e557d83282b5ced66029897b0fa03a43b58e"
+  "build": "8c07967234b5cc762416121cda26a48fccaac80f348d7ccd62d2f9e2e05e118b"
 }
