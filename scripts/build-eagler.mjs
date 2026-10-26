@@ -9,6 +9,9 @@ const port = resolve(fileURLToPath(new URL('..', import.meta.url))), repo=resolv
 const args = Object.fromEntries(process.argv.slice(2).map(arg => { const at=arg.indexOf('='); return [arg.slice(2,at<0?undefined:at),at<0?true:arg.slice(at+1)]; }));
 if (!args.source) throw Error('Specify --source=<complete th02-coop-lab directory>');
 const source = resolve(args.source), web=resolve(source,'web');
+const coopPatch=JSON.parse(await readFile(resolve(web,'local-patch.json'),'utf8'));
+if(coopPatch.hitClear?.version!==1||!coopPatch.hitClear.testInvincibility)
+  throw Error('TH02 source must include native multiplayer hit-clear v1 (including test invincibility).');
 let revision=null;try{revision=execFileSync('git',['-c','safe.directory='+source.replaceAll('\\','/'),'rev-parse','HEAD'],{cwd:source,encoding:'utf8'}).trim();}catch{}
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 async function files(directory,prefix='') {

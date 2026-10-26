@@ -15,6 +15,7 @@ node ports/th02/scripts/dev.mjs
 
 ```powershell
 node ports/th02/tests/contracts.mjs
+node ports/th02/tests/hit-clear-content.mjs
 node ports/th02/tests/transport.mjs
 node ports/th02/tests/browser.mjs
 node ports/th02/tests/launcher-browser.mjs
@@ -28,6 +29,8 @@ node ports/th02/tests/launcher-room-browser.mjs
 本地验收覆盖主 Launcher 单人安装与呈现、双人建房与加入、座位、预载、游戏检查、准备开局、键盘按下与释放、协议结束后同房再开，以及离开房间。真实 DOSBox-X 三人 Relay 回滚模式已推进超过 480 个确认帧。游戏原生暂停菜单退出、移动设备与远程网络另作验收；多人录像工作台与观战为后续接入项。
 
 封面采用 THBWiki 原版外包装扫描，来源链接与 SHA-256 保存在 `artwork/cover-source.json`。
+
+多人模式任意玩家中弹都会清除全屏普通敌弹和独立激光池，P1／P2／P3 共用原生触发规则。原仓库的测试无敌下，三位玩家撞弹均会清弹且保留库存；正常中弹保留各自的扣命流程。清弹状态随原生内存一同回滚与重放。构建器要求来源包含 `hitClear.version = 1`，`hit-clear-content.mjs` 校验中日文 Package Store 内容中的实际 MAIN 补丁和联机碰撞补丁身份。
 
 单人游戏保留原有浏览器练习器。点击画面右上角“练习 / 辅助”，或按 F12 选择机体、难度、关卡、Boss 与攻击阶段；Backspace 展开辅助菜单，F1–F5、U 切换辅助，Tab 显示信息，Shift+F 从已确认的目标重新练习。
 
