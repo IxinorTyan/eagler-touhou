@@ -1,16 +1,21 @@
+import {adaptPC98Practice} from '../../../common/browser/adapt-pc98-practice.mjs';
 import {readFile,writeFile,copyFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 export async function adaptRuntime({patch,replaceOnce,output,port,web,runtime,repo,files}) {
   const replace=(text,from,to)=>replaceOnce(text,from,to,from.slice(0,70));
   await patch('solo.js',text=>{
-    text=replace(text,'let base=0;for(const key of held)base|=keys[key];','let base=globalThis.__eaglerPC98Input.sample();');
+    text=replaceOnce(text,'function release(){','function release(){globalThis.__eaglerPC98Input.releaseGameplay();','release managed keys');
+    text=replace(text,'let base=0;for(const key of held)base|=keys[key];','let base=globalThis.__eaglerPC98Input.sample({play:game&&!state.flags});');
+    text=replace(text,'let value=player.sample(base);','let value=base;');
     text=replace(text,'const touch=unpackTouch(player.pack(value));','const touch=globalThis.__eaglerPC98Input.motion();');
-    text=replace(text,'player.alwaysPoint()||activePractice&&practiceUI.options.alwaysPoint','globalThis.__eaglerPC98Options().alwaysHitbox');
+    text=replace(text,'player.alwaysPoint()||activePractice&&practiceUI.options.alwaysPoint','globalThis.__eaglerPC98Options().alwaysHitbox||activePractice&&practiceUI.options.alwaysPoint');
     text=replace(text,'function failure(error){','function failure(error){\n  globalThis.__eaglerPC98Emit({event:"error",message:error.message});');
     text=replace(text,'function endSession(){','async function endSession(){\n  await managedNaturalExit();');
     text=replace(text,"$('replay-save-dialog').showModal();","void managedSaveReplay(blob);");
+    text=replace(text,"recordBlob=blob;$('record-save').disabled=false;","recordBlob=blob;void managedSaveReplay(blob);$('record-save').disabled=false;");
     return text;
   });
+  await adaptPC98Practice({patch,replaceOnce,game:'th05'});
   await writeFile(resolve(output,'solo.js'),await readFile(resolve(output,'solo.js'),'utf8')+'\n'+await readFile(resolve(port,'web/managed-solo-api.js'),'utf8'));
   await patch('dosbox-runtime.js',text=>{
     text=replace(text,"if(data.type==='game-exit'){api.stop();api.onExit?.();return;}","if(data.type==='game-exit'){void api.exportUserFiles().then(()=>{api.onExit?.();api.stop();}).catch(fail);return;}");
@@ -45,7 +50,8 @@ export async function adaptRuntime({patch,replaceOnce,output,port,web,runtime,re
   managedTransport.connect();
 `+text.slice(end);
     text=replace(text,"if(room?.transport==='relay'){switchRelay();return;}\n  await Promise.all(remoteRoles().filter(role=>roles.indexOf(identity.role)<roles.indexOf(role)).map(role=>offerPeer(peers.get(role))));",'');
-    text=replace(text,'const sampled=player.sample(buttons());','const sampled=globalThis.__eaglerPC98Input.sample();');
+    text=replace(text,'const sampled=player.sample(buttons());','const sampled=globalThis.__eaglerPC98Input.sample({play:touchContext()});');
+    text=replace(text,'play:!!play});\n}', 'play:!!play});return !!play;\n}');
     text=replace(text,'player.pack((sampled&~128)|control)',"packTouch((sampled&~128)|control,{...globalThis.__eaglerPC98Input.motion(),alwaysPoint:!!globalThis.__eaglerPC98Options().alwaysHitbox})");
     text=replace(text,'async function api(action,extra={},identity=auth){',"async function api(action,extra={},identity=auth){throw Error('房间由主项目管理：'+action);");
     text=replace(text,'async function finish(reason,notify=true,flush=true,keepRoom=true,snapshot=null){',"async function finish(reason,notify=true,flush=true,keepRoom=true,snapshot=null){return managedAPI.end(reason,false);");
@@ -72,11 +78,11 @@ export async function adaptRuntime({patch,replaceOnce,output,port,web,runtime,re
   let room=await readFile(resolve(web,'lan.html'),'utf8');room=room.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'');
   await writeFile(resolve(output,'managed-room.html'),room);runtime.push('managed-room.html');
   for(const name of await files(resolve(port,'web')))if(!name.endsWith('-api.js')){await copyFile(resolve(port,'web',name),resolve(output,name));runtime.push(name);}
-  for(const name of ['directory-keyboard.mjs','keyboard-input-bridge.mjs','keyboard-owners.mjs','direct-input-bridge.mjs']){await copyFile(resolve(repo,'common/browser',name),resolve(output,name));runtime.push(name);}
+  for(const name of ['directory-keyboard.mjs','keyboard-input-bridge.mjs','keyboard-owners.mjs','direct-input-bridge.mjs','pc98-practice.mjs']){await copyFile(resolve(repo,'common/browser',name),resolve(output,name));runtime.push(name);}
   let html=await readFile(resolve(web,'solo.html'),'utf8');
   html=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'');
   html=html.replace('<head>','<head><meta name="eagler-data-provider" content="retail-memory">');
-  html=html.replace('</head>',`<style>body>*:not(main),main>*:not(.local-layout),.local-layout>*:not(.game-column),.game-column>*:not(#player),.player-toolbar,.player-actions,.player-movement,.player-note,.touch-surface,[class^="touch-"],[data-layout-control],.practice-panel{display:none!important}html,body{margin:0;background:#000}#player.immersive{position:fixed;inset:0}.player-stage{width:100%;height:100%}</style><script type="module" src="managed-shell.mjs"></script></head>`);
+  html=html.replace('</head>',`<style>body>*:not(main),main>*:not(.local-layout),.local-layout>*:not(.game-column),.game-column>*:not(#player),.player-toolbar,.player-actions,.player-movement,.player-note,.touch-surface,[class^="touch-"],[data-layout-control]{display:none!important}html,body{margin:0;background:#000}#player.immersive{position:fixed;inset:0}.player-stage{width:100%;height:100%}</style><script type="module" src="managed-shell.mjs"></script></head>`);
   await writeFile(resolve(output,'th05.html'),html);runtime.push('th05.html');
   await patch('site.css',text=>replace(text,"url('assets/launcher-background.webp')",'none'));
   // Make known vendor bases explicit for the generation closure validator.
