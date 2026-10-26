@@ -1,5 +1,6 @@
 # TH02 主项目适配
 
+[适配检查](ADAPTATION.md) · [来源迁移](../../docs/migration/th02-eagler-20261025.md)
 [原仓库说明](README-UPSTREAM.md) · [来源与子树维护](../../docs/migration/th02-eagler-20261025.md)
 
 `ports/th02` 将《东方封魔录》的 PC-98 DOSBox-X 运行时接入 Eagler Touhou。主项目负责 Package Store 安装、`/savesth02` 与 `/savesth02mp` 文件空间、房间成员、准备状态和开局；运行时继续使用封魔录的原生盘片与游戏逻辑。

@@ -1,5 +1,6 @@
 # TH04 主项目接入
 
+[适配检查](ADAPTATION.md) · [来源迁移](../../docs/migration/th04-eagler-20261025.md)
 [原仓库说明](README-UPSTREAM.md) · [来源与子树维护](../../docs/migration/th04-eagler-20261025.md)
 
 此目录提供 TH04 普通版与两人、三人合作模式的主项目适配。主项目管理安装、存档、成员、准备、开局；现有 `th04-coop-lab` 提供 PC-98 模拟器与游戏同步内核。
