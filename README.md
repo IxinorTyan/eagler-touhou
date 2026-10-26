@@ -1,5 +1,6 @@
 # TH01 主项目适配
 
+[适配检查](ADAPTATION.md) · [来源迁移](../../docs/migration/th01-eagler-20261025.md)
 [原仓库说明](README-UPSTREAM.md) · [来源与子树维护](../../docs/migration/th01-eagler-20261025.md)
 
 `ports/th01` 将 TH01 的原生 C++／WebAssembly 核心接入 Eagler Touhou 主启动器。单人分数存于主项目 `/savesth01`，多人分数与单人隔离；建房、落座、准备、开局、Relay/WebRTC 传输和离开由主项目负责。游戏内模拟与多人同步继续使用 TH01 原有核心。
