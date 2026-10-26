@@ -1,3 +1,4 @@
+import {printPC98Inputs} from '../../../tools/build/pc98-inputs.mjs';
 import {adaptPC98Practice} from '../../../common/browser/adapt-pc98-practice.mjs';
 import {createHash} from 'node:crypto';
 import {readFile,writeFile,mkdir,readdir,copyFile,stat,mkdtemp,rename,rm} from 'node:fs/promises';
@@ -7,6 +8,7 @@ import {execFileSync} from 'node:child_process';
 import {DATA_SCHEMA,DATA_MAGIC,DATA_LAYOUT_SPEC} from '../web/managed-data.mjs';
 const port = resolve(fileURLToPath(new URL('..', import.meta.url))), repo=resolve(port,'../..');
 const args = Object.fromEntries(process.argv.slice(2).map(arg => { const at=arg.indexOf('='); return [arg.slice(2,at<0?undefined:at),at<0?true:arg.slice(at+1)]; }));
+if(args['print-inputs']) await printPC98Inputs({port,game:'th04'});
 const source = resolve(args.source||port), web=resolve(source,'web');
 const sourceIdentity=args.source?null:JSON.parse(await readFile(resolve(port,'source-import.json'),'utf8'));
 const privateInputs=new Set(sourceIdentity?.resources||[]);
@@ -29,7 +31,7 @@ async function files(directory,prefix='') {
 const retiredInputs=new Set(['local-music-disk.json','local-music-patch.json','netplay/frame-queue.js','netplay/input-wire.js','th04-local-music.hdi.gz']);
 const names=[...new Set([...(await files(web)).filter(name=>!/^managed-[^/]+\.(?:mjs|js)$/.test(name)),...privateInputs])].sort().filter(name=>!retiredInputs.has(name)&&name!=='room-title-th05.js'&&!/(?:^|\/)(?:build|reports|baseline|screenshots|backups|tools|test-results|__pycache__)(?:\/|$)/.test(name) && !/\.(?:map|wat|cpuprofile|log|tmp|bak)$/.test(name));
 const input=[]; for(const name of names) { const bytes=await readInput(name); input.push({path:name,bytes:bytes.length,sha256:sha(bytes)}); }
-if(args['print-inputs']) { console.log(JSON.stringify({game:'th04',kind:'managed-import',inputs:input})); process.exit(0); }
+if(args['print-package-inputs']) { console.log(JSON.stringify({game:'th04',kind:'managed-import',inputs:input})); process.exit(0); }
 const cache=resolve(port,'.cache');await mkdir(cache,{recursive:true});
 const staging=await mkdtemp(resolve(cache,'build-')),output=resolve(staging,'build-eagler'),content=resolve(staging,'content');
 try {

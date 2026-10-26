@@ -26,6 +26,13 @@
           },
           "cache": {}
         }
+      },
+      "sourceBuild": {
+        "kind": "managed-import",
+        "build": [
+          "scripts/build-eagler.mjs"
+        ],
+        "commonMarker": "browser/directory-keyboard.mjs"
       }
     },
     "th05": {
@@ -46,6 +53,13 @@
           },
           "cache": {}
         }
+      },
+      "sourceBuild": {
+        "kind": "managed-import",
+        "build": [
+          "scripts/build-eagler.mjs"
+        ],
+        "commonMarker": "browser/directory-keyboard.mjs"
       }
     },
     "th06": {
@@ -423,6 +437,13 @@
           },
           "cache": {}
         }
+      },
+      "sourceBuild": {
+        "kind": "managed-import",
+        "build": [
+          "scripts/build-eagler.mjs"
+        ],
+        "commonMarker": "browser/directory-keyboard.mjs"
       }
     },
     "th02": {
@@ -443,6 +464,13 @@
           },
           "cache": {}
         }
+      },
+      "sourceBuild": {
+        "kind": "managed-import",
+        "build": [
+          "scripts/build-eagler.mjs"
+        ],
+        "commonMarker": "browser/directory-keyboard.mjs"
       }
     },
     "th03": {
@@ -463,6 +491,13 @@
           },
           "cache": {}
         }
+      },
+      "sourceBuild": {
+        "kind": "managed-import",
+        "build": [
+          "scripts/build-eagler.mjs"
+        ],
+        "commonMarker": "browser/directory-keyboard.mjs"
       }
     }
   }

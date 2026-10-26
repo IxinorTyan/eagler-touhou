@@ -26,7 +26,9 @@
 
 目录规则检查 Git 当前跟踪或新增的源码，生成物和本地依赖继续由忽略规则隔离。退役目录、组件内 CI 和未登记的汇编／目标文件会使检查失败。当前目录职责见[源码布局](../../docs/architecture/source-layout.md)。
 
-根 CI 在 Windows 与 Linux 执行源码和模块检查。源码构建按目录映射与配方生成矩阵，成对选择普通版和 MP；共用生产程序也分别登记模式。TH06、TH07 使用已有 CMake 构建任务，其余作品使用 Emscripten 6.0.9 和共用构建入口。CI 保存检查日志与构建来源记录。
+根 CI 在 Windows 与 Linux 执行源码和模块检查。源码构建按目录映射与配方生成矩阵，成对选择普通版和 MP；共用生产程序也分别登记模式。TH06、TH07 使用已有 CMake 构建任务，Node 原生构建使用 Emscripten 6.0.9 和共用构建入口。CI 保存检查日志与构建来源记录。
+
+TH01–TH05 使用 `managed-import` 配方：`--print-inputs` 登记本目录适配代码、原运行时代码、原生补丁和共用浏览器模块，CI 无需游戏资源即可执行协议、输入与存储模块检查。完整组装使用 `npm run build:runtime -- --game=th02 --assets=../th02-coop-lab/web`，从外部资源目录读取预编译核心、游戏磁盘和音乐；`content/source.json` 保存本次组装的全部输入身份。`--print-package-inputs` 可单独导出组装输入清单。该配方的原生编译单元数为 0，原生核心编译与实际浏览器验收按各作 README 执行。五作的历史维护见[子树指南](../../docs/migration/pc98-subtree-20261026.md)。
 
 已执行的构建和打包可在 `status.json` 登记 `build`／`package` 范围的结果，附命令、环境与产物 SHA-256。源码身份相同时，重新检查会保留这些执行记录并显示“已验证”；源码身份改变后重新验收。源码接口检查失败始终优先显示。
 

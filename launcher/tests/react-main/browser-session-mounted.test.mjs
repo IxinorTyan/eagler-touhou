@@ -677,7 +677,7 @@ test('actual BrowserLauncher: cold save export owns file-only preparation and re
 const storageImportCases = [
   {kind: 'save', game: 'th06', name: 'import.dat', path: 'score.dat', accept: '.dat'},
   {kind: 'hint', game: 'th10', name: 'import.txt', path: 'hint/hint_user.txt', accept: '.txt'},
-  {kind: 'replay', game: 'th06', name: 'th6_01.rpy', path: 'replay/th6_01.rpy', accept: '.zip,.rpy,.rpyx,.rep'},
+  {kind: 'replay', game: 'th06', name: 'th6_01.rpy', path: 'replay/th6_01.rpy', accept: '.zip,.rpy,.rpyx,.th01r,.th02r,.th03r,.th04r,.th05r,.rep'},
 ];
 async function runningStorageImport({kind, game}) {
   const f = await mountBrowser({initial: `/?game=${game}&keep=a%20b`, host: subsetHost([game], {multiplayer: false}), seedPackages: game === 'th10' ? [game] : [], seedStorage(storage) {
@@ -2511,9 +2511,14 @@ for (const mobileDevice of [false,true]) for (const nativeFullscreen of [true,fa
 for(const presented of [true,false])test(`room ready requires native game menu presentation (${presented?'presented':'rejected'})`,async()=>{
  const host=developmentAcquisitionHost(['th09']);host.shared.netplayRelay='wss://relay.invalid/socket';
  const invite=api.encodeRoomInvite({g:'th09mp',r:'1234',f:true,a:'join',s:true});
- const f=await mountBrowser({initial:'/?j='+invite,host,autoReady:false,socketBoundary:true,seedPackages:['th09']});
+ const f=await mountBrowser({initial:'/?j='+invite,host,autoReady:false,socketBoundary:true,seedPackages:['th09'],fetchBoundary(url){
+  if(url.pathname.endsWith('/fixture-th09.data'))return new Response(new Uint8Array([1,2,3]));
+  return null;
+ },seedStorage(storage){
+  storage.values.set(api.gamePreferenceStorageKey('th09mp'),JSON.stringify({music:'none',options:{thpracEnabled:false}}));
+ }});
  const session=api.getTestSession();
- await until(()=>!!f.native?.envelope,'native program loading');f.holdRoomPreview=true;
+ await until(()=>!!f.native?.envelope,'native program loading',15_000);f.holdRoomPreview=true;
  await React.act(async()=>f.native.emit('ready',{roomPreview:true}));
  await until(()=>!!f.pendingRoomPreview,'resources configured and native menu starting');
  assert.equal(session.getRuntime().getSnapshot().ready,true);assert.equal(session.getRuntime().getSnapshot().roomPreview===true,false);

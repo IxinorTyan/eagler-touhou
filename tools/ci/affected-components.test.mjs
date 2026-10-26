@@ -14,6 +14,8 @@ test('source build matrix follows actual recipes and retains both shared-source 
   assert.equal(targets.filter(target=>target.game==='th20').length,1);
   assert.deepEqual(targets.filter(target=>target.game==='th075').map(target=>target.variant), ['normal','multiplayer']);
   assert.ok(targets.every(target=>!['th06','th07'].includes(target.game)));
+  assert.ok(targets.every(target=>!['th01','th02','th03','th04','th05'].includes(target.game)),
+    'managed imports validate source and assemble external cores separately from Emscripten compilation');
 });
 test('Launcher-only contribution does not schedule native consumers', () => {
   assert.deepEqual(affectedComponents(['launcher/app/routes/home.tsx'], workspace, builds), ['launcher']);

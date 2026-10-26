@@ -44,11 +44,22 @@ try {
         continue;
       }
       await put(resolve(source, recipe.kind === "cmake" ? "CMakeLists.txt" : recipe.build[0]));
+      if(recipe.commonMarker)await put(resolve(layout.path('common'),recipe.commonMarker));
       for(const input of recipe.commonInputs??[])await put(resolve(layout.path("common"),input));
       const before = await readdir(source);
       const plan = await planRuntimeSourceBuild({ game, variant, emsdk: sdk }, context);
       assert.deepEqual(await readdir(source), before, "planning must not create build output");
       assert.equal(plan.common, layout.path("common"), "a monorepo resolves its declared common directory");
+      if (recipe.kind === 'managed-import') {
+        assert.deepEqual(plan.toolchain,{kind:'managed-import',nativeCore:'external-precompiled'});
+        const assets=resolve(root,'private game resources');
+        const assembly=await planRuntimeSourceBuild({game,variant,assets},context);
+        assert.ok(assembly.steps[0].args.includes(`--assets=${assets}`));
+        assert.equal(assembly.steps[0].args[0],resolve(source,recipe.build[0]));
+        assert.equal(assembly.environment.EMSDK,undefined);
+        plans.push(plan);
+        continue;
+      }
       assert.equal(plan.environment.EMSDK, sdk);
       assert.equal(plan.environment.TH09_EMSDK, sdk);
       assert.equal(plan.environment.TH15_EMSDK, sdk);
@@ -63,7 +74,7 @@ try {
       plans.push(plan);
     }
   }
-  assert.equal(plans.length, 18);
+  assert.equal(plans.length, 28);
   assert.equal(plans.find(plan=>plan.game==='th12').source,layout.path('th12'));
   assert.equal(plans.find(plan => plan.game === "th10" && plan.variant === "multiplayer").source, layout.path("th10mp"));
   assert(plans.find(plan => plan.game === "th11" && plan.variant === "multiplayer").steps[0].args.includes("--multiplayer"));
@@ -102,4 +113,4 @@ try {
   assert.equal(dirname(root), resolve(tmpdir()));
   await rm(root, { recursive: true, force: true });
 }
-console.log("Runtime source plans: PASS (18 variants, shared dependencies, explicit tools, invalid inputs)");
+console.log("Runtime source plans: PASS (28 variants, managed assembly, shared dependencies, explicit tools, invalid inputs)");

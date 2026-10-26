@@ -11,6 +11,7 @@ const require = createRequire(new URL('../../launcher/package.json', import.meta
 const {parse} = require('acorn');
 
 export function runtimeSourceFiles(game, product) {
+  if (['th01','th02','th03','th04','th05'].includes(game)) return ['web/managed-shell.mjs','web/managed-input.mjs'];
   if (game === 'th12') return ['src/managed-shell.mjs', 'src/managed-input.mjs', 'site/game.mjs'];
   if (product.runtimeFileLayout !== 'directory') return ['resources/shell.html'];
   if (game === 'th09') return ['web/sdl-runtime/managed.mjs'];
@@ -35,6 +36,18 @@ export function checkRuntimeSource({game, variant, product, directory, nativeFil
   const nativeBodies = nativeFiles.map(path => ({path, text:readFileSync(path, 'utf8')}));
   const native = nativeBodies.map(item => item.text).join('\n');
   const records = [];
+  if (['th01','th02','th03','th04','th05'].includes(game)) {
+    const testFile='tests/managed-adapter.test.mjs';
+    return [
+      ['runtime-protocol',['RUNTIME-01','RUNTIME-02','RUNTIME-03'],'pc98 protocol:'],
+      ['touch-sensitivity',['TOUCH-14'],'pc98 touch:'],
+      ['native-gamepad',['INPUT-04'],'pc98 gamepad:'],
+      ['managed-presentation',['DISPLAY-01'],'pc98 presentation:'],
+    ].map(([id,checks,pattern])=>result(id,checks,[...files,testFile],()=>{
+      execFileSync(process.execPath,['--test','--test-name-pattern='+pattern,resolve(root,directory,testFile)],
+        {cwd:resolve(root,directory),encoding:'utf8',windowsHide:true});
+    }, {complete:id!=='managed-presentation'}));
+  }
   if (game === 'th12') {
     const testFile='tests/managed-adapter.test.mjs';
     return [

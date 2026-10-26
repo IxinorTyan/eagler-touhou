@@ -16,6 +16,11 @@ import { WORKSPACE_NODE_TESTS } from "./test-plan.mjs";
 import { runNativeCpp } from "./support/native-cpp.mjs";
 
 const verification = Object.freeze({
+  th01: {kind:'pc98-managed',test:'tests/managed-adapter.test.mjs'},
+  th02: {kind:'pc98-managed',test:'tests/managed-adapter.test.mjs'},
+  th03: {kind:'pc98-managed',test:'tests/managed-adapter.test.mjs'},
+  th04: {kind:'pc98-managed',test:'tests/managed-adapter.test.mjs'},
+  th05: {kind:'pc98-managed',test:'tests/managed-adapter.test.mjs'},
   th06: Object.freeze({ kind: "shared-preload", tests: Object.freeze([
     "tests/test-mobile-frame-pacing.mjs",
     "tests/test-native-frame-pacing.mjs",
@@ -47,8 +52,9 @@ const scheduledWorkspaceTests = new Set(WORKSPACE_NODE_TESTS);
 const selectedGames = selectedPortGames(Object.keys(verification));
 for (const [game, lane] of Object.entries(verification).filter(([game]) => selectedGames.includes(game))) {
   const product = PRODUCT_GAMES[game];
-  if (lane.kind === 'managed-web') {
-    const result=spawnSync(process.execPath,['--test','--test-name-pattern=managed presentation:',workspacePath(game,lane.test)],
+  if (lane.kind === 'managed-web' || lane.kind === 'pc98-managed') {
+    const pattern=lane.kind==='pc98-managed'?'pc98 presentation:':'managed presentation:';
+    const result=spawnSync(process.execPath,['--test','--test-name-pattern='+pattern,workspacePath(game,lane.test)],
       {cwd:workspacePath(game),encoding:'utf8',windowsHide:true});
     assert.equal(result.status,0,`${game}: presentation verification failed\n${result.stdout}\n${result.stderr}`);
     continue;
