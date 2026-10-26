@@ -1,8 +1,10 @@
+import {adaptPC98Practice} from '../../../common/browser/adapt-pc98-practice.mjs';
 import {readFile,writeFile,copyFile,mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
 export async function adaptRuntime({patch,replaceOnce,output,port,web,runtime,repo,files}){
 await patch('solo.js',text=>{
-  text=replaceOnce(text,"let bits=enabled?keyboardBits(keys,'solo')|padBits(navigator.getGamepads?.()[Number($('gamepad').value)],'solo'):0;",'let bits=enabled?globalThis.__eaglerPC98Input.sample():0;','solo input');
+  text=replaceOnce(text,'function release(){','function release(){globalThis.__eaglerPC98Input.releaseGameplay();','release managed keys');
+  text=replaceOnce(text,"let bits=enabled?keyboardBits(keys,'solo')|padBits(navigator.getGamepads?.()[Number($('gamepad').value)],'solo'):0;",'let bits=enabled?globalThis.__eaglerPC98Input.sample({play:readSoloState()?.mode===1&&!readSoloState()?.hit}):0;','solo input');
   text=replaceOnce(text,'if(enabled)bits=player.sample(bits);','', 'legacy touch input');
   text=replaceOnce(text,'m=motion?unpackTouch(player.pack(bits)):null','m=motion?globalThis.__eaglerPC98Input.motion():null','solo motion');
   text=replaceOnce(text,'player.alwaysPoint()||p?.options.alwaysPoint','globalThis.__eaglerPC98Options().alwaysHitbox||p?.options.alwaysPoint','hitbox');
@@ -11,6 +13,7 @@ await patch('solo.js',text=>{
   text=replaceOnce(text,"onExit:()=>{music?.suspend();","onExit:()=>{void managedNaturalExit();music?.suspend();",'managed solo exit');
   return text;
 });
+await adaptPC98Practice({patch,replaceOnce,game:'th02'});
 await writeFile(resolve(output,'solo.js'),await readFile(resolve(output,'solo.js'),'utf8')+'\n'+await readFile(resolve(port,'web/managed-solo-api.js'),'utf8'));
 await patch('practice-attempt.js',text=>replaceOnce(text,'if(!replay)await installPractice(data,resources,practice);',`if(!replay)await installPractice(data,resources,practice);
       if(!replay&&globalThis.__eaglerPC98Files){const {Fat12}=await import('./solo-fat12.js');const fat=new Fat12(data);for(const [name,bytes]of globalThis.__eaglerPC98Files.memory)if(['HUUHI.DAT','HUUMA.CFG'].includes(name))fat.put('HUMAROKU/'+name,bytes);}`,'saved files'));
@@ -36,7 +39,7 @@ await patch('netplay/room.js',text=>{
   text=replaceOnce(text,"if(session){\n    const q=new URLSearchParams", "if(false){\n    const q=new URLSearchParams",'legacy progress');
   text=replaceOnce(text,"if(session.role==='host')replayRecorder.connectNetwork", "if(false)replayRecorder.connectNetwork",'legacy replay service');
   text=replaceOnce(text,"if(session)navigator.sendBeacon", "if(false)navigator.sendBeacon",'legacy leave beacon');
-  text=replaceOnce(text,'normalize(player.sample(keyboardBits(keys)|childBits|gamepadBits())|pendingAction)','normalize(globalThis.__eaglerPC98Input.sample()|pendingAction)','host input');
+  text=replaceOnce(text,'normalize(player.sample(keyboardBits(keys)|childBits|gamepadBits())|pendingAction)','normalize(globalThis.__eaglerPC98Input.sample({play:runtime?.touchContext()?.play===true})|pendingAction)','host input');
   text=replaceOnce(text,'packed=player.pack(bits|pendingAction,{includePointPreference:false});','packed=packTouch(bits|pendingAction,{...globalThis.__eaglerPC98Input.motion(),alwaysPoint:!!globalThis.__eaglerPC98Options().alwaysHitbox});','host direct touch');
   text="import {packTouch} from '../touch-input.js';\n"+text;
   return text;
@@ -49,7 +52,7 @@ let roomHtml=await readFile(resolve(web,'lan.html'),'utf8');
 roomHtml=roomHtml.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'');
 await writeFile(resolve(output,'managed-room.html'),roomHtml);runtime.push('managed-room.html');
 for(const name of await files(resolve(port,'web'))) if(!name.endsWith('-api.js')) { await copyFile(resolve(port,'web',name),resolve(output,name)); runtime.push(name); }
-for(const name of ['directory-keyboard.mjs','keyboard-input-bridge.mjs','keyboard-owners.mjs','direct-input-bridge.mjs']) {await copyFile(resolve(repo,'common/browser',name),resolve(output,name));runtime.push(name);}
+for(const name of ['directory-keyboard.mjs','keyboard-input-bridge.mjs','keyboard-owners.mjs','direct-input-bridge.mjs','pc98-practice.mjs']) {await copyFile(resolve(repo,'common/browser',name),resolve(output,name));runtime.push(name);}
 for(const name of ['assets/option-0.png','assets/option-1.png','assets/option-2.png']) {await mkdir(resolve(output,'assets'),{recursive:true});await copyFile(resolve(web,name),resolve(output,name));runtime.push(name);}
 let html=await readFile(resolve(web,'solo.html'),'utf8');
 html=html.replace('<head>','<head><meta name="eagler-data-provider" content="retail-memory">');
