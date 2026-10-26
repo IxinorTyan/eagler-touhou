@@ -2,8 +2,10 @@
 
 import argparse
 import json
+import os
 import pathlib
 import re
+import shutil
 import subprocess
 
 
@@ -16,8 +18,19 @@ class Repository:
         self.path = pathlib.Path(path).resolve()
 
     def git(self, *arguments):
+        command = ["git", "-C", str(self.path), *arguments]
+        environment = None
+        if arguments[:1] == ("subtree",) and os.name != "nt":
+            helper = pathlib.Path(self.git("--exec-path")) / "git-subtree"
+            bash = shutil.which("bash")
+            # Run Git's own subtree implementation with Bash. Debian's /bin/sh
+            # caps nested functions at 1000, below imported source parent chains.
+            if bash and helper.is_file():
+                command = [bash, str(helper), *arguments[1:]]
+                environment = {**os.environ, "GIT_EXEC_PATH": str(helper.parent),
+                               "PATH": str(helper.parent) + os.pathsep + os.environ.get("PATH", "")}
         result = subprocess.run(
-            ["git", "-C", str(self.path), *arguments],
+            command, cwd=self.path, env=environment,
             capture_output=True, text=True, encoding="utf-8",
         )
         if result.returncode:
@@ -77,9 +90,7 @@ def verify_subtree(repo, head, record, workspace):
     joins = record["subtree"]
     verify_join(repo, head, directory, joins["initialJoin"], joins["initialSplit"])
     verify_join(repo, head, directory, joins["latestJoin"], joins["currentSplit"])
-    changes = repo.git("rev-list", "--max-count=1", f"{joins['latestJoin']}..{head}", "--", directory)
-    split = (repo.git("subtree", "split", f"--prefix={directory}", "--quiet", head)
-             if changes else joins["currentSplit"])
+    split = repo.git("subtree", "split", f"--prefix={directory}", "--quiet", head)
     if not repo.ancestor(upstream, split):
         raise RuntimeError(f"{directory}: original upstream {upstream} is not an ancestor of exported history")
     if not repo.ancestor(joins["currentSplit"], split):
