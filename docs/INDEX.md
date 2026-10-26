@@ -1,6 +1,6 @@
 # 文档总表
 
-共 267 份可读文档，包含贡献入口、适配说明、服务文档、生成报告、许可证和历史记录。由 `npm run docs:index` 更新。
+共 329 份可读文档，包含贡献入口、适配说明、服务文档、生成报告、许可证和历史记录。由 `npm run docs:index` 更新。
 
 项目说明按当前目录重写；许可证保留原文，生成报告由各自工具更新。原有 498 份 Markdown 的逐篇去向见[旧文档去向](history/INDEX.md)。
 
@@ -31,6 +31,11 @@
 | 适配指南 | [docs/adaptation/th15-pointdevice-issue113-20261020.md](adaptation/th15-pointdevice-issue113-20261020.md) | TH15 无欠检查点与完整存档导出 |
 | 适配指南 | [docs/adaptation/validation.md](adaptation/validation.md) | 验证与交付 |
 | 作品入口 | [ports/README.md](../ports/README.md) | 选择游戏 |
+| 作品入口 | [ports/th01/README.md](../ports/th01/README.md) | TH01 主项目适配 |
+| 作品入口 | [ports/th02/README.md](../ports/th02/README.md) | TH02 主项目适配 |
+| 作品入口 | [ports/th03/README.md](../ports/th03/README.md) | TH03 主项目适配 |
+| 作品入口 | [ports/th04/README.md](../ports/th04/README.md) | TH04 主项目接入 |
+| 作品入口 | [ports/th05/README.md](../ports/th05/README.md) | TH05 主项目接入 |
 | 作品入口 | [ports/th06/README.md](../ports/th06/README.md) | 東方紅魔郷 TH06 |
 | 作品入口 | [ports/th07/README.md](../ports/th07/README.md) | 東方妖々夢 TH07 |
 | 作品入口 | [ports/th075-mp/README.md](../ports/th075-mp/README.md) | 東方萃夢想 MP |
@@ -61,6 +66,33 @@
 | 作品适配表 | [ports/th15-mp/ADAPTATION.md](../ports/th15-mp/ADAPTATION.md) | th15 MP 适配检查 |
 | 作品适配表 | [ports/th15/ADAPTATION.md](../ports/th15/ADAPTATION.md) | th15 适配检查 |
 | 作品适配表 | [ports/th20/ADAPTATION.md](../ports/th20/ADAPTATION.md) | th20 适配检查 |
+| 作品源码文档 | [ports/th01/README-NETPLAY.md](../ports/th01/README-NETPLAY.md) | 原生移植版 UDP 联机 |
+| 作品源码文档 | [ports/th01/README-PUBLIC.md](../ports/th01/README-PUBLIC.md) | 公网联机 |
+| 作品源码文档 | [ports/th01/README-UPSTREAM.md](../ports/th01/README-UPSTREAM.md) | TH01《东方灵异传》· 原生移植与多人合作 |
+| 作品源码文档 | [ports/th02/LAN-公网联机说明.md](../ports/th02/LAN-公网联机说明.md) | TH02 局域网与公网联机 |
+| 作品源码文档 | [ports/th02/README-UPSTREAM.md](../ports/th02/README-UPSTREAM.md) | TH02《东方封魔录》· 单人游戏与两／三人合作 |
+| 作品源码文档 | [ports/th02/TH02-PRACTICE-WEB.md](../ports/th02/TH02-PRACTICE-WEB.md) | TH02 网页练习工具 |
+| 作品源码文档 | [ports/th02/联机同时操作卡顿优化记录.md](../ports/th02/联机同时操作卡顿优化记录.md) | TH02 联机同时操作卡顿优化记录 |
+| 作品源码文档 | [ports/th03/DEVELOPMENT.md](../ports/th03/DEVELOPMENT.md) | TH03 DOSBox-X 开发交接 |
+| 作品源码文档 | [ports/th03/MIGRATION.md](../ports/th03/MIGRATION.md) | TH03 DOSBox-X 迁移记录 |
+| 作品源码文档 | [ports/th03/README-PUBLIC.md](../ports/th03/README-PUBLIC.md) | TH03 公网联机 |
+| 作品源码文档 | [ports/th03/README-RELAY.md](../ports/th03/README-RELAY.md) | TH03 Relay 使用与部署说明 |
+| 作品源码文档 | [ports/th03/README-UPSTREAM.md](../ports/th03/README-UPSTREAM.md) | TH03《东方梦时空》· DOSBox-X 性能版 |
+| 作品源码文档 | [ports/th03/tools/mobile-runtime/README.md](../ports/th03/tools/mobile-runtime/README.md) | NP21 mobile runtime |
+| 作品源码文档 | [ports/th03/web/fonts/README.txt](../ports/th03/web/fonts/README.txt) | TH03 Pause Pixel is a 146-character subset of GNU Unifont 15.1.05. |
+| 作品源码文档 | [ports/th04/DOSBox-PC98核心优化与五部作品迁移指南.md](../ports/th04/DOSBox-PC98核心优化与五部作品迁移指南.md) | DOSBox-PC98 核心优化与五部作品迁移指南 |
+| 作品源码文档 | [ports/th04/LAN-试玩说明.md](../ports/th04/LAN-试玩说明.md) | 局域网双人／三人试玩：输入同步版 |
+| 作品源码文档 | [ports/th04/README-RELAY.md](../ports/th04/README-RELAY.md) | TH04 Relay 临时部署说明 |
+| 作品源码文档 | [ports/th04/README-UPSTREAM.md](../ports/th04/README-UPSTREAM.md) | TH04《东方幻想乡》· DOSBox-X 单机与合作版 |
+| 作品源码文档 | [ports/th04/TH04-PRACTICE-WEB.md](../ports/th04/TH04-PRACTICE-WEB.md) | TH04 网页单人练习工具 |
+| 作品源码文档 | [ports/th04/联机同时操作卡顿优化记录.md](../ports/th04/联机同时操作卡顿优化记录.md) | 联机同时操作卡顿优化记录 |
+| 作品源码文档 | [ports/th05/README-PUBLIC.md](../ports/th05/README-PUBLIC.md) | TH05 公网联机 |
+| 作品源码文档 | [ports/th05/README-UPSTREAM.md](../ports/th05/README-UPSTREAM.md) | TH05《东方怪绮谈》· DOSBox-X 单机与合作版 |
+| 作品源码文档 | [ports/th05/REPLAY-ACCEPTANCE-2026-10-21.md](../ports/th05/REPLAY-ACCEPTANCE-2026-10-21.md) | TH05 浏览器 Replay／检查点旁观验收交接 |
+| 作品源码文档 | [ports/th05/REPLAY-IMPLEMENTATION.md](../ports/th05/REPLAY-IMPLEMENTATION.md) | 浏览器侧游戏输入 Replay：TH05 实现与 TH02／03／04 迁移说明 |
+| 作品源码文档 | [ports/th05/REPLAY-PORTING-TH01-04.md](../ports/th05/REPLAY-PORTING-TH01-04.md) | TH01–04 浏览器 Replay 与检查点旁观移植交接 |
+| 作品源码文档 | [ports/th05/REPLAY-STABILITY.md](../ports/th05/REPLAY-STABILITY.md) | TH05 Replay／旁观稳定性验证（更新：2026-10-22） |
+| 作品源码文档 | [ports/th05/patches/translation/README.md](../ports/th05/patches/translation/README.md) | TH05 Chinese Translation |
 | 作品源码文档 | [ports/th06/docs/DEVELOPMENT.md](../ports/th06/docs/DEVELOPMENT.md) | TH06 开发指南 |
 | 作品源码文档 | [ports/th07/docs/DEVELOPMENT.md](../ports/th07/docs/DEVELOPMENT.md) | TH07 开发指南 |
 | 作品源码文档 | [ports/th07/vendored/README.md](../ports/th07/vendored/README.md) | 第三方构建依赖 |
@@ -164,6 +196,12 @@
 | 架构说明 | [docs/architecture/spectator.md](architecture/spectator.md) | 旁观协议 |
 | 迁移记录 | [docs/migration/README.md](migration/README.md) | Monorepo 迁移记录 |
 | 迁移记录 | [docs/migration/local-workspace-20261019.md](migration/local-workspace-20261019.md) | 本地工作区归并 ｜ 2026-10-19 |
+| 迁移记录 | [docs/migration/pc98-subtree-20261026.md](migration/pc98-subtree-20261026.md) | TH01–TH05 子树维护 |
+| 迁移记录 | [docs/migration/th01-eagler-20261025.md](migration/th01-eagler-20261025.md) | TH01 来源子树与主项目适配 |
+| 迁移记录 | [docs/migration/th02-eagler-20261025.md](migration/th02-eagler-20261025.md) | TH02 来源子树与主项目适配 |
+| 迁移记录 | [docs/migration/th03-eagler-20261025.md](migration/th03-eagler-20261025.md) | TH03 来源子树与主项目适配 |
+| 迁移记录 | [docs/migration/th04-eagler-20261025.md](migration/th04-eagler-20261025.md) | TH04 来源子树与主项目适配 |
+| 迁移记录 | [docs/migration/th05-eagler-20261025.md](migration/th05-eagler-20261025.md) | TH05 来源子树与主项目适配 |
 | 迁移记录 | [docs/migration/th12-subtree-20261024.md](migration/th12-subtree-20261024.md) | th12 子树继承 ｜ 上游同源历史 |
 | 历史记录 | [docs/history/INDEX.md](history/INDEX.md) | 旧文档去向 |
 | 历史记录 | [docs/history/README.md](history/README.md) | 历史与迁移 |
@@ -186,6 +224,31 @@
 | 许可证与声明 | [launcher/public/assets/room-icons-LICENSE.txt](../launcher/public/assets/room-icons-LICENSE.txt) | MIT License |
 | 许可证与声明 | [launcher/public/vendor/fflate.LICENSE](../launcher/public/vendor/fflate.LICENSE) | fflate |
 | 许可证与声明 | [launcher/public/vendor/webaudio-tinysynth.LICENSE](../launcher/public/vendor/webaudio-tinysynth.LICENSE) | webaudio tinysynth |
+| 许可证与声明 | [ports/th01/web/room-ui-assets/LICENSE.txt](../ports/th01/web/room-ui-assets/LICENSE.txt) | MIT License |
+| 许可证与声明 | [ports/th02/NOTICE-runtime.md](../ports/th02/NOTICE-runtime.md) | DOSBox-X / js-dos runtime for TH02 |
+| 许可证与声明 | [ports/th02/web/room-ui-assets/LICENSE.txt](../ports/th02/web/room-ui-assets/LICENSE.txt) | MIT License |
+| 许可证与声明 | [ports/th02/web/vendor/dosbox-x/LICENSE](../ports/th02/web/vendor/dosbox-x/LICENSE) | LICENSE |
+| 许可证与声明 | [ports/th02/web/vendor/dosbox-x/NOTICE.md](../ports/th02/web/vendor/dosbox-x/NOTICE.md) | DOSBox-X / js-dos runtime for TH02 |
+| 许可证与声明 | [ports/th03/web/fonts/OFL-Unifont.txt](../ports/th03/web/fonts/OFL-Unifont.txt) | OFL Unifont |
+| 许可证与声明 | [ports/th03/web/room-ui-assets/LICENSE.txt](../ports/th03/web/room-ui-assets/LICENSE.txt) | MIT License |
+| 许可证与声明 | [ports/th03/web/vendor/dosbox-x/LICENSE](../ports/th03/web/vendor/dosbox-x/LICENSE) | LICENSE |
+| 许可证与声明 | [ports/th03/web/vendor/dosbox-x/NOTICE.md](../ports/th03/web/vendor/dosbox-x/NOTICE.md) | DOSBox-X / js-dos runtime for TH03 |
+| 许可证与声明 | [ports/th03/web/vendor/np2/LICENSE](../ports/th03/web/vendor/np2/LICENSE) | LICENSE |
+| 许可证与声明 | [ports/th03/web/vendor/np2/NOTICE.md](../ports/th03/web/vendor/np2/NOTICE.md) | NP21 runtime |
+| 许可证与声明 | [ports/th04/web/room-ui-assets/LICENSE.txt](../ports/th04/web/room-ui-assets/LICENSE.txt) | MIT License |
+| 许可证与声明 | [ports/th04/web/vendor/dosbox-x/LICENSE](../ports/th04/web/vendor/dosbox-x/LICENSE) | LICENSE |
+| 许可证与声明 | [ports/th04/web/vendor/dosbox-x/NOTICE.md](../ports/th04/web/vendor/dosbox-x/NOTICE.md) | DOSBox-X / js-dos runtime for TH04 |
+| 许可证与声明 | [ports/th04/web/vendor/np2/LICENSE](../ports/th04/web/vendor/np2/LICENSE) | LICENSE |
+| 许可证与声明 | [ports/th04/web/vendor/np2/NOTICE.md](../ports/th04/web/vendor/np2/NOTICE.md) | Upstream components |
+| 许可证与声明 | [ports/th05/patches/translation/OFL-Unifont.txt](../ports/th05/patches/translation/OFL-Unifont.txt) | OFL Unifont |
+| 许可证与声明 | [ports/th05/web/room-ui-assets/LICENSE.txt](../ports/th05/web/room-ui-assets/LICENSE.txt) | MIT License |
+| 许可证与声明 | [ports/th05/web/vendor/dosbox-net/LICENSE](../ports/th05/web/vendor/dosbox-net/LICENSE) | LICENSE |
+| 许可证与声明 | [ports/th05/web/vendor/dosbox-net/NOTICE.md](../ports/th05/web/vendor/dosbox-net/NOTICE.md) | TH05 LAN DOSBox-X runtime |
+| 许可证与声明 | [ports/th05/web/vendor/dosbox-net/REFERENCE-NOTICE.md](../ports/th05/web/vendor/dosbox-net/REFERENCE-NOTICE.md) | DOSBox-X / js-dos runtime for TH04 |
+| 许可证与声明 | [ports/th05/web/vendor/dosbox-x/LICENSE](../ports/th05/web/vendor/dosbox-x/LICENSE) | LICENSE |
+| 许可证与声明 | [ports/th05/web/vendor/dosbox-x/NOTICE.md](../ports/th05/web/vendor/dosbox-x/NOTICE.md) | DOSBox-X / js-dos runtime |
+| 许可证与声明 | [ports/th05/web/vendor/np2/LICENSE](../ports/th05/web/vendor/np2/LICENSE) | LICENSE |
+| 许可证与声明 | [ports/th05/web/vendor/np2/NOTICE.md](../ports/th05/web/vendor/np2/NOTICE.md) | Upstream components |
 | 许可证与声明 | [ports/th06/LICENSE](../ports/th06/LICENSE) | LICENSE |
 | 许可证与声明 | [ports/th06/portable/THPRAC-LICENSE.txt](../ports/th06/portable/THPRAC-LICENSE.txt) | MIT License |
 | 许可证与声明 | [ports/th06/src/thirdparty/STB_LICENSE](../ports/th06/src/thirdparty/STB_LICENSE) | STB_LICENSE |
