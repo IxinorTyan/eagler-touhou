@@ -281,3 +281,9 @@ th05-*-diagnostics.json
 /web/vendor/dosbox-x/wdosbox-x-jspi.wasm
 /web/vendor/dosbox-x/wdosbox-x-practice.wasm
 /web/vendor/dosbox-x/wdosbox-x-replay.wasm
+
+# Retain the NP2 attribution used by the DOSBox PC-98 core.
+!/web/vendor/np2/
+/web/vendor/np2/*
+!/web/vendor/np2/LICENSE
+!/web/vendor/np2/NOTICE.md

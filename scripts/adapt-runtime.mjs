@@ -77,7 +77,7 @@ export async function adaptRuntime({patch,replaceOnce,output,port,web,runtime,re
   });
   let room=await readFile(resolve(web,'lan.html'),'utf8');room=room.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'');
   await writeFile(resolve(output,'managed-room.html'),room);runtime.push('managed-room.html');
-  for(const name of await files(resolve(port,'web')))if(!name.endsWith('-api.js')){await copyFile(resolve(port,'web',name),resolve(output,name));runtime.push(name);}
+  for(const name of await files(resolve(port,'web')))if(/^managed-[^/]+\.(?:mjs|js)$/.test(name)&&!name.endsWith('-api.js')){await copyFile(resolve(port,'web',name),resolve(output,name));runtime.push(name);}
   for(const name of ['directory-keyboard.mjs','keyboard-input-bridge.mjs','keyboard-owners.mjs','direct-input-bridge.mjs','pc98-practice.mjs']){await copyFile(resolve(repo,'common/browser',name),resolve(output,name));runtime.push(name);}
   let html=await readFile(resolve(web,'solo.html'),'utf8');
   html=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'');

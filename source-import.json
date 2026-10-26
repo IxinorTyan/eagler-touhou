@@ -120,5 +120,9 @@
     "vendor/dosbox-x/wdosbox-x-jspi.wasm",
     "vendor/dosbox-x/wdosbox-x-practice.wasm",
     "vendor/dosbox-x/wdosbox-x-replay.wasm"
+  ],
+  "additionalNotices": [
+    "web/vendor/np2/LICENSE",
+    "web/vendor/np2/NOTICE.md"
   ]
 }
