@@ -1,3 +1,4 @@
+import {adaptPC98Practice} from '../../../common/browser/adapt-pc98-practice.mjs';
 import {createHash} from 'node:crypto';
 import {readFile,writeFile,mkdir,readdir,copyFile,stat,mkdtemp,rename,rm} from 'node:fs/promises';
 import {resolve,relative,dirname} from 'node:path';
@@ -39,7 +40,10 @@ for(const item of input) {
 function replaceOnce(text,from,to,label) { if(text.split(from).length!==2) throw Error('Upstream changed at '+label); return text.replace(from,to); }
 const patch=async(name,edit)=>{const path=resolve(output,name);await writeFile(path,edit(await readFile(path,'utf8')));};
 await patch('solo.js',text=>{
-  text=replaceOnce(text,"base=keyboardBits(keys,'solo');try{base|=padBits(Array.from(navigator.getGamepads?.()||[]).find(p=>p?.connected),'solo');}catch{}","base=globalThis.__eaglerPC98Input.sample();",'solo input');
+  text=replaceOnce(text,'volume:.7','volume:managedMusicMode===\'none\'?0:.7','practice restart music preference');
+  text=replaceOnce(text,'function release(){','function release(){globalThis.__eaglerPC98Input.releaseGameplay();','release managed keys');
+  text=replaceOnce(text,"base=keyboardBits(keys,'solo');try{base|=padBits(Array.from(navigator.getGamepads?.()||[]).find(p=>p?.connected),'solo');}catch{}","base=globalThis.__eaglerPC98Input.sample({play:game&&!state.flags});",'solo input');
+  text=replaceOnce(text,'let bits=enabled?player.sample(base):0;','let bits=enabled?base:0;','main touch owner');
   text=replaceOnce(text,'const touch=unpackTouch(player.pack(bits));','const touch=globalThis.__eaglerPC98Input.motion();','solo motion');
   text=replaceOnce(text,'syntheticInputEvents.add(event);canvas.dispatchEvent(event);','syntheticInputEvents.add(event);event.__eaglerPC98Synthetic=true;canvas.dispatchEvent(event);','native input dispatch');
   text=replaceOnce(text,"if(config.mode!=='target')replayUI.offerSave(blob,result);","void managedSaveReplay(blob);",'managed recording');
@@ -48,6 +52,7 @@ await patch('solo.js',text=>{
   text=replaceOnce(text,"points:(focus()?1:0)|(player.alwaysPoint()||ps?.options.alwaysPoint?8:0)","points:(focus()?1:0)|(globalThis.__eaglerPC98Options().alwaysHitbox||ps?.options.alwaysPoint?8:0)",'managed hitbox preference');
   return text;
 });
+await adaptPC98Practice({patch,replaceOnce,game:'th04'});
 await writeFile(resolve(output,'solo.js'),await readFile(resolve(output,'solo.js'),'utf8')+'\n'+await readFile(resolve(port,'web/managed-solo-api.js'),'utf8'));
 await patch('practice-attempt.js',text=>replaceOnce(text,'if(!replay)await installPractice(data,resources,practice);',`if(!replay)await installPractice(data,resources,practice);
       if(!replay&&globalThis.__eaglerPC98Files){const {Fat12}=await import('./solo-fat12.js');const fat=new Fat12(data);for(const [name,bytes]of globalThis.__eaglerPC98Files.memory)if(['GENSOU.SCR','MIKO.CFG'].includes(name))fat.put('GENSO/'+name,bytes);}`,'saved files'));
@@ -82,7 +87,7 @@ await patch('netplay/room.js',text=>{
   text=replaceOnce(text,"if(session){\n    const q=new URLSearchParams", "if(false){\n    const q=new URLSearchParams",'legacy progress');
   text=replaceOnce(text,"if(session.role==='host')replayRecorder.connectNetwork", "if(false)replayRecorder.connectNetwork",'legacy replay service');
   text=replaceOnce(text,"if(session)navigator.sendBeacon", "if(false)navigator.sendBeacon",'legacy leave beacon');
-  text=replaceOnce(text,'normalize(player.sample(keyboardBits(keys)|childBits|gamepadBits())|pendingAction)','normalize(globalThis.__eaglerPC98Input.sample()|pendingAction)','host input');
+  text=replaceOnce(text,'normalize(player.sample(keyboardBits(keys)|childBits|gamepadBits())|pendingAction)','normalize(globalThis.__eaglerPC98Input.sample({play:runtime?.touchContext()?.play===true})|pendingAction)','host input');
   text=replaceOnce(text,'packed=player.pack(bits|pendingAction,{includePointPreference:false});','packed=packTouch(bits|pendingAction,{...globalThis.__eaglerPC98Input.motion(),alwaysPoint:!!globalThis.__eaglerPC98Options().alwaysHitbox});','host direct touch');
   text="import {packTouch} from '../touch-input.js';\n"+text;
   return text;
@@ -95,7 +100,7 @@ let roomHtml=await readFile(resolve(web,'lan.html'),'utf8');
 roomHtml=roomHtml.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'');
 await writeFile(resolve(output,'managed-room.html'),roomHtml);runtime.push('managed-room.html');
 for(const name of await files(resolve(port,'web'))) if(!name.endsWith('-api.js')) { await copyFile(resolve(port,'web',name),resolve(output,name)); runtime.push(name); }
-for(const name of ['directory-keyboard.mjs','keyboard-input-bridge.mjs','keyboard-owners.mjs','direct-input-bridge.mjs']) {await copyFile(resolve(repo,'common/browser',name),resolve(output,name));runtime.push(name);}
+for(const name of ['directory-keyboard.mjs','keyboard-input-bridge.mjs','keyboard-owners.mjs','direct-input-bridge.mjs','pc98-practice.mjs']) {await copyFile(resolve(repo,'common/browser',name),resolve(output,name));runtime.push(name);}
 let html=await readFile(resolve(web,'solo.html'),'utf8');
 html=html.replace('<head>','<head><meta name="eagler-data-provider" content="retail-memory">');
 html=replaceOnce(html,'src="solo.js"','src="managed-shell.mjs"','managed entry');
