@@ -53,7 +53,9 @@ async function command(message){
       if(next.touchSensitivity!==undefined&&(!Number.isFinite(next.touchSensitivity)||next.touchSensitivity<100||next.touchSensitivity>300))throw Error('触控灵敏度无效');
       if(next.netplaySpectator||next.replayViewer)throw Error('此接入预览尚未启用多人观战与录像工作台');
       const nextLanguage=message.language??'ja';if(nextLanguage!==language)preview?.stop();
-      options=next;music=message.music;language=nextLanguage;configured=true;return {};
+      options=next;music=message.music;language=nextLanguage;configured=true;
+      globalThis.Module ??= {}; globalThis.Module.eaglerOptions=options;
+      return {};
     }
     case 'resources':if(!Array.isArray(message.resources)||message.resources.length)throw Error('此资源包已包含运行所需的资源');return {};
     case 'prepare-room':if(!multiplayer||!configured||launched)throw Error('房间预载状态无效');return preview.prepare(language);

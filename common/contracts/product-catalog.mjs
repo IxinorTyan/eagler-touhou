@@ -95,6 +95,7 @@ export const PRODUCT_GAMES = Object.freeze({
         features:Object.freeze({thprac:false,languages:false,focusHitbox:false}),
     }),
     th02: Object.freeze({
+        practiceUI: 'browser',
         testOnly: true, number: '02', title: '東方封魔録', subtitle: 'the Story of Eastern Wonderland', cardArtwork: 'th02-card.webp',
         storage: Object.freeze({saveRoot:'/savesth02',scoreFile:'HUUHI.DAT',configFiles:Object.freeze(["HUUMA.CFG"])}),
         runtime:'./runtime/th02/th02.html', runtimeFileLayout:'directory', runtimeFileTree:true,
@@ -127,6 +128,7 @@ export const PRODUCT_GAMES = Object.freeze({
         features:Object.freeze({thprac:false,languages:false,focusHitbox:false}),
     }),
     th04: Object.freeze({
+        practiceUI: 'browser',
         testOnly: true, number: '04', title: '東方幻想郷', subtitle: 'Lotus Land Story', cardArtwork: 'th04-card.webp',
         storage: Object.freeze({saveRoot:'/savesth04',scoreFile:'GENSOU.SCR',configFiles:Object.freeze(['MIKO.CFG'])}),
         runtime:'./runtime/th04/th04.html', runtimeFileLayout:'directory', runtimeFileTree:true,
@@ -146,6 +148,7 @@ export const PRODUCT_GAMES = Object.freeze({
     // Launcher UI. False keeps unfinished adapters honest; it does not waive
     // the required presentation-cadence acceptance gate.
     th05: Object.freeze({
+        practiceUI: 'browser',
         testOnly: true, number: '05', title: '東方怪綺談', subtitle: 'Mystic Square', cardArtwork: 'th05-card.webp',
         storage: Object.freeze({saveRoot:'/savesth05',scoreFile:'GENSOU.SCR',configFiles:Object.freeze(['MIKO.CFG'])}),
         runtime:'./runtime/th05/th05.html', runtimeFileLayout:'directory', runtimeFileTree:true,

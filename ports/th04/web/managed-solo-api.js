@@ -1,13 +1,19 @@
+import {mountManagedPractice} from './pc98-practice.mjs';
 // Appended to the imported solo module by the managed build. All operations
 // enter the existing attempt/input/Replay paths rather than another game loop.
 const managedReplayWrites = new Set();
+let managedMusicMode = 'ogg';
+const managedSavedReplays = new WeakMap();
 async function managedSaveReplay(blob) {
+  if (managedSavedReplays.has(blob)) return managedSavedReplays.get(blob);
   const pending = (async () => {
-    const name = 'replay/th04_' + Date.now() + '_' + crypto.randomUUID().slice(0,8) + '.th04r';
-    await globalThis.__eaglerPC98Files.write(name, await blob.arrayBuffer());
+    const path = 'replay/th04_' + Date.now() + '_' + crypto.randomUUID().slice(0,8) + '.th04r';
+    await globalThis.__eaglerPC98Files.write(path, await blob.arrayBuffer());
+    return path;
   })();
-  managedReplayWrites.add(pending);
-  try { await pending; } catch (error) { globalThis.__eaglerPC98Emit({event:'error',message:'录像保存失败：'+error.message}); }
+  managedSavedReplays.set(blob, pending); managedReplayWrites.add(pending);
+  try { return await pending; }
+  catch (error) { managedSavedReplays.delete(blob); globalThis.__eaglerPC98Emit({event:'error',message:'录像保存失败：'+error.message}); }
   finally { managedReplayWrites.delete(pending); }
 }
 async function managedNaturalExit() {
@@ -18,7 +24,9 @@ async function managedNaturalExit() {
   finally { globalThis.__eaglerPC98Emit({event:'exit',code:0}); }
 }
 export const managedAPI = {
+  practiceState:()=>({...managedPractice.state(),retry:readRetryState()}),
   async start({language, music, options}) {
+    managedMusicMode = music;
     $('language').value = language === 'ja' ? 'jp' : 'cn';
     $('audio-mode').value = 'independent';
     if (options.replayPath) {
@@ -30,6 +38,7 @@ export const managedAPI = {
     await startGame(options.replayPath?loadedReplay:null);
     if (!emulator) throw Error($('status').textContent);
     if (music === 'none') soloMusic?.player.setVolume(0);
+    managedPractice.start({readOnly:!!options.replayPath});
   },
   health() {
     return {frames:emulator?.module.renderMetrics?.drawn ?? emulator?.module.framePresenter?.info().drawn ?? 0, audio:{state:emulator?.context?.state ?? emulator?.module.SDL2?.audioContext?.state}};
@@ -68,5 +77,9 @@ export const managedAPI = {
     if (!bytes) throw Error('录像不存在');
     loadedReplay = await decodeExternalReplay(new Blob([bytes]), '04'); await startGame(loadedReplay); return {};
   },
-  stop() { release(); discardRetry(); activeAttempt?.stop(); recorder?.dispose(); soloMusic?.dispose(); emulator?.dispose(); },
+  stop() { managedPractice.stop();release(); discardRetry(); activeAttempt?.stop(); recorder?.dispose(); soloMusic?.dispose(); emulator?.dispose(); },
 };
+
+const managedPractice=mountManagedPractice(practiceUI,globalThis.__eaglerPC98Input,{release,readState:()=>({...readSoloState(),practice:emulator?.isWorker?emulator.snapshot.practice:emulator?.practice?.status})});
+
+$('record-save').onclick=async()=>{if(!recordBlob)return;const path=await managedSaveReplay(recordBlob);if(path)$('record-save').textContent='已存入主项目录像';};
