@@ -1,5 +1,6 @@
 # TH03 主项目适配
 
+[适配检查](ADAPTATION.md) · [来源迁移](../../docs/migration/th03-eagler-20261025.md)
 [原仓库说明](README-UPSTREAM.md) · [来源与子树维护](../../docs/migration/th03-eagler-20261025.md)
 
 `ports/th03` 将《东方梦时空》的 DOSBox-X 运行时接入 Eagler Touhou。单人和多人均运行原游戏磁盘与模拟器核心；主项目负责安装、`/savesth03` 与 `/savesth03mp` 文件空间、两人对战房间、准备和开局。多人游戏保留梦时空原生选人流程，由两端同步进行。
