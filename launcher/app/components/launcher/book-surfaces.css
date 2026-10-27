@@ -56,7 +56,7 @@ body:not(.mp-room-active) .book-masthead {background:color-mix(in srgb,var(--boo
 .book-view-list .book-identity {grid-template-columns:55px minmax(130px,1fr) minmax(100px,1.2fr);padding-right:42px}
 .book-view-list .book-identity small {grid-row:auto}
 .book-view-list .book-identity>span {grid-row:auto}
-.book-view-list .book-favorite {position:static;grid-column:2;grid-row:1;margin:0 13px 0 0}
+.book-view-list .book-favorite {position:static;grid-column:2;grid-row:1;align-self:center;margin:0 13px 0 0}
 .book-view-list .book-card {display:grid;grid-template-columns:minmax(0,1fr) auto}
 .book-view-list .book-game-link {grid-column:1;grid-row:1}
 .book-view-list .book-row-action {display:none}
