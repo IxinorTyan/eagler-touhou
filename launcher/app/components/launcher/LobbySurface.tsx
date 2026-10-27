@@ -110,21 +110,30 @@ export function LobbySurface({
           </div>
         </header>
         <section
-          className={`lobby-list-surface${rail.selectedProduct === 'th09mp' ? ' th09-room-surface' : ''}`}
+          className="lobby-list-surface"
           aria-label={t('lobby.rooms')}
         >
           <div
             className="lobby-list-head"
             id="listHead"
             aria-hidden="true"
-            hidden={!hasRooms || rail.selectedProduct === 'th09mp'}
+            hidden={!hasRooms}
           >
+            {roomView === 'list' ? <>
+            <span>{locale === 'en' ? 'Game' : '游戏'}</span>
+            <span>{locale === 'en' ? 'Room' : '房间'}</span>
+            <span>{t('lobby.difficulty')}</span>
+            <span>{locale === 'en' ? 'Players' : '玩家 / 人数'}</span>
+            <span>{t('lobby.state')}</span>
+            <span />
+            </> : <>
             <span>{t('lobby.gameAndRoom')}</span>
             <span>{t('lobby.difficulty')}</span>
             <span />
             <span>{t('lobby.capacity')}</span>
             <span>{t('lobby.state')}</span>
             <span />
+            </>}
           </div>
           <div className="lobby-room-list" id="roomList" role="list" aria-busy={loading}>
             {roomList}

@@ -464,17 +464,12 @@ for (const locale of ['zh-CN','en']) for (const product of ['th06mp','th09mp']) 
   for(const [phase,players,key] of [['lobby',1,'lobby.recruiting'],['lobby',2,'lobby.roomFull'],['playing',2,null],['lobby',1,'lobby.recruiting']]){
     await f.receive([room({product,capacity:2,players,phase,startedAt:Date.now()-65000,seats:players===1?seats:[seats[0],{initial:'B',online:true,ready:false}]})]);
     await m.update({snapshot:f.service.getSnapshot()});
-    if(product==='th09mp'){
-      const text=n('.th09-room-duration').textContent;
-      assert.equal(env.document.querySelector('.lobby-room-state'),null,'state has one display location');
-      if(key)assert.equal(text,t(locale,key));else assert.equal(text,t(locale,'th09.elapsed',{minutes:0}));
-    }else{
+
       const state=phase==='playing'?'playing':players===2?'full':'recruiting';
       assert.equal(n('.lobby-room-state').textContent,t(locale,'lobby.'+state));
       assert.equal(!!env.document.querySelector('.room-elapsed'),phase==='playing');
       if(phase==='playing')assert.match(n('.room-elapsed').textContent,/1:0\d/);
       assert.equal(env.document.querySelector('.th09-room-duration'),null);
-    }
   }
 });
 
@@ -487,16 +482,16 @@ for (const locale of ['zh-CN', 'en']) test(`Every published multiplayer product 
     await rowsMount.update({snapshot: f.service.getSnapshot()});
     const snapshot = f.service.getSnapshot();
     const policy = owners.multiplayerConfigForProduct(product);
-    assert.equal(n('.lobby-difficulty').hidden, !!policy.inGameSelection);
+    assert.equal(n('.lobby-difficulty').hidden, false);
     if (policy.inGameSelection) {
-      assert.equal(n('.lobby-difficulty').textContent, '');
+      assert.equal(n('.lobby-difficulty').textContent, locale === 'en' ? 'In game' : '局内选择');
       assert.equal(all('.difficulty-label').length, 0);
     } else {
       assert.equal(n('.lobby-difficulty').textContent, policy.difficulties[snapshot.visibleRooms[0].difficulty]);
     }
     if (product === 'th09mp') {
-      assert.equal(n('.th09-room-score').textContent,'VS');
-      assert.equal(n('.th09-room-duration').textContent,t(locale,'lobby.recruiting'));
+      assert.equal(n('.book-room-score').textContent,'VS');
+
       assert.equal(all('.lobby-seat').length,2);
     } else {
       assert.equal(n('.lobby-room-code').textContent, '#' + snapshot.visibleRooms[0].code);
@@ -603,18 +598,18 @@ for (const product of ['th06mp','th09mp']) test(`Approved public names remain co
   const snapshot=f.service.getSnapshot();
   assert.deepEqual(snapshot.visibleRooms[0].seats.map(seat=>seat.name),names);
   await mount(owners.DirectoryRoomRows,{snapshot,service:f.service,assetUrl,initialRows:true});
-  assert.deepEqual(all(product==='th09mp'?'.th09-duel-name':'.lobby-seat-name').map(node=>node.textContent),names);
+  assert.deepEqual(all('.lobby-seat-name').map(node=>node.textContent),names);
 });
 
 test('Flower View keeps bilingual identity, score, time and one contextual entry', async () => {
   const f = await fixture({selectedProduct:'th09mp',locale:'zh-CN'}).live([room({product:'th09mp',capacity:2,phase:'playing',players:2,joinable:false,seats:[{initial:'A',online:true,stats:{wins:3,losses:2,minutes:7}},{initial:'B',online:true,stats:{wins:5,losses:1,minutes:8}}]})]);
   const m=await mount(owners.DirectoryRoomRows,{snapshot:f.service.getSnapshot(),service:f.service,assetUrl},{locale:'zh-CN'});
-  assert.equal(n('.th09-room-title').textContent,'東方花映塚');
-  assert.equal(n('.th09-room-subtitle').textContent,'Phantasmagoria of Flower View');
-  assert.equal(n('.th09-room-score').textContent,'3 : 5');
-  assert.equal(n('.th09-room-duration').textContent,t('zh-CN','th09.elapsed',{minutes:8}));
-  assert.equal(n('.th09-room-difficulty').textContent,'难度：游戏内选择');
-  assert.equal(all('.th09-room-actions button').length,1);
+  assert.equal(n('.lobby-room-title h2').textContent,'東方花映塚');
+  assert.equal(n('.lobby-room-subtitle').textContent,'Phantasmagoria of Flower View');
+  assert.equal(n('.book-room-score').textContent,'3 : 5');
+  assert.equal(n('.room-elapsed').textContent,t('zh-CN','th09.elapsed',{minutes:8}));
+  assert.equal(n('.lobby-difficulty').textContent,'局内选择');
+  assert.equal(all('.lobby-room-row button').length,1);
   assert.equal(n('.lobby-join').textContent,t('zh-CN','multiplayer.joinSpectator'));
   await click('.lobby-join');
   assert.equal(owners.decodeRoomInvite(new URL(f.navigations[0].url).searchParams.get('j')).s,true);
