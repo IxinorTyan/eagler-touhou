@@ -1,9 +1,10 @@
-import {useEffect, useLayoutEffect, useRef, type ReactNode} from 'react';
+import {useEffect, useLayoutEffect, useRef, useState, type ReactNode} from 'react';
 import {useLocale} from '../../i18n';
 import {mastheadIcons} from './masthead-icons';
 import {AppLink} from './AppLink';
 import {closeMainSelectMenus, MainSelectPrefix} from './MainSelect';
 import {BookThemeToggle} from './BookThemeToggle';
+import {ProfilePreview} from './ProfilePreview';
 
 export interface LauncherMastheadProps {
   /** Published pre-session markup has native links and no menu owner. */
@@ -38,6 +39,7 @@ export interface LauncherMastheadProps {
  */
 export function LauncherMasthead(props: LauncherMastheadProps) {
   const {t, locale} = useLocale();
+  const [profileOpen, setProfileOpen] = useState(false);
   const {variant, menuOpen, onMenuOpenChange, interactive = true} = props;
   const Link = interactive ? AppLink : 'a';
   const menu = useRef<HTMLDivElement>(null), toggle = useRef<HTMLButtonElement>(null), panel = useRef<HTMLDivElement>(null);
@@ -68,17 +70,16 @@ export function LauncherMasthead(props: LauncherMastheadProps) {
     }
   }, [menuOpen, variant, interactive]);
   return <header className={`masthead book-masthead${variant === 'lobby' ? ' lobby-masthead' : ''}`}>
-    <Link className="brand book-brand" id="launcherLink" href={props.launcherHref} aria-label="EAGLER TOUHOU"><span className="book-brand-symbol" aria-hidden="true">☯</span><span>EAGLER <b>TOUHOU</b></span><time className="brand-version" id="brandUpdateAge" title={props.updatedAge?.title} dateTime={props.updatedAge?.dateTime}>{props.updatedAge?.text ?? t('brand.neverUpdated')}</time></Link>
-    <nav className="book-main-nav" aria-label={locale === 'en' ? 'Main navigation' : '主导航'}>
-      <Link href={props.launcherHref} aria-current={variant === 'library' && !props.replayActive ? 'page' : undefined}>{locale === 'en' ? '▷ Solo' : '▷ 单机'}</Link>
-      <Link className="book-lobby-link" href={props.assetUrl('lobby.html')} aria-current={variant === 'lobby' && !props.replayActive ? 'page' : undefined}>{locale === 'en' ? '♧ Multiplayer' : '♧ 联机'}</Link>
+    <Link className="brand book-brand" id="launcherLink" href={props.launcherHref} aria-label="EAGLER TOUHOU" onClick={() => setProfileOpen(false)}><span className="book-brand-symbol" aria-hidden="true">☯</span><span>EAGLER <b>TOUHOU</b></span><time className="brand-version" id="brandUpdateAge" title={props.updatedAge?.title} dateTime={props.updatedAge?.dateTime}>{props.updatedAge?.text ?? t('brand.neverUpdated')}</time></Link>
+    <nav onClick={() => setProfileOpen(false)} className="book-main-nav" aria-label={locale === 'en' ? 'Main navigation' : '主导航'}>
+      <Link href={props.launcherHref} aria-current={variant === 'library' && !props.replayActive && !profileOpen ? 'page' : undefined}>{locale === 'en' ? '▷ Solo' : '▷ 单机'}</Link>
+      <Link className="book-lobby-link" href={props.assetUrl('lobby.html')} aria-current={variant === 'lobby' && !props.replayActive && !profileOpen ? 'page' : undefined}>{locale === 'en' ? '♧ Multiplayer' : '♧ 联机'}</Link>
     </nav>
     <nav className="masthead-links" aria-label={t('nav.siteInfo')}>
       <BookThemeToggle interactive={interactive}/>
+      <ProfilePreview interactive={interactive} open={profileOpen} onOpenChange={setProfileOpen}/>
       <a className="masthead-link" id="originMigrationOpen" href={props.migrationHref ?? 'migrate.html'} hidden={!props.migrationHref} data-policy={props.migrationPolicyKnown ? 'host-manifest-origin-migration-policy/1' : undefined}><span className="masthead-label"><span>{t('nav.oldSitePart1')}</span><wbr/><span>{t('nav.migrationPart2')}</span></span></a>
-      <button className="masthead-link" id="donationOpenTop" type="button" hidden={props.donationAvailable === false} onClick={props.onDonation}><span className="masthead-label">{t('nav.donate')}</span></button>
-      <a className="masthead-link" href={props.faqHref}><span className="masthead-label"><span>{t('nav.faqFirst')}</span><wbr/><span>{t('nav.faqSecond')}</span></span></a>
-      <a className="masthead-link masthead-github" href="https://github.com/YomotsuHisami/eagler-touhou" target="_blank" rel="noopener noreferrer" aria-label="GitHub" dangerouslySetInnerHTML={{__html: mastheadIcons.github}}/>
+      <a className="masthead-link book-top-faq" href={props.faqHref}><span className="masthead-label"><span>{t('nav.faqFirst')}</span><wbr/><span>{t('nav.faqSecond')}</span></span></a>
       <div ref={menu} className="masthead-menu" id="mastheadMenu" onKeyDown={event => {
         if (event.key !== 'Escape') return;
         if (variant === 'lobby') event.stopPropagation();
@@ -91,11 +92,11 @@ export function LauncherMasthead(props: LauncherMastheadProps) {
           else {focusFirst.current = true; onMenuOpenChange(true);}
         }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
         <div ref={panel} className="masthead-menu-panel" id="mastheadMenuPanel" aria-hidden={!menuOpen} inert={!menuOpen}>
-          <nav className="book-mobile-nav" aria-label={locale === 'en' ? 'Main navigation' : '主导航'}>
-            <Link className="masthead-menu-item" href={props.launcherHref} aria-current={variant === 'library' && !props.replayActive ? 'page' : undefined} onClick={() => onMenuOpenChange(false)}>{locale === 'en' ? '▷ Solo' : '▷ 单机'}</Link>
-            <Link className="masthead-menu-item" href={props.assetUrl('lobby.html')} aria-current={variant === 'lobby' && !props.replayActive ? 'page' : undefined} onClick={() => onMenuOpenChange(false)}>{locale === 'en' ? '♧ Multiplayer' : '♧ 联机'}</Link>
+          <nav onClick={() => setProfileOpen(false)} className="book-mobile-nav" aria-label={locale === 'en' ? 'Main navigation' : '主导航'}>
+            <Link className="masthead-menu-item" href={props.launcherHref} aria-current={variant === 'library' && !props.replayActive && !profileOpen ? 'page' : undefined} onClick={() => onMenuOpenChange(false)}>{locale === 'en' ? '▷ Solo' : '▷ 单机'}</Link>
+            <Link className="masthead-menu-item" href={props.assetUrl('lobby.html')} aria-current={variant === 'lobby' && !props.replayActive && !profileOpen ? 'page' : undefined} onClick={() => onMenuOpenChange(false)}>{locale === 'en' ? '♧ Multiplayer' : '♧ 联机'}</Link>
           </nav>
-          <a className="masthead-menu-item book-menu-faq" href={props.faqHref}><MenuIcon name="firstUse"/><span>{t('nav.faqFirst')}{t('nav.faqSecond')}</span></a>
+          <a className="masthead-menu-item" href="https://github.com/YomotsuHisami/eagler-touhou" target="_blank" rel="noopener noreferrer"><MenuIcon name="github"/><span>GitHub</span></a>
           <button className="masthead-menu-item book-menu-donation" type="button" hidden={props.donationAvailable === false} onClick={() => {onMenuOpenChange(false); props.onDonation();}}><span aria-hidden="true">♡</span><span>{t('nav.donate')}</span></button>
           <button className="masthead-menu-item motion-menu-toggle" id={variant === 'lobby' ? 'lobbyLessMotion' : 'lessMotionToggle'} type="button" aria-pressed={props.lessMotion} title={t(props.lessMotion ? 'nav.motionFullTitle' : 'nav.motionLessTitle')} onClick={props.onToggleMotion}><MenuIcon name="motion"/><span>{t('nav.lessMotion')}</span><i className="site-notice-toggle-state" aria-hidden="true"/></button>
           <button className="masthead-menu-item" id="siteNoticeToggle" type="button" role="switch" aria-checked={props.noticeEnabled} onClick={props.onToggleNotice}><MenuIcon name="notice"/><span>{t('notice.label')}</span><i className="site-notice-toggle-state" aria-hidden="true"/></button>
@@ -109,7 +110,7 @@ export function LauncherMasthead(props: LauncherMastheadProps) {
   </header>;
 }
 
-function MenuIcon({name}: {name: 'motion' | 'notice' | 'diagnostics' | 'firstUse' | 'about' | 'language'}) {
+function MenuIcon({name}: {name: keyof typeof mastheadIcons}) {
   // Preserve the original SVG as the direct child, with no layout wrapper.
   const svg = mastheadIcons[name];
   const path = svg.match(/<path d="([^"]*)"/)![1];

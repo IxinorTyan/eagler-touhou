@@ -1,4 +1,15 @@
 /* Shared Launcher palette; room light surfaces are scoped in room-light.css. */
+@property --book-bg {syntax:"<color>";inherits:true;initial-value:#171717}
+@property --book-surface {syntax:"<color>";inherits:true;initial-value:#242424}
+@property --book-raised {syntax:"<color>";inherits:true;initial-value:#303030}
+@property --book-ink {syntax:"<color>";inherits:true;initial-value:#edece4}
+@property --book-muted {syntax:"<color>";inherits:true;initial-value:#a1aaa0}
+@property --book-border {syntax:"<color>";inherits:true;initial-value:#ffffff1b}
+@property --book-accent {syntax:"<color>";inherits:true;initial-value:#d98b82}
+@property --book-accent-soft {syntax:"<color>";inherits:true;initial-value:#d98b821c}
+@property --book-on-accent {syntax:"<color>";inherits:true;initial-value:#201b1a}
+@property --book-overlay {syntax:"<color>";inherits:true;initial-value:#111111a8}
+
 :root, html[data-book-theme='dark'] {
   --book-bg: #171717;
   --book-surface: #242424;
@@ -11,6 +22,12 @@
   --book-shadow: 0 14px 38px #0003;
   --book-on-accent: #201b1a;
   --book-overlay: #111111a8;
+}
+html {
+  transition:--book-bg .36s ease-in-out,--book-surface .36s ease-in-out,--book-raised .36s ease-in-out,
+    --book-ink .36s ease-in-out,--book-muted .36s ease-in-out,--book-border .36s ease-in-out,
+    --book-accent .36s ease-in-out,--book-accent-soft .36s ease-in-out,--book-on-accent .36s ease-in-out,
+    --book-overlay .36s ease-in-out;
 }
 html[data-book-theme='light'] {
   --book-bg: #f7f6f2;
@@ -27,6 +44,10 @@ html[data-book-theme='light'] {
 }
 html:has(.book-masthead) {color-scheme:dark}
 html[data-book-theme='light']:has(.book-masthead) {color-scheme:light}
+@media (prefers-reduced-motion:reduce) {
+  html {transition:none}
+}
+html:has(body.less-motion) {transition:none}
 
 body:not(.mp-room-active):has(.book-masthead) {
   --ui-font: "ET Chill Round",sans-serif;
@@ -191,7 +212,7 @@ body:not(.mp-room-active) :is(#toast,.toast) {border:1px solid var(--book-border
 
 @media(max-width:1100px) {
   html:has(.book-masthead) .masthead {grid-template-columns:auto minmax(0,1fr) auto;gap:8px}
-  .book-masthead .masthead-links>.masthead-link:not(.masthead-menu-toggle) {display:none}
+  .book-masthead .masthead-links>.masthead-link:not(.masthead-menu-toggle):not(.book-top-faq) {display:none}
   .book-directory :is(.lobby-list-head,.lobby-room-row:not(.th09-room-row)) {grid-template-columns:minmax(150px,1fr) 60px 90px 38px 60px 65px;gap:8px}
   .book-directory .lobby-room-identity {gap:7px}
 }
@@ -475,3 +496,6 @@ html[data-book-theme='light'] .book-directory {--difficulty-easy:#23733e;--diffi
 @media(max-width:1000px),(hover:none),(pointer:coarse) {
  .lobby-page .book-directory.book-rooms-list .lobby-room-row>.lobby-join {grid-column:2;grid-row:3/span 2;align-self:end}
 }
+
+.book-masthead .book-top-faq{white-space:nowrap;flex-shrink:0}
+@media(max-width:780px),(hover:none),(pointer:coarse){html:has(.book-masthead) .masthead{gap:6px;padding-inline:14px}html:has(.book-masthead) .book-brand{font-size:13px;gap:5px;letter-spacing:.5px}.book-masthead .book-top-faq{font-size:11px;padding-inline:4px}.book-masthead .book-top-faq .masthead-label{display:block;line-height:1.25;max-width:3em;white-space:normal}.book-masthead .book-theme-toggle,.book-masthead .masthead-menu-toggle{width:32px;padding:5px}html:has(.book-masthead) .masthead-links{gap:3px}}
