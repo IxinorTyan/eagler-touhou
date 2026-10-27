@@ -72,7 +72,6 @@ export function LauncherMasthead(props: LauncherMastheadProps) {
     <nav className="book-main-nav" aria-label={locale === 'en' ? 'Main navigation' : '主导航'}>
       <Link href={props.launcherHref} aria-current={variant === 'library' && !props.replayActive ? 'page' : undefined}>{locale === 'en' ? '▷ Solo' : '▷ 单机'}</Link>
       <Link className="book-lobby-link" href={props.assetUrl('lobby.html')} aria-current={variant === 'lobby' && !props.replayActive ? 'page' : undefined}>{locale === 'en' ? '♧ Multiplayer' : '♧ 联机'}</Link>
-      <button type="button" disabled={!props.onReplay} aria-pressed={props.replayActive === true} onClick={props.onReplay}>▤ Replay</button>
     </nav>
     <nav className="masthead-links" aria-label={t('nav.siteInfo')}>
       <BookThemeToggle interactive={interactive}/>
@@ -95,7 +94,6 @@ export function LauncherMasthead(props: LauncherMastheadProps) {
           <nav className="book-mobile-nav" aria-label={locale === 'en' ? 'Main navigation' : '主导航'}>
             <Link className="masthead-menu-item" href={props.launcherHref} aria-current={variant === 'library' && !props.replayActive ? 'page' : undefined} onClick={() => onMenuOpenChange(false)}>{locale === 'en' ? '▷ Solo' : '▷ 单机'}</Link>
             <Link className="masthead-menu-item" href={props.assetUrl('lobby.html')} aria-current={variant === 'lobby' && !props.replayActive ? 'page' : undefined} onClick={() => onMenuOpenChange(false)}>{locale === 'en' ? '♧ Multiplayer' : '♧ 联机'}</Link>
-            <button className="masthead-menu-item" type="button" disabled={!props.onReplay} aria-pressed={props.replayActive === true} onClick={() => {onMenuOpenChange(false); props.onReplay?.();}}>▤ Replay</button>
           </nav>
           <button className="masthead-menu-item motion-menu-toggle" id={variant === 'lobby' ? 'lobbyLessMotion' : 'lessMotionToggle'} type="button" aria-pressed={props.lessMotion} title={t(props.lessMotion ? 'nav.motionFullTitle' : 'nav.motionLessTitle')} onClick={props.onToggleMotion}><MenuIcon name="motion"/><span>{t('nav.lessMotion')}</span><i className="site-notice-toggle-state" aria-hidden="true"/></button>
           <button className="masthead-menu-item" id="siteNoticeToggle" type="button" role="switch" aria-checked={props.noticeEnabled} onClick={props.onToggleNotice}><MenuIcon name="notice"/><span>{t('notice.label')}</span><i className="site-notice-toggle-state" aria-hidden="true"/></button>
