@@ -1,3 +1,4 @@
+import faviconUrl from '../../../public/assets/favicon.png?url';
 import backgroundUrl from '../../../public/assets/launcher-background.webp?url';
 import touhouFontUrl from '../../../public/assets/fonts/touhou98.woff2?url';
 import yatraFontUrl from '../../../public/assets/fonts/yatra-one-latin.woff2?url';
@@ -70,6 +71,7 @@ export function OriginalBootstrapHead() {
       <link rel="apple-touch-icon" sizes="180x180" href="assets/pwa/apple-touch-icon.png"/>
     </>}
     <link rel="icon" href={lobby ? 'favicon.ico' : 'assets/favicon.ico'} type={lobby ? undefined : 'image/x-icon'}/>
+    <link rel="icon" type="image/png" sizes="256x256" href={faviconUrl}/>
     <link rel="preload" href={backgroundUrl} as="image" fetchPriority="high"/>
     <link rel="preload" href={touhouFontUrl} as="font" type="font/woff2" crossOrigin="anonymous"/>
     <link rel="preload" href={yatraFontUrl} as="font" type="font/woff2" crossOrigin="anonymous"/>
