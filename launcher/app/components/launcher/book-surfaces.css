@@ -48,7 +48,6 @@ body:not(.mp-room-active) .book-masthead {background:color-mix(in srgb,var(--boo
 .book-card,.book-recent-link {background:color-mix(in srgb,var(--book-surface) 96%,transparent)}
 .book-art {background:var(--book-raised)}
 .book-favorite {box-shadow:0 2px 8px #0002}
-.book-play {background:var(--book-accent);color:var(--book-on-accent)}
 @media(min-width:781px) and (hover:hover) and (pointer:fine) {
   .book-sidebar nav button[data-book-category="windows"] {margin-top:12px}
 }
