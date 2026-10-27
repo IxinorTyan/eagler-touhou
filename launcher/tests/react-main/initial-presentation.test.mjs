@@ -156,7 +156,7 @@ test('actual root/nested builds publish shared initial cards and route-specific 
     execFileSync(process.execPath, ['node_modules/@react-router/dev/bin.cjs', 'build'], {cwd: project,
       env: {...process.env, EAGLER_REACT_BUILD_DIRECTORY: output, EAGLER_REACT_MOUNT_PATH: mountPath, EAGLER_REACT_APP_SHELL: 'disabled', EAGLER_REACT_APP_SHELL_ORIGIN: ''},
       stdio: 'pipe', timeout: 120000});
-    for (const entry of ['index.html', 'en.html', 'lobby.html']) {
+    for (const entry of ['index.html', 'en.html', 'lobby.html', 'profile.html']) {
       const document = parse(await readFile(resolve(output, 'client', entry), 'utf8')), lobby = entry === 'lobby.html';
       assert.equal(document.documentElement.dataset.bookTheme, 'dark');
       assert.equal(document.documentElement.lang, entry === 'en.html' ? 'en' : 'zh-CN');
@@ -164,6 +164,7 @@ test('actual root/nested builds publish shared initial cards and route-specific 
       assert.equal(document.documentElement.dataset.originalEntry, lobby ? 'lobby' : 'library');
       assert.equal(document.documentElement.getAttribute('data-lobby-boot'), lobby ? 'loading' : null);
       if (lobby) {assert.equal(document.querySelectorAll('.game').length, 0); assert.ok(document.querySelector('noscript').textContent.includes('联机大厅需要启用 JavaScript'));}
+      else if (entry === 'profile.html') {assert.ok(document.querySelector('main.player-profile')); assert.equal(document.querySelector('.book-library'), null);}
       else assert.deepEqual(bookContract(document), expectedBookContract());
       assert.equal(document.querySelector('iframe'), null); assertUniqueIds(document);
     }

@@ -120,7 +120,7 @@ export function createStartupController(options: StartupOptions) {
   async function notices(id: number, ports: StartupPorts) {
     const params = new URL(ports.url).searchParams;
     if (ports.lobbyOptionsEmbed) return;
-    if (ports.context === 'lobby') return;
+    if (ports.context === 'lobby' || /\/profile\.html\/?$/.test(new URL(ports.url).pathname)) return;
     const debug = params.get('debug'), preview = params.get('preview');
     // Main's browser-warning condition intentionally has no room exclusion.
     if (!debug && !preview) {

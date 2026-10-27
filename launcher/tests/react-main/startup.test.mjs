@@ -101,6 +101,10 @@ test('rapid SPA navigation never clones a loading cue or restarts cold boot', as
   assert.equal(f.events.filter(event => event === 'ready').length, 1);
 });
 
+test('standalone profile route skips automatic launcher notices', async () => {
+  const f = fixture({path: '/profile.html'}); f.owner.attach(f.ports); await tick();
+  assert.deepEqual(f.events, ['ready']);
+});
 test('first-use shown suppresses site notice; no duplicate initialization after completed binding', async () => {
   const f = fixture({shown: true}); const detach = f.owner.attach(f.ports); await tick(); detach(); f.owner.attach(f.ports); await tick();
   assert.deepEqual(f.events, ['ready', 'warning', 'warning-current:true', 'first-use']);

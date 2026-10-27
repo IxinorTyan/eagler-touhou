@@ -691,7 +691,7 @@ export function SurfaceNavigationProvider({dirty, isEditing, onDiscard, decision
   }
   function setLocaleAddress(locale: UiLocale) {
     const base = new URL(href(location), 'https://launcher.invalid');
-    const destination = new URL(address.context === 'lobby' ? 'lobby.html' : locale === 'en' ? 'en.html' : './', base);
+    const destination = new URL(/\/profile\.html\/?$/.test(location.pathname) ? 'profile.html' : address.context === 'lobby' ? 'lobby.html' : locale === 'en' ? 'en.html' : './', base);
     const next = {pathname: destination.pathname, search: location.search, hash: location.hash};
     const state = plainState(location.state);
     // main keeps history.state through locale replacement. Our href checks are

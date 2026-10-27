@@ -1,5 +1,5 @@
-import {useEffect, useRef, useState, type CSSProperties} from 'react';
-import {createPortal} from 'react-dom';
+import {useEffect, useState, type CSSProperties} from 'react';
+import {AppLink} from './AppLink';
 import {useLocale} from '../../i18n';
 import {PRODUCT_GAMES, gameIdForProduct, isProductId} from '../../../src/contracts/product-catalog.mts';
 import {bookGameArtwork} from './book-artwork';
@@ -21,7 +21,7 @@ const validProfile = (value: unknown): value is Profile => {
 const validGuides = (value: unknown): value is Guide[] => Array.isArray(value) && value.every(item => item && typeof item.id === 'string' && typeof item.title === 'string' && typeof item.body === 'string');
 
 /** Browser-local presentation only. No account or room identity is created. */
-export function ProfilePreview({interactive = true, open, onOpenChange}: {interactive?: boolean; open: boolean; onOpenChange(open: boolean): void}) {
+export function ProfilePreview({interactive = true, active, href}: {interactive?: boolean; active: boolean; href: string}) {
   const {locale} = useLocale();
   const [avatar, setAvatar] = useState('');
   useEffect(() => {
@@ -29,11 +29,12 @@ export function ProfilePreview({interactive = true, open, onOpenChange}: {intera
     refresh(); window.addEventListener(BOOK_PREFERENCES_EVENT, refresh); window.addEventListener('storage', refresh);
     return () => {window.removeEventListener(BOOK_PREFERENCES_EVENT, refresh); window.removeEventListener('storage', refresh);};
   }, []);
-  return <><button className="book-profile-trigger" type="button" disabled={!interactive} aria-label={locale === 'en' ? 'Player profile' : '玩家主页'} aria-pressed={open} onClick={() => onOpenChange(!open)}><span aria-hidden="true">{imageData(avatar) ? <img src={avatar} alt=""/> : <AvatarPlaceholder/>}</span></button>{open && createPortal(<ProfilePage onClose={() => onOpenChange(false)}/>, document.body)}</>;
+  const content = <span aria-hidden="true">{imageData(avatar) ? <img src={avatar} alt=""/> : <AvatarPlaceholder/>}</span>;
+  return interactive ? <AppLink className="book-profile-trigger" href={href} aria-label={locale === 'en' ? 'Player profile' : '玩家主页'} aria-current={active ? 'page' : undefined}>{content}</AppLink>
+    : <a className="book-profile-trigger" href={href} aria-label={locale === 'en' ? 'Player profile' : '玩家主页'} aria-current={active ? 'page' : undefined}>{content}</a>;
 }
 
-function ProfilePage({onClose}: {onClose: () => void}) {
-  const dialog = useRef<HTMLDialogElement>(null);
+export function ProfilePage() {
   const [profile, setProfile] = useState(blankProfile), [draft, setDraft] = useState(blankProfile);
   const [tab, setTab] = useState('概览'), [editing, setEditing] = useState(false);
   const [recent, setRecent] = useState<string[]>([]), [favorites, setFavorites] = useState<string[]>([]);
@@ -47,12 +48,10 @@ function ProfilePage({onClose}: {onClose: () => void}) {
     setNotifications(readBookPreference('friend-online-reminder', false, (value): value is boolean => typeof value === 'boolean'));
     const refresh = () => {setRecent(readBookPreference('recent', [], stringArray)); setFavorites(readBookPreference('favorites', [], stringArray));};
     refresh(); window.addEventListener(BOOK_PREFERENCES_EVENT, refresh); window.addEventListener('storage', refresh);
-    dialog.current?.show();
-    const previous = document.body.style.overflow; document.body.style.overflow = 'hidden';
-    return () => {document.body.style.overflow = previous; window.removeEventListener(BOOK_PREFERENCES_EVENT, refresh); window.removeEventListener('storage', refresh);};
+    return () => { window.removeEventListener(BOOK_PREFERENCES_EVENT, refresh); window.removeEventListener('storage', refresh);};
   }, []);
   useEffect(() => {if (!notice) return; const timer = window.setTimeout(() => setNotice(''), 3500); return () => window.clearTimeout(timer);}, [notice]);
-  const back = () => {if (editing) setEditing(false); else if (guideDraft) setGuideDraft(null); else if (article) setArticle(null); else onClose(); setError('');};
+  const back = () => {if (editing) setEditing(false); else if (guideDraft) setGuideDraft(null); else if (article) setArticle(null); setError('');};
   const editProfile = () => {setDraft({...profile, links: profile.links.map(link => ({...link}))}); setEditing(true); setError('');};
   const uploadImage = (file: File | undefined, field: 'avatar' | 'cover') => {
     if (!file) return;
@@ -72,7 +71,7 @@ function ProfilePage({onClose}: {onClose: () => void}) {
     setGuides(next); writeBookPreference('player-guide-drafts-v1', next); setGuideDraft(null); setArticle(null); setError(''); setNotice('草稿已保存到此浏览器');
   };
   const startGuide = () => {setGuideDraft({id: crypto.randomUUID(), title: '', body: ''}); setError('');};
-  return <dialog ref={dialog} className="player-profile" aria-labelledby="profile-name" onCancel={event => {event.preventDefault(); back();}} onClose={onClose}>
+  return <main className="player-profile" aria-labelledby="profile-name">
     {(editing || article || guideDraft) && <div className="profile-topbar"><button type="button" onClick={back}>← 返回主页</button></div>}
     <div className="profile-wrap">
       <section className="profile-hero" style={imageData(profile.cover) ? {'--profile-cover': `url("${profile.cover}")`} as CSSProperties : undefined}>
@@ -94,7 +93,7 @@ function ProfilePage({onClose}: {onClose: () => void}) {
         </div></div>}
       <footer className="profile-footer"><span>个人资料与攻略草稿保存在此浏览器</span></footer>
     </div>{notice && <div className="profile-toast" role="status">{notice}</div>}
-  {onlineNotice && <aside className="profile-online-notice" role="status" aria-label="好友上线提醒"><span className="profile-demo-avatar"><AvatarPlaceholder/><i/></span><div className="profile-online-copy"><div><span>好友上线</span><small>刚刚 · 演示</small></div><strong>演示好友</strong><p>现在在线</p><button type="button" onClick={() => {setTab('好友'); setSocialTab('好友'); setEditing(false); setOnlineNotice(false);}}>查看好友 →</button></div><button type="button" className="profile-notice-close" aria-label="关闭上线提醒" onClick={() => setOnlineNotice(false)}>×</button></aside>}</dialog>;
+  {onlineNotice && <aside className="profile-online-notice" role="status" aria-label="好友上线提醒"><span className="profile-demo-avatar"><AvatarPlaceholder/><i/></span><div className="profile-online-copy"><div><span>好友上线</span><small>刚刚 · 演示</small></div><strong>演示好友</strong><p>现在在线</p><button type="button" onClick={() => {setTab('好友'); setSocialTab('好友'); setEditing(false); setOnlineNotice(false);}}>查看好友 →</button></div><button type="button" className="profile-notice-close" aria-label="关闭上线提醒" onClick={() => setOnlineNotice(false)}>×</button></aside>}</main>;
 }
 
 function EmptyState({title, detail}: {title: string; detail?: string}) {return <div className="profile-empty"><h3>{title}</h3>{detail && <p>{detail}</p>}</div>;}

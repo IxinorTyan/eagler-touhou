@@ -1,3 +1,5 @@
+import {useLocation} from 'react-router';
+import {ProfilePage} from './components/launcher/ProfilePreview';
 import {bookArtwork} from './components/launcher/book-artwork';
 import {useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefCallback} from 'react';
 import {isProductId, isMultiplayerProductId, type ProductId} from '../src/contracts/product-catalog.mts';
@@ -84,6 +86,7 @@ export function LauncherApplication({host}: {host: LauncherHost}) {
 
 function LauncherSurfaces({host}: {host: LauncherHost}) {
   const navigation = useSurfaceNavigation();
+  const profilePage = /\/profile\.html\/?$/.test(useLocation().pathname);
   const settings = useSyncExternalStore(host.settings.subscribe, host.settings.getSnapshot, host.settings.getSnapshot);
   const layout = useSyncExternalStore(host.touchLayout.subscribe, host.touchLayout.getSnapshot, host.touchLayout.getSnapshot);
   const [preview, setPreview] = useState<string | undefined>(navigation.productId ?? host.products[0]?.id);
@@ -154,7 +157,7 @@ function LauncherSurfaces({host}: {host: LauncherHost}) {
     children: <LobbyOptionsHost open={presence.open} foregroundActive={navigation.surface === 'touch' || host.runtimeOpen === true || host.replayWorkspace === true} onCloseRequest={navigation.closeSurface}>{host.replayWorkspace && !roomOpen ? null : settingsPanel}</LobbyOptionsHost>};
   return <OptionsOwnership value={presence.targets}>
     {host.masthead}
-    {navigation.context === 'lobby' ? host.renderLobby ? host.renderLobby(lobbyProps) : <LobbySurface {...lobbyProps}/> : <LibrarySurface products={host.products} selectedProduct={preview} openedProduct={presence.openedProduct}
+    {profilePage ? <ProfilePage/> : navigation.context === 'lobby' ? host.renderLobby ? host.renderLobby(lobbyProps) : <LobbySurface {...lobbyProps}/> : <LibrarySurface products={host.products} selectedProduct={preview} openedProduct={presence.openedProduct}
       onSelect={setPreview} onActivate={activate} masthead={null} footer={host.footer} serverStatusNote={host.serverStatusNote}
       lobbyHref={host.lobbyHref} roomUsersArtwork={host.assetUrl('assets/room-users.svg')} optionsOpen={presence.open} roomOpen={roomOpen} roomDrawer={host.roomDrawer} onBack={navigation.closeSurface}>
       {host.replayWorkspace && !roomOpen ? null : settingsPanel}{host.roomSurface}

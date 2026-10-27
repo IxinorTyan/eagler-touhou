@@ -73,3 +73,10 @@ test('GitHub and donation are the final two menu entries', async () => {
   assert.equal(items.at(-2).textContent, 'GitHub');
   assert.equal(items.at(-1).classList.contains('book-menu-donation'), true);
 });
+
+test('avatar navigates to the profile address and selects only the profile destination', async () => {
+  await mount(el(Masthead)); await click('.book-profile-trigger');
+  assert.equal(n('#address').textContent, '/profile.html');
+  assert.equal(n('.book-profile-trigger').getAttribute('aria-current'), 'page');
+  assert.equal(env.document.querySelectorAll('.book-main-nav [aria-current]').length, 0);
+});
