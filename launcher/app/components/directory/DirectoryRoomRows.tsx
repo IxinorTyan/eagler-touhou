@@ -98,7 +98,7 @@ function RoomRow({
           <span className="lobby-room-code">#{room.code}</span>
           <h2>{title}</h2>
           <span className="lobby-room-subtitle">{meta.subtitle}</span>
-          <span className="lobby-mobile-difficulty" hidden={!difficulty}>{difficulty}</span>
+          <span className="lobby-mobile-difficulty" data-difficulty={difficulty.toLowerCase()} hidden={!difficulty}>{difficulty}</span>
           <span className="lobby-movement-rule" hidden={!room.disableCheatMovement}>
             {t('lobby.noCheat')}
           </span>
@@ -118,7 +118,12 @@ function RoomRow({
           </div>
         </div>
       </div>
-      <span className="lobby-difficulty" hidden={!difficulty && !duel}>{difficulty || (locale === 'en' ? 'In game' : '局内选择')}</span>
+      <span className="lobby-difficulty" data-difficulty={difficulty.toLowerCase()} hidden={!difficulty && !duel}>{difficulty || (locale === 'en' ? 'In game' : '局内选择')}</span>
+      <div className="lobby-room-rules" aria-label={locale === 'en' ? 'Rules' : '玩法'}>
+        {room.disableCheatMovement && <span>{t('lobby.noCheat')}</span>}
+        {room.challengeMode && <span>{t('room.challengeMode')}</span>}
+        {!room.disableCheatMovement && !room.challengeMode && <span className="lobby-rule-default">{locale === 'en' ? 'Standard' : '标准'}</span>}
+      </div>
       <div className="lobby-party" aria-label={count}>
         <span className="lobby-occupancy">{count}</span>
         <div

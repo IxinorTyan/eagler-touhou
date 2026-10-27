@@ -123,6 +123,7 @@ export function LobbySurface({
             <span>{locale === 'en' ? 'Game' : '游戏'}</span>
             <span>{locale === 'en' ? 'Room' : '房间'}</span>
             <span>{t('lobby.difficulty')}</span>
+            <span>{locale === 'en' ? 'Rules' : '玩法'}</span>
             <span>{locale === 'en' ? 'Players' : '玩家 / 人数'}</span>
             <span>{t('lobby.state')}</span>
             <span />

@@ -615,3 +615,17 @@ test('Flower View keeps bilingual identity, score, time and one contextual entry
   assert.equal(owners.decodeRoomInvite(new URL(f.navigations[0].url).searchParams.get('j')).s,true);
   await m.unmount();
 });
+
+test('Directory rules column retains gameplay flags and the standard fallback', async () => {
+  const f=await fixture({locale:'zh-CN'}).live([room({disableCheatMovement:true,challengeMode:true})]);
+  const {m}=await mountLobby(f,{}, {locale:'zh-CN'});
+  await click('.book-room-view-toggle button:last-child');
+  assert.equal(all('#listHead>span').length,7);
+  assert.ok(n('#listHead').textContent.includes('玩法'));
+  assert.equal(n('.lobby-difficulty').dataset.difficulty,'normal');
+  assert.ok(n('.lobby-room-rules').textContent.includes(t('zh-CN','lobby.noCheat')));
+  assert.ok(n('.lobby-room-rules').textContent.includes(t('zh-CN','room.challengeMode')));
+  await f.receive([room()]);
+  assert.equal(n('.lobby-room-rules').textContent,'标准');
+  await click('.book-room-view-toggle button:first-child');
+});
