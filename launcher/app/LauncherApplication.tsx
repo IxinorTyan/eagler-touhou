@@ -148,13 +148,14 @@ function LauncherSurfaces({host}: {host: LauncherHost}) {
   const editor = playerElement && navigation.surface === 'touch' && settings &&
     <TouchLayoutEditor playerElement={playerElement} model={host.touchLayout} settings={host.settings} actions={host.settingsActions}
       native={host.nativeTouch} onCloseIntent={navigation.closeSurface} fireEnabled={host.touchFireEnabled} previewImage={host.previewImage ?? (selectedProduct?.artwork ? `url(${JSON.stringify(selectedProduct.artwork)})` : 'none')}/>;
-  const lobbyProps: LobbySurfaceProps = {...host.lobby, products: host.products.filter(product => product.multiplayer),
+  const lobbyProps: LobbySurfaceProps = {...host.lobby, masthead: null, products: host.products.filter(product => product.multiplayer),
     selectedProduct: navigation.filterProductId ?? undefined, openedProduct: presence.openedProduct, onSelect: id => {if (isProductId(id)) navigation.selectLobbyProduct(id);},
     onActivate: activate, roomUsersArtwork: host.assetUrl('assets/room-users.svg'),
     children: <LobbyOptionsHost open={presence.open} foregroundActive={navigation.surface === 'touch' || host.runtimeOpen === true || host.replayWorkspace === true} onCloseRequest={navigation.closeSurface}>{host.replayWorkspace && !roomOpen ? null : settingsPanel}</LobbyOptionsHost>};
   return <OptionsOwnership value={presence.targets}>
+    {host.masthead}
     {navigation.context === 'lobby' ? host.renderLobby ? host.renderLobby(lobbyProps) : <LobbySurface {...lobbyProps}/> : <LibrarySurface products={host.products} selectedProduct={preview} openedProduct={presence.openedProduct}
-      onSelect={setPreview} onActivate={activate} masthead={host.masthead} footer={host.footer} serverStatusNote={host.serverStatusNote}
+      onSelect={setPreview} onActivate={activate} masthead={null} footer={host.footer} serverStatusNote={host.serverStatusNote}
       lobbyHref={host.lobbyHref} roomUsersArtwork={host.assetUrl('assets/room-users.svg')} optionsOpen={presence.open} roomOpen={roomOpen} roomDrawer={host.roomDrawer} onBack={navigation.closeSurface}>
       {host.replayWorkspace && !roomOpen ? null : settingsPanel}{host.roomSurface}
     </LibrarySurface>}

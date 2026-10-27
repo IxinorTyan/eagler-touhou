@@ -42,7 +42,7 @@ html[data-book-theme='light'] {
   --book-overlay: #f7f6f2d9;
   --book-shadow: 0 14px 38px #24291f14;
 }
-html:has(.book-masthead) {color-scheme:dark}
+html:has(.book-masthead) {color-scheme:dark;scrollbar-gutter:stable}
 html[data-book-theme='light']:has(.book-masthead) {color-scheme:light}
 @media (prefers-reduced-motion:reduce) {
   html {transition:none}
@@ -61,6 +61,17 @@ body:not(.mp-room-active):has(.book-masthead)::before {
 }
 body:not(.mp-room-active):has(.book-masthead) :is(.sheet,.book-directory) {position:relative;z-index:1;background:transparent}
 body:not(.mp-room-active) .book-masthead {background:color-mix(in srgb,var(--book-bg) 88%,transparent)}
+/* The live masthead stays outside the page containers and their entrance animation. */
+html:has(.book-masthead) .book-masthead {view-transition-name:launcher-masthead}
+::view-transition-group(launcher-masthead) {animation:none}
+::view-transition-old(launcher-masthead) {animation:none;opacity:1}
+::view-transition-new(launcher-masthead) {animation:none;opacity:1}
+.lobby-page .book-masthead .masthead-links {grid-column:3}
+html:has(.book-masthead) .book-directory:not(:has(>.book-masthead)) {padding-top:24px}
+@media(max-width:780px),(hover:none),(pointer:coarse) {
+  .lobby-page .book-masthead .masthead-links {grid-column:2}
+  html:has(.book-masthead) .book-directory:not(:has(>.book-masthead)) {padding-top:18px}
+}
 .book-brand .brand-version {display:none}
 .book-masthead .book-brand {line-height:1.2}
 .book-masthead .book-theme-toggle {background:transparent;border:0;border-radius:7px}
