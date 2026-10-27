@@ -74,8 +74,8 @@ html:has(.book-masthead) .book-directory:not(:has(>.book-masthead)) {padding-top
 }
 .book-brand .brand-version {display:none}
 .book-masthead .book-brand {line-height:1.2}
-.book-masthead .book-theme-toggle {background:transparent;border:0;border-radius:7px}
-.book-masthead .book-theme-toggle:hover {background:var(--book-accent-soft)}
+.book-masthead .book-theme-toggle {appearance:none;background:transparent;border:0;border-radius:0;box-shadow:none}
+.book-masthead .book-theme-toggle:hover {background:transparent;color:var(--book-ink)}
 .book-library {font-size:13px;line-height:1.5}
 .book-card,.book-recent-link {background:color-mix(in srgb,var(--book-surface) 96%,transparent)}
 .book-art {background:var(--book-raised)}
