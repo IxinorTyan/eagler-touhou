@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useLocale } from '../../i18n';
-import { LibraryCards, type LibraryCardsProps } from './LibraryCards';
+import type { LibraryCardsProps } from './LibraryCards';
+import {BookDirectoryGames} from './BookDirectoryGames';
 
 export interface LobbySurfaceProps extends Omit<
   LibraryCardsProps,
@@ -26,6 +27,8 @@ export interface LobbySurfaceProps extends Omit<
   connectionNote?: string;
   roomUsersArtwork: string;
   children?: ReactNode;
+  productFilters?: readonly string[];
+  onProductFiltersChange?(products: string[]): void;
 }
 /** Dedicated lobby skeleton from main lobby.html43–105, without home brand/footer. */
 export function LobbySurface({
@@ -50,7 +53,7 @@ export function LobbySurface({
   const { t } = useLocale();
   return (
     <>
-      <main className="lobby-main" inert={rail.interactive === false}>
+      <main className="lobby-main book-directory" inert={rail.interactive === false}>
         {masthead}
         <aside className="lobby-survey-notice" aria-label={t('notice.label')}>
           <strong>{t('lobby.surveyNotice')}</strong>
@@ -94,8 +97,8 @@ export function LobbySurface({
           {notice}
         </p>
         {membership}
-        <section className="main library-layout lobby-library" aria-label={t('lobby.game')}>
-          <LibraryCards {...rail} variant="lobby" selectBeforeActivate />
+        <section className="lobby-library" aria-label={t('lobby.game')}>
+          <BookDirectoryGames {...rail}/>
         </section>
         <header className="lobby-room-tools">
           <div className="lobby-actions">{roomTools}</div>
