@@ -510,3 +510,9 @@ html[data-book-theme='light'] .book-directory {--difficulty-easy:#23733e;--diffi
 
 .book-masthead .book-top-faq{white-space:nowrap;flex-shrink:0}
 @media(max-width:780px),(hover:none),(pointer:coarse){html:has(.book-masthead) .masthead{gap:6px;padding-inline:14px}html:has(.book-masthead) .book-brand{font-size:13px;gap:5px;letter-spacing:.5px}.book-masthead .book-top-faq{font-size:11px;padding-inline:4px}.book-masthead .book-top-faq .masthead-label{display:block;line-height:1.25;max-width:3em;white-space:normal}.book-masthead .book-theme-toggle,.book-masthead .masthead-menu-toggle{width:32px;padding:5px}html:has(.book-masthead) .masthead-links{gap:3px}}
+
+/* Give the plain FAQ link room beside the avatar selection ring. */
+.book-masthead .book-top-faq {margin-inline-start:8px;padding-inline:6px;border:0;border-radius:0;background:transparent;box-shadow:none;color:var(--book-muted);text-decoration:none}
+.book-masthead .book-top-faq::before,.book-masthead .book-top-faq::after {display:none}
+.book-masthead .book-top-faq:hover {color:var(--book-accent)}
+.book-masthead .book-menu-donation[hidden] {display:none}

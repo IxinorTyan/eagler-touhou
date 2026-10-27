@@ -104,7 +104,7 @@ export function LauncherMasthead(props: LauncherMastheadProps) {
           <button className="masthead-menu-item" id="firstUseNoticeOpen" type="button" onClick={() => {onMenuOpenChange(false); props.onFirstUse();}}><MenuIcon name="firstUse"/><span>{t('nav.firstUseNotice')}</span></button>
           <a className="masthead-menu-item" href={props.aboutHref}><MenuIcon name="about"/><span>{t('nav.about')}</span></a>
           <a className="masthead-menu-item" href="https://github.com/YomotsuHisami/eagler-touhou" target="_blank" rel="noopener noreferrer"><MenuIcon name="github"/><span>GitHub</span></a>
-          <button className="masthead-menu-item book-menu-donation" type="button" hidden={props.donationAvailable === false} onClick={() => {onMenuOpenChange(false); props.onDonation();}}><span aria-hidden="true">♡</span><span>{t('nav.donate')}</span></button>
+          <button className="masthead-menu-item book-menu-donation" type="button" hidden={props.donationAvailable === false} onClick={() => {onMenuOpenChange(false); props.onDonation();}}><MenuIcon name="donation"/><span>{t('nav.donate')}</span></button>
         </div>
       </div>
     </nav>
