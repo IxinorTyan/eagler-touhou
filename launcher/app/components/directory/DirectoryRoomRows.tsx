@@ -15,6 +15,7 @@ import {
 import { useLocale } from '../../i18n';
 import { Th09RoomCard } from './Th09RoomCard';
 import { RoomElapsed } from '../room/RoomElapsed';
+import {bookGameArtwork} from '../launcher/book-artwork';
 
 export interface DirectoryRoomRowsProps {
   snapshot: DirectorySnapshot;
@@ -62,7 +63,7 @@ function RoomRow({
     initiallyHiddenMotion = useRef(initial).current;
   const [coverFailed, setCoverFailed] = useState(false);
   const meta = PRODUCT_GAMES[gameIdForProduct(room.product)];
-  const artwork = 'cardArtwork' in meta ? meta.cardArtwork : null;
+  const artwork = bookGameArtwork(gameIdForProduct(room.product)) ?? ('cardArtwork' in meta && meta.cardArtwork ? assetUrl(`assets/${meta.cardArtwork}`) : undefined);
   const title = locale === 'en' ? meta.subtitle : meta.title;
   const policy = multiplayerConfigForProduct(room.product)!;
   const difficulty = policy.inGameSelection ? '' : policy.difficulties[room.difficulty];
@@ -97,7 +98,7 @@ function RoomRow({
       <div className="lobby-room-identity">
         <span className="lobby-cover" aria-hidden="true">
           <img
-            src={artwork ? assetUrl(`assets/${artwork}`) : undefined}
+            src={artwork}
             alt=""
             loading="lazy"
             decoding="async"

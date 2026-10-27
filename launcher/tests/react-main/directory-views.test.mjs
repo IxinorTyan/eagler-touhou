@@ -267,7 +267,16 @@ for (const locale of ['zh-CN', 'en']) test(`Lobby real loading/live/empty/list c
   }
   await click('#emptyAction'); await click('#createButton'); await click('#codeButton'); assert.deepEqual(opens, ['create', 'create', 'join']);
   assert.equal(n('#refreshRooms').getAttribute('aria-label'), t(locale, 'lobby.refresh'));
-  await f.receive([room()], {total: 45}); assert.equal(n('#listHead').hidden, false); assert.equal(env.document.querySelector('#emptyState'), null);
+  await f.receive([room()], {total: 45}); assert.equal(n('#listHead').hidden, true); assert.equal(env.document.querySelector('#emptyState'), null);
+  const rowBeforeSwitch = n('#roomList .lobby-room-row');
+  assert.ok(n('.book-directory').classList.contains('book-rooms-cards'));
+  await click('.book-room-view-toggle button:last-child');
+  assert.equal(n('#listHead').hidden, false);
+  assert.ok(n('.book-directory').classList.contains('book-rooms-list'));
+  assert.equal(n('#roomList .lobby-room-row'), rowBeforeSwitch, 'display changes preserve room identity');
+  assert.equal(JSON.parse(env.window.localStorage.getItem('eagler.book.lobby-room-view')), 'list');
+  await click('.book-room-view-toggle button:first-child');
+  assert.equal(n('#listHead').hidden, true);
   assert.equal(n('#connectionNote').hidden, false); assert.equal(n('#connectionNote').textContent, t(locale, 'lobby.truncated', {count: 1}));
   assert.equal(n('#roomCount').getAttribute('aria-live'), 'polite'); assert.equal(n('#roomCount').textContent, t(locale, 'lobby.roomCount', {count: 1}));
   await click('#refreshRooms'); assert.equal(n('#roomList').getAttribute('aria-busy'), 'true'); assert.equal(n('#listHead').hidden, true);

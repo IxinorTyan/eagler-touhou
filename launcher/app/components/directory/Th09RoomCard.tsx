@@ -6,6 +6,7 @@ import {multiplayerConfigForProduct} from '../../../src/contracts/product-catalo
 import type {UiMessageKey} from '../../../src/launcher/i18n.mts';
 import {DifficultyLabel} from '../room/DifficultyLabel';
 import {RoomElapsed} from '../room/RoomElapsed';
+import {bookGameArtwork} from '../launcher/book-artwork';
 
 /** Shared large room card; TH09 retains its native duel score and names. */
 export function Th09RoomCard({room, difficulty, state, spectating, disabled, initial, assetUrl, conflict, onJoin}: {
@@ -18,6 +19,7 @@ export function Th09RoomCard({room, difficulty, state, spectating, disabled, ini
   const minutes = Math.max(...room.seats.map(seat => seat?.stats?.minutes ?? 0), 0);
   return <article className={'lobby-room-row th09-room-row' + (!duel ? ' coop-room-row' : '') + (initialMotion ? ' lobby-room-initial' : '')}
     role="listitem" data-key={room.product + '-' + room.code}>
+    <div className="book-duel-cover"><img src={bookGameArtwork('th09')} alt=""/><strong>東方花映塚</strong></div>
     <div className="th09-room-meta">
       <strong className="lobby-room-code">#{room.code}</strong>
       <span className="lobby-difficulty" hidden={!difficulty}>{difficulty && <DifficultyLabel name={difficulty} assetUrl={assetUrl}/>}</span>

@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import {useEffect, useState, type ReactNode} from 'react';
+import {readBookPreference, writeBookPreference} from './book-preferences';
 import { useLocale } from '../../i18n';
 import type { LibraryCardsProps } from './LibraryCards';
 import {BookDirectoryGames} from './BookDirectoryGames';
@@ -50,10 +51,12 @@ export function LobbySurface({
   children,
   ...rail
 }: LobbySurfaceProps) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const [roomView, setRoomView] = useState<'cards' | 'list'>('cards');
+  useEffect(() => setRoomView(readBookPreference('lobby-room-view', 'cards', (value): value is 'cards' | 'list' => value === 'cards' || value === 'list')), []);
   return (
     <>
-      <main className="lobby-main book-directory" inert={rail.interactive === false}>
+      <main className={`lobby-main book-directory book-rooms-${roomView}`} inert={rail.interactive === false}>
         {masthead}
         <aside className="lobby-survey-notice" aria-label={t('notice.label')}>
           <strong>{t('lobby.surveyNotice')}</strong>
@@ -102,6 +105,9 @@ export function LobbySurface({
         </section>
         <header className="lobby-room-tools">
           <div className="lobby-actions">{roomTools}</div>
+          <div className="book-room-view-toggle" role="group" aria-label={locale === 'en' ? 'Room display' : '房间显示模式'}>
+            {(['cards', 'list'] as const).map(view => <button key={view} type="button" aria-pressed={roomView === view} onClick={() => {setRoomView(view); writeBookPreference('lobby-room-view', view);}}>{view === 'cards' ? (locale === 'en' ? 'Cover cards' : '普通模式') : (locale === 'en' ? 'List' : '列表模式')}</button>)}
+          </div>
         </header>
         <section
           className={`lobby-list-surface${rail.selectedProduct === 'th09mp' ? ' th09-room-surface' : ''}`}
@@ -111,7 +117,7 @@ export function LobbySurface({
             className="lobby-list-head"
             id="listHead"
             aria-hidden="true"
-            hidden={!hasRooms || rail.selectedProduct === 'th09mp'}
+            hidden={roomView === 'cards' || !hasRooms || rail.selectedProduct === 'th09mp'}
           >
             <span>{t('lobby.gameAndRoom')}</span>
             <span>{t('lobby.difficulty')}</span>

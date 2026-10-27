@@ -12,4 +12,5 @@ import th20 from './book-covers/th20.webp?url';
 
 // Vite resolves the same public asset URLs for server and client rendering.
 const covers: Record<string, string> = {th06, th07, th075, th08, th09, th10, th11, th12, th15, th20};
+export const bookGameArtwork = (gameId: string) => covers[gameId];
 export const bookArtwork = (product: LibraryProduct) => covers[product.gameId] ?? product.artwork;
