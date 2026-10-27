@@ -1502,9 +1502,9 @@ test('actual BrowserLauncher: late Host fallback before Start uses the current m
 // Host's independently retained business selection is not the directory filter.
 for (const timing of ['together', 'after-directory']) test(`actual BrowserLauncher: lobby guide follows directory filter and settings stay explicit (Host ${timing})`, async () => {
   const f = await mountBrowser({initial: '/lobby.html?game=th07mp&keep=a%20b', holdHost: timing === 'after-directory' ? 'launcher' : true, host: subsetHost(['th06', 'th07'])});
-  if (timing === 'after-directory') await until(() => env.document.querySelector('#lobbyGameRail .game.nav-preview[data-product="th07mp"]'), 'actual directory applies TH07 filter before Launcher Host');
+  if (timing === 'after-directory') await until(() => env.document.querySelector('#lobbyGameRail [data-lobby-product="th07mp"][data-selected="true"]'), 'actual directory applies TH07 filter before Launcher Host');
   await React.act(async () => {f.releaseHost();}); await tick();
-  await until(() => env.document.querySelector('#lobbyGameRail .game.nav-preview[data-product="th07mp"]'), 'actual directory applies TH07 filter');
+  await until(() => env.document.querySelector('#lobbyGameRail [data-lobby-product="th07mp"][data-selected="true"]'), 'actual directory applies TH07 filter');
   assert.equal(f.fetches.filter(item => new URL(item.url).pathname.endsWith('/site-manifest.json')).length, 2);
   assert.equal(node('#lobbyOptionsDialog').open, false, 'the directory filter is not an instruction to open game settings');
   await click('#lobbyGuideOpen');
@@ -1514,12 +1514,12 @@ for (const timing of ['together', 'after-directory']) test(`actual BrowserLaunch
   assert.equal(new URL(currentUrl(), env.window.location.href).searchParams.get('game'), 'th07mp');
   assert.equal(playerOpen(), false); assert.deepEqual(f.navigations, []);
   await click('#mpGuideClose'); await until(() => !node('#mpGuideDialog').open, 'guide closes its own entry');
-  await click('#lobbyGameRail .game[data-product="th07mp"]');
+  await click('#lobbyGameRail [data-lobby-product="th07mp"] .book-lobby-game');
   await until(() => node('#lobbyOptionsDialog').open, 'explicit card click still opens its original settings carrier');
   assert.equal(node('#gameId').textContent, 'TH07 MP');
   assert.equal(new URL(currentUrl(), env.window.location.href).searchParams.get('game'), 'th07mp', 'options product does not replace the independent filter');
   await click('#libraryBack'); await until(() => !node('#lobbyOptionsDialog').open, 'settings Back returns to the same directory');
-  await click('#lobbyGameRail .game[data-product="th06mp"]');
+  await click('#lobbyGameRail [data-lobby-product="th06mp"] .book-lobby-game');
   assert.equal(node('#lobbyOptionsDialog').open, false, 'browsing another cover changes only the filter');
   await click('#lobbyGuideOpen'); await until(() => node('#mpGuideDialog').open, 'directory guide reopens after another product settings');
   assert.equal(node('#mpGuideContent .multiplayer-rule-game-tab.selected').dataset.game, 'th06');
@@ -1529,11 +1529,11 @@ for (const timing of ['together', 'after-directory']) test(`actual BrowserLaunch
 test('directory TH11MP settings stay available without a hosted multiplayer Runtime', async () => {
   const host = developmentAcquisitionHost(['th11']); delete host.games.th11.multiplayerRuntime; host.shared.testBuild = true;
   await mountBrowser({initial: '/lobby.html?game=th11mp', host, actualHistory: true});
-  await until(() => env.document.querySelector('#lobbyGameRail .game.nav-preview[data-product="th11mp"]'), 'directory advertises TH11MP');
+  await until(() => env.document.querySelector('#lobbyGameRail [data-lobby-product="th11mp"][data-selected="true"]'), 'directory advertises TH11MP');
   const session = api.getTestSession();
   assert.equal(session.metadata.getSnapshot().products.includes('th11mp'), false);
   assert.equal(session.directory.getSnapshot().products.includes('th11mp'), true);
-  await click('#lobbyGameRail .game[data-product="th11mp"]');
+  await click('#lobbyGameRail [data-lobby-product="th11mp"] .book-lobby-game');
   await until(() => node('#lobbyOptionsDialog').open, 'TH11MP card opens settings independently of hosted Runtime');
   assert.equal(node('#gameId').textContent, 'TH11 MP');
   assert.equal(session.settings.getSnapshot().context.productId, 'th11mp');
@@ -1871,7 +1871,8 @@ for (const strictMode of [false, true]) for (const action of ['create', 'join by
       if (new URLSearchParams(state.location.search).has('j') && !navigationObservations.some(item => item.location.key === state.location.key)) navigationObservations.push({location: state.location, dialogOpen: env.document.querySelector('#roomDialog')?.open === true});
     });
     if (action === 'join row') {
-      await React.act(async () => {session.directory.selectProduct('th07mp'); directorySocket.message({type: 'directory', version: 1, product: 'th07mp', total: 1,
+      await click('#lobbyGameRail [data-lobby-product="th07mp"] .book-lobby-game');
+      await React.act(async () => {directorySocket.message({type: 'directory', version: 1, product: 'th07mp', total: 1,
         rooms: [{product: 'th07mp', code: '4321', capacity: 2, phase: 'lobby', joinable: true, seats: [{initial: 'R'}, null], difficulty: 2}]});});
       await click('.lobby-join');
     } else {
@@ -2115,7 +2116,7 @@ test('actual BrowserLauncher: leaving a directly loaded TH07 room selects TH07 a
   await until(() => session.directory.getSnapshot().initialized, 'returned directory loads its own manifest');
   assert.equal(currentUrl(), '/lobby.html?game=th07mp');
   assert.equal(session.directory.getSnapshot().selectedProduct, 'th07mp');
-  assert.ok(node('#lobbyGameRail .game.nav-preview[data-product="th07mp"]'), 'visible card matches the return URL');
+  assert.ok(node('#lobbyGameRail [data-lobby-product="th07mp"][data-selected="true"]'), 'visible card matches the return URL');
 });
 
 for (const origin of ['directory create', 'directory join', 'direct']) test(`actual BrowserLauncher: ${origin} native Exit keeps its room, then Leave returns to lobby`, async () => {
