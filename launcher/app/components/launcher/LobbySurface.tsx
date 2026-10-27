@@ -106,7 +106,7 @@ export function LobbySurface({
         <header className="lobby-room-tools">
           <div className="lobby-actions">{roomTools}</div>
           <div className="book-room-view-toggle" role="group" aria-label={locale === 'en' ? 'Room display' : '房间显示模式'}>
-            {(['cards', 'list'] as const).map(view => <button key={view} type="button" aria-pressed={roomView === view} onClick={() => {setRoomView(view); writeBookPreference('lobby-room-view', view);}}>{view === 'cards' ? (locale === 'en' ? 'Cover cards' : '普通模式') : (locale === 'en' ? 'List' : '列表模式')}</button>)}
+            {(['cards', 'list'] as const).map(view => <button key={view} type="button" aria-pressed={roomView === view} onClick={() => {setRoomView(view); writeBookPreference('lobby-room-view', view);}}>{view === 'cards' ? (locale === 'en' ? 'Normal' : '普通模式') : (locale === 'en' ? 'List' : '列表模式')}</button>)}
           </div>
         </header>
         <section
@@ -117,7 +117,7 @@ export function LobbySurface({
             className="lobby-list-head"
             id="listHead"
             aria-hidden="true"
-            hidden={roomView === 'cards' || !hasRooms || rail.selectedProduct === 'th09mp'}
+            hidden={!hasRooms || rail.selectedProduct === 'th09mp'}
           >
             <span>{t('lobby.gameAndRoom')}</span>
             <span>{t('lobby.difficulty')}</span>
