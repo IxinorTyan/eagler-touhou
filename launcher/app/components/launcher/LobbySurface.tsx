@@ -130,6 +130,7 @@ export function LobbySurface({
             </> : <>
             <span>{t('lobby.gameAndRoom')}</span>
             <span>{t('lobby.difficulty')}</span>
+            <span>{locale === 'en' ? 'Rules' : '玩法'}</span>
             <span />
             <span>{t('lobby.capacity')}</span>
             <span>{t('lobby.state')}</span>

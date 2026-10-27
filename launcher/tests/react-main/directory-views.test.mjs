@@ -264,9 +264,13 @@ for (const locale of ['zh-CN', 'en']) test(`Lobby real loading/live/empty/list c
   assert.equal(n('#roomCount').textContent, t(locale, 'lobby.roomCount', {count: 0}));
   assert.equal(n('#connectionWarning').hidden, true); assert.equal(n('#membership').hidden, true);
   const doc = baselineDoc(locale);
-  for (const selector of ['.lobby-survey-notice', '.lobby-intro', '#listHead']) {
+  for (const selector of ['.lobby-survey-notice', '.lobby-intro']) {
     assert.deepEqual(normalize(n(selector)), normalize(n(selector, doc)), `Pinned DOM: ${selector}`);
   }
+  assert.deepEqual([...n('#listHead').children].map(cell => cell.textContent), [
+    t(locale, 'lobby.gameAndRoom'), t(locale, 'lobby.difficulty'), locale === 'en' ? 'Rules' : '玩法',
+    '', t(locale, 'lobby.capacity'), t(locale, 'lobby.state'), '',
+  ]);
   await click('#emptyAction'); await click('#createButton'); await click('#codeButton'); assert.deepEqual(opens, ['create', 'create', 'join']);
   assert.equal(n('#refreshRooms').getAttribute('aria-label'), t(locale, 'lobby.refresh'));
   await f.receive([room()], {total: 45}); assert.equal(n('#listHead').hidden, false); assert.equal(env.document.querySelector('#emptyState'), null);
