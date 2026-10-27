@@ -6,5 +6,6 @@ export function AppLink({href, state, replace, ...props}: Omit<LinkProps, 'to'> 
   const location = useLocation();
   const url = new URL(href, new URL(location.pathname + location.search + location.hash, 'https://launcher.invalid'));
   const record = nextPageHistory(readPageHistory(location.state), pageOf({pathname: url.pathname, search: url.search, hash: url.hash, state}), replace === true);
-  return <Link {...props} to={href} replace={replace} state={{...state, [PAGE_HISTORY_KEY]: record}}/>;
+  const profileTransition = url.pathname.endsWith('/profile.html') || location.pathname.endsWith('/profile.html');
+  return <Link viewTransition={profileTransition} {...props} to={href} replace={replace} state={{...state, [PAGE_HISTORY_KEY]: record}}/>;
 }
