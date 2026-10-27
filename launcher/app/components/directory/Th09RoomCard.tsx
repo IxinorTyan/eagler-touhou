@@ -13,7 +13,7 @@ export function Th09RoomCard({room, difficulty, state, spectating, disabled, ini
   room: DirectoryRoom; difficulty: string; state: 'recruiting' | 'full' | 'playing'; spectating: boolean;
   disabled: boolean; initial: boolean; assetUrl(path: string): string; conflict: boolean; onJoin(): void;
 }) {
-  const {t} = useLocale(), policy = multiplayerConfigForProduct(room.product)!;
+  const {t, locale} = useLocale(), policy = multiplayerConfigForProduct(room.product)!;
   const initialMotion = useRef(initial).current;
   const duel = room.product === 'th09mp', complete = !!room.seats[0] && !!room.seats[1];
   const minutes = Math.max(...room.seats.map(seat => seat?.stats?.minutes ?? 0), 0);
@@ -21,14 +21,18 @@ export function Th09RoomCard({room, difficulty, state, spectating, disabled, ini
     role="listitem" data-key={room.product + '-' + room.code}>
     <div className="book-duel-cover"><img src={bookGameArtwork('th09')} alt=""/><strong>東方花映塚</strong></div>
     <div className="th09-room-meta">
+      <h2 className="th09-room-title">{locale === 'en' ? 'Phantasmagoria of Flower View' : '東方花映塚'}</h2>
+      {locale !== 'en' && <span className="lobby-room-subtitle th09-room-subtitle">Phantasmagoria of Flower View</span>}
       <strong className="lobby-room-code">#{room.code}</strong>
       <span className="lobby-difficulty" hidden={!difficulty}>{difficulty && <DifficultyLabel name={difficulty} assetUrl={assetUrl}/>}</span>
+      {!difficulty && <span className="th09-room-difficulty">{locale === 'en' ? 'Difficulty: selected in game' : '难度：游戏内选择'}</span>}
       {room.challengeMode && <span className="lobby-challengeMode room-challenge-on">{t('room.challengeEnabled')}</span>}
       {room.disableCheatMovement && <span className="lobby-movement-rule">{t('lobby.noCheat')}</span>}
+      <span className="th09-room-spectators"><img src={assetUrl('assets/room-users.svg')} alt=""/>{t('th09.spectatorCount', {count:room.spectators})}</span>
     </div>
     <div className="th09-room-duel" data-player-count={room.capacity} aria-label={t('lobby.count', {players:room.players,capacity:room.capacity})}>
       {Array.from({length:room.capacity}, (_, index) => {
-        const seat = room.seats[index], name = seat ? (seat.name !== undefined ? seat.name : seat.machineSign || seat.initial) || 'P' + (index+1) : t('th09.waitingPlayer');
+        const seat = room.seats[index], name = seat ? (seat.name !== undefined ? seat.name : seat.machineSign || seat.initial) || '?' : t('th09.waitingPlayer');
         const loadout = seat?.loadout === undefined ? undefined : policy.loadouts[seat.loadout];
         const character = loadout && !policy.inGameSelection ? t(loadout.labelKey as UiMessageKey) : '';
         return <div key={index} className={'th09-duel-player th09-duel-p' + (index+1) + (seat?.name !== undefined ? ' public-name' : '')}
@@ -36,7 +40,7 @@ export function Th09RoomCard({room, difficulty, state, spectating, disabled, ini
           <span className="lobby-seat th09-duel-avatar" data-empty={String(!seat)} data-ready={String(!!seat?.ready)} data-offline={String(seat?.online === false)} aria-hidden="true">
             {seat ? multiplayerDisplayInitial(seat.initial, '?') : <img className="th09-duel-empty-icon" src={assetUrl('assets/room-user.svg')} alt=""/>}
           </span>
-          <div className="room-card-player-copy"><strong className="th09-duel-name">{name}</strong>
+          <div className="room-card-player-copy"><strong className="th09-duel-name">{/^P[12]$/.test(name) ? '' : name}</strong>
             {character && <span className="room-card-loadout">{character}</span>}</div>
         </div>;
       })}
@@ -45,9 +49,10 @@ export function Th09RoomCard({room, difficulty, state, spectating, disabled, ini
     <span className="th09-room-duration" data-state={state}>{state !== 'playing'
       ? t(state === 'full' ? 'lobby.roomFull' : 'lobby.recruiting')
       : duel ? t('th09.elapsed', {minutes}) : <RoomElapsed phase={room.phase} startedAt={room.startedAt}/>}</span>
+    <div className="th09-room-actions">
     <button className="lobby-button lobby-join" type="button" disabled={disabled}
-      aria-label={t(!duel && spectating ? 'multiplayer.joinSpectator' : 'lobby.joinRoom') + ' #' + room.code}
-      title={conflict ? t('lobby.conflict') : ''} onClick={onJoin}>{t(!duel && spectating ? 'multiplayer.joinSpectator' : 'lobby.joinRoom')}</button>
-    <span className="th09-room-spectators"><img src={assetUrl('assets/room-users.svg')} alt=""/>{t('th09.spectatorCount', {count:room.spectators})}</span>
+      aria-label={t(spectating ? 'multiplayer.joinSpectator' : 'lobby.joinRoom') + ' #' + room.code}
+      title={conflict ? t('lobby.conflict') : ''} onClick={onJoin}>{t(spectating ? 'multiplayer.joinSpectator' : 'lobby.joinRoom')}</button>
+    </div>
   </article>;
 }

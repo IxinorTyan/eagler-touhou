@@ -233,9 +233,11 @@ for (const product of ['th06mp','th07mp','th08mp','th09mp','th10mp','th11mp','th
   const f=await fixture({selectedProduct:product,host:{games:[product.slice(0,-2)]}}).live([
     room({product,capacity:2,players:2,joinable:false,seats:[{initial:'A',online:true},{initial:'B',online:true}]})]);
   const m=await mount(owners.DirectoryRoomRows,{snapshot:f.service.getSnapshot(),service:f.service,assetUrl});
-  assert.equal(n('.lobby-join').disabled,false);
+  const entry = '.lobby-join';
+  assert.equal(n(entry).disabled,false);
+
   if(product!=='th09mp')assert.equal(n('.lobby-join').textContent,t('en','multiplayer.joinSpectator'));
-  await click('.lobby-join');assert.equal(f.navigations.length,1);
+  await click(entry);assert.equal(f.navigations.length,1);
   const invite=owners.decodeRoomInvite(new URL(f.navigations[0].url).searchParams.get('j'));
   assert.equal(invite.g,product);assert.equal(invite.s,true);assert.equal(invite.a,'join');
   assert.equal(f.sessionWrites.some(write=>write[0]==='save'),false,'directory must not reserve a player seat');
@@ -602,4 +604,19 @@ for (const product of ['th06mp','th09mp']) test(`Approved public names remain co
   assert.deepEqual(snapshot.visibleRooms[0].seats.map(seat=>seat.name),names);
   await mount(owners.DirectoryRoomRows,{snapshot,service:f.service,assetUrl,initialRows:true});
   assert.deepEqual(all(product==='th09mp'?'.th09-duel-name':'.lobby-seat-name').map(node=>node.textContent),names);
+});
+
+test('Flower View keeps bilingual identity, score, time and one contextual entry', async () => {
+  const f = await fixture({selectedProduct:'th09mp',locale:'zh-CN'}).live([room({product:'th09mp',capacity:2,phase:'playing',players:2,joinable:false,seats:[{initial:'A',online:true,stats:{wins:3,losses:2,minutes:7}},{initial:'B',online:true,stats:{wins:5,losses:1,minutes:8}}]})]);
+  const m=await mount(owners.DirectoryRoomRows,{snapshot:f.service.getSnapshot(),service:f.service,assetUrl},{locale:'zh-CN'});
+  assert.equal(n('.th09-room-title').textContent,'東方花映塚');
+  assert.equal(n('.th09-room-subtitle').textContent,'Phantasmagoria of Flower View');
+  assert.equal(n('.th09-room-score').textContent,'3 : 5');
+  assert.equal(n('.th09-room-duration').textContent,t('zh-CN','th09.elapsed',{minutes:8}));
+  assert.equal(n('.th09-room-difficulty').textContent,'难度：游戏内选择');
+  assert.equal(all('.th09-room-actions button').length,1);
+  assert.equal(n('.lobby-join').textContent,t('zh-CN','multiplayer.joinSpectator'));
+  await click('.lobby-join');
+  assert.equal(owners.decodeRoomInvite(new URL(f.navigations[0].url).searchParams.get('j')).s,true);
+  await m.unmount();
 });

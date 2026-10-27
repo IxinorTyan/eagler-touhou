@@ -438,3 +438,53 @@ html[data-book-theme='light'] body:not(.mp-room-active) :is(
  .book-rooms-list .lobby-occupancy,.book-rooms-list .lobby-mobile-difficulty {display:none}
  .book-directory.book-rooms-list .th09-room-row {min-width:570px}
 }
+
+/* Flower View keeps the score central within the shared horizontal room rows. */
+.book-directory .th09-room-row {display:grid;grid-template-columns:minmax(100px,1fr) minmax(110px,1.3fr) 80px 74px;grid-template-rows:auto auto;gap:8px 12px;align-items:center;min-height:100px;margin:0;padding:15px;border:0;border-radius:0;background:transparent}
+.book-directory .th09-room-row::before {display:block;content:'';position:absolute;inset:0 15px auto;height:1px;background:var(--book-border)}
+.book-directory.book-rooms-cards .th09-room-row {padding-left:84px}
+.book-directory .th09-room-meta {grid-column:1;grid-row:1/span 2;display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0}
+.book-directory .th09-room-title {margin:0;color:var(--book-ink);font:700 13px/1.4 var(--ui-font);overflow-wrap:anywhere}
+.book-directory .th09-room-meta .lobby-room-code {font-size:12px}
+.book-directory .th09-room-duel {grid-column:2;grid-row:1/span 2;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:center;min-width:0;margin:0}
+.book-directory .th09-duel-player {display:flex;flex-direction:column;align-items:center;gap:5px;padding:0;min-width:0}
+.book-directory .th09-duel-p1 {grid-column:1;grid-row:1}
+.book-directory .th09-duel-p2 {grid-column:3;grid-row:1}
+.book-directory .th09-room-score {position:static;grid-column:2;grid-row:1;transform:none;margin:0;color:var(--book-accent);font:700 24px/1.2 var(--ui-font);white-space:nowrap}
+.book-directory .th09-duel-name {font-size:11px;overflow-wrap:anywhere}
+.book-directory .th09-room-duration {grid-column:3;grid-row:1;position:static;align-self:end;justify-self:center;font-size:11px;margin:0;color:var(--book-muted)}
+.book-directory .th09-room-spectators {grid-column:3;grid-row:2;position:static;align-self:start;justify-self:center;font-size:10px;margin:0;color:var(--book-muted)}
+.book-directory .th09-room-actions {grid-column:4;grid-row:1/span 2;display:flex;flex-direction:column;gap:6px;align-self:center}
+.book-directory .th09-room-actions button {width:100%;min-height:32px;padding:6px 8px;border-radius:5px;font-size:11px}
+.book-directory.book-rooms-list .th09-room-row {grid-template-columns:minmax(100px,1fr) minmax(110px,1.3fr) 80px 74px;min-height:70px;padding:10px 15px}
+.book-rooms-list .th09-room-score {font-size:20px}
+.book-rooms-list .th09-room-duel .th09-duel-avatar {display:none}
+@media(max-width:780px),(hover:none),(pointer:coarse) {
+ .book-directory .th09-room-row {grid-template-columns:minmax(0,1fr) 88px;grid-template-rows:auto auto auto;gap:10px}
+ .book-directory .th09-room-meta {grid-column:1;grid-row:1}
+ .book-directory .th09-room-duel {grid-column:1;grid-row:2}
+ .book-directory .th09-room-duration {grid-column:1;grid-row:3;justify-self:start}
+ .book-directory .th09-room-spectators {grid-column:2;grid-row:3;justify-self:end}
+ .book-directory .th09-room-actions {grid-column:2;grid-row:1/span 2}
+ .book-directory.book-rooms-list .th09-room-row {grid-template-columns:minmax(100px,1fr) minmax(110px,1.3fr) 80px 74px;grid-template-rows:auto auto;min-width:570px}
+ .book-directory.book-rooms-list .th09-room-meta {grid-column:1;grid-row:1/span 2}
+ .book-directory.book-rooms-list .th09-room-duel {grid-column:2;grid-row:1/span 2}
+ .book-directory.book-rooms-list .th09-room-duration {grid-column:3;grid-row:1;justify-self:center}
+ .book-directory.book-rooms-list .th09-room-spectators {grid-column:3;grid-row:2;justify-self:center}
+ .book-directory.book-rooms-list .th09-room-actions {grid-column:4;grid-row:1/span 2}
+}
+.book-directory .th09-room-score {min-width:0;width:auto;letter-spacing:0}
+.book-directory .th09-room-duel .th09-duel-avatar {width:26px;height:28px;font-size:12px;border-radius:5px}
+.book-directory .th09-duel-player .room-card-player-copy {max-width:100%;min-width:0}
+.book-directory .th09-duel-player .th09-duel-name {font-size:11px;line-height:1.4;max-width:100%}
+/* Use the same single action and identity details as the other products. */
+.book-directory .th09-room-meta .th09-room-subtitle {display:block;font-size:10px;line-height:1.4;color:var(--book-muted)}
+.book-directory .th09-room-difficulty {font-size:10px;line-height:1.4;color:var(--book-muted)}
+.book-directory .th09-room-meta .th09-room-spectators {display:flex;align-items:center;gap:4px;align-self:auto;justify-self:auto;font-size:10px;margin:0;color:var(--book-muted)}
+.book-directory .th09-room-actions {display:block}
+.lobby-page .book-directory .th09-room-row .th09-room-actions .lobby-join {width:100%;min-height:34px;padding:7px 10px;border-radius:7px;font-size:12px}
+.book-directory .th09-room-duration {grid-row:1/span 2;align-self:center;white-space:normal;text-align:center}
+@media(max-width:780px),(hover:none),(pointer:coarse) {
+ .book-directory .th09-room-duration {grid-row:3;align-self:center}
+ .book-directory.book-rooms-list .th09-room-duration {grid-row:1/span 2;align-self:center}
+}
