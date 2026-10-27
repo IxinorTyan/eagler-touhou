@@ -42,7 +42,8 @@ export function OriginalBootstrapHead() {
     <script dangerouslySetInnerHTML={{__html: dispatch}}/>
     <style dangerouslySetInnerHTML={{__html: original.library.css + '\n' + original.lobby.css + '\n' + sharedLobbyPreloadCss +
       '\nhtml[data-original-entry="lobby"] #eaglerPreload,html:not([data-original-entry="lobby"]) #lobbyPreload{display:none}'}}/>
-    <style id="launcherNavigationTransition">{`@view-transition{navigation:auto}
+    <style id="launcherNavigationTransition">{'@view-transition{navigation:auto}'}</style>
+    <style id="bookStartupTheme">{`
       html[data-book-theme="light"]{background:#f7f6f2;color-scheme:light}
       html[data-book-theme="light"] body:not(.mp-room-active){background-color:#f7f6f2}
       html[data-book-theme="light"] :is(#eaglerPreload,#lobbyPreload){background:#f7f6f2;color:#2b302c}

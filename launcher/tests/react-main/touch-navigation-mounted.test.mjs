@@ -178,7 +178,7 @@ function hasParent(context) {
     !!env.document.querySelector(context === 'lobby' ? '.lobby-main' : '#main');
 }
 async function openOptions(productId) {
-  const selector = productId.endsWith('mp') ? `.game[data-product="${productId}"]` : `.book-game-link[data-game="${productId}"]`;
+  const selector = productId.endsWith('mp') ? `[data-lobby-product="${productId}"] .book-lobby-game` : `.book-game-link[data-game="${productId}"]`;
   for (let attempt = 0; attempt < 2 && !hasOptions(productId); attempt++) await click(selector);
   await until(() => hasOptions(productId), `actual options open for ${productId}`);
 }
@@ -238,7 +238,7 @@ for (const {context, entry, product} of [
 
   test(`synthetic mounted ${context}: same-act double options activation creates one parent layer`, async () => {
     await mountEntry([entry]);
-    const selector = product.endsWith('mp') ? `.game[data-product="${product}"]` : `.book-game-link[data-game="${product}"]`;
+    const selector = product.endsWith('mp') ? `[data-lobby-product="${product}"] .book-lobby-game` : `.book-game-link[data-game="${product}"]`;
     await React.act(async () => {const card = node(selector); card.click(); card.click();});
     await until(() => hasOptions(product), 'actual card activation opens options');
     await click('#libraryBack');
@@ -356,7 +356,7 @@ test('synthetic mounted lobby: another room product opens settings without repla
   await mountEntry([entry], {roomOptionsProduct: 'th07mp'});
   await click('#fixtureRoomSettings'); await until(() => hasOptions('th07mp'), 'real shared settings use the room product');
   assert.equal(url(), entry, 'settings product is independent of directory filter');
-  assert.equal(node('#lobbyGameRail .game.nav-preview').dataset.product, 'th06mp', 'directory rail retains its own filter selection');
+  assert.equal(node('#lobbyGameRail [data-lobby-product][data-selected="true"]').dataset.lobbyProduct, 'th06mp', 'directory rail retains its own filter selection');
   await openEditor(); await click('#touchLayoutExit'); await until(() => !hasEditor(), 'room-origin editor closes');
   await traverse(1); await until(() => hasOptions('th07mp') && !hasEditor(), 'retired Forward retains room product options');
   assert.equal(url(), entry, 'retired marker cleanup preserves raw query encoding');
@@ -490,7 +490,7 @@ for (const context of ['library', 'lobby']) test(`synthetic mounted reload: old 
   assert.ok(!hasEditor()); assert.deepEqual(mounted.nativeCalls, []);
   if (context === 'lobby') {
     assert.ok(hasParent('lobby')); assert.equal(mounted.router.state.location.state.launcherSurfaceEntry, undefined);
-    assert.equal(node('#lobbyGameRail .game.nav-preview').dataset.product, product);
+    assert.equal(node('#lobbyGameRail [data-lobby-product][data-selected="true"]').dataset.lobbyProduct, product);
   } else assert.ok(hasOptions(product));
 });
 
