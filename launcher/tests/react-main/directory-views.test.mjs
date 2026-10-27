@@ -47,7 +47,7 @@ before(async () => {
     export * from './app/components/launcher/products.ts';
     export * from './src/contracts/product-catalog.mts';
     export * from './src/launcher/room-invite.mts';
-  `}, bundle: true, platform: 'node', format: 'esm', jsx: 'automatic', outfile: resolve(work, 'actual-bundle.mjs'), logLevel: 'silent',
+  `}, bundle: true, platform: 'node', format: 'esm', jsx: 'automatic', loader: {'.webp': 'dataurl'}, outfile: resolve(work, 'actual-bundle.mjs'), logLevel: 'silent',
     plugins: [{name: 'installed-deps-original-mts', setup(ctx) {
       ctx.onResolve({filter: /^[^./]/}, args => ({path: pathToFileURL(require.resolve(args.path)).href, external: true}));
       ctx.onResolve({filter: /^\.\.?\/.*\.mjs$/}, args => {const path = resolve(dirname(args.importer), args.path).replace(/\.mjs$/, '.mts'); if (existsSync(path)) return {path};});
@@ -566,6 +566,24 @@ test('Unmount discards only its submitted receipt before a later dialog can clos
   const f = await fixture().live(), {m} = await mountDialog(f, 'join'); await change('#roomCodeInput', '1234'); await submit();
   await m.unmount(); assert.equal(f.navigations.length, 0); assert.equal(f.sessionWrites.length, 0);
   f.service.formDidClose(); assert.equal(f.navigations.length, 0);
+});
+
+test('All multiplayer requests the unfiltered directory; multi-selection shows only checked games', async () => {
+  const f = await fixture({selectedProduct: ''}).live([
+    room({product: 'th06mp', code: '1234'}), room({product: 'th07mp', code: '2345'}), room({product: 'th08mp', code: '3456'}),
+  ]);
+  assert.equal(f.service.getSnapshot().selectedProduct, '');
+  assert.equal(f.service.getSnapshot().visibleRooms.length, 3);
+  const {m} = await mountLobby(f, {productFilters: ['th06mp', 'th08mp']});
+  assert.deepEqual(all('.lobby-room-row').map(n => n.dataset.key), ['th06mp-1234', 'th08mp-3456']);
+  await m.update({productFilters: []});
+  assert.equal(all('.lobby-room-row').length, 3);
+  await React.act(async () => f.service.selectProduct('th07mp'));
+  await f.receive([room({product: 'th07mp', code: '2345'})]);
+  await React.act(async () => f.service.selectProduct(''));
+  assert.equal(f.service.getSnapshot().selectedProduct, '');
+  await React.act(async () => f.service.refreshRooms());
+  assert.equal(f.socket.sent.at(-1).product, '');
 });
 
 for (const product of ['th06mp','th09mp']) test(`Approved public names remain complete in directory cards (${product})`,async()=>{

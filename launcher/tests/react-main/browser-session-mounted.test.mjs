@@ -268,7 +268,7 @@ async function mountBrowser({initial = '/?game=th06&keep=a%20b', autoReady = tru
   if (hydrate) {
     container.innerHTML = renderToString(tree);
     mounted.initialNodes = [...container.querySelectorAll('[id]')];
-    assert.ok(container.querySelector('.game[data-game=th08]'), 'actual SSR entry retains original cards before hydration');
+    assert.ok(container.querySelector('.book-game-link[data-game=th08]'), 'actual SSR entry retains original cards before hydration');
     assert.equal(container.querySelector('iframe'), null, 'initial presentation owns no Runtime');
     Object.assign(mounted, {router});
     await React.act(async () => {root = hydrateRoot(container, tree); mounted.root = root;});
@@ -650,7 +650,7 @@ test('actual BrowserLauncher: same-card reopen preserves session-only settings a
   assert.equal(node('#focusHitboxToggle').getAttribute('aria-checked'), 'true');
   assert.equal(node('#mobileOptionsToggle').getAttribute('aria-expanded'), 'true');
   await click('#libraryBack'); await until(() => !env.document.querySelector('.tools[aria-hidden="false"]'), 'options close');
-  await click('.game[data-game="th06"]:not([data-product])');
+  await click('.book-game-link[data-game="th06"]');
   await until(() => !!env.document.querySelector('.tools[aria-hidden="false"]'), 'same selected product reopens');
   assert.equal(node('#status').textContent, 'Selected 東方紅魔郷', 'main app1790/8652 uses the product title for selection status');
   assert.equal(node('#toast').classList.contains('show'), false, 'status-only selection must not open an empty toast');
@@ -1188,9 +1188,8 @@ test('actual BrowserLauncher: absent default base falls back inside Host without
   await acceptHeldHost(f);
   assert.equal(visibleOptions(), null); assert.equal(playerOpen(), false); assert.equal(currentUrl(), initial); assert.equal(f.routeEvents.length, f.initialRouteCount);
   assert.equal(node('#gameFrame'), frame); assert.deepEqual(f.navigations, []);
-  await click('.game[data-game="th07"]:not([data-product])');
-  assert.equal(visibleOptions(), null, 'main game-library350–357: first different-cover click only previews it');
-  await click('.game[data-game="th07"]:not([data-product])');
+  await click('.book-game-link[data-game="th07"]');
+  assert.ok(visibleOptions(), 'a library card opens its real settings on the first click');
   assert.equal(node('#status').textContent, 'Selected 東方妖々夢', 'Host fallback already selected TH07 business preferences while home stayed closed');
   assert.equal(node('#gameId').dataset.game, 'th07');
 });
@@ -1243,13 +1242,11 @@ for (const close of ['Exit', 'Back']) test(`actual BrowserLauncher: original tou
   if (node('#decisionDialog').open) await click('#decisionConfirm');
   await until(() => !env.document.querySelector('#touchLayoutEditor'), 'first editor closes, as original lines136–143');
 
-  // Preserve the original sequence, including its programmatic hidden-button
-  // click. A single different-cover click previews TH07; it does not actually
-  // select TH07 business settings (main game-library350–357).
+  // The retained settings owner remains available to programmatic editor entry
+  // after returning home, without selecting another product.
   await click('#libraryBack');
   await until(() => !visibleOptions(), 'Back returns to home');
   const home = currentUrl(), homeKey = f.router.state.location.key, retainedButton = node('#touchLayoutEdit');
-  await click('.game[data-game="th07"]:not([data-product])');
   assert.equal(visibleOptions(), null); assert.equal(currentUrl(), home);
   assert.equal(node('#gameId').dataset.game, 'th06', 'the original sequence still owns the previously selected TH06 settings');
   if (!node('#mobileOptions').classList.contains('open')) await click('#mobileOptionsToggle');
@@ -1550,7 +1547,7 @@ test('actual BrowserLauncher: delayed automatic first-use cannot open or mark se
     storage.values.delete('eagler-touhou-first-use-notice-seen-v1');
   }});
   await until(() => f.fetches.some(item => new URL(item.url).pathname.endsWith('/content/FIRST_USE_NOTICE.html')), 'Launcher begins automatic first-use read');
-  await click('.game[data-product="th07mp"]');
+  await click('.book-lobby-link');
   await until(() => currentUrl().startsWith('/lobby.html'), 'MP card enters the original directory surface');
   await React.act(async () => {f.releaseFirstUse();}); await tick(); await tick();
   assert.equal(node('#firstUseNoticeDialog').open, false, 'retired Launcher request cannot open a modal on the directory');
@@ -1568,7 +1565,7 @@ test('actual BrowserLauncher: unseen first-use resumes automatically on library 
     storage.values.delete('eagler-touhou-first-use-notice-seen-v1');
   }});
   await until(() => f.fetches.some(item => new URL(item.url).pathname.endsWith('/content/FIRST_USE_NOTICE.html')), 'Launcher begins first-use read');
-  await click('.game[data-product="th07mp"]');
+  await click('.book-lobby-link');
   await until(() => currentUrl().startsWith('/lobby.html'), 'directory replaces the pending Launcher startup context');
   await React.act(async () => {f.releaseFirstUse();}); await tick(); await tick();
   assert.equal(node('#firstUseNoticeDialog').open, false);
@@ -1594,7 +1591,7 @@ test('actual BrowserLauncher hydrates shared static cards into one live session 
   assert.equal(f.fetches.filter(item => new URL(item.url).pathname.endsWith('/NOTICE.txt')).length, 1);
   assert.equal(typeof env.window.__eaglerPrepareManagedRuntimeDataV1, 'function');
   const frame = node('#gameFrame');
-  await click('.shelf-lobby-link'); await tick();
+  await click('.book-lobby-link'); await tick();
   assert.equal(node('#gameFrame'), frame, 'shared route navigation retains the sole live iframe');
   assert.equal(env.document.querySelectorAll('#mastheadMenu').length, 1);
 });

@@ -1,3 +1,4 @@
+import {bookArtwork} from './components/launcher/book-artwork';
 import {useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefCallback} from 'react';
 import {isProductId, isMultiplayerProductId, type ProductId} from '../src/contracts/product-catalog.mts';
 import type {UiLocale} from '../src/launcher/i18n.mts';
@@ -140,7 +141,7 @@ function LauncherSurfaces({host}: {host: LauncherHost}) {
     }
     navigation.openTouchLayout();
   };
-  const settingsPanel = presence.product && <OptionsPanel product={presence.product} open={presence.open || roomOpen && navigation.context === 'lobby'}
+  const settingsPanel = presence.product && <OptionsPanel product={presence.product} coverArtwork={roomOpen ? undefined : bookArtwork(presence.product)} open={presence.open || roomOpen && navigation.context === 'lobby'}
     onBack={roomOpen ? navigation.closeRoomSettings : navigation.closeSurface} roomDrawer={roomOpen} multiplayerDiagnostics={host.multiplayerDiagnostics} multiplayerOnline={host.multiplayerOnline} lobbyHref={host.lobbyHref} embeddedInLobby={navigation.context === 'lobby'} assetUrl={host.assetUrl} actions={host.optionsActions}>
     <SettingsBody model={host.settings} actions={host.settingsActions} onOpenTouchLayout={openTouchLayout} multiplayerControls={host.multiplayerControls}/>
   </OptionsPanel>;

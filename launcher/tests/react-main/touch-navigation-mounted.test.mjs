@@ -4,11 +4,11 @@
  */
 import test, {before, after, afterEach} from 'node:test';
 import assert from 'node:assert/strict';
-import {existsSync} from 'node:fs';
 import {mkdir, mkdtemp, rm} from 'node:fs/promises';
-import {dirname, resolve} from 'node:path';
+import {resolve} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {build} from 'esbuild';
+import {authoredSourcesPlugin} from './authored-sources.mjs';
 import {installMountedDom} from './mounted-dom-environment.mjs';
 
 const project = fileURLToPath(new URL('../../', import.meta.url));
@@ -39,15 +39,7 @@ before(async () => {
     `},
     bundle: true, platform: 'node', format: 'esm', jsx: 'automatic', outfile: output,
     packages: 'external', logLevel: 'silent',
-    plugins: [{name: 'authored-main-mts-siblings', setup(context) {
-      // Main NodeNext authored modules name emitted .mjs siblings. Resolve the
-      // same authored owner for this TSX test build; no behavior is substituted.
-      context.onResolve({filter: /^\.\.?\/.*\.mjs$/}, args => {
-        const source = resolve(dirname(args.importer), args.path);
-        const authored = source.slice(0, -4) + '.mts';
-        return source.replaceAll('\\', '/').startsWith(resolve(project, 'src').replaceAll('\\', '/') + '/') && existsSync(authored) ? {path: authored} : undefined;
-      });
-    }}],
+    plugins: [authoredSourcesPlugin(project)],
   });
   owners = await import(pathToFileURL(output).href);
 });
@@ -186,7 +178,7 @@ function hasParent(context) {
     !!env.document.querySelector(context === 'lobby' ? '.lobby-main' : '#main');
 }
 async function openOptions(productId) {
-  const selector = productId.endsWith('mp') ? `.game[data-product="${productId}"]` : `.game[data-game="${productId}"]:not([data-product])`;
+  const selector = productId.endsWith('mp') ? `.game[data-product="${productId}"]` : `.book-game-link[data-game="${productId}"]`;
   for (let attempt = 0; attempt < 2 && !hasOptions(productId); attempt++) await click(selector);
   await until(() => hasOptions(productId), `actual options open for ${productId}`);
 }
@@ -246,7 +238,7 @@ for (const {context, entry, product} of [
 
   test(`synthetic mounted ${context}: same-act double options activation creates one parent layer`, async () => {
     await mountEntry([entry]);
-    const selector = product.endsWith('mp') ? `.game[data-product="${product}"]` : `.game[data-game="${product}"]:not([data-product])`;
+    const selector = product.endsWith('mp') ? `.game[data-product="${product}"]` : `.book-game-link[data-game="${product}"]`;
     await React.act(async () => {const card = node(selector); card.click(); card.click();});
     await until(() => hasOptions(product), 'actual card activation opens options');
     await click('#libraryBack');

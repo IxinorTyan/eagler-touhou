@@ -42,7 +42,16 @@ export function OriginalBootstrapHead() {
     <script dangerouslySetInnerHTML={{__html: dispatch}}/>
     <style dangerouslySetInnerHTML={{__html: original.library.css + '\n' + original.lobby.css + '\n' + sharedLobbyPreloadCss +
       '\nhtml[data-original-entry="lobby"] #eaglerPreload,html:not([data-original-entry="lobby"]) #lobbyPreload{display:none}'}}/>
-    <style id="launcherNavigationTransition">{'@view-transition{navigation:auto}'}</style>
+    <style id="launcherNavigationTransition">{`@view-transition{navigation:auto}
+      html[data-book-theme="light"]{background:#f7f6f2;color-scheme:light}
+      html[data-book-theme="light"] body:not(.mp-room-active){background-color:#f7f6f2}
+      html[data-book-theme="light"] :is(#eaglerPreload,#lobbyPreload){background:#f7f6f2;color:#2b302c}
+      html[data-book-theme="light"] :is(.eagler-preload-card,.lobby-preload-card){background:#fffefa;border-color:#dfdfd6;box-shadow:0 14px 38px #24291f14}
+      html[data-book-theme="light"] :is(.eagler-preload-spinner,.lobby-preload-spinner){border-color:#dfdfd6;border-top-color:#a5353d}
+      html[data-book-theme="light"] .lobby-preload-failure a{color:#a5353d}
+      html[data-book-theme="light"] #eaglerBootEmergency>div{background:#fffefa!important;color:#2b302c!important;border-color:#dfdfd6!important;box-shadow:0 14px 38px #24291f14!important}
+      html[data-book-theme="light"] #eaglerBootEmergency :is(strong,button,pre){color:#2b302c!important}
+    `}</style>
     <title data-i18n={lobby ? undefined : 'site.documentTitle'}>{title}</title>
     <meta name="theme-color" content={lobby ? '#111210' : '#10100f'}/>
     {lobby ? <meta name="robots" content="noindex"/> : <>
