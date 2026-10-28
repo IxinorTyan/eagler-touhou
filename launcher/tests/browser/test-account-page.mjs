@@ -26,7 +26,7 @@ try {
       await selectMode(page, '登录');
       const dimensions = () => page.evaluate(() => {
         const box = selector => document.querySelector(selector).getBoundingClientRect().toJSON();
-        return {header: box('.book-masthead'), shell: box('.account-shell'), art: box('.account-art'), overflow: document.documentElement.scrollWidth > innerWidth};
+        return {header: box('.book-masthead'), radius: parseFloat(getComputedStyle(document.querySelector('.book-masthead')).borderBottomLeftRadius), shell: box('.account-shell'), art: box('.account-art'), overflow: document.documentElement.scrollWidth > innerWidth};
       });
       const login = await dimensions();
       assert.ok(Math.abs(login.header.left - login.shell.left) < 1, `${width}: left edges`);
@@ -34,6 +34,11 @@ try {
       assert.ok(Math.abs(login.header.bottom - login.shell.top) < 1, `${width}: top edge`);
       assert.ok(Math.abs(login.shell.bottom - 900) < 1, `${width}: viewport height`);
       assert.equal(login.overflow, false);
+      if (width > 640) {
+        assert.ok(Math.abs(login.art.top - (login.header.bottom - login.radius)) < 1, `${width}: artwork extends behind rounded corners`);
+        assert.ok(Math.abs(login.art.bottom - login.shell.bottom) < 1, `${width}: artwork reaches the bottom`);
+      }
+      assert.equal(await page.$eval('.account-shell', el => getComputedStyle(el, '::before').height), `${login.radius}px`);
       const image = width > 640 ? await (await page.$('.account-art')).screenshot() : null;
       if ([1440, 390].includes(width)) await page.screenshot({path: `.cache/account/login-${width}-${theme}.png`});
       await selectMode(page, '注册'); await settle(page);

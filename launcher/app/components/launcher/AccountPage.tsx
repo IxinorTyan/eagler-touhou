@@ -27,7 +27,12 @@ export function AccountPage({captcha: Captcha}: {captcha?: ComponentType<Account
   useEffect(() => {
     const header = document.querySelector('.book-masthead');
     if (!header) return;
-    const measure = () => pageRef.current?.style.setProperty('--account-header-height', `${header.getBoundingClientRect().height}px`);
+    const measure = () => {
+      const style = getComputedStyle(header);
+      const overlap = Math.max(parseFloat(style.borderBottomLeftRadius) || 0, parseFloat(style.borderBottomRightRadius) || 0);
+      pageRef.current?.style.setProperty('--account-header-height', `${header.getBoundingClientRect().height}px`);
+      pageRef.current?.style.setProperty('--account-header-overlap', `${overlap}px`);
+    };
     const observer = new ResizeObserver(measure);
     observer.observe(header); measure();
     return () => observer.disconnect();
