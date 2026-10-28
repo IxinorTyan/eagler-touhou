@@ -24,6 +24,16 @@ try {
       });
       assert.ok(animations.includes('profile-content-in'), `${width}/${label}: entering content animates`);
       assert.ok(animations.includes('profile-content-out'), `${width}/${label}: leaving content animates`);
+      const snapshot = await page.evaluate(() => ({
+        scope: document.documentElement.dataset.profileTransition,
+        pageName: getComputedStyle(document.querySelector('.player-profile')).viewTransitionName,
+        oldOpacity: getComputedStyle(document.documentElement, '::view-transition-old(profile-content)').opacity,
+      }));
+      if (['视角：', '好友', '关注'].includes(label)) {
+        assert.equal(snapshot.scope, 'content');
+        assert.equal(snapshot.pageName, 'none', 'Submenus never animate the whole profile');
+      }
+      assert.equal(snapshot.oldOpacity, '1', 'Old content stays visible beneath the arriving content');
       await page.evaluate(() => window.profileTestTransition.finished);
       await page.waitForFunction(() => !document.documentElement.classList.contains('profile-transition'));
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
@@ -32,6 +42,13 @@ try {
     await change('.profile-actions', '视角：');
     await change('.profile-tabs', '好友');
     await change('.profile-social-tools', '关注');
+    assert.equal(await page.$eval('.profile-aside', el => getComputedStyle(el).display === 'none'), width <= 780);
+    await change('.profile-tabs', '概览');
+    assert.equal(await page.$eval('.profile-aside', el => getComputedStyle(el).display === 'none'), false);
+    for (const label of ['生涯', '游玩记录', '内容']) {
+      await change('.profile-tabs', label);
+      assert.equal(await page.$eval('.profile-aside', el => getComputedStyle(el).display === 'none'), width <= 780);
+    }
     await change('.profile-actions', '账户设置');
     await change('.profile-settings-heading', '隐私与个性化');
     await change('.profile-settings-heading', '账户与安全');
