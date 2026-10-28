@@ -1,0 +1,44 @@
+.career-eyebrow{display:block;margin-bottom:5px;color:var(--book-accent);font-size:9px;letter-spacing:.16em}
+.career-heading{align-items:center;margin-bottom:10px}.career-heading>button{white-space:nowrap}
+.player-profile .career-intro{color:var(--book-muted);font-size:12px;line-height:1.8}
+.career-toolbar{display:flex;align-items:baseline;justify-content:space-between;gap:15px;margin:20px 0 16px;padding:12px 0;border-top:1px solid var(--book-border);border-bottom:1px solid var(--book-border);color:var(--book-muted);font-size:11px}
+.career-toolbar>span{flex:none}.career-toolbar b{color:var(--book-ink);font-weight:600}
+.career-help{max-width:400px;text-align:right}.career-help summary{color:var(--book-muted);cursor:pointer;list-style:none;font-size:11px}.career-help summary::-webkit-details-marker{display:none}.career-help summary:focus-visible{outline:2px solid var(--book-accent);outline-offset:4px}
+.career-help>div{display:grid;gap:8px;margin-top:12px;text-align:left;font-size:11px;line-height:1.8}
+.career-edit-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:-3px 0 14px;padding:12px;border-radius:6px;background:var(--book-accent-soft);color:var(--book-ink);font-size:11px}
+.career-edit-bar>button,.career-clear-confirm button{padding:0;border:0;background:none;color:var(--book-accent);font-size:11px}.career-edit-bar>button:disabled{opacity:.4;cursor:default}.career-clear-confirm{display:flex;align-items:center;gap:10px}
+.career-games{display:grid;gap:10px}.career-game{min-width:0;overflow:hidden;border:1px solid var(--book-border);border-radius:9px;background:color-mix(in srgb,var(--book-bg) 36%,transparent);transition:border-color .22s ease,background-color .22s ease}
+.player-profile .career-game-toggle{display:flex;align-items:center;gap:13px;width:100%;min-height:68px;padding:10px 13px;border:0;border-radius:0;background:transparent;text-align:left}
+.career-game-art{width:32px;height:42px;flex:none;overflow:hidden;border-radius:3px;background:var(--book-raised)}.career-game-art img{display:block;width:100%;height:100%;object-fit:cover}
+.career-game-name{display:grid;min-width:0;flex:1;gap:2px}.career-game-name small{color:var(--book-muted);font-size:9px;letter-spacing:.07em}.career-game-name strong{color:var(--book-ink);font-size:13px;font-weight:550}
+.career-game-count{flex:none;color:var(--book-muted);font-size:10px}.career-game-count b{color:var(--book-accent);font-size:13px;font-weight:550}.career-expand{display:grid;place-items:center;width:16px;flex:none;color:var(--book-muted);transition:transform .28s cubic-bezier(.22,.68,.2,1)}.career-expand svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.career-game.is-expanded>.career-game-toggle{background:linear-gradient(100deg,var(--book-accent-soft),transparent)}.career-game.is-expanded{border-color:color-mix(in srgb,var(--book-accent) 32%,var(--book-border))}.career-game.is-expanded .career-expand{transform:rotate(180deg)}
+.career-game-reveal{display:grid;grid-template-rows:0fr;opacity:0;transition:grid-template-rows .28s cubic-bezier(.22,.68,.2,1),opacity .2s ease}
+.career-game-body{min-height:0;min-width:0;overflow:hidden}.career-game.is-expanded .career-game-reveal{grid-template-rows:1fr;opacity:1}
+.player-profile .career-game-note{padding:12px 14px 0;color:var(--book-muted);font-size:11px;line-height:1.8}
+.career-table-scroll{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;padding:10px 12px 4px;scrollbar-width:thin;scrollbar-color:var(--book-border) transparent}
+.career-table{width:100%;border-collapse:separate;border-spacing:4px;table-layout:auto;font-size:10px}
+.career-table th{min-width:72px;padding:9px 5px;color:var(--book-muted);font-weight:500;text-align:center;white-space:nowrap}
+.career-table th:first-child{position:sticky;left:0;z-index:1;min-width:83px;border-radius:4px;background:var(--book-surface);text-align:left;font-size:10px}
+.career-table tbody tr{--career-tone:var(--book-accent)}.career-table tr[data-difficulty='easy']{--career-tone:#80a98b}.career-table tr[data-difficulty='normal']{--career-tone:#779cb7}.career-table tr[data-difficulty='hard']{--career-tone:#bd995f}.career-table tr[data-difficulty='lunatic']{--career-tone:#be819e}.career-table tr[data-difficulty='extra'],.career-table tr[data-difficulty='phantasm']{--career-tone:#9a8dbc}.career-difficulty-dot{display:inline-block;width:4px;height:4px;margin-right:6px;border-radius:50%;background:var(--career-tone);vertical-align:middle}
+.career-table td{min-width:72px;padding:0;text-align:center}
+.player-profile .career-cell{display:grid;place-items:center;width:100%;height:35px;padding:0;border:1px solid color-mix(in srgb,var(--book-border) 65%,transparent);border-radius:6px;background:color-mix(in srgb,var(--book-surface) 45%,transparent);color:var(--book-muted);font-size:14px;line-height:1;transition:background-color .16s ease,border-color .16s ease,color .16s ease,transform .16s ease}
+.player-profile .career-cell:hover{border-color:var(--book-accent);background:var(--book-accent-soft);color:var(--book-accent)}
+.player-profile .career-cell.is-complete{border-color:color-mix(in srgb,var(--career-tone) 55%,var(--book-border));background:color-mix(in srgb,var(--career-tone) 16%,var(--book-surface));color:var(--book-ink);font-size:15px;font-weight:650}
+.career-cell>span{transition:transform .16s ease}.career-cell.is-complete>span{color:var(--career-tone)}.career-cell:active>span{transform:scale(.85)}
+.career-unavailable{display:grid;place-items:center;height:35px;color:var(--book-muted);font-size:12px;opacity:.55}
+.player-profile .career-scroll-hint{padding:5px 16px 13px;color:var(--book-muted);font-size:9px}
+.player-profile .career-selection{min-height:36px;margin-top:15px;padding-top:12px;border-top:1px solid var(--book-border);color:var(--book-muted);font-size:11px;line-height:1.7}
+.career-summary-list{display:grid;gap:0}.player-profile .career-summary-list>button{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;padding:15px 0;border:0;border-bottom:1px solid var(--book-border);border-radius:0;background:none;text-align:left}.player-profile .career-summary-list>button:first-child{padding-top:0}.player-profile .career-summary-list>button:last-child{padding-bottom:0;border-bottom:0}
+.career-summary-name{display:grid;gap:4px;min-width:0}.career-summary-name small{color:var(--book-muted);font-size:10px}.career-summary-name strong{color:var(--book-ink);font-size:13px;font-weight:550}.career-badges{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:5px}.career-badges>span{padding:4px 7px;border-radius:4px;background:var(--book-accent-soft);color:var(--book-accent);font-size:10px;white-space:nowrap}
+.career-empty-mark{display:block;margin-bottom:12px;color:var(--book-accent);font-size:28px;font-weight:300;opacity:.7}.career-overview .profile-empty>button{margin-top:17px;padding:0;border:0;background:none;color:var(--book-accent);font-size:12px}
+@media(max-width:780px),(hover:none),(pointer:coarse){
+  .career-showcase{padding:17px 13px}.career-heading{gap:8px}.career-heading .profile-actions{flex:none;gap:5px}.career-heading .profile-actions button{padding:6px 9px;font-size:10px}.career-eyebrow{font-size:8px}.player-profile .career-intro{font-size:11px}
+  .career-toolbar{gap:10px;margin-top:14px;font-size:10px}.career-help summary{font-size:10px}.career-help>div{font-size:10px}.career-edit-bar{padding:10px;font-size:10px}.career-edit-bar>button,.career-clear-confirm button{font-size:10px}
+  .player-profile .career-game-toggle{gap:9px;padding:10px;min-height:63px}.career-game-name strong{font-size:12px}.career-game-art{width:28px;height:37px}.career-game-count{font-size:9px}.career-game-count b{font-size:12px}.career-expand{font-size:15px}
+  .career-table-scroll{padding:7px 7px 4px}.career-table th,.career-table td{min-width:65px}.career-table th:first-child{min-width:78px}.player-profile .career-game-note{padding:10px 11px 0;font-size:10px}.player-profile .career-selection{font-size:10px}
+  .player-profile .career-summary-list>button{align-items:flex-start;gap:8px;flex-direction:column}.career-badges{justify-content:flex-start}.career-summary-name strong{font-size:12px}.career-badges>span{font-size:9px}.career-overview .profile-section-title>button{font-size:10px}
+}
+@media(hover:hover) and (pointer:fine){.player-profile .career-cell:hover{transform:translateY(-1px)}.player-profile .career-game-toggle:hover{background:var(--book-accent-soft)}}
+@media(prefers-reduced-motion:reduce){.career-game,.career-expand,.career-game-reveal,.player-profile .career-cell,.career-cell>span{transition:none}}
+.less-motion :is(.career-game,.career-expand,.career-game-reveal,.career-cell,.career-cell>span){transition:none}
