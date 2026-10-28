@@ -281,24 +281,15 @@ export function trackerLayout(options) {
         y += 12;
         return {title: section.title, top, games, rows};
     });
-    return {width: 800, height: y + (options.legend ? 90 : 0), sections};
+    return {width: 800, height: y, sections};
 }
 export function createTrackerRenderer(surface) {
 const ctx = surface.getContext('2d');
 const canvas = {width: 800, height: 878};
-let transparentPng = false, showLegend = true, easyMode = true;
+let transparentPng = false, easyMode = true;
 let state = new Map();
 function getBoxFromState(key) {return state.get(key) ?? new BoxObject(key);}
 const boxWidth = 17;
-function drawBox(x, y, width = boxWidth, height = boxWidth, lineWidth = 1.0, strokeStyle = '#d8d4cb') {
-    if (ctx) {
-        ctx.lineCap = 'butt';
-        ctx.lineJoin = 'miter';
-        ctx.strokeStyle = strokeStyle;
-        ctx.lineWidth = lineWidth;
-        ctx.strokeRect(x, y, width, height);
-    }
-}
 function drawBoxContentsAux(x, y, done, misses, bombs, lives, vertical, focus, pacifist, unique, cellColour, textColour, colour) {
     if (ctx) {
         if (done) {
@@ -459,15 +450,6 @@ function drawGame(game, baseX, baseY, drawDifficulties = false) {
     }
     drawUILine(baseX + column * boxWidth, bottom, boxWidth - 8, 2);
 }
-function drawLegend(y) {
-    ctx.fillStyle = '#f6f3ed';
-    ctx.fillRect(24, y, 752, 72);
-    drawBox(38, y + 18, 48, 32, 1, '#c9c0b1');
-    drawText('2   0   3', 44, y + 33);
-    drawText('F   P   U', 44, y + 46);
-    drawText('MISS / BOMB / START LIVES', 102, y + 29);
-    drawText('NV  NO VERTICAL     F  NO FOCUS     P  PACIFIST     U  UNIQUE RULE', 102, y + 47);
-}
 function drawScreen(layout) {
     boxes = [];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -484,12 +466,12 @@ function drawScreen(layout) {
             drawText(difficulty, 48, row.y + (index + 1) * boxWidth - 5, 'right'));
         for (const block of section.games) drawGame(block.game, block.x, block.y, block.drawDifficulties);
     }
-    if (showLegend) drawLegend(layout.height - 98);
+
 }
 
 return {draw(records, options) {
     state = new Map(Object.entries(records));
-    transparentPng = options.transparent; showLegend = options.legend; easyMode = options.easy;
+    transparentPng = options.transparent; easyMode = options.easy;
     const layout = trackerLayout(options);
     canvas.width = layout.width;
     canvas.height = layout.height;
