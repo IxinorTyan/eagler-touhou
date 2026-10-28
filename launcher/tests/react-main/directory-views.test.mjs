@@ -264,9 +264,14 @@ for (const locale of ['zh-CN', 'en']) test(`Lobby real loading/live/empty/list c
   assert.equal(n('#roomCount').textContent, t(locale, 'lobby.roomCount', {count: 0}));
   assert.equal(n('#connectionWarning').hidden, true); assert.equal(n('#membership').hidden, true);
   const doc = baselineDoc(locale);
-  for (const selector of ['.lobby-survey-notice', '.lobby-intro']) {
-    assert.deepEqual(normalize(n(selector)), normalize(n(selector, doc)), `Pinned DOM: ${selector}`);
+  for (const selector of ['.lobby-intro']) {
+    const intro = n(selector).cloneNode(true);
+    intro.querySelector('.lobby-survey-link')?.remove();
+    assert.deepEqual(normalize(intro), normalize(n(selector, doc)), `Pinned DOM: ${selector}`);
   }
+  assert.ok(n('.lobby-support-links .lobby-survey-link').textContent.includes(t(locale,'lobby.surveyAction')));
+  assert.equal(n('.lobby-survey-link').getAttribute('href'),'https://v.wjx.cn/vm/QqmTdwh.aspx#');
+  assert.equal(n('.lobby-survey-link').getAttribute('target'),'_blank');
   assert.deepEqual([...n('#listHead').children].map(cell => cell.textContent), [
     t(locale, 'lobby.gameAndRoom'), t(locale, 'lobby.difficulty'), locale === 'en' ? 'Rules' : '玩法',
     '', t(locale, 'lobby.capacity'), t(locale, 'lobby.state'), '',
@@ -283,7 +288,7 @@ for (const locale of ['zh-CN', 'en']) test(`Lobby real loading/live/empty/list c
   assert.equal(JSON.parse(env.window.localStorage.getItem('eagler.book.lobby-room-view')), 'list');
   await click('.book-room-view-toggle button:first-child');
   assert.equal(n('#listHead').hidden, false);
-  assert.equal(n('#connectionNote').hidden, false); assert.equal(n('#connectionNote').textContent, t(locale, 'lobby.truncated', {count: 1}));
+  assert.equal(n('#connectionNote').hidden, true); assert.equal(n('#connectionNote').textContent, '');
   assert.equal(n('#roomCount').getAttribute('aria-live'), 'polite'); assert.equal(n('#roomCount').textContent, t(locale, 'lobby.roomCount', {count: 1}));
   await click('#refreshRooms'); assert.equal(n('#roomList').getAttribute('aria-busy'), 'true'); assert.equal(n('#listHead').hidden, true);
   assert.equal(env.document.querySelector('#emptyState'), null); assert.deepEqual(f.socket.sent.at(-1), {type: 'refresh', product: 'th06mp'});

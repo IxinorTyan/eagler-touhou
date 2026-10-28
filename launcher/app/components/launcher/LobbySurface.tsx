@@ -58,17 +58,6 @@ export function LobbySurface({
     <>
       <main className={`lobby-main book-directory book-rooms-${roomView}`} inert={rail.interactive === false}>
         {masthead}
-        <aside className="lobby-survey-notice" aria-label={t('notice.label')}>
-          <strong>{t('lobby.surveyNotice')}</strong>
-          <a
-            className="lobby-button lobby-primary"
-            href="https://v.wjx.cn/vm/QqmTdwh.aspx#"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {t('lobby.surveyAction')}
-          </a>
-        </aside>
         <header className="lobby-intro">
           <h1>{t('lobby.title')}</h1>
           <nav className="lobby-support-links" aria-label={t('multiplayerGuide.title')}>
@@ -93,6 +82,9 @@ export function LobbySurface({
               <span>{t('networkCheck.action')}</span>
               <span aria-hidden="true">›</span>
             </button>
+            <a className="lobby-support-link lobby-survey-link" href="https://v.wjx.cn/vm/QqmTdwh.aspx#" target="_blank" rel="noopener noreferrer" title={t('lobby.surveyNotice')}>
+              <span>{t('lobby.surveyAction')}</span><span aria-hidden="true">›</span>
+            </a>
           </nav>
         </header>
         {connectionWarning}
@@ -103,6 +95,7 @@ export function LobbySurface({
         <section className="lobby-library" aria-label={t('lobby.game')}>
           <BookDirectoryGames {...rail}/>
         </section>
+        <div className="lobby-rooms-column">
         <header className="lobby-room-tools">
           <div className="lobby-actions">{roomTools}</div>
           <div className="book-room-view-toggle" role="group" aria-label={locale === 'en' ? 'Room display' : '房间显示模式'}>
@@ -112,6 +105,7 @@ export function LobbySurface({
         <section
           className="lobby-list-surface"
           aria-label={t('lobby.rooms')}
+          data-has-rooms={hasRooms}
         >
           <div
             className="lobby-list-head"
@@ -168,6 +162,7 @@ export function LobbySurface({
         <p className="lobby-sr-only" id="roomCount" aria-live="polite">
           {roomCount}
         </p>
+        </div>
       </main>
       {children}
     </>

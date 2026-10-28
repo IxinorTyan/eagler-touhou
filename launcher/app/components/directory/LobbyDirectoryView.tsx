@@ -47,5 +47,5 @@ export function LobbyDirectoryView({service, assetUrl, onOpenForm, onReplay, ini
   return <LobbySurface {...surface} selectedProduct={state.selectedProduct} connectionWarning={warning} membership={membership} notice={state.notice} roomTools={roomTools}
     roomList={<DirectoryRoomRows snapshot={state} service={service} assetUrl={assetUrl} initialRows={initialRows}/>}
     hasRooms={!!state.visibleRooms.length} loading={state.loading} emptyState={empty} roomCount={state.loading ? '' : t('lobby.roomCount', {count: state.visibleRooms.length})}
-    connectionNote={state.connection === 'live' && state.total > state.rooms.length ? t('lobby.truncated', {count: state.rooms.length}) : undefined} roomUsersArtwork={assetUrl('assets/room-users.svg')}/>;
+    roomUsersArtwork={assetUrl('assets/room-users.svg')}/>;
 }
