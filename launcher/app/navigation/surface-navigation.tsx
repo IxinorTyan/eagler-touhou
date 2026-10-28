@@ -1,5 +1,6 @@
 import {createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode} from 'react';
 import {useBlocker, useLocation, useNavigate, useNavigationType, type Location, type To, type NavigateOptions} from 'react-router';
+import {markClientNavigation} from './page-transition';
 import {initialPageChain, nextPageHistory, pageOf, pageAddress, parentDistance, readPageHistory, PAGE_HISTORY_KEY, PAGE_PARENTS} from './page-history';
 import {isProductId, isMultiplayerProductId, DEFAULT_MULTIPLAYER_PRODUCT_ID, DEFAULT_PRODUCT_ID, gameIdForProduct, type ProductId} from '../../src/contracts/product-catalog.mts';
 import {FullscreenTransient} from '../components/FullscreenTransient';
@@ -711,8 +712,9 @@ export function SurfaceNavigationProvider({dirty, isEditing, onDiscard, decision
     // address carries only the selected product; legacy direct MP options stay valid.
     const destination = new URL('lobby.html', new URL(href(location), 'https://launcher.invalid'));
     destination.searchParams.set('game', productId);
+    markClientNavigation();
     void navigate({pathname: destination.pathname, search: destination.search, hash: destination.hash},
-      {state: {}, preventScrollReset: false});
+      {state: {}, preventScrollReset: false, viewTransition: true});
   }
   function openPlayer(productId: ProductId, options?: {dismissInfo?: boolean}) {
     if (playerOpen || typeof gameEntry.position === 'number' && gameEntry.position === pageHistory?.position) return;

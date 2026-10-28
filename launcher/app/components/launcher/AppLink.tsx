@@ -1,9 +1,6 @@
 import {Link, useLocation, type LinkProps} from 'react-router';
 import {nextPageHistory, pageOf, readPageHistory, PAGE_HISTORY_KEY} from '../../navigation/page-history';
-
-const markClientNavigation = () => {
-  document.documentElement.dataset.launcherClientNavigation = 'true';
-};
+import {markClientNavigation} from '../../navigation/page-transition';
 
 if (typeof window !== 'undefined') window.addEventListener('popstate', markClientNavigation);
 

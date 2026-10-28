@@ -61,11 +61,24 @@ body:not(.mp-room-active):has(.book-masthead)::before {
 }
 body:not(.mp-room-active):has(.book-masthead) :is(.sheet,.book-directory) {position:relative;z-index:1;background:transparent}
 body:not(.mp-room-active) .book-masthead {background:color-mix(in srgb,var(--book-bg) 88%,transparent)}
-/* The live masthead stays outside the page containers and their entrance animation. */
+/* All three destinations dissolve the content only. Keep the backdrop and
+   masthead steady, and never morph different page heights into one another. */
+body:not(.mp-room-active):has(.book-masthead) :is(.sheet,.book-directory,.player-profile) {view-transition-name:launcher-content}
+html:has(.book-masthead)::view-transition-group(root) {animation:none}
+html:has(.book-masthead)::view-transition-old(root) {animation:none;opacity:0}
+html:has(.book-masthead)::view-transition-new(root) {animation:none;opacity:1}
+::view-transition-group(launcher-content) {animation:none}
+::view-transition-old(launcher-content),::view-transition-new(launcher-content) {width:100%;height:100%;object-fit:none;object-position:center top}
+::view-transition-old(launcher-content) {animation:launcher-page-out var(--launcher-page-duration) ease-in-out both}
+::view-transition-new(launcher-content) {animation:launcher-page-in var(--launcher-page-duration) ease-in-out both}
 html:has(.book-masthead) .book-masthead {view-transition-name:launcher-masthead}
 ::view-transition-group(launcher-masthead) {animation:none}
-::view-transition-old(launcher-masthead) {animation:none;opacity:1}
+::view-transition-old(launcher-masthead) {animation:none;opacity:0}
 ::view-transition-new(launcher-masthead) {animation:none;opacity:1}
+html:has(body.less-motion)::view-transition-old(launcher-content),html:has(body.less-motion)::view-transition-new(launcher-content) {animation:none!important}
+@media(prefers-reduced-motion:reduce) {
+  ::view-transition-old(launcher-content),::view-transition-new(launcher-content) {animation:none!important}
+}
 .lobby-page .book-masthead .masthead-links {grid-column:3}
 html:has(.book-masthead) .book-directory:not(:has(>.book-masthead)) {padding-top:24px}
 @media(max-width:780px),(hover:none),(pointer:coarse) {
