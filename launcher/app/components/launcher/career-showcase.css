@@ -1,4 +1,4 @@
-html{--career-paper:#242524}
+html{--career-paper:#20242b}
 html[data-book-theme='light']{--career-paper:#fff}
 /* Career chart: paper preview, quiet controls, and a separate help surface. */
 .career-heading{align-items:center;gap:16px;margin-bottom:20px}

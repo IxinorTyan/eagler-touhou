@@ -286,7 +286,7 @@ export function trackerLayout(options) {
 // Muted rainbow from Easy through Phantasm; scene targets use the same fixed family.
 const difficultyPalette = {
     light: {E: '#dcebdc', N: '#dce9f3', H: '#f4e9bd', L: '#f1d6bb', X: '#ebcbd3', P: '#dfd1ed'},
-    dark: {E: '#324c3d', N: '#33495e', H: '#514b30', L: '#594333', X: '#563743', P: '#483b59'},
+    dark: {E: '#22785d', N: '#286fa6', H: '#927820', L: '#aa5c29', X: '#a44370', P: '#7856ad'},
 };
 export function trackerDifficultyColour(difficulty, dark = false) {
     const key = difficulty.includes('-') ? difficulty.at(-1) : difficulty;
@@ -483,9 +483,9 @@ function drawScreen(layout) {
 
 return {draw(records, options, dark = false) {
     darkMode = dark;
-    paper = dark ? '#242524' : '#ffffff';
-    ink = dark ? '#d7d4ce' : '#48443d';
-    grid = dark ? '#575954' : '#d8d4cb';
+    paper = dark ? '#20242b' : '#ffffff';
+    ink = dark ? '#edf2fa' : '#48443d';
+    grid = dark ? '#4b5666' : '#d8d4cb';
     state = new Map(Object.entries(records));
     transparentPng = options.transparent; easyMode = options.easy;
     const layout = trackerLayout(options);

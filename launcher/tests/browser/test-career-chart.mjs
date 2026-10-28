@@ -141,7 +141,7 @@ try {
     await page.evaluate(theme => document.documentElement.dataset.bookTheme = theme, theme);
     await page.waitForFunction(theme => {
       const rgb = document.querySelector('.career-overview canvas').getContext('2d').getImageData(0,0,1,1).data;
-      return theme === 'light' ? rgb[0] === 255 : rgb[0] === 36;
+      return theme === 'light' ? rgb[0] === 255 : rgb[0] === 32;
     }, {}, theme);
     await page.screenshot({path:output+'/overview-'+theme+'.png',fullPage:true});
   }
