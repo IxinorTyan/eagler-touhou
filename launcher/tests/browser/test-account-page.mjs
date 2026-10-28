@@ -46,13 +46,13 @@ try {
           const a = art.getBoundingClientRect(), f = document.querySelector('form').getBoundingClientRect();
           return {fit: getComputedStyle(art.querySelector('img')).objectFit, events: getComputedStyle(art).pointerEvents, scroll: getComputedStyle(document.querySelector('.account-content')).overflowY, size: getComputedStyle(input).fontSize, overlaps: a.left < f.right && a.right > f.left && a.top < f.bottom && a.bottom > f.top};
         });
-        assert.deepEqual(print, {fit: 'contain', events: 'none', scroll: 'visible', size: '16px', overlaps: true});
+        assert.deepEqual(print, {fit: 'cover', events: 'none', scroll: 'visible', size: '16px', overlaps: true});
       }
       const image = width >= 960 ? await (await page.$('.account-art')).screenshot() : null;
       if ([1440, 390].includes(width)) await page.screenshot({path: `.cache/account/login-${width}-${theme}.png`});
       await selectMode(page, '注册'); await settle(page);
       const registration = await dimensions();
-      assert.deepEqual(registration.art, login.art, `${width}: stable art geometry`);
+      if (width >= 960) assert.deepEqual(registration.art, login.art, `${width}: stable art geometry`);
       if (image) assert.deepEqual(await (await page.$('.account-art')).screenshot(), image, `${width}: stable art pixels`);
       assert.equal(await page.$eval('[data-captcha-slot]', el => el.childElementCount), 0);
       if ([1440, 390].includes(width)) await page.screenshot({path: `.cache/account/register-${width}-${theme}.png`});

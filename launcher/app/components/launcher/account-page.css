@@ -42,20 +42,26 @@
 .account-captcha-slot:not(:empty){border:0;background:transparent}
 .is-registering .account-content{padding-block:28px}.is-registering .account-tabs{margin-bottom:20px}.is-registering h1{margin-bottom:20px}.is-registering form{gap:13px}
 @media(max-width:900px){.account-content{padding-inline:28px}.account-shell{grid-template-columns:minmax(0,.8fr) minmax(0,1fr)}}
-/* Narrow layouts reuse the full artwork as a printed layer, not a new image strip. */
+/* A blurred backdrop supplies atmosphere without consuming form space. */
 @media(max-width:959px){
- .account-shell{isolation:isolate;grid-template-columns:minmax(0,1fr);height:auto;min-height:calc(100svh - var(--account-header-height,108px))}
- .account-art{position:absolute;z-index:0;inset:0 0 auto;margin-top:0;height:calc(100svh - var(--account-header-height,108px));min-height:360px;max-height:800px;border:0;background:transparent;overflow:visible;pointer-events:none;user-select:none;mix-blend-mode:screen}
- .account-art-image{inset:110px 0 auto;width:100%;height:auto;max-height:100%;object-fit:contain;object-position:center;filter:grayscale(1) invert(1);opacity:var(--account-print-opacity,.16);mask-image:radial-gradient(ellipse closest-side,#000 24%,transparent 100%)}
- html[data-book-theme='light'] .account-art{mix-blend-mode:multiply}
- html[data-book-theme='light'] .account-art-image{filter:grayscale(1);opacity:var(--account-print-opacity,.15)}
- .account-content,.is-registering .account-content{position:relative;z-index:1;width:100%;max-width:460px;max-height:none;overflow:visible;align-self:start;padding:36px 24px 40px;justify-content:flex-start}
- .account-content input{min-height:48px;font-size:16px}
+ .account-shell{isolation:isolate;grid-template-columns:minmax(0,1fr);height:auto;min-height:calc(100svh - var(--account-header-height,108px));background:var(--book-bg)}
+ .account-art{position:absolute;z-index:0;inset:0;margin:0;min-height:100%;border:0;background:var(--book-surface);overflow:clip;pointer-events:none;user-select:none}
+ .account-art-image{position:sticky;top:var(--account-header-height,108px);display:block;width:100%;height:calc(100svh - var(--account-header-height,108px));min-height:500px;object-fit:cover;object-position:40% center;filter:blur(18px) saturate(.55);opacity:1;transform:scale(1.12)}
+ .account-art:after{content:'';position:absolute;inset:0;background:var(--book-surface);opacity:.72;pointer-events:none}
+ html[data-book-theme='light'] .account-art:after{opacity:.78}
+ .account-content,.is-registering .account-content{position:relative;z-index:1;width:100%;max-width:440px;max-height:none;overflow:visible;align-self:start;padding:32px 24px 44px;justify-content:flex-start}
+ .account-content input{min-height:50px;font-size:16px;background:var(--book-surface);border-radius:9px}
+ .account-content form,.is-registering form{gap:20px}
+ .account-content label{gap:9px;font-size:13px}
+ .account-code button,.account-discord,.account-captcha-slot{background:var(--book-surface);border-radius:9px}
+ .account-password-toggle{height:44px;width:42px}
  .account-submit,.account-discord{min-height:48px}
- .account-topline{margin-bottom:28px}
- .account-tabs,.is-registering .account-tabs{margin-bottom:22px}
- .account-content h1,.is-registering h1{font-size:22px;margin-bottom:22px}
+ .account-topline{margin-bottom:32px}
+ .account-tabs,.is-registering .account-tabs{margin-bottom:28px}
+ .account-content h1,.is-registering h1{font-size:24px;margin-bottom:28px}
  .account-demo-note{margin-top:18px}
+ html:not([data-book-theme='light']) .account-shell{background:var(--book-surface)}
+ html:not([data-book-theme='light']) .account-content input{background:var(--book-raised)}
 }
 @media(prefers-reduced-motion:reduce){.account-content input{transition:none}}
 
