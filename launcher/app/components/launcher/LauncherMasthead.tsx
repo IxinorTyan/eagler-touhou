@@ -6,6 +6,7 @@ import {closeMainSelectMenus, MainSelectPrefix} from './MainSelect';
 import {BookThemeToggle} from './BookThemeToggle';
 import {useLocation} from 'react-router';
 import {ProfilePreview} from './ProfilePreview';
+import {NavigationIcon} from './NavigationIcon';
 
 export interface LauncherMastheadProps {
   /** Published pre-session markup has native links and no menu owner. */
@@ -73,8 +74,8 @@ export function LauncherMasthead(props: LauncherMastheadProps) {
   return <header className={`masthead book-masthead${variant === 'lobby' ? ' lobby-masthead' : ''}`}>
     <Link className="brand book-brand" id="launcherLink" href={props.launcherHref} aria-label="EAGLER TOUHOU"><span className="book-brand-symbol" aria-hidden="true">☯</span><span>EAGLER <b>TOUHOU</b></span><time className="brand-version" id="brandUpdateAge" title={props.updatedAge?.title} dateTime={props.updatedAge?.dateTime}>{props.updatedAge?.text ?? t('brand.neverUpdated')}</time></Link>
     <nav className="book-main-nav" aria-label={locale === 'en' ? 'Main navigation' : '主导航'}>
-      <Link href={props.launcherHref} aria-current={variant === 'library' && !props.replayActive && !profileOpen ? 'page' : undefined}>{locale === 'en' ? '▷ Solo' : '▷ 单机'}</Link>
-      <Link className="book-lobby-link" href={props.assetUrl('lobby.html')} aria-current={variant === 'lobby' && !props.replayActive && !profileOpen ? 'page' : undefined}>{locale === 'en' ? '♧ Multiplayer' : '♧ 联机'}</Link>
+      <Link href={props.launcherHref} aria-current={variant === 'library' && !props.replayActive && !profileOpen ? 'page' : undefined}>{locale === 'en' ? 'Solo' : '单机'}</Link>
+      <Link className="book-lobby-link" href={props.assetUrl('lobby.html')} aria-current={variant === 'lobby' && !props.replayActive && !profileOpen ? 'page' : undefined}>{locale === 'en' ? 'Multiplayer' : '联机'}</Link>
     </nav>
     <nav className="masthead-links" aria-label={t('nav.siteInfo')}>
       <BookThemeToggle interactive={interactive}/>
@@ -91,11 +92,11 @@ export function LauncherMasthead(props: LauncherMastheadProps) {
           event.preventDefault();
           if (menuOpen) focusMenu();
           else {focusFirst.current = true; onMenuOpenChange(true);}
-        }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+        }}><NavigationIcon name="menu"/></button>
         <div ref={panel} className="masthead-menu-panel" id="mastheadMenuPanel" aria-hidden={!menuOpen} inert={!menuOpen}>
           <nav className="book-mobile-nav" aria-label={locale === 'en' ? 'Main navigation' : '主导航'}>
-            <Link className="masthead-menu-item" href={props.launcherHref} aria-current={variant === 'library' && !props.replayActive && !profileOpen ? 'page' : undefined} onClick={() => onMenuOpenChange(false)}>{locale === 'en' ? '▷ Solo' : '▷ 单机'}</Link>
-            <Link className="masthead-menu-item" href={props.assetUrl('lobby.html')} aria-current={variant === 'lobby' && !props.replayActive && !profileOpen ? 'page' : undefined} onClick={() => onMenuOpenChange(false)}>{locale === 'en' ? '♧ Multiplayer' : '♧ 联机'}</Link>
+            <Link className="masthead-menu-item" href={props.launcherHref} aria-current={variant === 'library' && !props.replayActive && !profileOpen ? 'page' : undefined} onClick={() => onMenuOpenChange(false)}>{locale === 'en' ? 'Solo' : '单机'}</Link>
+            <Link className="masthead-menu-item" href={props.assetUrl('lobby.html')} aria-current={variant === 'lobby' && !props.replayActive && !profileOpen ? 'page' : undefined} onClick={() => onMenuOpenChange(false)}>{locale === 'en' ? 'Multiplayer' : '联机'}</Link>
           </nav>
           <button className="masthead-menu-item motion-menu-toggle" id={variant === 'lobby' ? 'lobbyLessMotion' : 'lessMotionToggle'} type="button" aria-pressed={props.lessMotion} title={t(props.lessMotion ? 'nav.motionFullTitle' : 'nav.motionLessTitle')} onClick={props.onToggleMotion}><MenuIcon name="motion"/><span>{t('nav.lessMotion')}</span><i className="site-notice-toggle-state" aria-hidden="true"/></button>
           <button className="masthead-menu-item" id="siteNoticeToggle" type="button" role="switch" aria-checked={props.noticeEnabled} onClick={props.onToggleNotice}><MenuIcon name="notice"/><span>{t('notice.label')}</span><i className="site-notice-toggle-state" aria-hidden="true"/></button>

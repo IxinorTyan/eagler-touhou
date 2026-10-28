@@ -1,6 +1,7 @@
 import {useEffect, useState} from 'react';
 import {useLocale} from '../../i18n';
 import {BOOK_PREFERENCES_EVENT, readBookPreference, writeBookPreference} from './book-preferences';
+import {NavigationIcon} from './NavigationIcon';
 
 export function BookThemeToggle({interactive = true}: {interactive?: boolean}) {
   const {locale} = useLocale();
@@ -16,5 +17,5 @@ export function BookThemeToggle({interactive = true}: {interactive?: boolean}) {
   return <button type="button" className="book-theme-toggle" disabled={!interactive} aria-pressed={dark}
     aria-label={locale === 'en' ? 'Dark appearance' : '深色外观'} onClick={() => {
       const next = !dark; setDark(next); document.documentElement.dataset.bookTheme = next ? 'dark' : 'light'; writeBookPreference('theme', next ? 'dark' : 'light');
-    }}>{dark ? '☾' : '☼'}</button>;
+    }} title={locale === 'en' ? 'Toggle light / dark appearance' : '切换明暗外观'}><NavigationIcon name={dark ? 'moon' : 'sun'}/></button>;
 }

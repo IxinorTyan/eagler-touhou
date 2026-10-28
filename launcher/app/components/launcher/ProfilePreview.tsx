@@ -7,6 +7,7 @@ import {BOOK_PREFERENCES_EVENT, readBookPreference, writeBookPreference, stringA
 import './profile-preview.css';
 import {CareerSummary, CareerShowcase} from './CareerShowcase';
 import {CAREER_STORAGE_KEY, validCareerRecords, type CareerRecords} from './career-records';
+import {NavigationIcon} from './NavigationIcon';
 
 type SocialLink = {label: string; url: string};
 type Profile = {name: string; bio: string; avatar: string; cover: string; links: SocialLink[]};
@@ -31,7 +32,7 @@ export function ProfilePreview({interactive = true, active, href}: {interactive?
     refresh(); window.addEventListener(BOOK_PREFERENCES_EVENT, refresh); window.addEventListener('storage', refresh);
     return () => {window.removeEventListener(BOOK_PREFERENCES_EVENT, refresh); window.removeEventListener('storage', refresh);};
   }, []);
-  const content = <span aria-hidden="true">{imageData(avatar) ? <img src={avatar} alt=""/> : <AvatarPlaceholder/>}</span>;
+  const content = <span aria-hidden="true">{imageData(avatar) ? <img src={avatar} alt=""/> : <NavigationIcon name="profile"/>}</span>;
   return interactive ? <AppLink className="book-profile-trigger" href={href} aria-label={locale === 'en' ? 'Player profile' : '玩家主页'} aria-current={active ? 'page' : undefined}>{content}</AppLink>
     : <a className="book-profile-trigger" href={href} aria-label={locale === 'en' ? 'Player profile' : '玩家主页'} aria-current={active ? 'page' : undefined}>{content}</a>;
 }
