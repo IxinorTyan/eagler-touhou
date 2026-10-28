@@ -136,3 +136,14 @@ test('decimal tables form two gameplay rows and one compact scene row', () => {
   }
   assert.ok(section.games.filter(block => ['GFW', 'GI', 'STB', 'DS', 'ISC', 'VD', '100BM'].includes(block.game.name)).every(block => block.drawDifficulties));
 });
+
+
+test('fixed difficulty colors follow routes and provide distinct theme palettes', () => {
+  for (const dark of [false, true]) {
+    const colors = ['E', 'N', 'H', 'L', 'X', 'P'].map(key => api.trackerDifficultyColour(key, dark));
+    assert.equal(new Set(colors).size, 6);
+    assert.equal(api.trackerDifficultyColour('B-N', dark), colors[1]);
+    assert.equal(api.trackerDifficultyColour('A-N', dark), colors[1]);
+  }
+  assert.notEqual(api.trackerDifficultyColour('N', true), api.trackerDifficultyColour('N', false));
+});

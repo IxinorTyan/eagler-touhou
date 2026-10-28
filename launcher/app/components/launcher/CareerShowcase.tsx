@@ -173,16 +173,14 @@ function CellEditor({record, editing, onApply}: {record: TrackerRecord; editing:
     for (const key of ['done', 'vertical', 'focus', 'pacifist', 'unique'] as const) next[key] = data.has(key);
     for (const key of ['misses', 'bombs', 'lives'] as const) next[key] = String(data.get(key) ?? '') || null;
     next.continued = data.has('continued');
-    next.cellColour = String(data.get('cellColour')); next.textColour = String(data.get('textColour'));
+    next.cellColour = '#ffffff'; next.textColour = '#000000';
     next.note = String(data.get('note') ?? '').trim(); next.challenge = String(data.get('challenge') ?? '').trim();
     onApply(next);
   }}>
-    <label className="career-check"><input type="checkbox" name="done" defaultChecked={record.done}/>标记 1CC / 使用作品配色</label>
+    <label className="career-check"><input type="checkbox" name="done" defaultChecked={record.done}/>标记 1CC</label>
     <label className="career-check"><input type="checkbox" name="continued" defaultChecked={record.continued}/>另记续关通关</label>
     <div className="career-count-fields">{([['misses', 'Miss'], ['bombs', 'Bomb'], ['lives', '初始残机']] as const).map(([key, label]) => <label key={key}>{label}<select name={key} aria-label={label} defaultValue={record[key] ?? ''}><option value="">未知</option>{Array.from({length: 10}, (_, n) => <option key={n} value={n}>{n}</option>)}</select></label>)}</div>
     <fieldset><legend>特殊限制</legend>{([['vertical', 'NV · 禁止纵向移动'], ['focus', 'NF · 禁止低速'], ['pacifist', 'P · 和平主义'], ['unique', 'U · 自定义限制']] as const).map(([key, label]) => <label className="career-check" key={key}><input type="checkbox" name={key} defaultChecked={record[key]}/>{label}</label>)}</fieldset>
-    <div className="career-color-fields"><label>格子颜色<input type="color" name="cellColour" defaultValue={record.cellColour}/></label><label>文字颜色<input type="color" name="textColour" defaultValue={record.textColour}/></label></div>
-    <p>取消作品配色后使用自定义格子颜色。</p>
     <label>自定义标记<input name="challenge" maxLength={24} defaultValue={record.challenge}/></label><label>备注<textarea name="note" rows={2} maxLength={240} defaultValue={record.note}/></label>
     <div className="career-backup-actions"><button type="button" onClick={() => onApply()}>移除此格</button><button className="is-primary" type="submit">应用到草稿</button></div>
   </form>;

@@ -283,25 +283,35 @@ export function trackerLayout(options) {
     });
     return {width: 800, height: y, sections};
 }
+// Muted rainbow from Easy through Phantasm; scene targets use the same fixed family.
+const difficultyPalette = {
+    light: {E: '#dcebdc', N: '#dce9f3', H: '#f4e9bd', L: '#f1d6bb', X: '#ebcbd3', P: '#dfd1ed'},
+    dark: {E: '#324c3d', N: '#33495e', H: '#514b30', L: '#594333', X: '#563743', P: '#483b59'},
+};
+export function trackerDifficultyColour(difficulty, dark = false) {
+    const key = difficulty.includes('-') ? difficulty.at(-1) : difficulty;
+    const sceneKey = {C: 'E', NI: 'X', '66': 'N', '85': 'H', '58': 'N', '108': 'H', '103': 'H'}[key];
+    return difficultyPalette[dark ? 'dark' : 'light'][sceneKey ?? key] ?? difficultyPalette[dark ? 'dark' : 'light'].N;
+}
 export function createTrackerRenderer(surface) {
 const ctx = surface.getContext('2d');
 const canvas = {width: 800, height: 878};
 let transparentPng = false, easyMode = true;
-let paper = '#ffffff', ink = '#48443d', grid = '#d8d4cb';
+let paper = '#ffffff', ink = '#48443d', grid = '#d8d4cb', darkMode = false;
 let state = new Map();
 function getBoxFromState(key) {return state.get(key) ?? new BoxObject(key);}
 const boxWidth = 17;
 function drawBoxContentsAux(x, y, done, misses, bombs, lives, vertical, focus, pacifist, unique, cellColour, textColour, colour) {
-    if (textColour.toLowerCase() === '#000000') textColour = ink;
+    textColour = ink;
     if (ctx) {
         if (done) {
             ctx.fillStyle = colour;
         }
         else {
-            ctx.fillStyle = cellColour.toLowerCase() === '#ffffff' ? paper : cellColour;
+            ctx.fillStyle = paper;
         }
         ctx.save();
-        if (done) ctx.globalAlpha = .30;
+
         ctx.fillRect(x, y, boxWidth, boxWidth);
         ctx.restore();
         // Draw the little bits and pieces
@@ -338,7 +348,7 @@ function drawBoxContentsAux(x, y, done, misses, bombs, lives, vertical, focus, p
 }
 function drawBoxContents(x, y, boxName, colour) {
     const box = getBoxFromState(boxName);
-    drawBoxContentsAux(x, y, box.done, box.misses, box.bombs, box.lives, box.vertical, box.focus, box.pacifist, box.unique, box.cellColour, box.textColour, colour);
+    drawBoxContentsAux(x, y, box.done, box.misses, box.bombs, box.lives, box.vertical, box.focus, box.pacifist, box.unique, paper, ink, trackerDifficultyColour(boxName.split('-').slice(2).join('-'), darkMode));
 }
 function drawText(text, x, y, align = 'left', font = '600 8px "Segoe UI", sans-serif', colour = ink) {
     x -= 0.5; // Dumb hack for Windows
@@ -472,6 +482,7 @@ function drawScreen(layout) {
 }
 
 return {draw(records, options, dark = false) {
+    darkMode = dark;
     paper = dark ? '#242524' : '#ffffff';
     ink = dark ? '#d7d4ce' : '#48443d';
     grid = dark ? '#575954' : '#d8d4cb';
