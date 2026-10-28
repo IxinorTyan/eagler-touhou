@@ -213,10 +213,43 @@ const gi = new Game("GI", "rgba(131, 5, 5, 1.0)", "HN".split(''), [new Character
     new Character("YT")]);
 
 export const trackerGames = [htrp, soew, podd, ls, ms, eosd, stb, ds, isc, vd, bm, pcb, imp, pofv, mof, sa, ufo, gfw, td, ddc, lolk, hsifs, wbawc, um, udoalg, iamp, swr, hsoku, hm, ulil, aocf, gi];
+export const trackerSections = [
+    {title: '整数作', games: [htrp, soew, ls, ms, eosd, pcb, imp, mof, sa, ufo, td, ddc, lolk, hsifs, wbawc, um]},
+    {title: '对战作', games: [podd, pofv, udoalg]},
+    {title: '小数点作', games: [iamp, stb, swr, hsoku, ds, gfw, hm, isc, ulil, aocf, vd, bm, gi]},
+];
+const additionalGames = new Set([iamp, swr, hsoku, hm, ulil, aocf, gi]);
+function gameDifficulties(game, easy) {
+    if (game.name === 'IN') return easy
+        ? ['X', 'B-L', 'B-H', 'B-N', 'B-E', 'A-L', 'A-H', 'A-N', 'A-E']
+        : ['X', 'B-L', 'B-H', 'B-N', 'A-L', 'A-H', 'A-N'];
+    return [...game.difficulties, ...(easy && game.difficulties.at(-1) === 'N' ? ['E'] : [])];
+}
+export function trackerLayout(options) {
+    let y = 24;
+    const sections = trackerSections.map(section => {
+        const top = y;
+        y += 42;
+        let x = 24, rowHeight = 0;
+        const games = section.games.filter(game => options.extra || !additionalGames.has(game)).map(game => {
+            const columns = game.characters.reduce((n, character) => n + (character.subcharacters.length || 1), 0);
+            const width = columns * 17 + 30;
+            const height = gameDifficulties(game, options.easy).length * 17 + 44;
+            if (x + width > 776) {y += rowHeight + 20; x = 24; rowHeight = 0;}
+            const block = {game, x, y, width, height};
+            x += width + 20;
+            rowHeight = Math.max(rowHeight, height);
+            return block;
+        });
+        y += rowHeight + 30;
+        return {title: section.title, top, games};
+    });
+    return {width: 800, height: y + (options.legend ? 98 : 0), sections};
+}
 export function createTrackerRenderer(surface) {
 const ctx = surface.getContext('2d');
 const canvas = {width: 800, height: 878};
-let transparentPng = false, showFighting = true, showLegend = true, easyMode = true;
+let transparentPng = false, showLegend = true, easyMode = true;
 let state = new Map();
 function getBoxFromState(key) {return state.get(key) ?? new BoxObject(key);}
 const boxWidth = 17;
@@ -227,19 +260,6 @@ function drawBox(x, y, width = boxWidth, height = boxWidth, lineWidth = 1.0, str
         ctx.strokeStyle = strokeStyle;
         ctx.lineWidth = lineWidth;
         ctx.strokeRect(x, y, width, height);
-    }
-}
-function drawExtraHeader(x, y) {
-    if (ctx) {
-        ctx.lineCap = 'butt';
-        ctx.lineJoin = 'miter';
-        ctx.strokeStyle = '#d8d4cb';
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        ctx.lineTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-        drawText("EXTRA", 2, y + 8);
     }
 }
 function drawBoxContentsAux(x, y, done, misses, bombs, lives, vertical, focus, pacifist, unique, cellColour, textColour, colour) {
@@ -290,8 +310,6 @@ function drawBoxContents(x, y, boxName, colour) {
     const box = getBoxFromState(boxName);
     drawBoxContentsAux(x, y, box.done, box.misses, box.bombs, box.lives, box.vertical, box.focus, box.pacifist, box.unique, box.cellColour, box.textColour, colour);
 }
-let lastX = 0;
-let lastY = 0;
 function drawText(text, x, y, align = 'left', font = '600 8px "Segoe UI", sans-serif', colour = "#48443d") {
     x -= 0.5; // Dumb hack for Windows
     if (ctx) {
@@ -344,20 +362,12 @@ function drawGame(game, baseX, baseY, drawDifficulties = false) {
     baseY = Math.round(baseY * 2) / 2;
     const characters = game.characters.flatMap(character => character.subcharacters.length
         ? character.subcharacters.map(sub => character.name + sub) : [character.name]);
-    let difficulties = game.difficulties.slice();
-    if (game.name === 'IN') {
-        difficulties = easyMode
-            ? ['X', 'B-L', 'B-H', 'B-N', 'B-E', 'A-L', 'A-H', 'A-N', 'A-E']
-            : ['X', 'B-L', 'B-H', 'B-N', 'A-L', 'A-H', 'A-N'];
-    } else if (easyMode && difficulties.at(-1) === 'N') difficulties.push('E');
+    const difficulties = gameDifficulties(game, easyMode);
     if (drawDifficulties) {
         difficulties.forEach((difficulty, row) => {
-            drawText(difficulty.length > 1 && game.name === 'IN' ? difficulty.at(-1) : difficulty,
-                baseX + 11, baseY + (row + 1) * boxWidth - 1, 'right');
-            if (game.name === 'IN' && ['B-L', 'A-L'].includes(difficulty))
-                drawText(difficulty[0], baseX - 2, baseY + row * boxWidth + 7);
+            drawText(difficulty, baseX + 24, baseY + (row + 1) * boxWidth - 5, 'right');
         });
-        baseX += 14;
+        baseX += 30;
     }
     const dotOffset = characters.length === 1 ? -6 : 0;
     const nameOffset = ['GFW', 'PODD'].includes(game.name) ? 4 : 3;
@@ -376,7 +386,6 @@ function drawGame(game, baseX, baseY, drawDifficulties = false) {
         drawBoxContents(cell.x, cell.y, cell.key, game.colour);
     }));
     drawCellGrid(gameCells);
-    lastX = baseX + (characters.length - 1) * boxWidth;
     const bottom = baseY + difficulties.length * boxWidth;
     let column = 0;
     for (const character of game.characters) {
@@ -395,107 +404,42 @@ function drawGame(game, baseX, baseY, drawDifficulties = false) {
     }
     drawUILine(baseX + column * boxWidth, bottom, boxWidth - 8, 2);
 }
-function drawLegend() {
-    const left = canvas.width - 8 * boxWidth + 2.5;
+function drawLegend(y) {
     ctx.fillStyle = '#f6f3ed';
-    ctx.fillRect(left, 0, 8 * boxWidth, 190);
-    drawText('LEGEND', left + 10, 18, 'left', '600 9px "Segoe UI", sans-serif');
-    drawBox(left + 10, 31, 48, 28, 1, '#c9c0b1');
-    drawText('2', left + 16, 48, 'left', '500 11px "Segoe UI", sans-serif');
-    drawText('0', left + 30, 48, 'left', '500 11px "Segoe UI", sans-serif');
-    drawText('3', left + 44, 48, 'left', '500 11px "Segoe UI", sans-serif');
-    drawText('MISS / BOMB / START LIVES', left + 10, 73, 'left', '500 7px "Segoe UI", sans-serif');
-    drawText('1CC', left + 10, 96);
-    drawText('NO CONTINUE', left + 43, 96, 'left', '500 8px "Segoe UI", sans-serif');
-    for (const [index, [symbol, label]] of [['NV', 'NO VERTICAL'], ['F', 'NO FOCUS'], ['P', 'PACIFIST'], ['U', 'UNIQUE RULE']].entries()) {
-        const y = 119 + index * 17;
-        drawText(symbol, left + 10, y);
-        drawText(label, left + 35, y, 'left', '500 8px "Segoe UI", sans-serif');
-    }
+    ctx.fillRect(24, y, 752, 72);
+    drawBox(38, y + 18, 48, 32, 1, '#c9c0b1');
+    drawText('2   0   3', 44, y + 33);
+    drawText('F   P   U', 44, y + 46);
+    drawText('MISS / BOMB / START LIVES', 102, y + 29);
+    drawText('NV  NO VERTICAL     F  NO FOCUS     P  PACIFIST     U  UNIQUE RULE', 102, y + 47);
 }
-function drawScreen() {
+function drawScreen(layout) {
     boxes = [];
-    if (ctx) {
-        ctx.clearRect(-2, -2, canvas.width + 2, canvas.height + 2);
-        if (!transparentPng) {
-            ctx.fillStyle = 'white';
-            ctx.fillRect(-2, -2, canvas.width + 2, canvas.height + 2);
-        }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!transparentPng) {
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
-    let yOffset = boxWidth;
-    drawText("1CC CHART", 2, 6);
-    if (showLegend) {
-        drawLegend();
+    for (const section of layout.sections) {
+        drawText(section.title, 24, section.top + 14, 'left', '600 14px "Segoe UI", "Microsoft YaHei", sans-serif');
+        ctx.strokeStyle = '#d8d4cb';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(106, section.top + 9); ctx.lineTo(776, section.top + 9); ctx.stroke();
+        for (const block of section.games) drawGame(block.game, block.x, block.y, true);
     }
-    drawGame(htrp, 2, yOffset + boxWidth, true);
-    drawGame(soew, lastX + boxWidth, yOffset);
-    drawGame(podd, lastX + boxWidth, yOffset + boxWidth);
-    drawGame(ls, lastX + boxWidth, yOffset);
-    drawGame(ms, lastX + boxWidth, yOffset);
-    drawGame(eosd, lastX + boxWidth, yOffset);
-    drawGame(stb, lastX + 2 * boxWidth - 6, yOffset + 0 * boxWidth, true);
-    drawGame(ds, lastX + 2 * boxWidth - 4, yOffset + 0 * boxWidth, true);
-    drawGame(isc, lastX + 2 * boxWidth - 8, yOffset + 0 * boxWidth, true);
-    drawGame(vd, lastX + 2 * boxWidth, yOffset + 0 * boxWidth, true);
-    drawGame(bm, 27.585 * boxWidth, yOffset + 4 * boxWidth, true);
-    if (easyMode) {
-        yOffset += boxWidth;
-    }
-    let pcvPofvOffset = 0;
-    if (easyMode) {
-        pcvPofvOffset = 1;
-    }
-    drawGame(pcb, 2, yOffset + ((pcvPofvOffset + 8) * boxWidth), true);
-    drawGame(imp, lastX + 2 * boxWidth, yOffset + 6 * boxWidth, true);
-    drawGame(pofv, lastX + 2 * boxWidth, yOffset + ((pcvPofvOffset + 9) * boxWidth), true);
-    if (easyMode) {
-        yOffset += 2 * boxWidth;
-    }
-    drawGame(mof, 2, yOffset + 15 * boxWidth, true);
-    drawGame(sa, lastX + boxWidth, yOffset + 15 * boxWidth);
-    drawGame(ufo, lastX + boxWidth, yOffset + 15 * boxWidth);
-    drawGame(gfw, lastX + boxWidth, yOffset + 16 * boxWidth);
-    drawGame(td, lastX + 2 * boxWidth, yOffset + 15 * boxWidth, true);
-    drawGame(ddc, lastX + boxWidth, yOffset + 15 * boxWidth);
-    if (easyMode) {
-        yOffset += boxWidth;
-    }
-    drawGame(lolk, 2, yOffset + 21 * boxWidth, true);
-    drawGame(hsifs, lastX + 2 * boxWidth, yOffset + 21 * boxWidth, true);
-    drawGame(wbawc, lastX + 2 * boxWidth, yOffset + 21 * boxWidth, true);
-    drawGame(um, lastX + boxWidth, yOffset + 21 * boxWidth);
-    if (easyMode) {
-        yOffset += boxWidth;
-    }
-    drawGame(udoalg, 2, yOffset + 27 * boxWidth, true);
-    if (easyMode) {
-        yOffset += boxWidth;
-	}
-    if (showFighting) {
-        drawExtraHeader(lastX, yOffset + 31.35 * boxWidth);
-        drawGame(iamp, 2, yOffset + 32.7 * boxWidth, true);
-        drawGame(swr, lastX + boxWidth, yOffset + 32.7 * boxWidth);
-        drawGame(hsoku, lastX + boxWidth, yOffset + 32.7 * boxWidth);
-        drawGame(hm, lastX + boxWidth, yOffset + 32.7 * boxWidth);
-        if (easyMode) {
-            yOffset += boxWidth;
-        }
-        drawGame(ulil, 2, yOffset + 37.7 * boxWidth, true);
-        drawGame(aocf, lastX + boxWidth, yOffset + 37.7 * boxWidth);
-        drawGame(gi, lastX + 2 * boxWidth, yOffset + 37.7 * boxWidth, true);
-    }
-
+    if (showLegend) drawLegend(layout.height - 98);
 }
 
 return {draw(records, options) {
     state = new Map(Object.entries(records));
-    transparentPng = options.transparent; showFighting = options.extra; showLegend = options.legend; easyMode = options.easy;
-    canvas.width = 800;
-    canvas.height = showFighting ? (easyMode ? 878 : 745) : (easyMode ? 644 : 540);
+    transparentPng = options.transparent; showLegend = options.legend; easyMode = options.easy;
+    const layout = trackerLayout(options);
+    canvas.width = layout.width;
+    canvas.height = layout.height;
     surface.width = canvas.width * 2;
     surface.height = canvas.height * 2;
     ctx.scale(2, 2);
-    drawScreen();
+    drawScreen(layout);
     return boxes.map(({key, x, y}) => ({key, x, y}));
 }};
 }

@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState, type PointerEvent as ReactPointerEvent} from 'react';
-import {createTrackerRenderer} from './tracker-renderer';
+import {createTrackerRenderer, trackerLayout} from './tracker-renderer';
 import {blankRecord, cellLabel, DEFAULT_OPTIONS, TRACKER_CELLS, TRACKER_GAMES, validCareerRecords, validOptions,
   type CareerRecords, type TrackerOptions, type TrackerRecord} from './tracker-records';
 import {readBookPreference, writeBookPreference} from './book-preferences';
@@ -7,7 +7,7 @@ import './career-showcase.css';
 
 type Cell = {key: string; x: number; y: number};
 type View = {scale: number; x: number; y: number};
-const chartHeight = (options: TrackerOptions) => options.extra ? (options.easy ? 878 : 745) : (options.easy ? 644 : 540);
+const chartHeight = (options: TrackerOptions) => trackerLayout(options).height;
 const completed = (records: CareerRecords) => Object.values(records).filter(record => record.done).length;
 function saveFile(name: string, url: string) {const link = document.createElement('a'); link.download = name; link.href = url; link.click();}
 
@@ -30,10 +30,10 @@ export function CareerSummary({records, onOpen}: {records: CareerRecords; onOpen
     <button type="button" className="career-thumbnail" onClick={() => onOpen()} aria-label="查看完整生涯通关图"><Chart records={records} options={DEFAULT_OPTIONS}/></button></section>;
 }
 
-export function CareerShowcase({records, onSave}: {records: CareerRecords; onSave: (next: CareerRecords) => void}) {
+export function CareerShowcase({records, onSave, initiallyOpen = false}: {records: CareerRecords; onSave: (next: CareerRecords) => void; initiallyOpen?: boolean}) {
   const [options, setOptions] = useState(DEFAULT_OPTIONS);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [open, setOpen] = useState(false), [editing, setEditing] = useState(false), [draft, setDraft] = useState<CareerRecords>({});
+  const [open, setOpen] = useState(initiallyOpen), [editing, setEditing] = useState(false), [draft, setDraft] = useState<CareerRecords>({});
   const [selection, setSelection] = useState<string | null>(null), [brush, setBrush] = useState('details');
   const [cells, setCells] = useState<Cell[]>([]), [view, setView] = useState<View>({scale: 1, x: 0, y: 0});
   const [confirmClose, setConfirmClose] = useState(false), [message, setMessage] = useState('');
@@ -45,10 +45,10 @@ export function CareerShowcase({records, onSave}: {records: CareerRecords; onSav
   const dirty = editing && JSON.stringify(draft) !== JSON.stringify(records);
   useEffect(() => {setOptions(readBookPreference('career-chart-options-v1', DEFAULT_OPTIONS, validOptions));}, []);
   const changeOptions = (next: TrackerOptions) => {setOptions(next); writeBookPreference('career-chart-options-v1', next); fitted.current = false;};
-  const fit = () => {
+  const fit = (whole = false) => {
     const area = viewport.current; if (!area) return;
-    const scale = Math.max(.15, Math.min((area.clientWidth - 48) / 800, (area.clientHeight - 48) / height));
-    setView({scale, x: (area.clientWidth - 800 * scale) / 2, y: (area.clientHeight - height * scale) / 2}); fitted.current = true;
+    const scale = Math.max(.15, Math.min((area.clientWidth - 48) / 800, whole ? (area.clientHeight - 48) / height : 6));
+    setView({scale, x: (area.clientWidth - 800 * scale) / 2, y: whole ? (area.clientHeight - height * scale) / 2 : 24}); fitted.current = true;
   };
   const fitRef = useRef(fit); fitRef.current = fit;
   useEffect(() => {
@@ -123,7 +123,7 @@ export function CareerShowcase({records, onSave}: {records: CareerRecords; onSav
   const exportJson = () => {const url = URL.createObjectURL(new Blob([JSON.stringify({version: 2, records: shown, options}, null, 2)], {type: 'application/json'})); saveFile('touhou-career.json', url); setTimeout(() => URL.revokeObjectURL(url), 1000);};
   return <section className="profile-panel career-showcase" aria-label="东方生涯通关图">
     <div className="profile-section-title career-heading"><h2>东方通关图</h2><span className="career-total"><b>{completed(records)}</b> 项通关</span></div>
-    <button type="button" className="career-thumbnail" onClick={() => launch()} aria-label="全屏查看通关图"><Chart records={records} options={options}/><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg>点击放大</span></button>
+    <button type="button" className="career-thumbnail" onClick={() => launch()} aria-label="全屏查看通关图"><Chart records={records} options={options}/></button>
     <div className="career-card-footer"><div><button type="button" onClick={() => launch(true)}>编辑记录</button><button type="button" onClick={exportPng}>导出 PNG</button></div></div>
 
     {open && <dialog ref={dialog} className="career-viewer" aria-labelledby="career-viewer-title" onCancel={event => {event.preventDefault(); close();}}>
@@ -132,7 +132,7 @@ export function CareerShowcase({records, onSave}: {records: CareerRecords; onSav
         <button type="button" className="career-help-trigger" onClick={() => setHelpOpen(true)}><span aria-hidden="true">?</span>说明</button><button type="button" onClick={exportPng}>导出 PNG</button><button type="button" aria-label="关闭全屏通关图" onClick={close}>×</button></div></header>
       {confirmClose && <div className="career-discard" role="alert">还有未保存的修改。<button type="button" onClick={() => setConfirmClose(false)}>继续编辑</button><button type="button" onClick={() => {setConfirmClose(false); setEditing(false); setOpen(false); setSelection(null);}}>放弃修改并关闭</button></div>}
       <div className="career-viewer-body"><div className="career-map-column">
-        <div className="career-map-tools"><div><button type="button" aria-label="缩小通关图" onClick={() => zoom(1 / 1.25)}>−</button><output aria-label="缩放比例">{Math.round(view.scale * 100)}%</output><button type="button" aria-label="放大通关图" onClick={() => zoom(1.25)}>＋</button><button type="button" onClick={fit}>适应屏幕</button><button type="button" onClick={() => zoom(1 / view.scale)}>原始大小</button></div><span>{editing ? '选择格子填写记录' : '滚轮缩放 · 拖动平移 · 双指缩放'}</span></div>
+        <div className="career-map-tools"><div><button type="button" aria-label="缩小通关图" onClick={() => zoom(1 / 1.25)}>−</button><output aria-label="缩放比例">{Math.round(view.scale * 100)}%</output><button type="button" aria-label="放大通关图" onClick={() => zoom(1.25)}>＋</button><button type="button" onClick={() => fit(true)}>适应屏幕</button><button type="button" onClick={() => zoom(1 / view.scale)}>原始大小</button></div><span>{editing ? '选择格子填写记录' : '滚轮缩放 · 拖动平移 · 双指缩放'}</span></div>
         <div className="career-map-viewport" ref={viewport} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} onLostPointerCapture={event => pointers.current.delete(event.pointerId)}>
           <div className="career-map-sheet" style={{width: 800, height, transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`}}>
             <Chart records={shown} options={options} onCells={setCells}/>

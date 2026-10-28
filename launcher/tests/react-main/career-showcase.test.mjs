@@ -9,7 +9,7 @@ let api, work;
 before(async () => {
   work = await mkdtemp(resolve(project, '.cache/career-chart-'));
   const outfile = resolve(work, 'records.mjs');
-  await build({absWorkingDir: project, stdin: {resolveDir: project, contents: "export * from './app/components/launcher/tracker-records.ts'; export * from './app/components/launcher/tracker-grid.ts';"}, outfile, bundle: true, platform: 'node', format: 'esm', logLevel: 'silent'});
+  await build({absWorkingDir: project, stdin: {resolveDir: project, contents: "export * from './app/components/launcher/tracker-records.ts'; export * from './app/components/launcher/tracker-grid.ts'; export * from './app/components/launcher/tracker-renderer.ts';"}, outfile, bundle: true, platform: 'node', format: 'esm', logLevel: 'silent'});
   api = await import(pathToFileURL(outfile).href);
 });
 after(async () => {await rm(work, {recursive: true, force: true});});
@@ -60,4 +60,24 @@ test('adjacent squares share one aligned border while exposed edges retain thick
   const fractional = api.trackerCellEdges([{x: 0.1, y: 0.9}, {x: 17.1, y: 0.9}]);
   assert.equal(fractional.length, 7);
   assert.equal(fractional.filter(edge => !edge.outer).length, 1);
+});
+
+
+test('three chronological sections keep game tables separate and inside the chart', () => {
+  for (const easy of [true, false]) for (const extra of [true, false]) {
+    const layout = api.trackerLayout({...api.DEFAULT_OPTIONS, easy, extra});
+    assert.deepEqual(layout.sections.map(section => section.title), ['整数作', '对战作', '小数点作']);
+    assert.deepEqual(layout.sections[1].games.map(block => block.game.name), ['PODD', 'POFV', 'UDOALG']);
+    const blocks = layout.sections.flatMap(section => section.games);
+    assert.equal(blocks.length, extra ? 32 : 25);
+    assert.equal(new Set(blocks.map(block => block.game.name)).size, blocks.length);
+    for (const [index, block] of blocks.entries()) {
+      assert.ok(block.x >= 24 && block.x + block.width <= 776);
+      assert.ok(block.y + block.height < layout.height);
+      for (const other of blocks.slice(index + 1)) {
+        assert.ok(block.x + block.width <= other.x || other.x + other.width <= block.x ||
+          block.y + block.height <= other.y || other.y + other.height <= block.y);
+      }
+    }
+  }
 });
