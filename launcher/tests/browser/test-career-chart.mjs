@@ -27,6 +27,13 @@ try {
   assert.equal(await page.$$eval('.career-map-cell', cells => cells.length), 1070);
   assert.equal(await page.$eval('dialog', dialog => dialog.matches(':modal')), true);
   assert.equal(await page.$eval('input[type=file]', input => getComputedStyle(input).display), 'none');
+  await page.click('.career-help-trigger');
+  await page.waitForSelector('.career-help-dialog[open]');
+  assert.match(await page.$eval('.career-help-content', el => el.textContent), /Final A.*Final B/);
+  assert.equal(await page.$$eval('.career-help-games>div', el => el.length), 32);
+  await page.keyboard.press('Escape'); await page.waitForSelector('.career-help-dialog', {hidden: true});
+  assert.equal(await page.$eval('.career-viewer', dialog => dialog.matches(':modal')), true);
+  report.push('Help button, all game abbreviations, route explanations and Escape return to viewer');
   const initialZoom = await zoom(page), area = await page.$eval('.career-map-viewport', element => {const r = element.getBoundingClientRect(); return {x:r.x,y:r.y,w:r.width,h:r.height};});
   await page.mouse.move(area.x + area.w / 2, area.y + area.h / 2); await page.mouse.wheel({deltaY: -300}); await nextFrame(page);
   assert.ok(await zoom(page) > initialZoom);
@@ -64,14 +71,14 @@ try {
   report.push('Dirty close protection, discard and reload retain saved records');
   await page.evaluate(() => {window.careerDownloads=[]; HTMLAnchorElement.prototype.click=function(){window.careerDownloads.push({name:this.download,href:this.href});};});
   await clickText(page, '.career-viewer-actions', '导出 PNG');
-  const png = await page.evaluate(async () => {const image=new Image();image.src=window.careerDownloads.at(-1).href;await image.decode();const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);return {w:image.width,h:image.height,alpha:ctx.getImageData(790,870,1,1).data[3]};});
-  assert.deepEqual(png,{w:800,h:878,alpha:255});
+  const png = await page.evaluate(async () => {const image=new Image();image.src=window.careerDownloads.at(-1).href;await image.decode();const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);return {w:image.width,h:image.height,alpha:ctx.getImageData(1580,1740,1,1).data[3]};});
+  assert.deepEqual(png,{w:1600,h:1756,alpha:255});
   // Select display toggles by their visible labels.
   const toggle = label => page.evaluate(label => {const el=[...document.querySelectorAll('.career-check')].find(el=>el.textContent===label);el.querySelector('input').click();}, label);
   // Export the same chart with a transparent background.
   await page.evaluate(()=>{const el=[...document.querySelectorAll('.career-check')].find(el=>el.textContent==='透明 PNG 背景').querySelector('input');if(!el.checked)el.click();});
   await nextFrame(page); await clickText(page,'.career-viewer-actions','导出 PNG');
-  assert.equal(await page.evaluate(async()=>{const image=new Image();image.src=window.careerDownloads.at(-1).href;await image.decode();const c=document.createElement('canvas');c.width=image.width;c.height=image.height;const ctx=c.getContext('2d');ctx.drawImage(image,0,0);return ctx.getImageData(790,870,1,1).data[3];}),0);
+  assert.equal(await page.evaluate(async()=>{const image=new Image();image.src=window.careerDownloads.at(-1).href;await image.decode();const c=document.createElement('canvas');c.width=image.width;c.height=image.height;const ctx=c.getContext('2d');ctx.drawImage(image,0,0);return ctx.getImageData(1580,1740,1,1).data[3];}),0);
   await toggle('显示 Easy'); await nextFrame(page);
   assert.equal(await page.$$eval('.career-map-cell', cells => new Set(cells.map(cell => cell.dataset.cellKey)).size), await page.$$eval('.career-map-cell', cells => cells.length));
   assert.equal(await page.$$eval('[data-cell-key="IN-BT-B-N"]', cells => cells.length), 1);
@@ -104,6 +111,10 @@ try {
   for(let n=1;n<=4;n++)await client.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:mobileArea.x-35-n*12,y:mobileArea.y,id:1},{x:mobileArea.x+35+n*12,y:mobileArea.y,id:2}]});
   await client.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await nextFrame(mobile);
   assert.ok(await zoom(mobile)>mobileZoom);await mobile.screenshot({path:output+'/mobile-viewer.png'});
+  await mobile.click('.career-help-trigger'); await mobile.waitForSelector('.career-help-dialog[open]');
+  assert.ok(await mobile.$eval('.career-help-dialog', el => el.getBoundingClientRect().width <= innerWidth));
+  await mobile.screenshot({path:output+'/mobile-help.png'});
+  await mobile.click('button[aria-label="关闭说明"]'); await mobile.waitForSelector('.career-help-dialog', {hidden: true});
   await mobile.click('button[aria-label="关闭全屏通关图"]');await mobile.waitForSelector('dialog',{hidden:true});
   assert.deepEqual(errors,[]);report.push('390px mobile layout, native two-finger pinch and close');
   await writeFile(output+'/report.json',JSON.stringify({passed:true,report},null,2));console.log(JSON.stringify({passed:true,report},null,2));

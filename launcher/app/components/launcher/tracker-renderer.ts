@@ -212,13 +212,14 @@ const gi = new Game("GI", "rgba(131, 5, 5, 1.0)", "HN".split(''), [new Character
     new Character("YT")]);
 
 export const trackerGames = [htrp, soew, podd, ls, ms, eosd, stb, ds, isc, vd, bm, pcb, imp, pofv, mof, sa, ufo, gfw, td, ddc, lolk, hsifs, wbawc, um, udoalg, iamp, swr, hsoku, hm, ulil, aocf, gi];
-export function createTrackerRenderer(canvas) {
-const ctx = canvas.getContext('2d');
+export function createTrackerRenderer(surface) {
+const ctx = surface.getContext('2d');
+const canvas = {width: 800, height: 878};
 let transparentPng = false, showFighting = true, showLegend = true, easyMode = true;
 let state = new Map();
 function getBoxFromState(key) {return state.get(key) ?? new BoxObject(key);}
 const boxWidth = 17;
-function drawBox(x, y, width = boxWidth, height = boxWidth, lineWidth = 1.0, strokeStyle = 'rgba(128, 128, 128, 1.0)') {
+function drawBox(x, y, width = boxWidth, height = boxWidth, lineWidth = 1.0, strokeStyle = '#d8d4cb') {
     if (ctx) {
         ctx.lineCap = 'butt';
         ctx.lineJoin = 'miter';
@@ -231,7 +232,7 @@ function drawExtraHeader(x, y) {
     if (ctx) {
         ctx.lineCap = 'butt';
         ctx.lineJoin = 'miter';
-        ctx.strokeStyle = 'rgba(128, 128, 128, 1.0)';
+        ctx.strokeStyle = '#d8d4cb';
         ctx.lineWidth = 1.0;
         ctx.beginPath();
         ctx.lineTo(0, y);
@@ -244,8 +245,8 @@ function drawGFWBox(x, y) {
     if (ctx) {
         ctx.lineCap = 'butt';
         ctx.lineJoin = 'miter';
-        ctx.strokeStyle = 'rgba(128, 128, 128, 1.0)';
-        ctx.lineWidth = 2.0;
+        ctx.strokeStyle = '#d8d4cb';
+        ctx.lineWidth = 1.3;
         // Do the really annoying thing of tracing around the box...
         ctx.beginPath();
         ctx.lineTo(x, y);
@@ -284,8 +285,8 @@ function drawLOLKBox(x, y) {
     if (ctx) {
         ctx.lineCap = 'butt';
         ctx.lineJoin = 'miter';
-        ctx.strokeStyle = 'rgba(128, 128, 128, 1.0)';
-        ctx.lineWidth = 2.0;
+        ctx.strokeStyle = '#d8d4cb';
+        ctx.lineWidth = 1.3;
         // Do the really annoying thing of tracing around the box...
         ctx.beginPath();
         ctx.lineTo(x, y + boxWidth);
@@ -321,8 +322,8 @@ function drawHSIFSBox(x, y) {
     if (ctx) {
         ctx.lineCap = 'square';
         ctx.lineJoin = 'miter';
-        ctx.strokeStyle = 'rgba(128, 128, 128, 1.0)';
-        ctx.lineWidth = 2.0;
+        ctx.strokeStyle = '#d8d4cb';
+        ctx.lineWidth = 1.3;
         // Do the really annoying thing of tracing around the box...
         ctx.beginPath();
         ctx.lineTo(x, y);
@@ -374,8 +375,8 @@ function drawTDUMBox(x, y) {
     if (ctx) {
         ctx.lineCap = 'square';
         ctx.lineJoin = 'miter';
-        ctx.strokeStyle = 'rgba(128, 128, 128, 1.0)';
-        ctx.lineWidth = 2.0;
+        ctx.strokeStyle = '#d8d4cb';
+        ctx.lineWidth = 1.3;
         // Do the really annoying thing of tracing around the box...
         ctx.beginPath();
         ctx.lineTo(x, y);
@@ -428,17 +429,20 @@ function drawBoxContentsAux(x, y, done, misses, bombs, lives, vertical, focus, p
         else {
             ctx.fillStyle = cellColour;
         }
+        ctx.save();
+        if (done) ctx.globalAlpha = .30;
         ctx.fillRect(x, y, boxWidth, boxWidth);
+        ctx.restore();
         // Draw the little bits and pieces
         // Draw miss/bomb/starting counts
         if (misses) {
-            drawText(misses, x + 2, y + 7, 'left', "16px touhouFontMini", textColour);
+            drawText(misses, x + 2, y + 7, 'left', '500 7px "Segoe UI", sans-serif', textColour);
         }
         if (bombs) {
-            drawText(bombs, x + 7, y + 7, 'left', "16px touhouFontMini", textColour);
+            drawText(bombs, x + 7, y + 7, 'left', '500 7px "Segoe UI", sans-serif', textColour);
         }
         if (lives) {
-            drawText(lives, x + 16, y + 7, 'right', "16px touhouFontMini", textColour);
+            drawText(lives, x + 16, y + 7, 'right', '500 7px "Segoe UI", sans-serif', textColour);
         }
         // No vertical?
         if (vertical) {
@@ -451,13 +455,13 @@ function drawBoxContentsAux(x, y, done, misses, bombs, lives, vertical, focus, p
         }
         // No focus / pacifist / unique
         if (focus) {
-            drawText("F", x + 2, y + 15, 'left', "16px touhouFontMini", textColour);
+            drawText("F", x + 2, y + 15, 'left', '500 7px "Segoe UI", sans-serif', textColour);
         }
         if (pacifist) {
-            drawText("P", x + 7, y + 15, 'left', "16px touhouFontMini", textColour);
+            drawText("P", x + 7, y + 15, 'left', '500 7px "Segoe UI", sans-serif', textColour);
         }
         if (unique) {
-            drawText("U", x + 12, y + 15, 'left', "16px touhouFontMini", textColour);
+            drawText("U", x + 12, y + 15, 'left', '500 7px "Segoe UI", sans-serif', textColour);
         }
     }
 }
@@ -467,7 +471,7 @@ function drawBoxContents(x, y, boxName, colour) {
 }
 let lastX = 0;
 let lastY = 0;
-function drawText(text, x, y, align = 'left', font = "16px touhouFont", colour = "black") {
+function drawText(text, x, y, align = 'left', font = '600 8px "Segoe UI", sans-serif', colour = "#48443d") {
     x -= 0.5; // Dumb hack for Windows
     if (ctx) {
         ctx.font = font;
@@ -481,7 +485,7 @@ function drawUILine(x, y, drop, width) {
         ctx.beginPath();
         ctx.lineTo(x, y);
         ctx.lineTo(x, y + drop);
-        ctx.strokeStyle = 'rgba(128, 128, 128, 1.0)';
+        ctx.strokeStyle = '#d8d4cb';
         ctx.lineWidth = width;
         ctx.stroke();
     }
@@ -648,7 +652,7 @@ function drawGame(game, baseX, baseY, drawDifficulties = false) {
             drawUILine(xAdjust + (charX * boxWidth) + baseX, yAdjust + lastY + boxWidth, boxWidth - 2, lineWidth);
             drawText(character.name, baseX + (charX * boxWidth) + 2, lastY + (boxWidth) + 14);
             for (let subcharacter of character.subcharacters) {
-                drawText(subcharacter, baseX + (charX * boxWidth) + 2, lastY + (boxWidth) + 7, 'left', "16px touhouFontMini");
+                drawText(subcharacter, baseX + (charX * boxWidth) + 2, lastY + (boxWidth) + 7, 'left', '500 7px "Segoe UI", sans-serif');
                 charX += 1;
             }
             charX -= 1;
@@ -678,88 +682,21 @@ function drawGame(game, baseX, baseY, drawDifficulties = false) {
     drawUILine(baseX - 0.5 + (charX * boxWidth), lastY + boxWidth + 0.5, boxWidth - 8, 2);
 }
 function drawLegend() {
-    const topLeft = canvas.width - 8 * boxWidth + 2.5;
-    const textOffset = topLeft - 0.5;
-    if (ctx) {
-        ctx.fillStyle = 'white';
-        ctx.fillRect(topLeft, -2.5, 8 * boxWidth, 15 * boxWidth);
-        drawBox(canvas.width - 8 * boxWidth + 2.5, -2.5, 8 * boxWidth, 15 * boxWidth, 2.0);
-        drawBox(canvas.width - 8 * boxWidth + 2.5, -2.5, 8 * boxWidth, 10 * boxWidth + 6, 2.0);
-        drawText("LEGEND", textOffset + 5, 8);
-        let yOffset = 0;
-        drawBoxContentsAux(topLeft + 5.5, 15, false, "0", null, null, false, false, false, false, "#FFFFFF", "#000000", "#FFFFFF");
-        drawBoxContentsAux(topLeft + 5.5 + boxWidth, 15, false, "1", null, null, false, false, false, false, "#FFFFFF", "#000000", "#FFFFFF");
-        drawBoxContentsAux(topLeft + 5.5 + boxWidth * 2, 15, false, "2", null, null, false, false, false, false, "#FFFFFF", "#000000", "#FFFFFF");
-        drawBoxContentsAux(topLeft + 5.5 + boxWidth * 3, 15, false, "3", null, null, false, false, false, false, "#FFFFFF", "#000000", "#FFFFFF");
-        drawBox(topLeft + 5, 14 + 0.5, 4 * boxWidth, boxWidth, 2.0);
-        drawBox(topLeft + 5.5, 14 + 0.5, boxWidth, boxWidth, 1.0);
-        drawBox(topLeft + 5.5 + boxWidth, 14 + 0.5, boxWidth, boxWidth, 1.0);
-        drawBox(topLeft + 5.5 + 2 * boxWidth, 14 + 0.5, boxWidth, boxWidth, 1.0);
-        drawBox(topLeft + 5.5 + 3 * boxWidth, 14 + 0.5, boxWidth, boxWidth, 1.0);
-        drawText("ETC", textOffset + 10 + 4 * boxWidth, 22);
-        drawText("MISS COUNT", textOffset + 5, 8 + boxWidth * 2 - 3);
-        yOffset = boxWidth * 2 - 6;
-        drawBoxContentsAux(topLeft + 5.5, yOffset + 15, false, null, "0", null, false, false, false, false, "#FFFFFF", "#000000", "#FFFFFF");
-        drawBoxContentsAux(topLeft + 5.5 + boxWidth, yOffset + 15, false, null, "1", null, false, false, false, false, "#FFFFFF", "#000000", "#FFFFFF");
-        drawBoxContentsAux(topLeft + 5.5 + boxWidth * 2, yOffset + 15, false, null, "2", null, false, false, false, false, "#FFFFFF", "#000000", "#FFFFFF");
-        drawBoxContentsAux(topLeft + 5.5 + boxWidth * 3, yOffset + 15, false, null, "3", null, false, false, false, false, "#FFFFFF", "#000000", "#FFFFFF");
-        drawBox(topLeft + 5, yOffset + 14 + 0.5, 4 * boxWidth, boxWidth, 2.0);
-        drawBox(topLeft + 5.5, yOffset + 14 + 0.5, boxWidth, boxWidth, 1.0);
-        drawBox(topLeft + 5.5 + boxWidth, yOffset + 14 + 0.5, boxWidth, boxWidth, 1.0);
-        drawBox(topLeft + 5.5 + 2 * boxWidth, yOffset + 14 + 0.5, boxWidth, boxWidth, 1.0);
-        drawBox(topLeft + 5.5 + 3 * boxWidth, yOffset + 14 + 0.5, boxWidth, boxWidth, 1.0);
-        drawText("ETC", textOffset + 10 + 4 * boxWidth, yOffset + 22);
-        drawText("BOMB COUNT", textOffset + 5, yOffset + 8 + boxWidth * 2 - 3);
-        yOffset = boxWidth * 4 - 12;
-        drawBoxContentsAux(topLeft + 6, yOffset + 15, false, null, null, "7", false, false, false, false, "#FFFFFF", "#000000", "#FFFFFF");
-        drawBoxContentsAux(topLeft + 5.5 + boxWidth, yOffset + 15, false, null, null, "6", false, false, false, false, "#FFFFFF", "#000000", "#FFFFFF");
-        drawBoxContentsAux(topLeft + 5.5 + boxWidth * 2, yOffset + 15, false, null, null, "5", false, false, false, false, "#FFFFFF", "#000000", "#FFFFFF");
-        drawBoxContentsAux(topLeft + 5.5 + boxWidth * 3, yOffset + 15, false, null, null, "4", false, false, false, false, "#FFFFFF", "#000000", "#FFFFFF");
-        drawBoxContentsAux(topLeft + 5.5 + boxWidth * 4, yOffset + 15, false, null, null, "2", false, false, false, false, "#FFFFFF", "#000000", "#FFFFFF");
-        drawBoxContentsAux(topLeft + 5.5 + boxWidth * 5, yOffset + 15, false, null, null, "1", false, false, false, false, "#FFFFFF", "#000000", "#FFFFFF");
-        drawBox(topLeft + 5, yOffset + 14 + 0.5, 6 * boxWidth, boxWidth, 2.0);
-        drawBox(topLeft + 5.5, yOffset + 14 + 0.5, boxWidth, boxWidth, 1.0);
-        drawBox(topLeft + 5.5 + boxWidth, yOffset + 14 + 0.5, boxWidth, boxWidth, 1.0);
-        drawBox(topLeft + 5.5 + 2 * boxWidth, yOffset + 14 + 0.5, boxWidth, boxWidth, 1.0);
-        drawBox(topLeft + 5.5 + 3 * boxWidth, yOffset + 14 + 0.5, boxWidth, boxWidth, 1.0);
-        drawBox(topLeft + 5.5 + 4 * boxWidth, yOffset + 14 + 0.5, boxWidth, boxWidth, 1.0);
-        drawBox(topLeft + 5.5 + 5 * boxWidth, yOffset + 14 + 0.5, boxWidth, boxWidth, 1.0);
-        drawText("STARTING LIVES", textOffset + 5, yOffset + 8 + boxWidth * 2 - 3);
-        yOffset = boxWidth * 6 - 18;
-        drawBoxContentsAux(topLeft + 5.5, yOffset + 14, false, null, null, null, true, false, false, false, "#FFFFFF", "#000000", "#FFFFFF");
-        drawBoxContentsAux(topLeft + 5.5, yOffset + 14 + boxWidth, false, null, null, null, false, true, false, false, "#FFFFFF", "#000000", "#FFFFFF");
-        drawBoxContentsAux(topLeft + 5.5, yOffset + 14 + boxWidth * 2, false, null, null, null, false, false, true, false, "#FFFFFF", "#000000", "#FFFFFF");
-        drawBoxContentsAux(topLeft + 5.5, yOffset + 14 + boxWidth * 3, false, null, null, null, false, false, false, true, "#FFFFFF", "#000000", "#FFFFFF");
-        drawBox(topLeft + 5, yOffset + 14 + 0.5, boxWidth, boxWidth * 4, 2.0);
-        drawBox(topLeft + 5, yOffset + 14, boxWidth, boxWidth, 1.0);
-        drawText("NO", textOffset + 8 + boxWidth, yOffset + 22);
-        drawText("VERTICAL", textOffset + 8 + boxWidth, yOffset + 28);
-        drawBox(topLeft + 5, boxWidth + yOffset + 14, boxWidth, boxWidth, 1.0);
-        drawText("F", textOffset + 26 + boxWidth, yOffset + 21 + boxWidth, 'left', "16px touhouFont", "red");
-        drawText("NO  OCUS", textOffset + 8 + boxWidth, yOffset + 21 + boxWidth);
-        drawBox(topLeft + 5, 2 * boxWidth + yOffset + 14, boxWidth, boxWidth, 1.0);
-        drawText("P", textOffset + 8 + boxWidth, yOffset + 21 + boxWidth * 2, 'left', "16px touhouFont", "red");
-        drawText(" ACIFIST", textOffset + 8 + boxWidth, yOffset + 21 + boxWidth * 2);
-        drawBox(topLeft + 5, 3 * boxWidth + yOffset + 14, boxWidth, boxWidth, 1.0);
-        drawText("U", textOffset + 8 + boxWidth, yOffset + 21 + boxWidth * 3, 'left', "16px touhouFont", "red");
-        drawText(" NIQUE", textOffset + 8 + boxWidth, yOffset + 21 + boxWidth * 3);
-        drawText(" (GAME-SPECIFIC)", textOffset + 6 + boxWidth, yOffset + 27 + boxWidth * 3);
-        drawText("LIMITATION", textOffset + 8 + boxWidth, yOffset + 33 + boxWidth * 3);
-        yOffset = 10 * boxWidth + 6;
-        drawText("METADATA", textOffset + 5, yOffset + 6);
-        drawText("1234567890", textOffset + 5, yOffset + 14);
-        drawText("QWERTYUIOP", textOffset + 5, yOffset + 20);
-        drawText("ASDFGHJKL", textOffset + 5, yOffset + 26);
-        drawText("ZXCVBNM", textOffset + 5, yOffset + 32);
-        drawText("18", topLeft + 10.5 + boxWidth * 4, yOffset + 13, 'left', "16px touhouFontMini");
-        drawText("1", topLeft + 24.5 + boxWidth * 4, yOffset + 13 + boxWidth / 2, 'left', "16px touhouFontMini");
-        drawText("8", topLeft + 24.5 + boxWidth * 4, yOffset + 13 + boxWidth / 2 + 6, 'left', "16px touhouFontMini");
-        drawBox(topLeft + 5.5 + boxWidth * 4, yOffset + 14, boxWidth, boxWidth, 1.0);
-        drawBoxContentsAux(topLeft + 5.5 + boxWidth * 6, yOffset + 14, false, "0", "0", "1", true, true, true, true, "#FFFFFF", "#000000", "#FFFFFF");
-        drawBox(topLeft + 5.5 + boxWidth * 6, yOffset + 14, boxWidth, boxWidth, 1.0);
-        drawText("CREATE YOUR CHART AT:", textOffset + 5, yOffset + 48);
-        drawText("TINYURL.COM/TJ9829WC", textOffset + 5, yOffset + 54);
-        drawText("FONT SIZE 5 PIXELS", textOffset + 5, yOffset + 70);
+    const left = canvas.width - 8 * boxWidth + 2.5;
+    ctx.fillStyle = '#f6f3ed';
+    ctx.fillRect(left, 0, 8 * boxWidth, 190);
+    drawText('LEGEND', left + 10, 18, 'left', '600 9px "Segoe UI", sans-serif');
+    drawBox(left + 10, 31, 48, 28, 1, '#c9c0b1');
+    drawText('2', left + 16, 48, 'left', '500 11px "Segoe UI", sans-serif');
+    drawText('0', left + 30, 48, 'left', '500 11px "Segoe UI", sans-serif');
+    drawText('3', left + 44, 48, 'left', '500 11px "Segoe UI", sans-serif');
+    drawText('MISS / BOMB / START LIVES', left + 10, 73, 'left', '500 7px "Segoe UI", sans-serif');
+    drawText('1CC', left + 10, 96);
+    drawText('NO CONTINUE', left + 43, 96, 'left', '500 8px "Segoe UI", sans-serif');
+    for (const [index, [symbol, label]] of [['NV', 'NO VERTICAL'], ['F', 'NO FOCUS'], ['P', 'PACIFIST'], ['U', 'UNIQUE RULE']].entries()) {
+        const y = 119 + index * 17;
+        drawText(symbol, left + 10, y);
+        drawText(label, left + 35, y, 'left', '500 8px "Segoe UI", sans-serif');
     }
 }
 function drawScreen() {
@@ -841,6 +778,9 @@ return {draw(records, options) {
     transparentPng = options.transparent; showFighting = options.extra; showLegend = options.legend; easyMode = options.easy;
     canvas.width = 800;
     canvas.height = showFighting ? (easyMode ? 878 : 745) : (easyMode ? 644 : 540);
+    surface.width = canvas.width * 2;
+    surface.height = canvas.height * 2;
+    ctx.scale(2, 2);
     ctx.translate(0.5, 0.5);
     drawScreen();
     return boxes.map(({key, x, y}) => ({key, x, y}));

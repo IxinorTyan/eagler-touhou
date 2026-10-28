@@ -4,4 +4,4 @@ The chart layout, game definitions, Canvas drawing routines and pixel fonts are 
 
 `tracker-renderer.ts` retains the original chart drawing and all 32 game blocks. The browser-global initialization, DOM controls and storage have been replaced by isolated renderers and the React career viewer. Each instance receives records and display options; it does not read or write browser storage.
 
-The locally bundled fonts live in `app/assets/1cc-tracker/`. `tracker-records.ts` owns chart cells and validation. The frontend demo saves under `player-career-chart-v2`. Views, editors, backup import/export and gestures are implemented in `CareerShowcase.tsx`.
+The redesigned renderer uses system sans-serif text, softened grid lines and fills, and a bitmap at twice the logical chart resolution. The original font assets remain in `app/assets/1cc-tracker/` for source provenance and are not loaded by the viewer. `tracker-records.ts` owns chart cells and validation. The frontend demo saves under `player-career-chart-v2`. Views, editors, backup import/export and gestures are implemented in `CareerShowcase.tsx`.

@@ -8,7 +8,6 @@ import './career-showcase.css';
 type Cell = {key: string; x: number; y: number};
 type View = {scale: number; x: number; y: number};
 const chartHeight = (options: TrackerOptions) => options.extra ? (options.easy ? 878 : 745) : (options.easy ? 644 : 540);
-const loadFonts = () => document.fonts ? Promise.all([document.fonts.load('16px touhouFont'), document.fonts.load('16px touhouFontMini')]) : Promise.resolve();
 const completed = (records: CareerRecords) => Object.values(records).filter(record => record.done).length;
 function saveFile(name: string, url: string) {const link = document.createElement('a'); link.download = name; link.href = url; link.click();}
 
@@ -20,21 +19,20 @@ function Chart({records, options, onCells}: {records: CareerRecords; options: Tr
     const renderer = createTrackerRenderer(canvas);
     let active = true;
     const draw = () => {if (active) {const cells = renderer.draw(records, options); onCells?.(cells);}};
-    // Draw synchronously for the thumbnail, then redraw after the bundled fonts load.
     draw();
-    loadFonts().then(draw).catch(() => {});
     return () => {active = false;};
   }, [records, options, onCells]);
   return <canvas ref={own} width={800} height={chartHeight(options)} aria-label="东方全作品通关图，使用下方入口放大查看"/>;
 }
 
 export function CareerSummary({records, onOpen}: {records: CareerRecords; onOpen: () => void}) {
-  return <section className="profile-panel career-overview"><div className="profile-section-title"><h2>东方通关图</h2><span>{completed(records)} 项通关</span></div>
+  return <section className="profile-panel career-overview"><div className="profile-section-title"><h2>东方通关图</h2><span className="career-total"><b>{completed(records)}</b> 项通关</span></div>
     <button type="button" className="career-thumbnail" onClick={() => onOpen()} aria-label="查看完整生涯通关图"><Chart records={records} options={DEFAULT_OPTIONS}/><span>查看完整生涯 ↗</span></button></section>;
 }
 
 export function CareerShowcase({records, onSave}: {records: CareerRecords; onSave: (next: CareerRecords) => void}) {
   const [options, setOptions] = useState(DEFAULT_OPTIONS);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [open, setOpen] = useState(false), [editing, setEditing] = useState(false), [draft, setDraft] = useState<CareerRecords>({});
   const [selection, setSelection] = useState<string | null>(null), [brush, setBrush] = useState('details');
   const [cells, setCells] = useState<Cell[]>([]), [view, setView] = useState<View>({scale: 1, x: 0, y: 0});
@@ -119,20 +117,19 @@ export function CareerShowcase({records, onSave}: {records: CareerRecords; onSav
     if (cell) select(cell.key);
   };
   const exportPng = async () => {
-    await loadFonts().catch(() => {});
     const canvas = document.createElement('canvas'); createTrackerRenderer(canvas).draw(shown, options);
     saveFile('touhou-1cc-chart.png', canvas.toDataURL('image/png'));
   };
   const exportJson = () => {const url = URL.createObjectURL(new Blob([JSON.stringify({version: 2, records: shown, options}, null, 2)], {type: 'application/json'})); saveFile('touhou-career.json', url); setTimeout(() => URL.revokeObjectURL(url), 1000);};
   return <section className="profile-panel career-showcase" aria-label="东方生涯通关图">
-    <div className="profile-section-title career-heading"><h2>东方通关图</h2><span>{completed(records)} 项通关</span></div>
-    <button type="button" className="career-thumbnail" onClick={() => launch()} aria-label="全屏查看通关图"><Chart records={records} options={options}/><span>点击放大</span></button>
+    <div className="profile-section-title career-heading"><h2>东方通关图</h2><span className="career-total"><b>{completed(records)}</b> 项通关</span></div>
+    <button type="button" className="career-thumbnail" onClick={() => launch()} aria-label="全屏查看通关图"><Chart records={records} options={options}/><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg>点击放大</span></button>
     <div className="career-card-footer"><div><button type="button" onClick={() => launch(true)}>编辑记录</button><button type="button" onClick={exportPng}>导出 PNG</button></div></div>
 
     {open && <dialog ref={dialog} className="career-viewer" aria-labelledby="career-viewer-title" onCancel={event => {event.preventDefault(); close();}}>
-      <header className="career-viewer-header"><div><h2 id="career-viewer-title">{editing ? '编辑通关记录' : '我的东方通关图'}</h2></div><div className="career-viewer-actions">
+      <header className="career-viewer-header"><div><h2 id="career-viewer-title">{editing ? '编辑通关记录' : '东方通关图'}</h2><span className="career-viewer-count">{completed(shown)} / {TRACKER_CELLS.length}</span></div><div className="career-viewer-actions">
         {editing ? <><button type="button" onClick={() => {if (dirty) setConfirmClose(true); else {setEditing(false); setSelection(null);}}}>取消编辑</button><button type="button" className="is-primary" onClick={() => {onSave(draft); setEditing(false); setSelection(null); setConfirmClose(false); setMessage('通关记录已保存到此浏览器');}}>保存记录</button></> : <button type="button" onClick={() => {setDraft({...records}); setEditing(true);}}>编辑记录</button>}
-        <button type="button" onClick={exportPng}>导出 PNG</button><button type="button" aria-label="关闭全屏通关图" onClick={close}>×</button></div></header>
+        <button type="button" className="career-help-trigger" onClick={() => setHelpOpen(true)}><span aria-hidden="true">?</span>说明</button><button type="button" onClick={exportPng}>导出 PNG</button><button type="button" aria-label="关闭全屏通关图" onClick={close}>×</button></div></header>
       {confirmClose && <div className="career-discard" role="alert">还有未保存的修改。<button type="button" onClick={() => setConfirmClose(false)}>继续编辑</button><button type="button" onClick={() => {setConfirmClose(false); setEditing(false); setOpen(false); setSelection(null);}}>放弃修改并关闭</button></div>}
       <div className="career-viewer-body"><div className="career-map-column">
         <div className="career-map-tools"><div><button type="button" aria-label="缩小通关图" onClick={() => zoom(1 / 1.25)}>−</button><output aria-label="缩放比例">{Math.round(view.scale * 100)}%</output><button type="button" aria-label="放大通关图" onClick={() => zoom(1.25)}>＋</button><button type="button" onClick={fit}>适应屏幕</button><button type="button" onClick={() => zoom(1 / view.scale)}>原始大小</button></div><span>{editing ? '选择格子填写记录' : '滚轮缩放 · 拖动平移 · 双指缩放'}</span></div>
@@ -146,12 +143,12 @@ export function CareerShowcase({records, onSave}: {records: CareerRecords; onSav
       </div>
       <aside className="career-map-sidebar">
         {editing && <section className="career-tool-section"><h3>填表工具</h3><div className="career-brushes">{[['details', '单格详情'], ['1cc', '1CC'], ['nm', 'NM'], ['nb', 'NB'], ['nn', 'NN'], ['erase', '擦除']].map(([id, label]) => <button type="button" key={id} aria-pressed={brush === id} onClick={() => setBrush(id)}>{label}</button>)}</div></section>}
-        <section className="career-tool-section"><h3>{selection ? cellLabel(selection) : '格子详情'}</h3>
+        <section className="career-tool-section"><div className="career-detail-title"><h3>{selection ? cellLabel(selection) : '格子详情'}</h3><button type="button" className="career-detail-help" aria-label="查看格子说明" onClick={() => setHelpOpen(true)}>?</button></div>
           {selection ? <CellEditor key={selection + JSON.stringify(shown[selection])} record={shown[selection] ?? blankRecord(selection)} editing={editing && brush === 'details'} onApply={record => update(selection, record)}/>
           : <p>选择格子查看记录。</p>}
           <label className="career-cell-jump">快速查找格子<select aria-label="快速查找格子" value={selection ?? ''} onChange={event => {const key = event.target.value; if (!key) return; setSelection(key); const cell = cells.find(cell => cell.key === key); if (cell) setView({scale: 2, x: (viewport.current?.clientWidth ?? 800) / 2 - cell.x * 2, y: (viewport.current?.clientHeight ?? 600) / 2 - cell.y * 2});}}><option value="">选择作品 / 机体 / 难度</option>{TRACKER_GAMES.filter(game => options.extra || !['IAMP', 'SWR', 'H.SOKU', 'HM', 'ULIL', 'AOCF', 'GI'].includes(game.name)).map(game => <optgroup key={game.name} label={game.title}>{TRACKER_CELLS.filter(cell => cell.game.name === game.name && (options.easy || !cell.difficulty.endsWith('E'))).map(cell => <option key={cell.key} value={cell.key}>{cell.character} · {cell.difficulty}</option>)}</optgroup>)}</select></label>
         </section>
-        <section className="career-tool-section"><h3>图表显示</h3>{([['easy', '显示 Easy'], ['extra', '显示附加作品'], ['legend', '显示原版图例'], ['transparent', '透明 PNG 背景']] as const).map(([key, label]) => <label className="career-check" key={key}><input type="checkbox" checked={options[key]} onChange={event => changeOptions({...options, [key]: event.target.checked})}/>{label}</label>)}</section>
+        <section className="career-tool-section"><h3>图表显示</h3>{([['easy', '显示 Easy'], ['extra', '显示附加作品'], ['legend', '显示图例'], ['transparent', '透明 PNG 背景']] as const).map(([key, label]) => <label className="career-check" key={key}><input type="checkbox" checked={options[key]} onChange={event => changeOptions({...options, [key]: event.target.checked})}/>{label}</label>)}</section>
         <section className="career-tool-section"><h3>本地备份</h3><div className="career-backup-actions"><button type="button" onClick={exportJson}>导出 JSON</button><button type="button" onClick={() => input.current?.click()}>导入 JSON</button></div><input hidden ref={input} type="file" accept="application/json,.json" onChange={async event => {
           const file = event.target.files?.[0]; event.target.value = ''; if (!file) return;
           try {if (file.size > 2_000_000) throw new Error(); const data = JSON.parse(await file.text()); if (data.version !== 2 || !validCareerRecords(data.records)) throw new Error();
@@ -159,12 +156,13 @@ export function CareerShowcase({records, onSave}: {records: CareerRecords; onSav
           } catch {setMessage('无法导入：请选择有效的生涯 JSON 备份');}
         }}/><p>导入后先预览，再保存整张通关图。</p></section>
       </aside></div>{message && <div className="career-viewer-status" role="status">{message}</div>}
+    {helpOpen && <CareerHelp onClose={() => setHelpOpen(false)}/>}
     </dialog>}
   </section>;
 }
 
 function CellEditor({record, editing, onApply}: {record: TrackerRecord; editing: boolean; onApply: (record?: TrackerRecord) => void}) {
-  if (!editing) return <div className="career-record-description"><strong>{record.done ? '已通关 · 1CC' : record.continued ? '续关通关' : '尚无通关记录'}</strong><p>Miss {record.misses ?? '—'} · Bomb {record.bombs ?? '—'} · 初始残机 {record.lives ?? '—'}</p><p>{[record.vertical && 'NV', record.focus && 'NF', record.pacifist && 'Pacifist', record.unique && 'Unique', record.challenge].filter(Boolean).join(' · ')}</p>{record.note && <p>{record.note}</p>}</div>;
+  if (!editing) return <div className="career-record-description"><strong className={record.done ? 'is-complete' : ''}>{record.done ? '已通关 · 1CC' : record.continued ? '续关通关' : '尚无记录'}</strong><dl className="career-record-counts">{[['Miss', record.misses], ['Bomb', record.bombs], ['初始残机', record.lives]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value ?? '—'}</dd></div>)}</dl><div className="career-record-tags">{[record.vertical && 'NV', record.focus && 'NF', record.pacifist && 'P', record.unique && 'U', record.challenge].filter(Boolean).map(tag => <span key={String(tag)}>{tag}</span>)}</div>{record.note && <p className="career-record-note">{record.note}</p>}</div>;
   return <form className="career-cell-form" onSubmit={event => {
     event.preventDefault(); const data = new FormData(event.currentTarget);
     const next = {...record};
@@ -184,4 +182,25 @@ function CellEditor({record, editing, onApply}: {record: TrackerRecord; editing:
     <label>自定义标记<input name="challenge" maxLength={24} defaultValue={record.challenge}/></label><label>备注<textarea name="note" rows={2} maxLength={240} defaultValue={record.note}/></label>
     <div className="career-backup-actions"><button type="button" onClick={() => onApply()}>移除此格</button><button className="is-primary" type="submit">应用到草稿</button></div>
   </form>;
+}
+
+function CareerHelp({onClose}: {onClose: () => void}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const opened = dialog.current;
+    const previous = document.activeElement as HTMLElement | null;
+    opened?.showModal();
+    return () => {opened?.close(); previous?.focus();};
+  }, []);
+  return <dialog ref={dialog} className="career-help-dialog" aria-labelledby="career-help-title" onCancel={event => {event.preventDefault(); event.stopPropagation(); onClose();}}>
+    <header><h2 id="career-help-title">通关图说明</h2><button type="button" aria-label="关闭说明" onClick={onClose}>×</button></header>
+    <div className="career-help-content">
+      <section><h3>格子怎么读</h3><div className="career-help-example"><div className="career-example-cell" aria-label="示例：2 Miss，0 Bomb，初始残机 3，NF 限制"><span>2</span><span>0</span><span>3</span><b>F</b></div><p>每格对应一个机体、路线和难度。顶部从左到右为 Miss、Bomb、初始残机；下方为特殊限制标记。作品配色表示已标记 1CC。</p></div></section>
+      <section><h3>难度与通关</h3><dl className="career-help-definitions"><div><dt>E / N / H / L</dt><dd>Easy / Normal / Hard / Lunatic</dd></div><div><dt>X / P</dt><dd>Extra / Phantasm</dd></div><div><dt>1CC</dt><dd>不使用续关完成对应流程。</dd></div><div><dt>NM / NB / NN</dt><dd>同一次 1CC 的无 Miss / 无 Bomb / 双无记录。</dd></div></dl><p>次数留空表示未知，0 表示本次没有使用或发生。续关通关独立记录，不计入 1CC 数量。</p></section>
+      <section><h3>特殊限制</h3><dl className="career-help-definitions"><div><dt>横线 / NV</dt><dd>禁止纵向移动</dd></div><div><dt>F / NF</dt><dd>禁止低速</dd></div><div><dt>P</dt><dd>和平主义</dd></div><div><dt>U</dt><dd>自定义限制，具体规则填入备注。</dd></div></dl></section>
+      <section><h3>路线与模式</h3><dl className="career-help-definitions"><div><dt>永夜抄 A / B</dt><dd>Final A / Final B 路线</dd></div><div><dt>绀珠传 p / l</dt><dd>绀珠模式 / 传统模式</dd></div><div><dt>天空璋 sp / sm / f / w</dt><dd>春 / 夏 / 秋 / 冬季节</dd></div><div><dt>e1 / e2</dt><dd>对应作品的两种结局记录</dd></div></dl><p>摄影作等作品沿用原图的场景与完成标记；记录时可在备注中补充条件。</p></section>
+      <section><h3>查看与编辑</h3><p>滚轮或双指缩放，拖动画布移动。「适应屏幕」查看全图，「原始大小」返回 100%。</p><p>进入编辑后，选格子填写详情并应用到草稿；也可选择填表工具快速标记。点击「保存记录」保存整张图。</p><p>PNG 导出当前显示的通关图；JSON 用于备份和恢复记录。</p></section>
+      <section><h3>作品缩写</h3><dl className="career-help-games">{TRACKER_GAMES.map(game => <div key={game.name}><dt><i style={{background: game.colour}}/>{game.name}</dt><dd>{game.title}</dd></div>)}</dl></section>
+    </div>
+  </dialog>;
 }
