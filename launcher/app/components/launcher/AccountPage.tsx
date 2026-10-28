@@ -70,6 +70,7 @@ export function AccountPage({captcha: Captcha, artworkSrc = backgroundUrl}: {cap
       <aside className="account-art" aria-hidden="true"><img src={artworkSrc} alt="" className="account-art-image"/></aside>
       <div className="account-content">
         <nav className="account-tabs" aria-label="账号操作">{[['login', '登录'], ['register', '注册']].map(([mode, label]) => <button type="button" key={mode} aria-current={registering === (mode === 'register') ? 'page' : undefined} onClick={() => setSearch(mode === 'register' ? {mode} : {})}>{label}</button>)}</nav>
+        <div key={registering ? 'register' : 'login'} className="account-mode-content">
         <header><h1 id="account-title">{registering ? '注册账号' : '登录'}</h1></header>
         <form method="post" onSubmit={submit}>
           {registering ? <>
@@ -87,6 +88,7 @@ export function AccountPage({captcha: Captcha, artworkSrc = backgroundUrl}: {cap
         </form>
         {!registering && <><div className="account-divider"><span>或</span></div><button type="button" className="account-discord" onClick={() => {setError(''); setMessage('Discord 登录将在接入账号服务后开放。');}}><DiscordIcon/>使用 Discord 登录</button></>}
         <p className="account-demo-note">前端预览 · 尚未接入账号服务</p>
+        </div>
       </div>
     </section>
   </main>;

@@ -10,9 +10,11 @@
 @property --book-on-accent {syntax:"<color>";inherits:true;initial-value:#201b1a}
 @property --book-overlay {syntax:"<color>";inherits:true;initial-value:#111111a8}
 
-:root, html[data-book-theme='dark'] {
+:root {
   --launcher-layout-width:1360px;
   --launcher-layout-gutter:24px;
+}
+:root, html[data-book-theme='dark'] {
   --book-bg: #171717;
   --book-surface: #242424;
   --book-raised: #303030;
@@ -632,7 +634,10 @@ body:not(.mp-room-active) .main.library-layout>.tools .tools-head .library-back{
   .book-room-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:12px}
   .book-room-filters button{min-height:44px;padding:7px 2px;gap:3px;font-size:clamp(9px,2.6vw,11px)}
   .book-room-filter-count{grid-column:1/-1;margin:0;white-space:nowrap}
-  .book-favorite{width:44px;height:44px}
+  .book-library .book-favorite{width:44px;height:44px;border:0;background:transparent;box-shadow:none;isolation:isolate}
+  .book-library .book-favorite::before{content:"";position:absolute;inset:6px;border:1px solid color-mix(in srgb,var(--book-border) 80%,transparent);border-radius:50%;background:color-mix(in srgb,var(--book-surface) 88%,transparent);z-index:-1}
+  .book-library .book-favorite svg{width:22px;height:22px;min-width:22px;min-height:22px}
+  .book-library .book-favorite:is(:hover,[aria-pressed='true'])::before{background:var(--book-accent-soft);border-color:transparent}
 }
 
 /* Keep actions and filters intrinsic; only the room list consumes remaining height. */
