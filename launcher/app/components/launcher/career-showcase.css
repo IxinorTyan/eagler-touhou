@@ -2,7 +2,7 @@ html{--career-paper:#20242b}
 html[data-book-theme='light']{--career-paper:#fff}
 /* Career chart: paper preview, quiet controls, and a separate help surface. */
 .career-heading{align-items:center;gap:16px;margin-bottom:20px}
-.career-heading h2{font-size:17px!important;letter-spacing:.03em}
+.career-heading h2{font-size:var(--profile-heading-size,17px);letter-spacing:normal}
 .career-total{display:flex;align-items:baseline;gap:6px;color:var(--book-muted);font-size:11px}
 .career-total b{font-size:22px;font-weight:500;font-variant-numeric:tabular-nums;color:var(--book-ink)}
 .player-profile .career-thumbnail{position:relative;display:block;width:100%;padding:0;overflow:hidden;border:1px solid var(--book-border);border-radius:6px;background:var(--career-paper);cursor:zoom-in}
@@ -11,7 +11,7 @@ html[data-book-theme='light']{--career-paper:#fff}
 .career-thumbnail:focus-visible{outline:2px solid var(--book-accent);outline-offset:4px}
 .career-card-footer{display:flex;justify-content:flex-end;padding-top:16px}
 .career-card-footer>div{display:flex;gap:8px}
-.player-profile .career-card-footer button{padding:8px 16px;border-radius:6px;font-size:11px}
+.player-profile .career-card-footer button{padding:8px 16px;border-radius:6px;font-size:12px}
 .player-profile .career-card-footer button:first-child{border-color:var(--book-accent);background:var(--book-accent);color:var(--book-on-accent,#fff)}
 .player-profile .career-overview .career-thumbnail[data-expanded=false] canvas{position:absolute;top:0;left:0}
 .career-overview .profile-section-title>span{color:var(--book-muted);font-size:11px}
@@ -21,13 +21,13 @@ html[data-book-theme='light']{--career-paper:#fff}
 .career-viewer::backdrop{background:#211c18b3}
 .career-viewer *{box-sizing:border-box}
 .career-viewer [hidden]{display:none!important}
-.career-viewer button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:34px;padding:8px 12px;border:1px solid var(--book-border,#ddd5ca);border-radius:6px;background:var(--book-surface,#fffdf8);color:var(--book-ink,#302c28);font:inherit;font-size:11px;line-height:1.3;cursor:pointer;transition:background .15s,border-color .15s}
+.career-viewer button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:34px;padding:8px 12px;border:1px solid var(--book-border,#ddd5ca);border-radius:6px;background:var(--book-surface,#fffdf8);color:var(--book-ink,#302c28);font:inherit;font-size:12px;line-height:1.5;cursor:pointer;transition:background .15s,border-color .15s}
 .career-viewer button:hover{border-color:var(--book-accent,#a44e4b);background:var(--book-accent-soft,#eee4da)}
 .career-viewer button:focus-visible,.career-viewer :is(select,input,textarea):focus-visible{outline:2px solid var(--book-accent,#a44e4b);outline-offset:3px}
 .career-viewer button.is-primary{border-color:var(--book-accent,#a44e4b);background:var(--book-accent,#a44e4b);color:var(--book-on-accent,#fff)}
 .career-viewer-header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex:none;padding:18px 24px;border-bottom:1px solid var(--book-border,#ddd5ca);background:var(--book-surface,#fffdf8)}
 .career-viewer-header>div:first-child{display:flex;align-items:center;gap:14px;min-width:0}
-.career-viewer-header h2{margin:0;font-size:17px;font-weight:550;letter-spacing:.03em}
+.career-viewer-header h2{margin:0;font-size:17px;font-weight:700;letter-spacing:normal}
 .career-viewer-count{padding-left:14px;border-left:1px solid var(--book-border,#ddd5ca);color:var(--book-muted,#8b8075);font-size:11px;font-variant-numeric:tabular-nums}
 .career-viewer-actions{display:flex;align-items:center;gap:8px;flex:none}
 .career-viewer-actions button:last-child{width:34px;padding:0;font-size:22px;margin-left:4px}
@@ -51,7 +51,7 @@ html[data-book-theme='light']{--career-paper:#fff}
 .career-map-sidebar{flex:0 0 310px;overflow-y:auto;overscroll-behavior:contain;padding:0 22px;border-left:1px solid var(--book-border,#ddd5ca);background:var(--book-surface,#fffdf8);scrollbar-width:thin}
 .career-tool-section{padding:22px 0;border-bottom:1px solid var(--book-border,#ddd5ca)}
 .career-tool-section:last-child{border-bottom:0}
-.career-tool-section h3{margin:0 0 14px;font-size:12px;font-weight:600;line-height:1.8}
+.career-tool-section h3{margin:0 0 14px;font-size:12px;font-weight:700;line-height:1.8}
 .career-viewer .career-tool-section p{margin:8px 0;color:var(--book-muted,#8b8075);font-size:11px;line-height:1.9;overflow-wrap:anywhere}
 .career-detail-title{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:16px}
 .career-detail-title h3{margin:0}
@@ -89,12 +89,12 @@ html[data-book-theme='light']{--career-paper:#fff}
 .career-help-dialog[open]{display:flex;flex-direction:column}
 .career-help-dialog::backdrop{background:#1119;backdrop-filter:blur(5px)}
 .career-help-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex:none;padding:22px 28px;border-bottom:1px solid var(--book-border,#ddd5ca)}
-.career-help-dialog h2{margin:0;font-size:17px;font-weight:550}
+.career-help-dialog h2{margin:0;font-size:17px;font-weight:700}
 .career-help-dialog>header button{width:30px;height:30px;min-height:0;padding:0;border:0;background:transparent;font-size:22px}
 .career-help-content{overflow:auto;overscroll-behavior:contain;padding:0 28px 8px;scrollbar-width:thin}
 .career-help-content section{padding:22px 0;border-bottom:1px solid var(--book-border,#ddd5ca)}
 .career-help-content section:last-child{border-bottom:0}
-.career-help-content h3{margin:0 0 14px;font-size:12px;font-weight:600}
+.career-help-content h3{margin:0 0 14px;font-size:12px;font-weight:700}
 .career-help-content p{margin:10px 0 0;color:var(--book-muted,#8b8075);font-size:12px;line-height:1.9}
 .career-help-example{display:flex;align-items:center;gap:22px}
 .career-example-cell{display:grid;grid-template-columns:repeat(3,1fr);flex:0 0 72px;height:72px;padding:9px;border:1px solid var(--book-border);border-radius:6px;background:var(--book-raised);color:var(--book-ink);font-size:14px;font-variant-numeric:tabular-nums}
@@ -110,7 +110,7 @@ html[data-book-theme='light']{--career-paper:#fff}
 .career-help-games dd{font-size:11px}
 
 @media(max-width:780px){
-  .career-heading{margin-bottom:16px}.career-heading h2{font-size:15px!important}.career-total b{font-size:18px}
+  .career-heading{margin-bottom:16px}.career-heading h2{font-size:var(--profile-heading-size,15px)}.career-total b{font-size:18px}
   .career-viewer-header{padding:13px 12px;gap:8px}.career-viewer-header h2{font-size:14px;white-space:nowrap}.career-viewer-count{display:none}
   .career-viewer-actions{gap:4px}.career-viewer-actions button{padding:7px 8px;font-size:10px;min-height:32px}.career-viewer-actions button:last-child{width:28px;margin-left:0}.career-help-trigger>span{display:none}
   .career-map-tools{padding:8px 10px}.career-map-tools>span{display:none}.career-map-tools button{padding:6px 8px}.career-map-tools button:nth-child(4){margin-left:3px}
@@ -129,4 +129,4 @@ html[data-book-theme='light']{--career-paper:#fff}
 .player-profile .career-overview .career-thumbnail{cursor:pointer}
 .career-overview .profile-section-title{display:flex;align-items:center;gap:12px}
 .career-overview .career-total{margin-left:auto}
-.player-profile .career-overview-toggle{font-size:11px;padding:5px 10px}
+.player-profile .career-overview-toggle{font-size:12px;padding:5px 10px}

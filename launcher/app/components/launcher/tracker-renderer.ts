@@ -295,6 +295,7 @@ export function trackerDifficultyColour(difficulty, dark = false) {
 }
 export function createTrackerRenderer(surface) {
 const ctx = surface.getContext('2d');
+const fontFamily = surface.ownerDocument?.defaultView?.getComputedStyle(surface).fontFamily || '"ET Chill Round", sans-serif';
 const canvas = {width: 800, height: 878};
 let transparentPng = false, easyMode = true;
 let paper = '#ffffff', ink = '#48443d', grid = '#d8d4cb', darkMode = false;
@@ -317,13 +318,13 @@ function drawBoxContentsAux(x, y, done, misses, bombs, lives, vertical, focus, p
         // Draw the little bits and pieces
         // Draw miss/bomb/starting counts
         if (misses) {
-            drawText(misses, x + 2, y + 7, 'left', '500 7px "Segoe UI", sans-serif', textColour);
+            drawText(misses, x + 2, y + 7, 'left', `400 7px ${fontFamily}`, textColour);
         }
         if (bombs) {
-            drawText(bombs, x + 7, y + 7, 'left', '500 7px "Segoe UI", sans-serif', textColour);
+            drawText(bombs, x + 7, y + 7, 'left', `400 7px ${fontFamily}`, textColour);
         }
         if (lives) {
-            drawText(lives, x + 16, y + 7, 'right', '500 7px "Segoe UI", sans-serif', textColour);
+            drawText(lives, x + 16, y + 7, 'right', `400 7px ${fontFamily}`, textColour);
         }
         // No vertical?
         if (vertical) {
@@ -336,13 +337,13 @@ function drawBoxContentsAux(x, y, done, misses, bombs, lives, vertical, focus, p
         }
         // No focus / pacifist / unique
         if (focus) {
-            drawText("F", x + 2, y + 15, 'left', '500 7px "Segoe UI", sans-serif', textColour);
+            drawText("F", x + 2, y + 15, 'left', `400 7px ${fontFamily}`, textColour);
         }
         if (pacifist) {
-            drawText("P", x + 7, y + 15, 'left', '500 7px "Segoe UI", sans-serif', textColour);
+            drawText("P", x + 7, y + 15, 'left', `400 7px ${fontFamily}`, textColour);
         }
         if (unique) {
-            drawText("U", x + 12, y + 15, 'left', '500 7px "Segoe UI", sans-serif', textColour);
+            drawText("U", x + 12, y + 15, 'left', `400 7px ${fontFamily}`, textColour);
         }
     }
 }
@@ -350,7 +351,7 @@ function drawBoxContents(x, y, boxName, colour) {
     const box = getBoxFromState(boxName);
     drawBoxContentsAux(x, y, box.done, box.misses, box.bombs, box.lives, box.vertical, box.focus, box.pacifist, box.unique, paper, ink, trackerDifficultyColour(boxName.split('-').slice(2).join('-'), darkMode));
 }
-function drawText(text, x, y, align = 'left', font = '600 8px "Segoe UI", sans-serif', colour = ink) {
+function drawText(text, x, y, align = 'left', font = `700 8px ${fontFamily}`, colour = ink) {
     x -= 0.5; // Dumb hack for Windows
     if (ctx) {
         ctx.font = font;
@@ -453,7 +454,7 @@ function drawGame(game, baseX, baseY, drawDifficulties = false) {
         if (character.subcharacters.length) {
             drawText(character.name, x + 2, bottom + 14);
             for (const [index, sub] of character.subcharacters.entries())
-                drawText(sub, x + index * boxWidth + 2, bottom + 7, 'left', '500 7px "Segoe UI", sans-serif');
+                drawText(sub, x + index * boxWidth + 2, bottom + 7, 'left', `400 7px ${fontFamily}`);
             column += character.subcharacters.length;
         } else {
             drawText(character.name, x + 2, bottom + 8);
@@ -470,7 +471,7 @@ function drawScreen(layout) {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
     for (const section of layout.sections) {
-        drawText(section.title, 24, section.top + 14, 'left', '600 14px "Segoe UI", "Microsoft YaHei", sans-serif');
+        drawText(section.title, 24, section.top + 14, 'left', `700 14px ${fontFamily}`);
         ctx.strokeStyle = grid;
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(106, section.top + 9); ctx.lineTo(776, section.top + 9); ctx.stroke();

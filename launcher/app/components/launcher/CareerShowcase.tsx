@@ -22,6 +22,7 @@ function Chart({records, options, onCells}: {records: CareerRecords; options: Tr
     const observer = new MutationObserver(draw);
     observer.observe(document.documentElement, {attributes: true, attributeFilter: ['data-book-theme']});
     draw();
+    void document.fonts.ready.then(draw);
     return () => {active = false; observer.disconnect();};
   }, [records, options, onCells]);
   return <canvas ref={own} width={800} height={chartHeight(options)} aria-label="东方全作品通关图，使用下方入口放大查看"/>;
