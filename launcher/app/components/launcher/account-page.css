@@ -1,8 +1,6 @@
 .account-page{position:relative;z-index:1;width:100%;margin:0 auto;padding:0;color:var(--book-ink);font:14px/1.6 var(--ui-font)}
 .account-page *{box-sizing:border-box}
 .account-page :is(button,input){font:inherit}
-.account-topline{display:flex;justify-content:space-between;align-items:center;margin-bottom:32px;font-size:12px;color:var(--book-muted)}
-.account-topline a{color:inherit;text-decoration:none}.account-topline a:hover{color:var(--book-accent)}
 .account-shell{position:relative;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);height:calc(100dvh - var(--account-header-height,61px));min-height:0;background:var(--book-surface)}
 /* Continue both surfaces behind the masthead's rounded bottom corners. */
 .account-shell:before{content:'';position:absolute;left:0;right:0;top:calc(-1 * var(--account-header-overlap,0px));height:var(--account-header-overlap,0px);background:var(--book-surface);pointer-events:none}
@@ -56,7 +54,6 @@
  .account-code button,.account-discord,.account-captcha-slot{background:var(--book-surface);border-radius:9px}
  .account-password-toggle{height:44px;width:42px}
  .account-submit,.account-discord{min-height:48px}
- .account-topline{margin-bottom:32px}
  .account-tabs,.is-registering .account-tabs{margin-bottom:28px}
  .account-content h1,.is-registering h1{font-size:24px;margin-bottom:28px}
  .account-demo-note{margin-top:18px}

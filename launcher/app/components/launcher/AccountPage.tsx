@@ -1,6 +1,5 @@
 import {useCallback, useEffect, useRef, useState, type ComponentType, type FormEvent} from 'react';
 import {useSearchParams} from 'react-router';
-import {AppLink} from './AppLink';
 import backgroundUrl from '../../../public/assets/launcher-background.webp?url';
 import './account-page.css';
 
@@ -70,7 +69,6 @@ export function AccountPage({captcha: Captcha, artworkSrc = backgroundUrl}: {cap
     <section className={`account-shell${registering ? ' is-registering' : ''}`}>
       <aside className="account-art" aria-hidden="true"><img src={artworkSrc} alt="" className="account-art-image"/></aside>
       <div className="account-content">
-        <div className="account-topline"><AppLink href="./">← 返回游戏库</AppLink></div>
         <nav className="account-tabs" aria-label="账号操作">{[['login', '登录'], ['register', '注册']].map(([mode, label]) => <button type="button" key={mode} aria-current={registering === (mode === 'register') ? 'page' : undefined} onClick={() => setSearch(mode === 'register' ? {mode} : {})}>{label}</button>)}</nav>
         <header><h1 id="account-title">{registering ? '注册账号' : '登录'}</h1></header>
         <form method="post" onSubmit={submit}>
