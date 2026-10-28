@@ -10,7 +10,9 @@ const click = async (page, scope, text) => {
     if (!button) throw new Error(`Missing button: ${text}`);
     button.click();
   }, {scope, text});
-  if (scope === '.profile-identity' && ['编辑资料', '编辑展示'].includes(text)) {
+  if (scope === '.profile-perspective') {
+    await page.$eval('.profile-perspective', (el, text) => {if (!el.textContent.includes(text)) el.click();}, text);
+  } else if (scope === '.profile-identity' && ['编辑资料', '编辑展示'].includes(text)) {
     await press(scope, '账户设置');
     if (text === '编辑展示') await press('.profile-settings-heading', '隐私与个性化');
   } else {
@@ -47,7 +49,9 @@ try {
   await click(page, '.profile-display-editor', '保存展示');
   assert.deepEqual(await tabs(page), ['概览', '生涯', '游玩记录', '内容', '好友']);
   assert.deepEqual(await overview(page), ['东方通关图', '最近启动', '收藏的游戏']);
+  assert.equal(await page.$$eval('button.profile-perspective', els => els.length), 1);
   await click(page, '.profile-perspective', '访客');
+  assert.equal(await page.$eval('.profile-avatar', el => getComputedStyle(el).opacity), '1');
   assert.deepEqual(await tabs(page), ['概览']);
   assert.deepEqual(await overview(page), ['收藏的游戏']);
   await page.reload({waitUntil: 'networkidle2'});
