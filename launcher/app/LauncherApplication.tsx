@@ -1,4 +1,5 @@
 import {useLocation} from 'react-router';
+import {AccountPage} from './components/launcher/AccountPage';
 import {ProfilePage} from './components/launcher/ProfilePreview';
 import {bookArtwork} from './components/launcher/book-artwork';
 import {useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefCallback} from 'react';
@@ -86,6 +87,7 @@ export function LauncherApplication({host}: {host: LauncherHost}) {
 
 function LauncherSurfaces({host}: {host: LauncherHost}) {
   const navigation = useSurfaceNavigation();
+  const accountPage = /\/login\.html\/?$/.test(useLocation().pathname);
   const profilePage = /\/profile\.html\/?$/.test(useLocation().pathname);
   const settings = useSyncExternalStore(host.settings.subscribe, host.settings.getSnapshot, host.settings.getSnapshot);
   const layout = useSyncExternalStore(host.touchLayout.subscribe, host.touchLayout.getSnapshot, host.touchLayout.getSnapshot);
@@ -157,8 +159,8 @@ function LauncherSurfaces({host}: {host: LauncherHost}) {
     children: <LobbyOptionsHost open={presence.open} foregroundActive={navigation.surface === 'touch' || host.runtimeOpen === true || host.replayWorkspace === true} onCloseRequest={navigation.closeSurface}>{host.replayWorkspace && !roomOpen ? null : settingsPanel}</LobbyOptionsHost>};
   return <OptionsOwnership value={presence.targets}>
     {host.masthead}
-    <div className="launcher-page-surface" data-page={profilePage ? 'profile' : navigation.context}>
-    {profilePage ? <ProfilePage/> : navigation.context === 'lobby' ? host.renderLobby ? host.renderLobby(lobbyProps) : <LobbySurface {...lobbyProps}/> : <LibrarySurface products={host.products} selectedProduct={preview} openedProduct={presence.openedProduct}
+    <div className="launcher-page-surface" data-page={accountPage ? 'account' : profilePage ? 'profile' : navigation.context}>
+    {accountPage ? <AccountPage/> : profilePage ? <ProfilePage/> : navigation.context === 'lobby' ? host.renderLobby ? host.renderLobby(lobbyProps) : <LobbySurface {...lobbyProps}/> : <LibrarySurface products={host.products} selectedProduct={preview} openedProduct={presence.openedProduct}
       onSelect={setPreview} onActivate={activate} masthead={null} footer={host.footer} serverStatusNote={host.serverStatusNote}
       lobbyHref={host.lobbyHref} roomUsersArtwork={host.assetUrl('assets/room-users.svg')} optionsOpen={presence.open} roomOpen={roomOpen} roomDrawer={host.roomDrawer} onBack={navigation.closeSurface}>
       {host.replayWorkspace && !roomOpen ? null : settingsPanel}{host.roomSurface}

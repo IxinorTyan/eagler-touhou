@@ -41,7 +41,7 @@ export interface LauncherMastheadProps {
  */
 export function LauncherMasthead(props: LauncherMastheadProps) {
   const {t, locale} = useLocale();
-  const profileOpen = /\/profile\.html\/?$/.test(useLocation().pathname);
+  const profileOpen = /\/(?:profile|login)\.html\/?$/.test(useLocation().pathname);
   const {variant, menuOpen, onMenuOpenChange, interactive = true} = props;
   const Link = interactive ? AppLink : 'a';
   const menu = useRef<HTMLDivElement>(null), toggle = useRef<HTMLButtonElement>(null), panel = useRef<HTMLDivElement>(null);
@@ -98,6 +98,7 @@ export function LauncherMasthead(props: LauncherMastheadProps) {
             <Link className="masthead-menu-item" href={props.launcherHref} aria-current={variant === 'library' && !props.replayActive && !profileOpen ? 'page' : undefined} onClick={() => onMenuOpenChange(false)}>{locale === 'en' ? 'Solo' : '单机'}</Link>
             <Link className="masthead-menu-item" href={props.assetUrl('lobby.html')} aria-current={variant === 'lobby' && !props.replayActive && !profileOpen ? 'page' : undefined} onClick={() => onMenuOpenChange(false)}>{locale === 'en' ? 'Multiplayer' : '联机'}</Link>
           </nav>
+          <Link className="masthead-menu-item" href={props.assetUrl('login.html')} onClick={() => onMenuOpenChange(false)}><NavigationIcon name="profile"/><span>{locale === 'en' ? 'Log in / Sign up' : '登录 / 注册'}</span></Link>
           <Link className="masthead-menu-item book-mobile-faq" href={props.faqHref}>{locale === 'en' ? 'FAQ' : '常见问题'}</Link>
           <button className="masthead-menu-item motion-menu-toggle" id={variant === 'lobby' ? 'lobbyLessMotion' : 'lessMotionToggle'} type="button" aria-pressed={props.lessMotion} title={t(props.lessMotion ? 'nav.motionFullTitle' : 'nav.motionLessTitle')} onClick={props.onToggleMotion}><MenuIcon name="motion"/><span>{t('nav.lessMotion')}</span><i className="site-notice-toggle-state" aria-hidden="true"/></button>
           <button className="masthead-menu-item" id="siteNoticeToggle" type="button" role="switch" aria-checked={props.noticeEnabled} onClick={props.onToggleNotice}><MenuIcon name="notice"/><span>{t('notice.label')}</span><i className="site-notice-toggle-state" aria-hidden="true"/></button>

@@ -37,8 +37,9 @@ export function OriginalBootstrapHead() {
   const {pathname} = useLocation();
   const locale = useDocumentUiLocale();
   const lobby = /\/(?:lobby|lobby\.html)\/?$/.test(pathname);
+  const account = /\/login\.html\/?$/.test(pathname);
   const profile = /\/profile\.html\/?$/.test(pathname);
-  const title = lobby ? `${translate(locale, 'lobby.title')} ~ EAGLER TOUHOU` : profile ? locale === 'en' ? 'Player Profile ~ EAGLER TOUHOU' : '玩家主页 ~ EAGLER TOUHOU' : translate(locale, 'site.documentTitle');
+  const title = account ? '登录 / 注册 ~ EAGLER TOUHOU' : lobby ? `${translate(locale, 'lobby.title')} ~ EAGLER TOUHOU` : profile ? locale === 'en' ? 'Player Profile ~ EAGLER TOUHOU' : '玩家主页 ~ EAGLER TOUHOU' : translate(locale, 'site.documentTitle');
   const description = translate(locale, 'site.description');
   return <>
     <script dangerouslySetInnerHTML={{__html: dispatch}}/>
@@ -55,7 +56,7 @@ export function OriginalBootstrapHead() {
       html[data-book-theme="light"] #eaglerBootEmergency>div{background:#fffefa!important;color:#2b302c!important;border-color:#dfdfd6!important;box-shadow:0 14px 38px #24291f14!important}
       html[data-book-theme="light"] #eaglerBootEmergency :is(strong,button,pre){color:#2b302c!important}
     `}</style>
-    <title data-i18n={lobby || profile ? undefined : 'site.documentTitle'}>{title}</title>
+    <title data-i18n={lobby || profile || account ? undefined : 'site.documentTitle'}>{title}</title>
     <meta name="theme-color" content={lobby ? '#111210' : '#10100f'}/>
     {lobby ? <meta name="robots" content="noindex"/> : <>
       <meta name="color-scheme" content="dark"/>

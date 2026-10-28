@@ -6,6 +6,7 @@ const entries = [
   ['en.html', true],
   ['lobby.html', true],
   ['profile.html', true],
+  ['login.html', true],
   ['lobby.css', true],
   ['site.webmanifest', true],
   ['favicon.ico', true],

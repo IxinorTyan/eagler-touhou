@@ -112,3 +112,5 @@ html[data-book-theme='light'] .player-profile{color-scheme:light}.player-profile
  .profile-editor-shell form>p[role=alert]{margin-inline:20px}
 }
 @media(prefers-reduced-motion:reduce){.profile-display-options label,.profile-display-order li,.profile-detail-fields :is(input,textarea){transition:none}}
+
+.profile-account-login{display:inline-block;margin-top:12px;font-size:12px;text-decoration:none}
