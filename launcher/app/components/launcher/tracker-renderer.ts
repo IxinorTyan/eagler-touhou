@@ -212,14 +212,20 @@ const gi = new Game("GI", "rgba(131, 5, 5, 1.0)", "HN".split(''), [new Character
     new Character("FL", ["a", "b", "c"]),
     new Character("YT")]);
 
-export const trackerGames = [htrp, soew, podd, ls, ms, eosd, stb, ds, isc, vd, bm, pcb, imp, pofv, mof, sa, ufo, gfw, td, ddc, lolk, hsifs, wbawc, um, udoalg, iamp, swr, hsoku, hm, ulil, aocf, gi];
+const th20 = new Game('TH20', '#b75256', ['E', 'N', 'H', 'L', 'X'], [
+    new Character('R', ['r', 'y', 'b', 'g']), new Character('M', ['r', 'y', 'b', 'g']),
+]);
+
+export const trackerDisplayName = game => game.name === 'TH20' ? 'KJ' : game.name;
+export const trackerGames = [htrp, soew, podd, ls, ms, eosd, stb, ds, isc, vd, bm, pcb, imp, pofv, mof, sa, ufo, gfw, td, ddc, lolk, hsifs, wbawc, um, udoalg, iamp, swr, hsoku, hm, ulil, aocf, gi, th20];
 export const trackerSections = [
-    {title: '整数作', games: [htrp, soew, ls, ms, eosd, pcb, imp, mof, sa, ufo, td, ddc, lolk, hsifs, wbawc, um]},
+    {title: '整数作', games: [htrp, soew, ls, ms, eosd, pcb, imp, mof, sa, ufo, td, ddc, lolk, hsifs, wbawc, um, th20]},
     {title: '对战作', games: [podd, pofv, udoalg]},
     {title: '小数点作', games: [iamp, stb, swr, hsoku, ds, gfw, hm, isc, ulil, aocf, vd, bm, gi]},
 ];
 const additionalGames = new Set([iamp, swr, hsoku, hm, ulil, aocf, gi]);
 function gameDifficulties(game, easy) {
+    if (game.name === 'TH20') return game.difficulties.filter(difficulty => easy || difficulty !== 'E');
     if (game.name === 'IN') return easy
         ? ['X', 'B-L', 'B-H', 'B-N', 'B-E', 'A-L', 'A-H', 'A-N', 'A-E']
         : ['X', 'B-L', 'B-H', 'B-N', 'A-L', 'A-H', 'A-N'];
@@ -372,7 +378,7 @@ function drawGame(game, baseX, baseY, drawDifficulties = false) {
     const dotOffset = characters.length === 1 ? -6 : 0;
     const nameOffset = ['GFW', 'PODD'].includes(game.name) ? 4 : 3;
     drawDot(game.colour, baseX + nameOffset + dotOffset, baseY - 5);
-    drawText(game.name, baseX + nameOffset + 4 + dotOffset, baseY - 2);
+    drawText(trackerDisplayName(game), baseX + nameOffset + 4 + dotOffset, baseY - 2);
     const gameCells = [];
     characters.forEach((character, column) => difficulties.forEach((difficulty, row) => {
         if ((game.name === 'GFW' && character === 'EX' && difficulty !== 'N') ||

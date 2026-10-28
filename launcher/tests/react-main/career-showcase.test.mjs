@@ -14,10 +14,10 @@ before(async () => {
 });
 after(async () => {await rm(work, {recursive: true, force: true});});
 
-test('full chart includes all 32 reference works independent of playable platform games', () => {
-  assert.equal(api.TRACKER_GAMES.length, 32);
-  assert.equal(api.TRACKER_CELLS.length, 1070);
-  assert.equal(new Set(api.TRACKER_CELLS.map(cell => cell.key)).size, 1070);
+test('full chart includes all reference works and TH20 independent of playable platform games', () => {
+  assert.equal(api.TRACKER_GAMES.length, 33);
+  assert.equal(api.TRACKER_CELLS.length, 1110);
+  assert.equal(new Set(api.TRACKER_CELLS.map(cell => cell.key)).size, 1110);
   for (const game of ['HRTP', 'MS', 'UFO', 'TD', 'DDC', 'HSIFS', 'WBAWC', 'UM', 'UDOALG', 'STB', 'DS', 'ISC', 'VD', '100BM', 'IAMP', 'SWR', 'H.SOKU', 'HM', 'ULIL', 'AOCF', 'GI']) {
     assert.ok(api.TRACKER_CELLS.some(cell => cell.game.name === game), game);
   }
@@ -69,7 +69,7 @@ test('three chronological sections keep game tables separate and inside the char
     assert.deepEqual(layout.sections.map(section => section.title), ['整数作', '对战作', '小数点作']);
     assert.deepEqual(layout.sections[1].games.map(block => block.game.name), ['PODD', 'POFV', 'UDOALG']);
     const blocks = layout.sections.flatMap(section => section.games);
-    assert.equal(blocks.length, extra ? 32 : 25);
+    assert.equal(blocks.length, extra ? 33 : 26);
     assert.equal(new Set(blocks.map(block => block.game.name)).size, blocks.length);
     for (const [index, block] of blocks.entries()) {
       assert.ok(block.x >= 24 && block.x + block.width <= 776);
@@ -80,4 +80,15 @@ test('three chronological sections keep game tables separate and inside the char
       }
     }
   }
+});
+
+
+test('TH20 has five difficulties and four colors for both R and M in the integer section', () => {
+  const game = api.TRACKER_GAMES.find(game => game.name === 'TH20');
+  assert.equal(api.trackerDisplayName(game), 'KJ');
+  assert.deepEqual(game.difficulties, ['E', 'N', 'H', 'L', 'X']);
+  assert.deepEqual(game.characters, ['Rr', 'Ry', 'Rb', 'Rg', 'Mr', 'My', 'Mb', 'Mg']);
+  assert.equal(api.TRACKER_CELLS.filter(cell => cell.game.name === 'TH20').length, 40);
+  assert.equal(api.trackerLayout(api.DEFAULT_OPTIONS).sections[0].games.at(-1).game.name, 'TH20');
+  assert.equal(api.cellLabel('TH20-Rr-X'), '东方锦上京 · Rr · Extra');
 });
