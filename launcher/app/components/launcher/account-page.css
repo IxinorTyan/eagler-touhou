@@ -46,7 +46,7 @@
 @media(max-width:959px){
  .account-shell{isolation:isolate;grid-template-columns:minmax(0,1fr);height:auto;min-height:calc(100svh - var(--account-header-height,108px));background:var(--book-bg)}
  .account-art{position:absolute;z-index:0;inset:0;margin:0;min-height:100%;border:0;background:var(--book-surface);overflow:clip;pointer-events:none;user-select:none}
- .account-art-image{position:sticky;top:var(--account-header-height,108px);display:block;width:100%;height:calc(100svh - var(--account-header-height,108px));min-height:500px;object-fit:cover;object-position:40% center;filter:blur(18px) saturate(.55);opacity:1;transform:scale(1.12)}
+ .account-art-image{position:sticky;top:var(--account-header-height,108px);display:block;width:100%;height:calc(100svh - var(--account-header-height,108px));min-height:500px;object-fit:cover;object-position:40% center;filter:blur(7px) saturate(.55);opacity:1;transform:scale(1.12)}
  .account-art:after{content:'';position:absolute;inset:0;background:var(--book-surface);opacity:.72;pointer-events:none}
  html[data-book-theme='light'] .account-art:after{opacity:.78}
  .account-content,.is-registering .account-content{position:relative;z-index:1;width:100%;max-width:440px;max-height:none;overflow:visible;align-self:start;padding:32px 24px 44px;justify-content:flex-start}
