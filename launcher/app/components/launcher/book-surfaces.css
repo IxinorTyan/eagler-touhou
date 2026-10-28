@@ -532,4 +532,8 @@ html[data-book-theme='light'] .book-directory {--difficulty-easy:#23733e;--diffi
   .book-masthead .book-top-faq{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;margin-inline-start:0;padding-inline:3px;box-sizing:border-box}
 }
 @media(max-width:380px){html:has(.book-masthead) .book-brand>span:not(.book-brand-symbol){display:none}}
+@media(min-width:781px) and (hover:hover) and (pointer:fine){
+  html:has(.book-masthead) .masthead{width:calc(100% - 48px);max-width:1312px;min-height:61px;margin:0 auto;padding:0 18px;border:1px solid var(--book-border);border-top:0;border-radius:0 0 16px 16px;background:color-mix(in srgb,var(--book-bg) 94%,transparent);box-shadow:0 6px 20px #0000000a}
+  html:has(.player-profile) .book-masthead{max-width:1152px}
+}
 .book-masthead .book-menu-donation[hidden] {display:none}
