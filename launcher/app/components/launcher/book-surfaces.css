@@ -86,6 +86,7 @@ html:has(.book-masthead) .book-directory:not(:has(>.book-masthead)) {padding-top
 .book-library {font-size:13px;line-height:1.5}
 .book-card,.book-recent-link {background:color-mix(in srgb,var(--book-surface) 96%,transparent)}
 .book-art {background:var(--book-raised)}
+.book-view-covers .book-recent-link{border-color:color-mix(in srgb,var(--book-border) 45%,transparent);box-shadow:none}.book-view-covers .book-recent-link:hover{border-color:color-mix(in srgb,var(--book-accent) 60%,transparent)}
 .book-favorite {box-shadow:0 2px 8px #0002}
 @media(min-width:781px) and (hover:hover) and (pointer:fine) {
   .book-sidebar nav button[data-book-category="windows"] {margin-top:12px}
