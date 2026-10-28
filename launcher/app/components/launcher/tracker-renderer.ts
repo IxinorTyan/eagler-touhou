@@ -401,16 +401,13 @@ function drawGame(game, baseX, baseY, drawDifficulties = false) {
         ? character.subcharacters.map(sub => character.name + sub) : [character.name]);
     const difficulties = gameDifficulties(game, easyMode);
     if (drawDifficulties) {
+        const gridX = baseX + 30;
         difficulties.forEach((difficulty, row) => {
             drawText(game.name === 'IN' ? difficulty.at(-1) : difficulty,
-                baseX + 24, baseY + (row + 1) * boxWidth - 5, 'right');
-            if (game.name === 'IN' && ['B-L', 'A-L'].includes(difficulty)) {
-                const routeRows = easyMode ? 4 : 3;
-                drawText(difficulty[0], baseX + 5, baseY + row * boxWidth + routeRows * boxWidth / 2 + 3);
-            }
-
+                game.name === 'IN' ? gridX - 3 : baseX + 24,
+                baseY + (row + 1) * boxWidth - (game.name === 'IN' ? 1 : 5), 'right');
         });
-        baseX += 30;
+        baseX = gridX;
     }
     const dotOffset = characters.length === 1 ? -6 : 0;
     const nameOffset = ['GFW', 'PODD'].includes(game.name) ? 4 : 3;
@@ -430,16 +427,19 @@ function drawGame(game, baseX, baseY, drawDifficulties = false) {
     }));
     drawCellGrid(gameCells);
     if (game.name === 'IN') {
-        ctx.strokeStyle = '#a49a8b';
-        ctx.lineWidth = 2;
+        // Upstream places route markers below short ticks in the label gutter.
+        // The ticks meet the left border; ordinary cell edges continue across the grid.
+        ctx.strokeStyle = '#d8d4cb';
+        ctx.lineWidth = 1;
         ctx.lineCap = 'butt';
-        ctx.beginPath();
         for (const route of ['B-L', 'A-L']) {
             const y = baseY + difficulties.indexOf(route) * boxWidth;
-            ctx.moveTo(baseX, y);
-            ctx.lineTo(baseX + characters.length * boxWidth, y);
+            ctx.beginPath();
+            ctx.moveTo(baseX - 17.5, y);
+            ctx.lineTo(baseX + 1, y);
+            ctx.stroke();
+            drawText(route[0], baseX - 16, y + 7);
         }
-        ctx.stroke();
     }
     const bottom = baseY + difficulties.length * boxWidth;
     let column = 0;
