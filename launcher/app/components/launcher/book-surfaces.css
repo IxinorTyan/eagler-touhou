@@ -594,6 +594,19 @@ html[data-book-theme='light'] .book-directory {--difficulty-easy:#23733e;--diffi
 }
 .book-masthead .book-menu-donation[hidden] {display:none}
 
+/* Lift the complete settings layer above the sticky site navigation. */
+body.library-tools-open:not(.mp-room-active) .launcher-page-surface{z-index:30;view-transition-name:none}
+body.library-tools-open:not(.mp-room-active) .launcher-page-surface .sheet{overflow:visible}
+:is(.main.library-layout>.tools,.mp-settings-room-drawer) .tools-head .library-back,
+body:not(.mp-room-active) .main.library-layout>.tools .tools-head .library-back{
+  top:10px;left:auto;right:12px;z-index:4;display:flex;align-items:center;justify-content:center;gap:7px;
+  width:auto;min-width:76px;height:44px;min-height:44px;padding:0 12px;border:1px solid var(--book-border);
+  border-radius:8px;background:var(--book-surface);color:var(--book-ink);font:13px var(--ui-font);
+}
+:is(.main.library-layout>.tools,.mp-settings-room-drawer) .library-back svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8}
+:is(.main.library-layout>.tools,.mp-settings-room-drawer) .tools-head{overflow:hidden}
+:is(.main.library-layout>.tools,.mp-settings-room-drawer) .tools-title{max-width:calc(100% - 44px)}
+
 /* Filtering and favoriting have distinct targets throughout the directory. */
 .book-lobby-favorite{display:grid;place-items:center;width:32px;min-height:44px;height:auto;padding:0;border:0;border-radius:6px;background:transparent;color:var(--book-muted);cursor:pointer}
 .book-room-filters{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 14px;min-width:0}

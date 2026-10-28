@@ -55,7 +55,7 @@ export function SettingsBody({model, actions, onOpenTouchLayout, multiplayerCont
       </div>
     </section>);
   return <div className={multiplayer ? 'mp-settings-body options-settings' : 'options-singleplayer options-settings'}>
-    {multiplayer && <><OptionRow className={item('option-frame-limit mp-shared-settings')} label={t('settings.shareSingleplayer')} hint={t('settings.shareSingleplayerHint')} control={<OptionSwitch id="mpShareSettingsToggle" checked={state.shareSingleplayerSettings} label={t('settings.shareSingleplayer')} onChange={() => {model.setShareSingleplayerSettings(!state.shareSingleplayerSettings);}}/>}/>{multiplayerControls}</>}
+    {multiplayer && multiplayerControls}
     {context.mobile && touch}
     <OptionsGroup id={id('fileOptions')} title={t('options.files')} open={state.disclosure.files} onOpenChange={open => model.setDisclosure('files', open)} bodyClassName="file-tools-grid">
       <section className={item('file-tool-item')} id={id('saveFileTool')}><div className="itemtop"><span>{t('settings.save')}</span></div><div className="mini">{actionButton('export-save', t('settings.download'), downloadPath)}{actionButton('import-save', t('settings.import'), uploadPath)}</div></section>
