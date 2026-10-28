@@ -13,8 +13,8 @@
 .career-card-footer>div{display:flex;gap:8px}
 .player-profile .career-card-footer button{padding:8px 16px;border-radius:6px;font-size:11px}
 .player-profile .career-card-footer button:first-child{border-color:var(--book-accent);background:var(--book-accent);color:var(--book-on-accent,#fff)}
-.career-overview .career-thumbnail{padding:20px 16px 48px}
-.career-overview canvas{max-height:300px}
+.career-overview .career-thumbnail{display:block;width:100%;aspect-ratio:800/878;padding:0;overflow:hidden;border:1px solid var(--book-border);border-radius:10px;background:#fff;cursor:zoom-in}
+.career-overview .career-thumbnail canvas{display:block;width:100%;height:100%;max-width:none;max-height:none;margin:0;background:#fff;box-shadow:none;image-rendering:auto}
 .career-overview .profile-section-title>span{color:var(--book-muted);font-size:11px}
 
 .career-viewer{position:fixed;inset:0;box-sizing:border-box;width:100vw;max-width:none;height:100dvh;max-height:none;margin:0;padding:0;border:0;background:var(--book-bg,#f6f2eb);color:var(--book-ink,#302c28);font-family:inherit;overflow:hidden}
@@ -112,7 +112,7 @@
 
 @media(max-width:780px){
   .career-heading{margin-bottom:16px}.career-heading h2{font-size:15px!important}.career-total b{font-size:18px}
-  .player-profile .career-thumbnail{padding:20px 14px 48px}.career-thumbnail canvas{max-height:340px}.career-overview canvas{max-height:270px}
+  .player-profile .career-thumbnail{padding:20px 14px 48px}.career-thumbnail canvas{max-height:340px}.career-overview .career-thumbnail{aspect-ratio:800/878}.career-overview .career-thumbnail canvas{max-height:none}
   .career-viewer-header{padding:13px 12px;gap:8px}.career-viewer-header h2{font-size:14px;white-space:nowrap}.career-viewer-count{display:none}
   .career-viewer-actions{gap:4px}.career-viewer-actions button{padding:7px 8px;font-size:10px;min-height:32px}.career-viewer-actions button:last-child{width:28px;margin-left:0}.career-help-trigger>span{display:none}
   .career-map-tools{padding:8px 10px}.career-map-tools>span{display:none}.career-map-tools button{padding:6px 8px}.career-map-tools button:nth-child(4){margin-left:3px}
