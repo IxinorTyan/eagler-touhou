@@ -68,11 +68,11 @@ test('career changes remain drafts until saved; cancel, local reload, summary an
   await click('[data-career-game="th06"] .career-game-toggle');
   await click(cell); assert.equal(node(cell).getAttribute('aria-pressed'), 'false');
   assert.ok(node('.career-selection').textContent.includes('Normal'));
-  await clickText('编辑生涯'); await click(cell);
+  await clickText('编辑生涯'); await click('.career-brushes [data-status="1cc"]'); await click(cell);
   assert.equal(node(cell).getAttribute('aria-pressed'), 'true');
   assert.ok(node('.career-overview').textContent.includes('尚未记录通关'));
   await clickText('取消'); assert.equal(node(cell).getAttribute('aria-pressed'), 'false');
-  await clickText('编辑生涯'); await click(cell); await clickText('保存记录');
+  await clickText('编辑生涯'); await click('.career-brushes [data-status="1cc"]'); await click(cell); await clickText('保存记录');
   assert.ok(node('.career-summary-list').textContent.includes('Normal'));
   assert.equal(Object.keys(JSON.parse(env.window.localStorage.getItem('eagler.book.' + api.CAREER_STORAGE_KEY))).length, 1);
   await React.act(async () => root.unmount()); root = null; await mount();
@@ -82,4 +82,62 @@ test('career changes remain drafts until saved; cancel, local reload, summary an
   await clickText('取消'); assert.equal(node(cell).getAttribute('aria-pressed'), 'true');
   await clickText('编辑生涯'); await clickText('清空记录'); await clickText('清空'); await clickText('保存记录');
   assert.ok(node('.career-overview').textContent.includes('尚未记录通关'));
+});
+
+test('records distinguish independent achievements, unknown counts and continued clears', () => {
+  const game = api.CAREER_GAMES[0];
+  const keys = game.loadouts.map(loadout => api.careerCellKey(game, 'Normal', loadout.id));
+  const records = {[keys[0]]: api.careerPreset('nm'), [keys[1]]: api.careerPreset('nb'), [keys[2]]: api.careerPreset('clear'), [keys[3]]: true};
+  assert.equal(api.validCareerRecords(records), true);
+  assert.equal(api.careerCount(game, records), 3);
+  assert.equal(api.careerBest(game, 'Normal', records), 'NM / NB');
+  assert.deepEqual(api.careerRecord(true), {status: '1cc'});
+  assert.equal(api.careerWithCounts({status: '1cc'}, undefined, undefined).status, '1cc');
+  assert.equal(api.careerWithCounts({status: '1cc'}, 0, 0).status, 'nn');
+  assert.equal(api.careerWithCounts({status: 'clear'}, 0, 0).status, 'clear');
+  assert.equal(api.careerWithCounts(api.careerPreset('nn'), 2, 0).status, 'nb');
+  for (const value of [{status: 'nn'}, {status: 'nb', bombs: 1}, {status: '1cc', misses: -1},
+    {status: '1cc', bombs: 1.2}, {status: '1cc', misses: Infinity}, {status: '1cc', restrictions: ['bogus']},
+    {status: '1cc', restrictions: ['nf', 'nf']}, {status: '1cc', challenge: 'a'.repeat(25)}, {status: '1cc', note: 'a'.repeat(241)}]) {
+    assert.equal(api.validCareerRecords({[keys[0]]: value}), false, JSON.stringify(value));
+  }
+  assert.equal(api.validCareerRecords({[keys[0]]: {status: 'nn', misses: 0, bombs: 0, restrictions: ['nf', 'special'], note: '无结界'}}), true);
+});
+
+test('brushes, detail counts, restrictions, erasing and persistence preserve the actual run', async () => {
+  const game = api.CAREER_GAMES[0], oldKey = api.careerCellKey(game, 'Hard', game.loadouts[0].id);
+  function Fixture() {
+    const [records, setRecords] = React.useState(() => api.readBookPreference(api.CAREER_STORAGE_KEY, {[oldKey]: true}, api.validCareerRecords));
+    return React.createElement(api.CareerShowcase, {records, onSave(next) {api.writeBookPreference(api.CAREER_STORAGE_KEY, next); setRecords(next);}});
+  }
+  const container = env.document.createElement('div'); env.document.body.append(container); root = createRoot(container);
+  await React.act(async () => root.render(React.createElement(Fixture)));
+  const cell = '[data-career-game="th06"] tr[data-difficulty="normal"] .career-cell';
+  const change = async (selector, value) => React.act(async () => {
+    const element = node(selector);
+    const prototype = element.tagName === 'SELECT' ? env.window.HTMLSelectElement.prototype : env.window.HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(prototype, 'value').set.call(element, value);
+    element.dispatchEvent(new env.window.Event(element.tagName === 'SELECT' ? 'change' : 'input', {bubbles: true}));
+  });
+  await clickText('编辑生涯'); await click('.career-brushes [data-status="nn"]'); await click(cell);
+  assert.equal(node(cell).dataset.status, 'nn');
+  await clickText('单格详情'); await click(cell);
+  assert.equal(node('input[aria-label="Miss 次数"]').value, '0');
+  await change('input[aria-label="Miss 次数"]', '2');
+  await click('input[name="nf"]');
+  await clickText('应用到草稿');
+  assert.equal(node(cell).dataset.status, 'nb');
+  assert.ok(node(cell).textContent.includes('2M · NF'));
+  await change('select[aria-label="通关方式"]', 'clear'); await clickText('应用到草稿');
+  assert.equal(node(cell).dataset.status, 'clear');
+  assert.ok(node('.career-toolbar').textContent.includes('1 项 1CC · 1 项续关通关'));
+  await clickText('保存记录');
+  const saved = JSON.parse(env.window.localStorage.getItem('eagler.book.' + api.CAREER_STORAGE_KEY));
+  const key = api.careerCellKey(game, 'Normal', game.loadouts[0].id);
+  assert.equal(saved[oldKey], true);
+  assert.deepEqual(saved[key], {status: 'clear', misses: 2, bombs: 0, restrictions: ['nf'], challenge: '', note: ''});
+  assert.equal(api.validCareerRecords(saved), true);
+  await clickText('编辑生涯'); await clickText('擦除'); await click(cell);
+  assert.equal(node(cell).getAttribute('aria-pressed'), 'false');
+  await clickText('取消'); assert.equal(node(cell).dataset.status, 'clear');
 });
