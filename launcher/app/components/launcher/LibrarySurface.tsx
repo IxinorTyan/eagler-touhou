@@ -28,5 +28,6 @@ export function LibrarySurface({masthead, footer, serverStatusNote, lobbyHref, r
       {children}
     </main>
     {roomDrawer}{serverStatusNote}
-  </div>{footer}</>;
+    {footer}
+  </div></>;
 }
