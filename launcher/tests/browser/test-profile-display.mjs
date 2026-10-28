@@ -9,9 +9,10 @@ const click = async (page, scope, text) => {
     const button = [...document.querySelectorAll(`${scope} button`)].find(el => el.textContent === text);
     if (!button) throw new Error(`Missing button: ${text}`);
     button.click();
-  }, {scope, text});
+  }, {scope, text}).then(() => page.waitForFunction(() => !document.documentElement.classList.contains('profile-transition')));
   if (scope === '.profile-perspective') {
     await page.$eval('.profile-perspective', (el, text) => {if (!el.textContent.includes(text)) el.click();}, text);
+    await page.waitForFunction(() => !document.documentElement.classList.contains('profile-transition'));
   } else if (scope === '.profile-identity' && ['编辑资料', '编辑展示'].includes(text)) {
     await press(scope, '账户设置');
     if (text === '编辑展示') await press('.profile-settings-heading', '隐私与个性化');

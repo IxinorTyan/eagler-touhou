@@ -166,3 +166,14 @@ html:has(.book-masthead) .profile-settings .profile-topbar{max-width:none;paddin
  .profile-settings .profile-wrap,.profile-settings .profile-topbar{position:relative;z-index:1}
 }
 @media(max-width:780px),(hover:none),(pointer:coarse){.profile-settings{--profile-header-height:109px}}
+
+/* Scope snapshots to profile interactions; masthead and surrounding artwork stay still. */
+html.profile-transition .player-profile{view-transition-name:profile-content}
+html.profile-transition::view-transition-group(*){animation:none}
+html.profile-transition::view-transition-old(*),html.profile-transition::view-transition-new(*){animation:none;mix-blend-mode:normal}
+html.profile-transition::view-transition-old(root),html.profile-transition::view-transition-old(launcher-page){visibility:hidden}
+html.profile-transition::view-transition-old(profile-content){animation:profile-content-out 140ms ease-out both}
+html.profile-transition::view-transition-new(profile-content){animation:profile-content-in 210ms ease-out both}
+@keyframes profile-content-out{to{opacity:0}}
+@keyframes profile-content-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){html.profile-transition::view-transition-old(profile-content),html.profile-transition::view-transition-new(profile-content){animation:none}}
