@@ -57,7 +57,11 @@ body:not(.mp-room-active):has(.book-masthead) {
 }
 /* The same source as the original Launcher is resolved by Vite for nested
    deployments and belongs to the existing offline asset graph. */
-body:not(.mp-room-active):has(.book-masthead)::before {display:none}
+body:not(.mp-room-active):has(.book-masthead)::before {
+  content:"";display:block;opacity:1;filter:none;transform:none;position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:linear-gradient(var(--book-overlay),var(--book-overlay)),url('../../../public/assets/launcher-background.webp') center/cover no-repeat;
+}
+html[data-book-theme='light'] body:not(.mp-room-active):has(.book-library)::before {display:none}
 body:not(.mp-room-active):has(.book-masthead) :is(.sheet,.book-directory) {position:relative;z-index:1;background:transparent}
 body:not(.mp-room-active) .book-masthead {background:color-mix(in srgb,var(--book-bg) 88%,transparent)}
 /* The same route layer serves the library, multiplayer, and profile pages. */
