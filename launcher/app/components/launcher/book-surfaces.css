@@ -257,7 +257,7 @@ body:not(.mp-room-active) :is(#toast,.toast) {border:1px solid var(--book-border
   .lobby-page .book-lobby-cover {grid-row:auto;width:28px;height:28px}
   .lobby-page .book-lobby-number {align-self:center}
   .lobby-page .book-lobby-game strong {align-self:center}
-  .lobby-page .lobby-rooms-column {grid-area:rooms;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:8px;min-width:0;min-height:0;overflow:hidden}
+  .lobby-page .lobby-rooms-column {grid-area:rooms;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto auto;gap:12px;min-width:0;min-height:0;overflow:hidden}
   .lobby-page .lobby-room-tools {align-items:center;min-width:0;margin:0}
   .lobby-page .lobby-list-surface {min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--book-border) transparent}
   .lobby-page .lobby-list-head {position:sticky;top:0;z-index:2;background:var(--book-surface)}
@@ -632,4 +632,23 @@ body:not(.mp-room-active) .main.library-layout>.tools .tools-head .library-back{
   .book-room-filters button{min-height:44px;padding:7px 2px;gap:3px;font-size:clamp(9px,2.6vw,11px)}
   .book-room-filter-count{grid-column:1/-1;margin:0;white-space:nowrap}
   .book-favorite{width:44px;height:44px}
+}
+
+/* Keep actions and filters intrinsic; only the room list consumes remaining height. */
+.lobby-page .lobby-rooms-column>.lobby-room-tools{grid-row:1;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:12px;margin:0;min-width:0}
+.lobby-page .lobby-room-tools .lobby-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;width:auto}
+.lobby-page .lobby-room-tools .lobby-actions .lobby-button{flex:0 0 auto;min-height:40px;white-space:nowrap}
+.lobby-page .lobby-room-tools .book-room-view-toggle{margin:0;white-space:nowrap}
+.lobby-page .lobby-rooms-column>.book-room-filters{grid-row:2;align-self:stretch;width:100%;box-sizing:border-box;margin:0;min-height:40px}
+.lobby-page .lobby-rooms-column>.lobby-list-surface{grid-row:3;align-self:stretch;margin:0}
+.lobby-page .lobby-rooms-column>#connectionNote{grid-row:4}
+@media(max-width:1000px),(hover:none),(pointer:coarse){
+ .lobby-page .lobby-rooms-column{display:flex;flex-direction:column;gap:12px;min-width:0}
+ .lobby-page .lobby-rooms-column>.lobby-list-surface{flex:none}
+}
+@media(max-width:600px){
+ .lobby-page .lobby-rooms-column>.lobby-room-tools{grid-template-columns:minmax(0,1fr)}
+ .lobby-page .lobby-room-tools .lobby-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) 40px;width:100%;gap:6px}
+ .lobby-page .lobby-room-tools .lobby-actions .lobby-button{width:100%;min-width:0;padding:8px 3px;font-size:11px}
+ .lobby-page .lobby-room-tools .book-room-view-toggle{justify-self:end}
 }
