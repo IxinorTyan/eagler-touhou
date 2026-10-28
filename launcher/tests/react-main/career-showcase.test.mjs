@@ -107,7 +107,7 @@ test('compact chart shares aligned difficulty rows and fits versus games on one 
 
 test('shared difficulty labels align every standard game including games without Easy', () => {
   const layout = api.trackerLayout(api.DEFAULT_OPTIONS);
-  for (const section of layout.sections) for (const block of section.games.filter(block => block.standard)) {
+  for (const section of layout.sections) for (const block of section.games.filter(block => block.standard && !block.ownLabels)) {
     const row = section.rows.find(row => block.difficulties.every((difficulty, index) =>
       row.labels.includes(difficulty) && row.y + row.labels.indexOf(difficulty) * 17 === block.y + index * 17));
     assert.ok(row, block.game.name);
@@ -121,4 +121,18 @@ test('every work uses a unique Th number for its display label', () => {
   assert.ok(labels.every(label => /^Th[0-9]{2}(?:\.[0-9])?$/.test(label)));
   assert.equal(api.trackerDisplayName({name: 'STB'}), 'Th09.5');
   assert.equal(api.trackerDisplayName({name: 'H.SOKU'}), 'Th12.3');
+});
+
+
+test('decimal tables form two gameplay rows and one compact scene row', () => {
+  const section = api.trackerLayout(api.DEFAULT_OPTIONS).sections[2];
+  assert.equal(section.rows.length, 3);
+  const expected = [['IAMP', 'SWR', 'H.SOKU', 'HM'], ['ULIL', 'AOCF', 'GI'], ['GFW', 'STB', 'DS', 'ISC', 'VD', '100BM']];
+  for (const [index, names] of expected.entries()) {
+    const blocks = section.games.filter(block => names.includes(block.game.name));
+    assert.deepEqual(blocks.map(block => block.game.name), names);
+    assert.equal(new Set(blocks.map(block => block.y + block.difficulties.length * 17)).size, 1);
+    assert.ok(blocks.every(block => block.y >= section.rows[index].y));
+  }
+  assert.ok(section.games.filter(block => ['GFW', 'GI', 'STB', 'DS', 'ISC', 'VD', '100BM'].includes(block.game.name)).every(block => block.drawDifficulties));
 });

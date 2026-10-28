@@ -229,7 +229,8 @@ export const trackerGames = [htrp, soew, podd, ls, ms, eosd, stb, ds, isc, vd, b
 export const trackerSections = [
     {title: '整数作', games: [htrp, soew, ls, ms, eosd, pcb, imp, mof, sa, ufo, td, ddc, lolk, hsifs, wbawc, um, th20]},
     {title: '对战作', games: [podd, pofv, udoalg]},
-    {title: '小数点作', games: [iamp, stb, swr, hsoku, ds, gfw, hm, isc, ulil, aocf, vd, bm, gi]},
+    {title: '小数点作', games: [iamp, swr, hsoku, hm, ulil, aocf, gi, gfw, stb, ds, isc, vd, bm],
+        groups: [[iamp, swr, hsoku, hm], [ulil, aocf, gi], [gfw, stb, ds, isc, vd, bm]]},
 ];
 const additionalGames = new Set([iamp, swr, hsoku, hm, ulil, aocf, gi]);
 function gameDifficulties(game, easy) {
@@ -248,30 +249,35 @@ export function trackerLayout(options) {
         let row = [], used = 0;
         const finishRow = () => {
             if (!row.length) return;
-            const standard = row.some(block => block.standard);
+            const standard = row.some(block => block.standard && !block.ownLabels);
             const maxRows = Math.max(...row.map(block => block.difficulties.length));
-            const labels = standard ? row.filter(block => block.standard).sort((a, b) => b.difficulties.length - a.difficulties.length)[0].difficulties : [];
+            const labels = standard ? row.filter(block => block.standard && !block.ownLabels).sort((a, b) => b.difficulties.length - a.difficulties.length)[0].difficulties : [];
             let x = 24 + (standard ? 30 : 0);
             for (const block of row) {
-                const offset = block.standard ? maxRows - labels.length + labels.indexOf(block.difficulties[0]) : maxRows - block.difficulties.length;
-                Object.assign(block, {x, y: y + offset * 17, height: block.difficulties.length * 17 + 18, drawDifficulties: !block.standard});
+                const offset = block.standard && !block.ownLabels ? maxRows - labels.length + labels.indexOf(block.difficulties[0]) : maxRows - block.difficulties.length;
+                x += block.gap;
+                Object.assign(block, {x, y: y + offset * 17, height: block.difficulties.length * 17 + 18, drawDifficulties: !block.standard || block.ownLabels});
                 games.push(block);
                 x += block.width;
             }
-            rows.push({y: y + (maxRows - labels.length) * 17, labels});
+            rows.push({y: y + (labels.length ? maxRows - labels.length : 0) * 17, labels});
             y += maxRows * 17 + 36;
             row = []; used = 0;
         };
-        for (const game of section.games.filter(game => options.extra || !additionalGames.has(game))) {
-            const difficulties = gameDifficulties(game, options.easy);
-            const standard = difficulties.every(difficulty => ['P', 'X', 'L', 'H', 'N', 'E'].includes(difficulty));
-            const columns = game.characters.reduce((n, character) => n + (character.subcharacters.length || 1), 0);
-            // Matching difficulty rows share a label gutter and touching game boundaries.
-            const width = columns * 17 + (standard ? 0 : 44);
-            if (row.length && (used + width + 30 > 752)) finishRow();
-            row.push({game, width, difficulties, standard}); used += width;
+        for (const group of section.groups ?? [section.games]) {
+            for (const game of group.filter(game => options.extra || !additionalGames.has(game))) {
+                const difficulties = gameDifficulties(game, options.easy);
+                const standard = difficulties.every(difficulty => ['P', 'X', 'L', 'H', 'N', 'E'].includes(difficulty));
+                const ownLabels = section.groups && [gfw, gi].includes(game);
+                const gap = section.groups && [gi, stb].includes(game) && row.length ? 17 : 0;
+                const columns = game.characters.reduce((n, character) => n + (character.subcharacters.length || 1), 0);
+                // Matching rows share labels; scene tables and special rules keep their own gutter.
+                const width = standard ? columns * 17 + (ownLabels ? 30 : 0) : Math.max(columns * 17, 42) + 44;
+                if (row.length && used + gap + width + 30 > 752) finishRow();
+                row.push({game, width, difficulties, standard, ownLabels, gap}); used += width + gap;
+            }
+            finishRow();
         }
-        finishRow();
         y += 12;
         return {title: section.title, top, games, rows};
     });
