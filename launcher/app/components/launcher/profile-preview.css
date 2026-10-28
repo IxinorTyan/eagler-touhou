@@ -15,5 +15,5 @@ html[data-book-theme='light'] .player-profile{color-scheme:light}.player-profile
 
 /* The avatar is the active destination while the profile is open. */
 .book-profile-trigger[aria-current='page']{outline:2px solid var(--book-accent);outline-offset:3px;border-color:transparent;color:var(--book-accent)}
-.player-profile{background:color-mix(in srgb,var(--book-bg) 76%,transparent);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.player-profile{background:transparent}
 .player-profile .profile-panel,.player-profile .profile-hero{background:color-mix(in srgb,var(--book-surface) 78%,transparent)}
