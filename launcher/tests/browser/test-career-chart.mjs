@@ -132,9 +132,20 @@ try {
     return frame.height < canvas.height / 2 && Math.abs(canvas.width - frame.width + 2) < 2;
   }));
   await page.click('.career-overview .career-thumbnail');
-  await page.waitForSelector('.career-viewer[open]');
-  assert.equal(await page.$eval('.career-viewer', dialog => dialog.matches(':modal')), true);
-  report.push('Overview enters full detail in one click; preview fills frame and detail opens at full width');
+  assert.equal(await page.$eval('.career-overview .career-thumbnail', el => el.getAttribute('aria-expanded')), 'true');
+  assert.equal(await page.$('.career-viewer[open]'), null);
+  assert.ok(await page.$eval('.career-overview .career-thumbnail', button => Math.abs(button.getBoundingClientRect().height - button.querySelector('canvas').getBoundingClientRect().height - 2) < 2));
+  await page.click('.career-overview-toggle');
+  assert.equal(await page.$eval('.career-overview .career-thumbnail', el => el.getAttribute('aria-expanded')), 'false');
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(theme => document.documentElement.dataset.bookTheme = theme, theme);
+    await page.waitForFunction(theme => {
+      const rgb = document.querySelector('.career-overview canvas').getContext('2d').getImageData(0,0,1,1).data;
+      return theme === 'light' ? rgb[0] === 255 : rgb[0] === 36;
+    }, {}, theme);
+    await page.screenshot({path:output+'/overview-'+theme+'.png',fullPage:true});
+  }
+  report.push('Overview expands and collapses inline; canvas responds to light and dark themes');
   assert.deepEqual(errors,[]);report.push('390px mobile layout, native two-finger pinch and close');
   await writeFile(output+'/report.json',JSON.stringify({passed:true,report},null,2));console.log(JSON.stringify({passed:true,report},null,2));
 }finally{await browser.close();}

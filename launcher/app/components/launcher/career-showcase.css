@@ -1,17 +1,19 @@
+html{--career-paper:#242524}
+html[data-book-theme='light']{--career-paper:#fff}
 /* Career chart: paper preview, quiet controls, and a separate help surface. */
 .career-heading{align-items:center;gap:16px;margin-bottom:20px}
 .career-heading h2{font-size:17px!important;letter-spacing:.03em}
 .career-total{display:flex;align-items:baseline;gap:6px;color:var(--book-muted);font-size:11px}
 .career-total b{font-size:22px;font-weight:500;font-variant-numeric:tabular-nums;color:var(--book-ink)}
-.player-profile .career-thumbnail{position:relative;display:block;width:100%;padding:0;overflow:hidden;border:1px solid var(--book-border);border-radius:6px;background:#fff;cursor:zoom-in}
-.player-profile .career-thumbnail canvas{display:block;width:100%;height:auto;max-width:none;max-height:none;margin:0;background:#fff;box-shadow:none;image-rendering:auto}
+.player-profile .career-thumbnail{position:relative;display:block;width:100%;padding:0;overflow:hidden;border:1px solid var(--book-border);border-radius:6px;background:var(--career-paper);cursor:zoom-in}
+.player-profile .career-thumbnail canvas{display:block;width:100%;height:auto;max-width:none;max-height:none;margin:0;background:var(--career-paper);box-shadow:none;image-rendering:auto}
 .career-thumbnail:hover{border-color:var(--book-accent);box-shadow:0 5px 20px #0000000b}
 .career-thumbnail:focus-visible{outline:2px solid var(--book-accent);outline-offset:4px}
 .career-card-footer{display:flex;justify-content:flex-end;padding-top:16px}
 .career-card-footer>div{display:flex;gap:8px}
 .player-profile .career-card-footer button{padding:8px 16px;border-radius:6px;font-size:11px}
 .player-profile .career-card-footer button:first-child{border-color:var(--book-accent);background:var(--book-accent);color:var(--book-on-accent,#fff)}
-.player-profile .career-overview .career-thumbnail canvas{position:absolute;top:0;left:0}
+.player-profile .career-overview .career-thumbnail[data-expanded=false] canvas{position:absolute;top:0;left:0}
 .career-overview .profile-section-title>span{color:var(--book-muted);font-size:11px}
 
 .career-viewer{position:fixed;inset:0;box-sizing:border-box;width:100vw;max-width:none;height:100dvh;max-height:none;margin:0;padding:0;border:0;background:var(--book-bg,#f6f2eb);color:var(--book-ink,#302c28);font-family:inherit;overflow:hidden}
@@ -40,7 +42,7 @@
 .career-map-tools>span{color:var(--book-muted,#8b8075);font-size:10px}
 .career-map-viewport{position:relative;flex:1;min-height:0;overflow:hidden;background-color:var(--book-raised,#eee9e2);background-image:radial-gradient(color-mix(in srgb,var(--book-muted,#8b8075) 18%,transparent) .7px,transparent .7px);background-size:20px 20px;touch-action:none;cursor:grab;overscroll-behavior:contain;user-select:none}
 .career-map-viewport:active{cursor:grabbing}
-.career-map-sheet{position:absolute;left:0;top:0;transform-origin:0 0;background:#fff;box-shadow:0 2px 6px #0000000a,0 16px 48px #00000020;will-change:transform}
+.career-map-sheet{position:absolute;left:0;top:0;transform-origin:0 0;background:var(--career-paper);box-shadow:0 2px 6px #0000000a,0 16px 48px #00000020;will-change:transform}
 .career-map-sheet canvas{display:block;width:800px;height:100%;image-rendering:auto}
 .career-viewer .career-map-cell{position:absolute;width:17px;height:17px;min-height:0;padding:0;border:0;border-radius:0;background:transparent;cursor:crosshair}
 .career-viewer .career-map-cell:hover,.career-viewer .career-map-cell.is-selected{z-index:1;outline:1.3px solid #af695f;outline-offset:-.7px;background:#af695f1a}
@@ -95,7 +97,7 @@
 .career-help-content h3{margin:0 0 14px;font-size:12px;font-weight:600}
 .career-help-content p{margin:10px 0 0;color:var(--book-muted,#8b8075);font-size:12px;line-height:1.9}
 .career-help-example{display:flex;align-items:center;gap:22px}
-.career-example-cell{display:grid;grid-template-columns:repeat(3,1fr);flex:0 0 72px;height:72px;padding:9px;border:1px solid #bcaaa0;border-radius:6px;background:#e6d7cb;color:#64544c;font-size:14px;font-variant-numeric:tabular-nums}
+.career-example-cell{display:grid;grid-template-columns:repeat(3,1fr);flex:0 0 72px;height:72px;padding:9px;border:1px solid var(--book-border);border-radius:6px;background:var(--book-raised);color:var(--book-ink);font-size:14px;font-variant-numeric:tabular-nums}
 .career-example-cell span{text-align:center}.career-example-cell b{font-size:16px;font-weight:500}
 .career-help-definitions{display:grid;gap:12px;margin:0}
 .career-help-definitions>div{display:grid;grid-template-columns:minmax(120px,1fr) 3fr;gap:16px}
@@ -123,3 +125,8 @@
 }
 @media(max-width:380px){.career-viewer-header{flex-wrap:wrap}.career-viewer-actions{width:100%;justify-content:flex-end}}
 @media(prefers-reduced-motion:reduce){.career-thumbnail,.career-viewer button{transition:none}}
+
+.player-profile .career-overview .career-thumbnail{cursor:pointer}
+.career-overview .profile-section-title{display:flex;align-items:center;gap:12px}
+.career-overview .career-total{margin-left:auto}
+.player-profile .career-overview-toggle{font-size:11px;padding:5px 10px}

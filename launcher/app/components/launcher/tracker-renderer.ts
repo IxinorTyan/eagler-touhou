@@ -287,16 +287,18 @@ export function createTrackerRenderer(surface) {
 const ctx = surface.getContext('2d');
 const canvas = {width: 800, height: 878};
 let transparentPng = false, easyMode = true;
+let paper = '#ffffff', ink = '#48443d', grid = '#d8d4cb';
 let state = new Map();
 function getBoxFromState(key) {return state.get(key) ?? new BoxObject(key);}
 const boxWidth = 17;
 function drawBoxContentsAux(x, y, done, misses, bombs, lives, vertical, focus, pacifist, unique, cellColour, textColour, colour) {
+    if (textColour.toLowerCase() === '#000000') textColour = ink;
     if (ctx) {
         if (done) {
             ctx.fillStyle = colour;
         }
         else {
-            ctx.fillStyle = cellColour;
+            ctx.fillStyle = cellColour.toLowerCase() === '#ffffff' ? paper : cellColour;
         }
         ctx.save();
         if (done) ctx.globalAlpha = .30;
@@ -338,7 +340,7 @@ function drawBoxContents(x, y, boxName, colour) {
     const box = getBoxFromState(boxName);
     drawBoxContentsAux(x, y, box.done, box.misses, box.bombs, box.lives, box.vertical, box.focus, box.pacifist, box.unique, box.cellColour, box.textColour, colour);
 }
-function drawText(text, x, y, align = 'left', font = '600 8px "Segoe UI", sans-serif', colour = "#48443d") {
+function drawText(text, x, y, align = 'left', font = '600 8px "Segoe UI", sans-serif', colour = ink) {
     x -= 0.5; // Dumb hack for Windows
     if (ctx) {
         ctx.font = font;
@@ -352,7 +354,7 @@ function drawUILine(x, y, drop, width) {
         ctx.beginPath();
         ctx.lineTo(x, y);
         ctx.lineTo(x, y + drop);
-        ctx.strokeStyle = '#d8d4cb';
+        ctx.strokeStyle = grid;
         ctx.lineWidth = width;
         ctx.stroke();
     }
@@ -368,7 +370,7 @@ function drawDot(colour, x, y, width = 2) {
 let boxes = [];
 function drawCellGrid(cells) {
     const edges = trackerCellEdges(cells, boxWidth);
-    ctx.strokeStyle = '#d8d4cb';
+    ctx.strokeStyle = grid;
     ctx.lineJoin = 'miter';
     // Each shared edge is stroked once. Thick outlines follow the actual cell union,
     // including the stepped Extra rows, instead of a separately offset shape.
@@ -420,7 +422,7 @@ function drawGame(game, baseX, baseY, drawDifficulties = false) {
     if (game.name === 'IN') {
         // Upstream places route markers below short ticks in the label gutter.
         // The ticks meet the left border; ordinary cell edges continue across the grid.
-        ctx.strokeStyle = '#d8d4cb';
+        ctx.strokeStyle = grid;
         ctx.lineWidth = 1;
         ctx.lineCap = 'butt';
         for (const route of ['B-L', 'A-L']) {
@@ -454,12 +456,12 @@ function drawScreen(layout) {
     boxes = [];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (!transparentPng) {
-        ctx.fillStyle = 'white';
+        ctx.fillStyle = paper;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
     for (const section of layout.sections) {
         drawText(section.title, 24, section.top + 14, 'left', '600 14px "Segoe UI", "Microsoft YaHei", sans-serif');
-        ctx.strokeStyle = '#d8d4cb';
+        ctx.strokeStyle = grid;
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(106, section.top + 9); ctx.lineTo(776, section.top + 9); ctx.stroke();
         for (const row of section.rows) row.labels.forEach((difficulty, index) =>
@@ -469,7 +471,10 @@ function drawScreen(layout) {
 
 }
 
-return {draw(records, options) {
+return {draw(records, options, dark = false) {
+    paper = dark ? '#242524' : '#ffffff';
+    ink = dark ? '#d7d4ce' : '#48443d';
+    grid = dark ? '#575954' : '#d8d4cb';
     state = new Map(Object.entries(records));
     transparentPng = options.transparent; easyMode = options.easy;
     const layout = trackerLayout(options);

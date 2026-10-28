@@ -18,17 +18,20 @@ function Chart({records, options, onCells}: {records: CareerRecords; options: Tr
     if (!canvas) return;
     const renderer = createTrackerRenderer(canvas);
     let active = true;
-    const draw = () => {if (active) {const cells = renderer.draw(records, options); onCells?.(cells);}};
+    const draw = () => {if (active) {const cells = renderer.draw(records, options, document.documentElement.dataset.bookTheme !== 'light'); onCells?.(cells);}};
+    const observer = new MutationObserver(draw);
+    observer.observe(document.documentElement, {attributes: true, attributeFilter: ['data-book-theme']});
     draw();
-    return () => {active = false;};
+    return () => {active = false; observer.disconnect();};
   }, [records, options, onCells]);
   return <canvas ref={own} width={800} height={chartHeight(options)} aria-label="东方全作品通关图，使用下方入口放大查看"/>;
 }
 
-export function CareerSummary({records, onOpen}: {records: CareerRecords; onOpen: () => void}) {
+export function CareerSummary({records}: {records: CareerRecords}) {
+  const [expanded, setExpanded] = useState(false);
   const previewHeight = trackerLayout(DEFAULT_OPTIONS).sections[0].rows[1].y - 12;
-  return <section className="profile-panel career-overview"><div className="profile-section-title"><h2>东方通关图</h2><span className="career-total"><b>{completed(records)}</b> 项通关</span></div>
-    <button type="button" className="career-thumbnail" style={{aspectRatio: "800 / " + previewHeight}} onClick={() => onOpen()} aria-label="查看完整生涯通关图"><Chart records={records} options={DEFAULT_OPTIONS}/></button></section>;
+  return <section className="profile-panel career-overview"><div className="profile-section-title"><h2>东方通关图</h2><span className="career-total"><b>{completed(records)}</b> 项通关</span><button type="button" className="career-overview-toggle" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? "收起" : "展开"}</button></div>
+    <button type="button" className="career-thumbnail" style={expanded ? undefined : {aspectRatio: "800 / " + previewHeight}} data-expanded={expanded} aria-expanded={expanded} onClick={() => setExpanded(value => !value)} aria-label={expanded ? "收起通关图" : "展开通关图"}><Chart records={records} options={DEFAULT_OPTIONS}/></button></section>;
 }
 
 export function CareerShowcase({records, onSave, initiallyOpen = false}: {records: CareerRecords; onSave: (next: CareerRecords) => void; initiallyOpen?: boolean}) {
@@ -118,7 +121,7 @@ export function CareerShowcase({records, onSave, initiallyOpen = false}: {record
     if (cell) select(cell.key);
   };
   const exportPng = async () => {
-    const canvas = document.createElement('canvas'); createTrackerRenderer(canvas).draw(shown, options);
+    const canvas = document.createElement('canvas'); createTrackerRenderer(canvas).draw(shown, options, document.documentElement.dataset.bookTheme !== 'light');
     saveFile('touhou-1cc-chart.png', canvas.toDataURL('image/png'));
   };
   const exportJson = () => {const url = URL.createObjectURL(new Blob([JSON.stringify({version: 2, records: shown, options}, null, 2)], {type: 'application/json'})); saveFile('touhou-career.json', url); setTimeout(() => URL.revokeObjectURL(url), 1000);};
