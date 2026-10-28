@@ -22,12 +22,11 @@ export function LibrarySurface({masthead, footer, serverStatusNote, lobbyHref, r
     <main className={`main library-layout${roomOpen ? ' mp-room-open' : ''}`} id="main">
       <h1 className="visually-hidden">东方Project 原作 STG ~ EAGLER TOUHOU</h1>
       <div className="game-library" inert={optionsOpen}>
-        <BookLibrary {...rail}/>
+        <BookLibrary {...rail} footer={footer}/>
       </div>
       <OptionsBackdrop onBack={onBack}/>
       {children}
     </main>
     {roomDrawer}{serverStatusNote}
-    {footer}
   </div></>;
 }

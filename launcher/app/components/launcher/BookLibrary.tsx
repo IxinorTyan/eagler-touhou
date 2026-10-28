@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useState, type ReactNode} from 'react';
 import {useLocale} from '../../i18n';
 import {useOptionsTarget} from './options-ownership';
 import type {LibraryCardsProps} from './LibraryCards';
@@ -6,11 +6,11 @@ import type {LibraryProduct} from './products';
 import {BOOK_PREFERENCES_EVENT, bookCategory, filterBookProducts, readBookPreference, writeBookPreference, stringArray, type BookCategory} from './book-preferences';
 import {bookArtwork} from './book-artwork';
 
-type Props = Omit<LibraryCardsProps, 'variant' | 'lobbyLink' | 'inert'>;
+type Props = Omit<LibraryCardsProps, 'variant' | 'lobbyLink' | 'inert'> & {footer?: ReactNode};
 const categories: BookCategory[] = ['all', 'favorites', 'windows', 'pc98', 'spin-off', 'doujin'];
 
 /** Presentation only: activation still enters the existing Router/settings owner. */
-export function BookLibrary({products, openedProduct, onSelect, onActivate, interactive = true}: Props) {
+export function BookLibrary({products, openedProduct, onSelect, onActivate, interactive = true, footer}: Props) {
   const {locale} = useLocale(), en = locale === 'en';
   const [category, setCategory] = useState<BookCategory>('all');
   const [query, setQuery] = useState(''), [sort, setSort] = useState('number');
@@ -56,6 +56,7 @@ export function BookLibrary({products, openedProduct, onSelect, onActivate, inte
       <p className="book-sidebar-note">EAGLER TOUHOU</p>
     </aside>
     <div className="book-content">
+      <div className="book-content-main">
       <section className="book-recent" aria-labelledby="bookRecentTitle"><div className="book-section-heading"><h2 id="bookRecentTitle">{en ? 'Recently played' : '最近游玩'}</h2><span>{en ? 'Your latest adventures' : '按最近启动顺序'}</span></div>
         <div className="book-recent-games">{history.length ? history.map(product => <article key={product.id}>{gameLink(product, true)}</article>) : <p className="book-recent-empty">{en ? 'Choose a game below to begin your collection.' : '还没有游玩记录，从下方选择一部作品开始吧。'}</p>}</div>
       </section>
@@ -66,6 +67,8 @@ export function BookLibrary({products, openedProduct, onSelect, onActivate, inte
       </div>
       <div className="book-grid">{list.map(product => <article key={product.id} className="book-card">{gameLink(product)}<button className="book-favorite" data-book-favorite={product.id} type="button" disabled={!interactive} aria-label={`${en ? 'Favorite' : '收藏'} ${product.title}`} aria-pressed={favorites.includes(product.id)} onClick={() => toggleFavorite(product.id)}><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 3 2.78 5.63L21 9.54l-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.93 1.06-6.2L3 9.54l6.22-.91Z"/></svg></button></article>)}</div>
       {!list.length && <div className="book-empty"><h3>{en ? 'No matching games' : '未找到匹配的游戏'}</h3><p>{en ? 'Try another search or category.' : '请尝试搜索其他关键词或选择其他分类。'}</p><button type="button" onClick={() => {setQuery(''); setCategory('all');}}>{en ? 'Reset filters' : '重置筛选'}</button></div>}
+      </div>
+      {footer}
     </div>
   </div>;
 }

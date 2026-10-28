@@ -40,19 +40,24 @@ body:not(.mp-room-active):has(.book-masthead):before,body:not(.mp-room-active):h
 .book-library :is(button,a,input,select){-webkit-tap-highlight-color:transparent}
 .book-library button:disabled{cursor:default}
 .less-motion :is(.book-card,.book-art img){transition:none!important}
-body:not(.mp-room-active):has(.book-library) .site-footer{position:static;max-width:1360px;margin:0 auto;padding:0 24px 20px;color:var(--book-muted);font-size:11px}
+body:not(.mp-room-active):has(.book-library) .site-footer{position:static;max-width:1360px;margin:0 auto;padding:0 24px 20px;color:var(--book-muted);font-size:11px;justify-content:center;justify-items:center;text-align:center}
+body:not(.mp-room-active):has(.book-library) .site-footer-inner{justify-items:center}
+body:not(.mp-room-active):has(.book-library) .site-footer p{justify-content:center}
+body:not(.mp-room-active):has(.book-library) .site-footer-divider{margin-left:auto;margin-right:auto}
 body:not(.mp-room-active):has(.book-library) .site-footer :is(a,button){color:var(--book-muted)}
 @media(min-width:781px) and (hover:hover) and (pointer:fine){
-  body:not(.mp-room-active):has(.book-library) .sheet{display:grid;grid-template-rows:minmax(0,1fr) auto;gap:0;height:calc(100dvh - 61px);min-height:0;overflow:hidden}
+  body:not(.mp-room-active):has(.book-library) .sheet{display:grid;grid-template-rows:minmax(0,1fr);gap:0;height:calc(100dvh - 61px);min-height:0;overflow:hidden}
   body:not(.mp-room-active):has(.book-library) .main.library-layout,
   body:not(.mp-room-active):has(.book-library) .game-library{height:100%;min-height:0}
   body:not(.mp-room-active):has(.book-library) .main.library-layout{grid-row:1}
-  body:not(.mp-room-active):has(.book-library) .site-footer{grid-row:2}
-  .book-library{height:100%;box-sizing:border-box;overflow:hidden}
+  .book-content-main{min-height:100%;margin-left:262px}
+  body:not(.mp-room-active):has(.book-library) .site-footer{padding-top:32px}
+  .book-library{position:relative;display:block;height:100%;box-sizing:border-box;overflow:hidden}
   .book-sidebar,.book-content{height:100%;min-height:0;overscroll-behavior-y:contain;scrollbar-width:thin;scrollbar-color:var(--book-border) transparent}
-  .book-sidebar{position:relative;top:auto;align-self:stretch;overflow-y:auto}
+  .book-sidebar{position:absolute;left:24px;top:30px;bottom:48px;width:230px;height:calc(100% - 78px);box-sizing:border-box;overflow-y:auto;z-index:1}
   .book-content{overflow-y:auto;padding-right:4px}
 }
+@media(min-width:781px) and (max-width:1050px) and (hover:hover) and (pointer:fine){.book-sidebar{width:205px}.book-content-main{margin-left:228px}}
 .book-main-nav button:disabled{opacity:.45;cursor:default}
 body:not(.mp-room-active):has(.book-directory){--lobby-paper:var(--book-ink);--lobby-muted:var(--book-muted);--lobby-pink:var(--book-accent-soft);--lobby-wine:var(--book-accent);background:var(--book-bg);color:var(--book-ink)}
 .book-directory{display:grid;grid-template-columns:220px minmax(0,1fr);grid-template-areas:"head head" "survey survey" "intro intro" "warning warning" "notice notice" "membership membership" "games tools" "games rooms" "games connection" "count count";column-gap:28px;max-width:1360px;padding:0 24px 35px}
