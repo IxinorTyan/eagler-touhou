@@ -1,4 +1,5 @@
-import {useSyncExternalStore} from 'react';
+import {useEffect, useState, useSyncExternalStore} from 'react';
+import {BOOK_PREFERENCES_EVENT, readBookPreference, stringArray} from '../launcher/book-preferences';
 import {useLocale} from '../../i18n';
 import {LobbySurface, type LobbySurfaceProps} from '../launcher/LobbySurface';
 import {DirectoryRoomRows} from './DirectoryRoomRows';
@@ -17,13 +18,20 @@ export interface LobbyDirectoryViewProps extends Omit<LobbySurfaceProps, Derived
 /** Original lobby.mts349–385 render conditions, composed once in LobbySurface. */
 export function LobbyDirectoryView({service, assetUrl, onOpenForm, onReplay, initialRows = false, ...surface}: LobbyDirectoryViewProps) {
   const {t} = useLocale(), snapshot = useSyncExternalStore(service.subscribe, service.getSnapshot, service.getSnapshot);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  useEffect(() => {
+    const refresh = () => setFavorites(readBookPreference('multiplayer-favorites', [], stringArray));
+    refresh(); window.addEventListener(BOOK_PREFERENCES_EVENT, refresh); window.addEventListener('storage', refresh);
+    return () => {window.removeEventListener(BOOK_PREFERENCES_EVENT, refresh); window.removeEventListener('storage', refresh);};
+  }, []);
   // Background reconnects keep the warning and last known rows on screen.
   // Only the first connection presents a loading layer.
   const visibleRooms = snapshot.connectionInterrupted && snapshot.loading
     ? snapshot.rooms.filter(room => !snapshot.selectedProduct || room.product === snapshot.selectedProduct)
     : snapshot.visibleRooms;
+  const filteredRooms = surface.productFilters?.length ? visibleRooms.filter(room => surface.productFilters!.includes(room.product)) : visibleRooms;
   const state = {...snapshot, loading: snapshot.loading && !snapshot.connectionInterrupted,
-    visibleRooms: surface.productFilters?.length ? visibleRooms.filter(room => surface.productFilters!.includes(room.product)) : visibleRooms};
+    visibleRooms: [...filteredRooms].sort((a, b) => Number(favorites.includes(b.product)) - Number(favorites.includes(a.product)))};
   const disabled = state.connection !== 'live' || !!state.mine || state.leaving || !state.products.length;
   const warning = <aside className="lobby-warning lobby-connection-warning" id="connectionWarning" role="alert" hidden={!state.connectionInterrupted}>
     <div><strong><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 4.7 2.8 18a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.7a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4m0 4h.01"/></svg><span id="connectionWarningTitle">{t(state.connection === 'unsupported' ? 'lobby.unsupported' : state.rooms.length ? 'lobby.disconnected' : 'lobby.offline')}</span></strong><p id="connectionWarningHint">{t(state.connection === 'unsupported' ? 'lobby.unsupportedHint' : state.connection === 'missing' ? 'lobby.noService' : 'lobby.refreshHint')}</p></div>

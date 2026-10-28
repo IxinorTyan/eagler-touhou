@@ -322,6 +322,38 @@ for (const [kind, title, hint] of [['offline', 'lobby.offline', 'lobby.refreshHi
     if (kind === 'unsupported') assert.equal(f.sockets.length, before + 1);
   });
 }
+test('favorite multiplayer rooms sort first, update immediately and retain order within each group', async () => {
+  const rooms = [room({code:'1111'}), room({product:'th07mp',code:'2222'}), room({code:'3333'}), room({product:'th07mp',code:'4444'})];
+  const f = await fixture({selectedProduct:''}).live(rooms);
+  const saved = env.window.localStorage.getItem('eagler.book.multiplayer-favorites');
+  const order = () => all('#roomList .lobby-room-row').map(el => el.dataset.key);
+  const original = rooms.map(room => `${room.product}-${room.code}`);
+  try {
+    env.window.localStorage.setItem('eagler.book.multiplayer-favorites', JSON.stringify(['th07mp']));
+    const {m} = await mountLobby(f);
+    const favoriteFirst = ['th07mp-2222','th07mp-4444','th06mp-1111','th06mp-3333'];
+    assert.deepEqual(order(), favoriteFirst);
+    const retained = n('[data-key="th06mp-1111"]');
+    await f.receive(rooms); assert.deepEqual(order(), favoriteFirst);
+    await React.act(async () => {
+      env.window.localStorage.setItem('eagler.book.multiplayer-favorites', '[]');
+      env.window.dispatchEvent(new env.window.CustomEvent('eagler-book-preferences'));
+    });
+    assert.deepEqual(order(), original); assert.equal(n('[data-key="th06mp-1111"]'),retained);
+    await React.act(async () => {
+      env.window.localStorage.setItem('eagler.book.multiplayer-favorites', JSON.stringify(['th07mp']));
+      env.window.dispatchEvent(new env.window.Event('storage'));
+    });
+    assert.deepEqual(order(), favoriteFirst);
+    await m.update({productFilters:['th06mp']});
+    assert.deepEqual(order(), ['th06mp-1111','th06mp-3333']);
+    assert.deepEqual(f.service.getSnapshot().visibleRooms.map(room => `${room.product}-${room.code}`),original);
+  } finally {
+    if (saved === null) env.window.localStorage.removeItem('eagler.book.multiplayer-favorites');
+    else env.window.localStorage.setItem('eagler.book.multiplayer-favorites',saved);
+  }
+});
+
 test('Lobby failed live connection retains stale room warning, interrupted reconnect, and recovery', async () => {
   const f = await fixture().live([room()]); await mountLobby(f); await f.emit('error');
   assert.equal(n('#connectionWarningTitle').textContent, t('en', 'lobby.disconnected')); assert.equal(n('#connectionWarning').hidden, false);
