@@ -148,12 +148,17 @@ function Footer({donationAvailable}: {donationAvailable: boolean}) {const naviga
 function Directory({session, network, ...props}: LobbySurfaceProps & {session: BrowserSession; network: React.RefObject<NetworkDiagnosticsHandle | null>}) {
   const navigation = useSurfaceNavigation();
   const location = useLocation();
+  const routeViewingProduct = useMemo(() => {
+    const product = new URLSearchParams(location.search).get('game') || '';
+    return isMultiplayerProductId(product) ? product : '';
+  }, [location.search]);
   const directory = useSyncExternalStore(session.directory.subscribe, session.directory.getSnapshot, session.directory.getSnapshot);
   const productFilters = useMemo(() => {
     const params = new URLSearchParams(location.search);
-    return [...new Set((params.get('game') || params.get('games') || '').split(','))]
+    return [...new Set((params.get('games') || '').split(','))]
       .filter(id => isMultiplayerProductId(id) && (!directory.initialized || directory.products.includes(id)));
   }, [location.search, directory.initialized, directory.products]);
+  const viewingProduct = productFilters.length ? '' : routeViewingProduct;
   useEffect(() => {
     let active = true;
     queueMicrotask(() => {if (active) session.directory.resumeView();});
@@ -166,12 +171,15 @@ function Directory({session, network, ...props}: LobbySurfaceProps & {session: B
     return () => {active = false; session.directory.pageHide(); window.removeEventListener('pagehide', pageHide); window.removeEventListener('pageshow', pageShow);
       window.removeEventListener('online', session.directory.online); window.removeEventListener('offline', session.directory.offline); document.removeEventListener('visibilitychange', visible); connection?.removeEventListener('change', session.directory.networkChanged);};
   }, [session]);
-  useEffect(() => {session.directory.selectProduct(productFilters.length === 1 ? productFilters[0] : '');}, [session, productFilters]);
+  useEffect(() => {session.directory.selectProduct(productFilters.length === 1 ? productFilters[0] : viewingProduct);}, [session, productFilters, viewingProduct]);
   return <LobbyDirectoryView {...props} initialRows={document.documentElement.hasAttribute('data-lobby-boot')} service={session.directory} products={createLibraryProducts(directory.products, path => new URL(path, session.baseUrl).href, id => `?game=${id}`)}
-    productFilters={productFilters} onProductFiltersChange={ids => {
+    viewingProduct={viewingProduct} onSelect={id => {
+      const next = new URL(window.location.href); next.searchParams.delete('games');
+      next.searchParams.delete('game'); if (id) next.searchParams.set('game', id);
+      navigation.navigateAddress(routerDestination(next.href, session.baseUrl));
+    }} productFilters={productFilters} onProductFiltersChange={ids => {
       const next = new URL(window.location.href); next.searchParams.delete('game'); next.searchParams.delete('games');
-      if (ids.length === 1) next.searchParams.set('game', ids[0]);
-      else if (ids.length > 1) next.searchParams.set('games', ids.join(','));
+      if (ids.length) next.searchParams.set('games', ids.join(','));
       navigation.navigateAddress(routerDestination(next.href, session.baseUrl));
     }}
     assetUrl={path => new URL(path, session.baseUrl).href} onGuide={() => navigation.openInfoDialog('mpGuideDialog')}

@@ -57,7 +57,7 @@ export function BookLibrary({products, openedProduct, onSelect, onActivate, inte
     </aside>
     <div className="book-content">
       <div className="book-content-main">
-      <section className="book-recent" aria-labelledby="bookRecentTitle"><div className="book-section-heading"><h2 id="bookRecentTitle">{en ? 'Recently played' : '最近游玩'}</h2><span>{en ? 'Your latest adventures' : '按最近启动顺序'}</span></div>
+      <section className={`book-recent${history.length ? '' : ' is-empty'}`} aria-labelledby="bookRecentTitle"><div className="book-section-heading"><h2 id="bookRecentTitle">{en ? 'Recently played' : '最近游玩'}</h2><span>{en ? 'Your latest adventures' : '按最近启动顺序'}</span></div>
         <div className="book-recent-games">{history.length ? history.map(product => <article key={product.id}>{gameLink(product, true)}</article>) : <p className="book-recent-empty">{en ? 'Choose a game below to begin your collection.' : '还没有游玩记录，从下方选择一部作品开始吧。'}</p>}</div>
       </section>
       <div className="book-view-header"><div className="book-current"><h2>{labels[category]}</h2><span role="status">{list.length} {en ? 'games' : '部作品'}</span></div>

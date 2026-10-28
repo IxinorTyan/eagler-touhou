@@ -682,3 +682,26 @@ test('Directory rules column retains gameplay flags and the standard fallback', 
   assert.equal(n('.lobby-room-rules').textContent,'标准');
   await click('.book-room-view-toggle button:first-child');
 });
+
+
+test('room quick filters distinguish playable seats, waiting rooms and spectators and update with the live directory', async () => {
+  const rooms = [room({code: '1111'}), room({code: '2222', players: 3, seats: [...room().seats.slice(0, 2), {initial: 'S', online: true, ready: false, controlMode: 'normal'}]}), room({code: '3333', phase: 'playing', players: 3}), room({code: '4444', joinable: false})];
+  const f = await fixture({selectedProduct: ''}).live(rooms);
+  await mountLobby(f);
+  const keys = () => all('.lobby-room-row').map(n => n.dataset.key);
+  assert.equal(keys().length, 4);
+  await click('[data-room-filter="open"]');
+  assert.deepEqual(keys(), ['th06mp-1111']);
+  await click('[data-room-filter="waiting"]');
+  assert.deepEqual(keys(), ['th06mp-1111', 'th06mp-2222', 'th06mp-4444']);
+  await click('[data-room-filter="spectate"]');
+  assert.deepEqual(keys(), ['th06mp-2222', 'th06mp-3333']);
+  await click('[data-room-filter="open"]');
+  await f.receive(rooms.slice(1));
+  assert.equal(keys().length, 0);
+  assert.equal(n('#emptyTitle').textContent, 'No matching rooms');
+  await click('#emptyAction');
+  assert.equal(n('[data-room-filter="all"]').getAttribute('aria-pressed'), 'true');
+  assert.equal(keys().length, 3);
+  assert.equal(f.navigations.length, 0, 'filtering never enters a room');
+});

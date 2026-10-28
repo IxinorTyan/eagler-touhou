@@ -34,23 +34,32 @@ const click = selector => React.act(async () => node(selector).click());
 const ids = () => [...env.document.querySelectorAll('.book-grid [data-book-product]')].map(node => node.dataset.bookProduct);
 test('multiplayer filters allow several games, all resets them, and favorites persist and sort first', async () => {
   const products = api.createLibraryProducts(['th06mp', 'th07mp', 'th08mp'], p => p, id => '?game=' + id);
-  const activated = [];
+  const viewed = [];
   function Fixture() {
     const [filters, setFilters] = React.useState([]);
-    return React.createElement(api.BookDirectoryGames, {products, productFilters: filters, onProductFiltersChange: setFilters, onSelect() {}, onActivate: id => activated.push(id)});
+    const [viewing, setViewing] = React.useState('');
+    return React.createElement(api.BookDirectoryGames, {products, productFilters: filters, viewingProduct: viewing,
+    onProductFiltersChange: ids => {setFilters(ids); setViewing('');}, onSelect: id => {if (id) viewed.push(id); setViewing(id); if (!id) setFilters([]);}});
   }
   const container = env.document.createElement('div'); env.document.body.append(container); root = createRoot(container);
   const render = () => React.act(async () => root.render(React.createElement(api.LocaleProvider, {locale: 'en'}, React.createElement(Fixture))));
   await render();
   await click('[data-lobby-product="th06mp"] input'); await click('[data-lobby-product="th08mp"] input');
-  assert.deepEqual([...env.document.querySelectorAll('input:checked')].map(n => n.parentElement.dataset.lobbyProduct), ['th06mp', 'th08mp']);
+  assert.deepEqual([...env.document.querySelectorAll('input:checked')].map(n => n.closest('[data-lobby-product]').dataset.lobbyProduct), ['th06mp', 'th08mp']);
   await click('[data-lobby-product="th08mp"] .book-lobby-favorite');
   assert.equal(node('[data-lobby-product]').dataset.lobbyProduct, 'th08mp');
   assert.equal(env.document.querySelectorAll('input:checked').length, 2);
   await click('.book-lobby-all'); assert.equal(env.document.querySelectorAll('input:checked').length, 0);
   await click('[data-lobby-product="th07mp"] .book-lobby-game');
-  assert.equal(node('input:checked').parentElement.dataset.lobbyProduct, 'th07mp');
-  await click('[data-lobby-product="th07mp"] .book-lobby-game'); assert.deepEqual(activated, ['th07mp']);
+  assert.deepEqual([...env.document.querySelectorAll('input:checked')].map(n => n.closest('[data-lobby-product]').dataset.lobbyProduct), []);
+  assert.deepEqual(viewed, ['th07mp']);
+  assert.equal(node('[data-lobby-product="th07mp"]').dataset.viewing, 'true');
+  await click('[data-lobby-product="th07mp"] .book-lobby-game'); assert.deepEqual(viewed, ['th07mp', 'th07mp']);
+  assert.deepEqual([...env.document.querySelectorAll('input:checked')].map(n => n.closest('[data-lobby-product]').dataset.lobbyProduct), [], 'viewing does not change filters');
+  await click('[data-lobby-product="th06mp"] input'); await click('[data-lobby-product="th08mp"] input');
+  assert.deepEqual([...env.document.querySelectorAll('input:checked')].map(n => n.closest('[data-lobby-product]').dataset.lobbyProduct), ['th08mp', 'th06mp'], 'only checkboxes control multi-select');
+  assert.equal(node('[data-lobby-product="th07mp"] .book-lobby-game').getAttribute('aria-pressed'), 'false', 'checkbox filtering clears the view-only selection');
+  assert.equal(env.document.querySelector('[data-lobby-product] .book-lobby-settings'), null, 'the directory has no game settings button');
   await React.act(async () => root.unmount()); root = createRoot(container); await render();
   assert.equal(node('[data-lobby-product]').dataset.lobbyProduct, 'th08mp');
   assert.equal(node('[data-lobby-product="th08mp"] .book-lobby-favorite').getAttribute('aria-pressed'), 'true');

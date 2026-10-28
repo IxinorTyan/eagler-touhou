@@ -1498,13 +1498,32 @@ test('actual BrowserLauncher: late Host fallback before Start uses the current m
   }
 });
 
-// Main lobby.mts113 gives the directory guide its filter product. The Launcher
-// Host's independently retained business selection is not the directory filter.
-for (const timing of ['together', 'after-directory']) test(`actual BrowserLauncher: lobby guide follows directory filter and settings stay explicit (Host ${timing})`, async () => {
+test('actual BrowserLauncher: checkbox multi-filtering and game-only viewing remain independent', async () => {
+  const {directorySocket} = await liveActualDirectory();
+  await until(() => !node('#lobbyGameRail [data-lobby-product="th07mp"] input').disabled, 'TH07 checkbox becomes interactive');
+  await click('#lobbyGameRail [data-lobby-product="th06mp"] input');
+  await until(() => new URL(currentUrl(), env.window.location.href).searchParams.get('games') === 'th06mp', 'first checkbox creates an explicit filter');
+  await click('#lobbyGameRail [data-lobby-product="th07mp"] input');
+  await until(() => new URL(currentUrl(), env.window.location.href).searchParams.get('games') === 'th06mp,th07mp', 'second checkbox adds to the multi-filter');
+  assert.equal(node('#lobbyGameRail [data-lobby-product="th06mp"] input').checked, true);
+  assert.equal(node('#lobbyGameRail [data-lobby-product="th07mp"] input').checked, true);
+  await click('#lobbyGameRail [data-lobby-product="th07mp"] .book-lobby-game');
+  await until(() => new URL(currentUrl(), env.window.location.href).searchParams.get('game') === 'th07mp' &&
+    !new URL(currentUrl(), env.window.location.href).searchParams.has('games'), 'game button replaces checkboxes with one viewed game');
+  assert.equal(node('#lobbyGameRail [data-lobby-product="th06mp"] input').checked, false);
+  assert.equal(node('#lobbyGameRail [data-lobby-product="th07mp"] input').checked, false);
+  assert.equal(node('#lobbyGameRail [data-lobby-product="th07mp"]').dataset.viewing, 'true');
+  assert.equal(node('#lobbyOptionsDialog').open, false, 'view-only does not open options');
+  assert.ok(directorySocket, 'real directory transport remained mounted during filter changes');
+});
+
+// A direct game query and the explicit room-filter checkboxes have separate state.
+for (const timing of ['together', 'after-directory']) test(`actual BrowserLauncher: lobby guide follows the viewed game without checking its box (Host ${timing})`, async () => {
   const f = await mountBrowser({initial: '/lobby.html?game=th07mp&keep=a%20b', holdHost: timing === 'after-directory' ? 'launcher' : true, host: subsetHost(['th06', 'th07'])});
-  if (timing === 'after-directory') await until(() => env.document.querySelector('#lobbyGameRail [data-lobby-product="th07mp"][data-selected="true"]'), 'actual directory applies TH07 filter before Launcher Host');
+  if (timing === 'after-directory') await until(() => env.document.querySelector('#lobbyGameRail [data-lobby-product="th07mp"][data-viewing="true"]'), 'actual directory views TH07 before Launcher Host');
   await React.act(async () => {f.releaseHost();}); await tick();
-  await until(() => env.document.querySelector('#lobbyGameRail [data-lobby-product="th07mp"][data-selected="true"]'), 'actual directory applies TH07 filter');
+  await until(() => env.document.querySelector('#lobbyGameRail [data-lobby-product="th07mp"][data-viewing="true"]'), 'actual directory views TH07');
+  assert.equal(node('#lobbyGameRail [data-lobby-product="th07mp"] input').checked, false);
   assert.equal(f.fetches.filter(item => new URL(item.url).pathname.endsWith('/site-manifest.json')).length, 2);
   assert.equal(node('#lobbyOptionsDialog').open, false, 'the directory filter is not an instruction to open game settings');
   await click('#lobbyGuideOpen');
@@ -1514,30 +1533,33 @@ for (const timing of ['together', 'after-directory']) test(`actual BrowserLaunch
   assert.equal(new URL(currentUrl(), env.window.location.href).searchParams.get('game'), 'th07mp');
   assert.equal(playerOpen(), false); assert.deepEqual(f.navigations, []);
   await click('#mpGuideClose'); await until(() => !node('#mpGuideDialog').open, 'guide closes its own entry');
+  await click('.book-lobby-all');
+  await until(() => !new URL(currentUrl(), env.window.location.href).searchParams.has('game'), 'all multiplayer clears the viewed game');
   await click('#lobbyGameRail [data-lobby-product="th07mp"] .book-lobby-game');
-  await until(() => node('#lobbyOptionsDialog').open, 'explicit card click still opens its original settings carrier');
-  assert.equal(node('#gameId').textContent, 'TH07 MP');
-  assert.equal(new URL(currentUrl(), env.window.location.href).searchParams.get('game'), 'th07mp', 'options product does not replace the independent filter');
-  await click('#libraryBack'); await until(() => !node('#lobbyOptionsDialog').open, 'settings Back returns to the same directory');
+  await until(() => new URL(currentUrl(), env.window.location.href).searchParams.get('game') === 'th07mp', 'game button views only that game');
+  assert.equal(node('#lobbyGameRail [data-lobby-product="th07mp"] input').checked, false, 'viewing a game does not toggle its checkbox');
+  assert.equal(node('#lobbyOptionsDialog').open, false, 'game options are not opened from the directory card');
+  await click('#lobbyGuideOpen'); await until(() => node('#mpGuideDialog').open, 'guide reopens for viewed product');
+  assert.equal(node('#mpGuideContent .multiplayer-rule-game-tab.selected').dataset.game, 'th07');
+  await click('#mpGuideClose'); await until(() => !node('#mpGuideDialog').open, 'guide closes');
+  await click('.book-lobby-all');
   await click('#lobbyGameRail [data-lobby-product="th06mp"] .book-lobby-game');
-  assert.equal(node('#lobbyOptionsDialog').open, false, 'browsing another cover changes only the filter');
+  assert.equal(node('#lobbyOptionsDialog').open, false, 'viewing another game does not open settings');
+  assert.equal(node('#lobbyGameRail [data-lobby-product="th06mp"] input').checked, false);
   await click('#lobbyGuideOpen'); await until(() => node('#mpGuideDialog').open, 'directory guide reopens after another product settings');
   assert.equal(node('#mpGuideContent .multiplayer-rule-game-tab.selected').dataset.game, 'th06');
   assert.equal(f.fetches.filter(item => new URL(item.url).pathname.endsWith('/content/MULTIPLAYER.html')).length, 1, 'cached authored guide follows the filter on reopen');
 });
 
-test('directory TH11MP settings stay available without a hosted multiplayer Runtime', async () => {
+test('directory can view TH11MP without a hosted multiplayer Runtime or checking its box', async () => {
   const host = developmentAcquisitionHost(['th11']); delete host.games.th11.multiplayerRuntime; host.shared.testBuild = true;
   await mountBrowser({initial: '/lobby.html?game=th11mp', host, actualHistory: true});
-  await until(() => env.document.querySelector('#lobbyGameRail [data-lobby-product="th11mp"][data-selected="true"]'), 'directory advertises TH11MP');
+  await until(() => env.document.querySelector('#lobbyGameRail [data-lobby-product="th11mp"][data-viewing="true"]'), 'directory advertises TH11MP');
   const session = api.getTestSession();
   assert.equal(session.metadata.getSnapshot().products.includes('th11mp'), false);
   assert.equal(session.directory.getSnapshot().products.includes('th11mp'), true);
-  await click('#lobbyGameRail [data-lobby-product="th11mp"] .book-lobby-game');
-  await until(() => node('#lobbyOptionsDialog').open, 'TH11MP card opens settings independently of hosted Runtime');
-  assert.equal(node('#gameId').textContent, 'TH11 MP');
-  assert.equal(session.settings.getSnapshot().context.productId, 'th11mp');
-  await click('#libraryBack'); await until(() => !node('#lobbyOptionsDialog').open, 'Back closes TH11MP settings');
+  assert.equal(node('#lobbyGameRail [data-lobby-product="th11mp"] input').checked, false);
+  assert.equal(node('#lobbyOptionsDialog').open, false);
 });
 
 // Main lobby.mts has no automatic first-use presentation. A route-owned shared
@@ -2116,7 +2138,7 @@ test('actual BrowserLauncher: leaving a directly loaded TH07 room selects TH07 a
   await until(() => session.directory.getSnapshot().initialized, 'returned directory loads its own manifest');
   assert.equal(currentUrl(), '/lobby.html?game=th07mp');
   assert.equal(session.directory.getSnapshot().selectedProduct, 'th07mp');
-  assert.ok(node('#lobbyGameRail [data-lobby-product="th07mp"][data-selected="true"]'), 'visible card matches the return URL');
+  assert.ok(node('#lobbyGameRail [data-lobby-product="th07mp"][data-viewing="true"]'), 'visible card matches the return URL');
 });
 
 for (const origin of ['directory create', 'directory join', 'direct']) test(`actual BrowserLauncher: ${origin} native Exit keeps its room, then Leave returns to lobby`, async () => {

@@ -16,6 +16,7 @@ export interface LobbySurfaceProps extends Omit<
   membership?: ReactNode;
   notice?: string;
   roomTools: ReactNode;
+  roomFilters?: ReactNode;
   roomList: ReactNode;
   hasRooms: boolean;
   loading: boolean;
@@ -29,6 +30,7 @@ export interface LobbySurfaceProps extends Omit<
   roomUsersArtwork: string;
   children?: ReactNode;
   productFilters?: readonly string[];
+  viewingProduct?: string;
   onProductFiltersChange?(products: string[]): void;
 }
 /** Dedicated lobby skeleton from main lobby.html43–105, without home brand/footer. */
@@ -41,6 +43,7 @@ export function LobbySurface({
   membership,
   notice,
   roomTools,
+  roomFilters,
   roomList,
   hasRooms,
   loading,
@@ -102,6 +105,7 @@ export function LobbySurface({
             {(['cards', 'list'] as const).map(view => <button key={view} type="button" aria-pressed={roomView === view} onClick={() => {setRoomView(view); writeBookPreference('lobby-room-view', view);}}>{view === 'cards' ? (locale === 'en' ? 'Normal' : '普通模式') : (locale === 'en' ? 'List' : '列表模式')}</button>)}
           </div>
         </header>
+        {roomFilters}
         <section
           className="lobby-list-surface"
           aria-label={t('lobby.rooms')}

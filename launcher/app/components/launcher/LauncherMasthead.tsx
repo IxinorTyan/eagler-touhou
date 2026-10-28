@@ -50,7 +50,7 @@ export function LauncherMasthead(props: LauncherMastheadProps) {
     const items = panel.current?.querySelectorAll<HTMLElement>('.mizuki-select-trigger, .masthead-menu-item');
     const first = Array.from(items ?? []).find(item => {
       const mobileNav = item.closest('.book-mobile-nav');
-      return !mobileNav || getComputedStyle(mobileNav).display !== 'none';
+      return getComputedStyle(item).display !== 'none' && (!mobileNav || getComputedStyle(mobileNav).display !== 'none');
     });
     first?.focus();
   };
@@ -98,6 +98,7 @@ export function LauncherMasthead(props: LauncherMastheadProps) {
             <Link className="masthead-menu-item" href={props.launcherHref} aria-current={variant === 'library' && !props.replayActive && !profileOpen ? 'page' : undefined} onClick={() => onMenuOpenChange(false)}>{locale === 'en' ? 'Solo' : '单机'}</Link>
             <Link className="masthead-menu-item" href={props.assetUrl('lobby.html')} aria-current={variant === 'lobby' && !props.replayActive && !profileOpen ? 'page' : undefined} onClick={() => onMenuOpenChange(false)}>{locale === 'en' ? 'Multiplayer' : '联机'}</Link>
           </nav>
+          <Link className="masthead-menu-item book-mobile-faq" href={props.faqHref}>{locale === 'en' ? 'FAQ' : '常见问题'}</Link>
           <button className="masthead-menu-item motion-menu-toggle" id={variant === 'lobby' ? 'lobbyLessMotion' : 'lessMotionToggle'} type="button" aria-pressed={props.lessMotion} title={t(props.lessMotion ? 'nav.motionFullTitle' : 'nav.motionLessTitle')} onClick={props.onToggleMotion}><MenuIcon name="motion"/><span>{t('nav.lessMotion')}</span><i className="site-notice-toggle-state" aria-hidden="true"/></button>
           <button className="masthead-menu-item" id="siteNoticeToggle" type="button" role="switch" aria-checked={props.noticeEnabled} onClick={props.onToggleNotice}><MenuIcon name="notice"/><span>{t('notice.label')}</span><i className="site-notice-toggle-state" aria-hidden="true"/></button>
           <button className="masthead-menu-item" id="runtimeDiagnosticsToggle" type="button" role="switch" aria-checked={props.diagnosticsEnabled} onClick={props.onToggleDiagnostics}><MenuIcon name="diagnostics"/><span>{t('diagnostics.toggle')}</span><i className="site-notice-toggle-state" aria-hidden="true"/></button>

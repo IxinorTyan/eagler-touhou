@@ -321,7 +321,7 @@ export function createBrowserSession({document, window, baseUrl: configuredBaseU
     identity, sessions, sessionStorage, translate: t,
     launcherUrl: () => new URL(snapshot.locale === 'en' ? 'en.html' : './', baseUrl).href,
     navigateToRoom: url => requiredNavigation().navigateToRoom(url),
-    selectedProduct: new URL(window.location.href).searchParams.get('game') ?? undefined,
+    selectedProduct: new URL(window.location.href).searchParams.has('games') ? undefined : new URL(window.location.href).searchParams.get('game') ?? undefined,
     onSelectedProductNormalized: product => requiredNavigation().selectLobbyProduct(product),
   });
   const networkDiagnostics = createNetworkDiagnosticsModel({ translate: stringTranslate,

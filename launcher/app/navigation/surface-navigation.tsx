@@ -88,7 +88,7 @@ interface SurfaceNavigation extends SurfaceAddress {
   filterProductId: ProductId | null;
   navigateAddress(address: string): void;
   openOptions(productId: ProductId): void;
-  selectLobbyProduct(productId: ProductId): void;
+  selectLobbyProduct(productId: ProductId | ''): void;
   openDirectory(productId: ProductId): void;
   setLocaleAddress(locale: UiLocale): void;
   restoreRoomRoute(input: {product: ProductId; code: string; fromDirectory: boolean}): void;
@@ -662,11 +662,14 @@ export function SurfaceNavigationProvider({dirty, isEditing, onDiscard, decision
         {replace: true, preventScrollReset: true, state});
     }
   }
-  function selectLobbyProduct(productId: ProductId) {
+  function selectLobbyProduct(productId: ProductId | '') {
     if (address.context !== 'lobby' || address.surface !== 'library' ||
-        !isMultiplayerProductId(productId) || address.productId === productId || blocker.state !== 'unblocked') return;
+        (productId && !isMultiplayerProductId(productId)) || blocker.state !== 'unblocked') return;
     const params = new URLSearchParams(location.search);
-    params.set('game', productId);
+    params.delete('games');
+    if (productId) params.set('game', productId);
+    else params.delete('game');
+    if (params.toString() === location.search.replace(/^\?/, '')) return;
     void navigate(target(params), {replace: true, preventScrollReset: true, state: withoutEntry(location.state)});
   }
   function openOptions(productId: ProductId) {

@@ -152,7 +152,7 @@ function LauncherSurfaces({host}: {host: LauncherHost}) {
     <TouchLayoutEditor playerElement={playerElement} model={host.touchLayout} settings={host.settings} actions={host.settingsActions}
       native={host.nativeTouch} onCloseIntent={navigation.closeSurface} fireEnabled={host.touchFireEnabled} previewImage={host.previewImage ?? (selectedProduct?.artwork ? `url(${JSON.stringify(selectedProduct.artwork)})` : 'none')}/>;
   const lobbyProps: LobbySurfaceProps = {...host.lobby, masthead: null, products: host.products.filter(product => product.multiplayer),
-    selectedProduct: navigation.filterProductId ?? undefined, openedProduct: presence.openedProduct, onSelect: id => {if (isProductId(id)) navigation.selectLobbyProduct(id);},
+    selectedProduct: navigation.filterProductId ?? undefined, viewingProduct: navigation.filterProductId ?? undefined, openedProduct: presence.openedProduct, onSelect: id => {navigation.selectLobbyProduct(isProductId(id) ? id : '');},
     onActivate: activate, roomUsersArtwork: host.assetUrl('assets/room-users.svg'),
     children: <LobbyOptionsHost open={presence.open} foregroundActive={navigation.surface === 'touch' || host.runtimeOpen === true || host.replayWorkspace === true} onCloseRequest={navigation.closeSurface}>{host.replayWorkspace && !roomOpen ? null : settingsPanel}</LobbyOptionsHost>};
   return <OptionsOwnership value={presence.targets}>
