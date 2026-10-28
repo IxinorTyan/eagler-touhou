@@ -420,6 +420,7 @@ export function createLobbyDirectory(options: LobbyDirectoryOptions) {
       const unsupported = !received && event.code === 1008;
       publish({
         recovering: null,
+        connectionInterrupted: true,
         ...(hadRecovery ? { notice: options.translate('lobby.releaseFailed') } : {}),
         connection: unsupported ? 'unsupported' : received ? 'loading' : 'offline',
       });

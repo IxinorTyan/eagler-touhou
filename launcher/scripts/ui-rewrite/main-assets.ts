@@ -23,6 +23,19 @@ export function mainAssets(): Plugin {
   return {
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
+        const pathname = req.url?.split('?')[0];
+        const asset = pathname?.startsWith(deployment.mountPath) ? pathname.slice(deployment.mountPath.length) : '';
+        // publicDir is disabled: serve the same explicit static asset inventory
+        // in development that closeBundle copies into the production artifact.
+        if (asset.startsWith('assets/') && STATIC_FRONTEND_PACKAGE_FILES.includes(asset)) {
+          try {
+            const source = resolvePublicOrRepositorySource(asset);
+            res.setHeader('Content-Type', asset.endsWith('.svg') ? 'image/svg+xml' : asset.endsWith('.png') ? 'image/png' : asset.endsWith('.webp') ? 'image/webp' : asset.endsWith('.ico') ? 'image/x-icon' : 'application/octet-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.end(readFileSync(source));
+          } catch (error) {next(error);}
+          return;
+        }
         if (req.url?.split('?')[0] !== deployment.mountPath + 'runtime-program-sw.js') {next();return;}
         try {res.setHeader('Content-Type', 'application/javascript');res.setHeader('Cache-Control', 'no-cache');
           res.end(await buildRuntimeProgramWorkerSource({project:root}));}

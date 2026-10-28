@@ -59,6 +59,8 @@ body:not(.mp-room-active):has(.book-masthead)::before {
   content:"";display:block;opacity:1;filter:none;transform:none;position:fixed;inset:0;z-index:0;pointer-events:none;
   background:linear-gradient(var(--book-overlay),var(--book-overlay)),url('../../../public/assets/launcher-background.webp') center/cover no-repeat;
 }
+/* The library has one solid canvas, including the area above its content. */
+body:not(.mp-room-active):has(.book-library)::before {display:none}
 body:not(.mp-room-active):has(.book-masthead) :is(.sheet,.book-directory) {position:relative;z-index:1;background:transparent}
 body:not(.mp-room-active) .book-masthead {background:color-mix(in srgb,var(--book-bg) 88%,transparent)}
 /* All three destinations dissolve the content only. Keep the backdrop and
@@ -547,6 +549,5 @@ html[data-book-theme='light'] .book-directory {--difficulty-easy:#23733e;--diffi
 @media(max-width:380px){html:has(.book-masthead) .book-brand>span:not(.book-brand-symbol){display:none}}
 @media(min-width:781px) and (hover:hover) and (pointer:fine){
   html:has(.book-masthead) .masthead{width:calc(100% - 48px);max-width:1312px;min-height:61px;margin:0 auto;padding:0 18px;border:1px solid var(--book-border);border-top:0;border-radius:0 0 16px 16px;background:color-mix(in srgb,var(--book-bg) 94%,transparent);box-shadow:0 6px 20px #0000000a}
-  html:has(.player-profile) .book-masthead{max-width:1152px}
 }
 .book-masthead .book-menu-donation[hidden] {display:none}

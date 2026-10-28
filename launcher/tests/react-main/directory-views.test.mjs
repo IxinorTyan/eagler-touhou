@@ -327,8 +327,20 @@ test('Lobby failed live connection retains stale room warning, interrupted recon
   assert.equal(n('#connectionWarningTitle').textContent, t('en', 'lobby.disconnected')); assert.equal(n('#connectionWarning').hidden, false);
   assert.equal(n('.lobby-join').disabled, true); assert.equal(env.document.querySelector('#emptyState'), null);
   await click('#connectionRefresh'); assert.equal(f.service.getSnapshot().connection, 'loading'); assert.equal(n('#connectionWarning').hidden, false);
-  assert.equal(n('#listLoading').hidden, false); assert.equal(all('.lobby-room-row').length, 0);
+  assert.equal(n('#listLoading').hidden, true); assert.equal(all('.lobby-room-row').length, 1);
+  const retainedRow = n('.lobby-room-row');
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await f.emit('error'); await click('#connectionRefresh');
+    assert.equal(n('#listLoading').hidden, true);
+    assert.equal(n('#connectionWarning').hidden, false);
+    assert.equal(n('.lobby-room-row'), retainedRow, 'reconnect keeps the existing row without replaying its entrance');
+  }
   await f.receive(); assert.equal(n('#connectionWarning').hidden, true); assert.ok(n('#emptyState'));
+  await f.receive([room()]);
+  await f.emit('close', {code: 1006});
+  assert.equal(n('#connectionWarning').hidden, false);
+  assert.equal(n('#listLoading').hidden, true);
+  assert.equal(all('.lobby-room-row').length, 1);
 });
 for (const locale of ['zh-CN', 'en']) test(`Lobby membership/recovery uses exact state/copy and release service action: ${locale}`, async () => {
   const mine = {product: 'th06mp', code: '9876', recoveryToken: 'fixture-token'};
