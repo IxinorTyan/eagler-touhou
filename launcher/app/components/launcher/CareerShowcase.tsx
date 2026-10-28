@@ -1,131 +1,187 @@
-import {useEffect, useRef, useState, type CSSProperties} from 'react';
-import {useLocale} from '../../i18n';
-import {bookGameArtwork} from './book-artwork';
-import {CAREER_GAMES, CAREER_STATUSES, CAREER_RESTRICTIONS, careerCellKey, careerCellAvailable, careerCount, careerDifficulties, careerBest,
-  careerRecord, careerStatus, careerPreset, careerWithCounts, careerDescription, type CareerRecords, type CareerGame, type CareerRecord, type CareerStatus} from './career-records';
+import {useEffect, useRef, useState, type PointerEvent as ReactPointerEvent} from 'react';
+import {createTrackerRenderer} from './tracker-renderer';
+import {blankRecord, cellLabel, DEFAULT_OPTIONS, TRACKER_CELLS, TRACKER_GAMES, validCareerRecords, validOptions,
+  type CareerRecords, type TrackerOptions, type TrackerRecord} from './tracker-records';
+import {readBookPreference, writeBookPreference} from './book-preferences';
 import './career-showcase.css';
 
-export function CareerSummary({records, onOpen}: {records: CareerRecords; onOpen: (gameId?: string) => void}) {
-  const games = CAREER_GAMES.filter(game => careerCount(game, records) > 0);
-  return <section className="profile-panel career-overview">
-    <div className="profile-section-title"><h2>生涯展示柜</h2><button type="button" onClick={() => onOpen()}>查看完整生涯 →</button></div>
-    {games.length ? <div className="career-summary-list">{games.slice(0, 4).map(game => <button type="button" key={game.id} onClick={() => onOpen(game.id)}>
-      <span className="career-summary-name"><small>TH{game.number}</small><strong>{game.title}</strong></span>
-      <span className="career-badges">{careerDifficulties(game, records).map(difficulty => <span key={difficulty}>{difficulty} · {careerBest(game, difficulty, records)}</span>)}</span>
-    </button>)}</div> : <div className="profile-empty"><span className="career-empty-mark" aria-hidden="true">▦</span><h3>尚未记录通关</h3><p>从一次不续关通关开始，留下你的东方生涯。</p><button type="button" onClick={() => onOpen()}>记录第一项 1CC →</button></div>}
-  </section>;
+type Cell = {key: string; x: number; y: number};
+type View = {scale: number; x: number; y: number};
+const chartHeight = (options: TrackerOptions) => options.extra ? (options.easy ? 878 : 745) : (options.easy ? 644 : 540);
+const loadFonts = () => document.fonts ? Promise.all([document.fonts.load('16px touhouFont'), document.fonts.load('16px touhouFontMini')]) : Promise.resolve();
+const completed = (records: CareerRecords) => Object.values(records).filter(record => record.done).length;
+function saveFile(name: string, url: string) {const link = document.createElement('a'); link.download = name; link.href = url; link.click();}
+
+function Chart({records, options, onCells}: {records: CareerRecords; options: TrackerOptions; onCells?: (cells: Cell[]) => void}) {
+  const own = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = own.current;
+    if (!canvas) return;
+    const renderer = createTrackerRenderer(canvas);
+    let active = true;
+    const draw = () => {if (active) {const cells = renderer.draw(records, options); onCells?.(cells);}};
+    // Draw synchronously for the thumbnail, then redraw after the bundled fonts load.
+    draw();
+    loadFonts().then(draw).catch(() => {});
+    return () => {active = false;};
+  }, [records, options, onCells]);
+  return <canvas ref={own} width={800} height={chartHeight(options)} aria-label="东方全作品通关图，使用下方入口放大查看"/>;
 }
 
-export function CareerShowcase({records, initialGame, onSave}: {records: CareerRecords; initialGame?: string; onSave: (next: CareerRecords) => void}) {
-  const [editing, setEditing] = useState(false), [draft, setDraft] = useState<CareerRecords>({});
-  const [expanded, setExpanded] = useState(initialGame ?? CAREER_GAMES[0].id);
-  const [selection, setSelection] = useState<{key: string; label: string} | null>(null);
-  const [brush, setBrush] = useState<CareerStatus | 'erase' | 'details'>('details');
-  const [clearing, setClearing] = useState(false);
+export function CareerSummary({records, onOpen}: {records: CareerRecords; onOpen: () => void}) {
+  return <section className="profile-panel career-overview"><div className="profile-section-title"><h2>东方通关图</h2><span>{completed(records)} 项通关</span></div>
+    <button type="button" className="career-thumbnail" onClick={() => onOpen()} aria-label="查看完整生涯通关图"><Chart records={records} options={DEFAULT_OPTIONS}/><span>查看完整生涯 ↗</span></button></section>;
+}
+
+export function CareerShowcase({records, onSave}: {records: CareerRecords; onSave: (next: CareerRecords) => void}) {
+  const [options, setOptions] = useState(DEFAULT_OPTIONS);
+  const [open, setOpen] = useState(false), [editing, setEditing] = useState(false), [draft, setDraft] = useState<CareerRecords>({});
+  const [selection, setSelection] = useState<string | null>(null), [brush, setBrush] = useState('details');
+  const [cells, setCells] = useState<Cell[]>([]), [view, setView] = useState<View>({scale: 1, x: 0, y: 0});
+  const [confirmClose, setConfirmClose] = useState(false), [message, setMessage] = useState('');
+  const dialog = useRef<HTMLDialogElement>(null), viewport = useRef<HTMLDivElement>(null);
+  const returnFocus = useRef<HTMLElement | null>(null), input = useRef<HTMLInputElement>(null), fitted = useRef(false);
+  const pointers = useRef(new Map<number, {x: number; y: number}>()), gesture = useRef({moved: false, startX: 0, startY: 0});
   const shown = editing ? draft : records;
-  const edit = () => {setDraft({...records}); setEditing(true); setClearing(false); setBrush('details');};
-  const cancel = () => {setEditing(false); setClearing(false); setSelection(null);};
-  const update = (key: string, record: CareerRecord | undefined) => setDraft(current => {
-    const next = {...current}; if (record) next[key] = record; else delete next[key];
-    return next;
-  });
-  const count = CAREER_GAMES.reduce((sum, game) => sum + careerCount(game, shown), 0);
-  const continued = Object.values(shown).filter(value => careerRecord(value)?.status === 'clear').length;
-  return <section className="profile-panel career-showcase" aria-label="生涯展示柜">
-    <div className="profile-section-title career-heading"><div><small className="career-eyebrow">1CC COLLECTION</small><h2>生涯展示柜</h2></div>
-      {editing ? <div className="profile-actions"><button type="button" onClick={cancel}>取消</button><button type="button" className="profile-primary" onClick={() => {onSave(draft); cancel();}}>保存记录</button></div>
-        : <button type="button" onClick={edit}>编辑生涯</button>}
-    </div>
-    <p className="career-intro">按作品、难度与机体，记录每一次突破：1CC、NM、NB、NN 与特殊限制。</p>
-    <div className="career-toolbar"><span>已记录 <b>{count}</b> 项 1CC{continued > 0 && <> · <b>{continued}</b> 项续关通关</>}</span><details className="career-help"><summary>图例与规则 ⓘ</summary><div>
-      <p><b>1CC</b>：从头开始，不使用续关，完成该难度全流程。</p>
-      <p>NM：无 Miss；NB：无 Bomb；NN：同一次 1CC 同时无 Miss、无 Bomb。其他作品机制与限制请用 ★ 和备注说明。</p>
-      <p><b>·</b> 尚无记录　<b>—</b> 不适用。每格展示一次代表记录；各难度独立，特殊限制独立标注。</p>
-      <p>Miss / Bomb 留空表示未知；旧版勾选保留为普通 1CC。记录由你手动填写，保存在此浏览器。</p>
-    </div></details></div>
-    <div className="career-legend" aria-label="通关状态图例">{CAREER_STATUSES.map(status => <span key={status.id} data-status={status.id} title={status.detail}><b>{status.label}</b><small>{status.detail.split(' · ').at(-1)}</small></span>)}</div>
-    {editing && <><div className="career-edit-bar"><span>选择状态，再点击格子快速填入；单格详情可补充次数与限制。</span>
-      {clearing ? <span className="career-clear-confirm">清空所有记录？<button type="button" onClick={() => {setDraft({}); setClearing(false); setSelection(null);}}>清空</button><button type="button" onClick={() => setClearing(false)}>保留</button></span>
-        : <button type="button" disabled={!Object.keys(shown).length} onClick={() => setClearing(true)}>清空记录</button>}
-    </div>
-    <div className="career-brushes" role="group" aria-label="填表工具">
-      <button type="button" aria-pressed={brush === 'details'} onClick={() => setBrush('details')}>单格详情</button>
-      {CAREER_STATUSES.map(status => <button type="button" key={status.id} data-status={status.id} title={status.detail} aria-pressed={brush === status.id} onClick={() => {setBrush(status.id); setSelection(null);}}>{status.label}</button>)}
-      <button type="button" aria-pressed={brush === 'erase'} onClick={() => {setBrush('erase'); setSelection(null);}}>擦除</button>
-    </div><p className="career-brush-hint">{brush === 'details' ? '点击格子打开详情，编辑后应用到草稿。' : `当前工具：${brush === 'erase' ? '擦除' : careerStatus(brush).label}。点击将替换该格的整项记录，最后保存生涯。`}</p></>}
-    {selection && (!editing || brush === 'details') && <CareerCellDetail key={`${selection.key}:${JSON.stringify(shown[selection.key])}`} label={selection.label}
-      record={careerRecord(shown[selection.key])} editing={editing} onApply={record => update(selection.key, record)} onClose={() => setSelection(null)}/>}
-    <div className="career-games">{CAREER_GAMES.map(game => <CareerGameTable key={game.id} game={game} records={shown} editing={editing} expanded={expanded === game.id}
-      onExpand={() => {setExpanded(expanded === game.id ? '' : game.id); setSelection(null);}}
-      onCell={(key, label) => {setSelection({key, label}); if (editing && brush !== 'details') update(key, brush === 'erase' ? undefined : careerPreset(brush));}}/>)}</div>
-    <p className="career-selection" role="status">{selection ? `${selection.label} · ${careerDescription(shown[selection.key])}` : (editing ? '选择工具，点击对应格子记录通关。' : '点击作品展开，点击格子查看完整说明。')}</p>
+  const height = chartHeight(options);
+  const dirty = editing && JSON.stringify(draft) !== JSON.stringify(records);
+  useEffect(() => {setOptions(readBookPreference('career-chart-options-v1', DEFAULT_OPTIONS, validOptions));}, []);
+  const changeOptions = (next: TrackerOptions) => {setOptions(next); writeBookPreference('career-chart-options-v1', next); fitted.current = false;};
+  const fit = () => {
+    const area = viewport.current; if (!area) return;
+    const scale = Math.max(.15, Math.min((area.clientWidth - 48) / 800, (area.clientHeight - 48) / height));
+    setView({scale, x: (area.clientWidth - 800 * scale) / 2, y: (area.clientHeight - height * scale) / 2}); fitted.current = true;
+  };
+  const fitRef = useRef(fit); fitRef.current = fit;
+  useEffect(() => {
+    if (!open) return;
+    const openedDialog = dialog.current; openedDialog?.showModal();
+    const overflow = document.body.style.overflow; document.body.style.overflow = 'hidden';
+    if (!fitted.current) fitRef.current();
+    const observer = new ResizeObserver(() => {if (!fitted.current) fitRef.current();});
+    if (viewport.current) observer.observe(viewport.current);
+    const resize = () => fitRef.current(); window.addEventListener('resize', resize);
+    return () => {observer.disconnect(); window.removeEventListener('resize', resize); document.body.style.overflow = overflow; openedDialog?.close(); pointers.current.clear(); returnFocus.current?.focus();};
+  }, [open]);
+  useEffect(() => {if (open) fitRef.current();}, [height]);
+  const zoom = (factor: number, x?: number, y?: number) => {
+    const area = viewport.current; if (!area) return;
+    const ax = x ?? area.clientWidth / 2, ay = y ?? area.clientHeight / 2;
+    setView(previous => {const scale = Math.max(.15, Math.min(6, previous.scale * factor)); const ratio = scale / previous.scale;
+      return {scale, x: ax - (ax - previous.x) * ratio, y: ay - (ay - previous.y) * ratio};});
+  };
+  useEffect(() => {
+    const area = viewport.current; if (!open || !area) return;
+    const wheel = (event: WheelEvent) => {event.preventDefault(); const rect = area.getBoundingClientRect(); zoom(Math.exp(-event.deltaY * .0015), event.clientX - rect.left, event.clientY - rect.top);};
+    area.addEventListener('wheel', wheel, {passive: false});
+    return () => area.removeEventListener('wheel', wheel);
+  }, [open]);
+  const launch = (edit = false) => {returnFocus.current = document.activeElement as HTMLElement; setOpen(true); setConfirmClose(false); if (edit) {setDraft({...records}); setEditing(true);} };
+  const close = () => {if (dirty) {setConfirmClose(true); return;} setOpen(false); setEditing(false); setSelection(null);};
+  const update = (key: string, record?: TrackerRecord) => setDraft(current => {const next = {...current}; if (record) next[key] = record; else delete next[key]; return next;});
+  const select = (key: string) => {
+    setSelection(key);
+    if (!editing || brush === 'details') return;
+    if (brush === 'erase') update(key);
+    else update(key, {...(draft[key] ?? blankRecord(key)), done: true, continued: false,
+      misses: brush === 'nm' || brush === 'nn' ? '0' : null, bombs: brush === 'nb' || brush === 'nn' ? '0' : null});
+  };
+  const pointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    pointers.current.set(event.pointerId, {x: event.clientX, y: event.clientY});
+    if (pointers.current.size === 1) gesture.current = {moved: false, startX: event.clientX, startY: event.clientY};
+    else gesture.current.moved = true;
+  };
+  const pointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const previous = pointers.current.get(event.pointerId); if (!previous) return;
+    const before = [...pointers.current.values()];
+    pointers.current.set(event.pointerId, {x: event.clientX, y: event.clientY});
+    const after = [...pointers.current.values()];
+    if (Math.hypot(event.clientX - gesture.current.startX, event.clientY - gesture.current.startY) > 5) gesture.current.moved = true;
+    if (before.length === 2) {
+      const distance = (points: typeof before) => Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+      const oldDistance = distance(before); if (oldDistance < 1) return;
+      const rect = event.currentTarget.getBoundingClientRect();
+      const oldX = (before[0].x + before[1].x) / 2 - rect.left, oldY = (before[0].y + before[1].y) / 2 - rect.top;
+      const newX = (after[0].x + after[1].x) / 2 - rect.left, newY = (after[0].y + after[1].y) / 2 - rect.top;
+      setView(view => {const scale = Math.max(.15, Math.min(6, view.scale * distance(after) / oldDistance)); const ratio = scale / view.scale;
+        return {scale, x: newX - (oldX - view.x) * ratio, y: newY - (oldY - view.y) * ratio};});
+    } else if (before.length === 1 && gesture.current.moved) setView(view => ({...view, x: view.x + event.clientX - previous.x, y: view.y + event.clientY - previous.y}));
+  };
+  const pointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!pointers.current.has(event.pointerId)) return;
+    pointers.current.delete(event.pointerId);
+    if (gesture.current.moved || event.type === 'pointercancel') return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - rect.left - view.x) / view.scale, y = (event.clientY - rect.top - view.y) / view.scale;
+    const cell = cells.find(cell => x >= cell.x && x < cell.x + 17 && y >= cell.y && y < cell.y + 17);
+    if (cell) select(cell.key);
+  };
+  const exportPng = async () => {
+    await loadFonts().catch(() => {});
+    const canvas = document.createElement('canvas'); createTrackerRenderer(canvas).draw(shown, options);
+    saveFile('touhou-1cc-chart.png', canvas.toDataURL('image/png'));
+  };
+  const exportJson = () => {const url = URL.createObjectURL(new Blob([JSON.stringify({version: 2, records: shown, options}, null, 2)], {type: 'application/json'})); saveFile('touhou-career.json', url); setTimeout(() => URL.revokeObjectURL(url), 1000);};
+  return <section className="profile-panel career-showcase" aria-label="东方生涯通关图">
+    <div className="profile-section-title career-heading"><h2>东方通关图</h2><span>{completed(records)} 项通关</span></div>
+    <button type="button" className="career-thumbnail" onClick={() => launch()} aria-label="全屏查看通关图"><Chart records={records} options={options}/><span>点击放大</span></button>
+    <div className="career-card-footer"><div><button type="button" onClick={() => launch(true)}>编辑记录</button><button type="button" onClick={exportPng}>导出 PNG</button></div></div>
+
+    {open && <dialog ref={dialog} className="career-viewer" aria-labelledby="career-viewer-title" onCancel={event => {event.preventDefault(); close();}}>
+      <header className="career-viewer-header"><div><h2 id="career-viewer-title">{editing ? '编辑通关记录' : '我的东方通关图'}</h2></div><div className="career-viewer-actions">
+        {editing ? <><button type="button" onClick={() => {if (dirty) setConfirmClose(true); else {setEditing(false); setSelection(null);}}}>取消编辑</button><button type="button" className="is-primary" onClick={() => {onSave(draft); setEditing(false); setSelection(null); setConfirmClose(false); setMessage('通关记录已保存到此浏览器');}}>保存记录</button></> : <button type="button" onClick={() => {setDraft({...records}); setEditing(true);}}>编辑记录</button>}
+        <button type="button" onClick={exportPng}>导出 PNG</button><button type="button" aria-label="关闭全屏通关图" onClick={close}>×</button></div></header>
+      {confirmClose && <div className="career-discard" role="alert">还有未保存的修改。<button type="button" onClick={() => setConfirmClose(false)}>继续编辑</button><button type="button" onClick={() => {setConfirmClose(false); setEditing(false); setOpen(false); setSelection(null);}}>放弃修改并关闭</button></div>}
+      <div className="career-viewer-body"><div className="career-map-column">
+        <div className="career-map-tools"><div><button type="button" aria-label="缩小通关图" onClick={() => zoom(1 / 1.25)}>−</button><output aria-label="缩放比例">{Math.round(view.scale * 100)}%</output><button type="button" aria-label="放大通关图" onClick={() => zoom(1.25)}>＋</button><button type="button" onClick={fit}>适应屏幕</button><button type="button" onClick={() => zoom(1 / view.scale)}>原始大小</button></div><span>{editing ? '选择格子填写记录' : '滚轮缩放 · 拖动平移 · 双指缩放'}</span></div>
+        <div className="career-map-viewport" ref={viewport} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} onLostPointerCapture={event => pointers.current.delete(event.pointerId)}>
+          <div className="career-map-sheet" style={{width: 800, height, transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`}}>
+            <Chart records={shown} options={options} onCells={setCells}/>
+            {cells.map(cell => <button type="button" key={cell.key} tabIndex={selection === cell.key ? 0 : -1} data-cell-key={cell.key} className={`career-map-cell${selection === cell.key ? ' is-selected' : ''}`} style={{left: cell.x, top: cell.y}} aria-label={`${cellLabel(cell.key)} · ${shown[cell.key]?.done ? '已通关' : '尚无通关'}`} aria-pressed={!!shown[cell.key]?.done} title={cellLabel(cell.key)} onClick={event => {if (event.detail === 0) select(cell.key);}} onFocus={event => {if (event.currentTarget.matches(':focus-visible')) {setSelection(cell.key); setView(view => ({...view, x: (viewport.current?.clientWidth ?? 800) / 2 - cell.x * view.scale, y: (viewport.current?.clientHeight ?? 600) / 2 - cell.y * view.scale}));}}}/>)}
+          </div>
+        </div>
+        <footer className="career-map-footer"><span>{completed(shown)} 项通关 · {cells.length} 个格子</span></footer>
+      </div>
+      <aside className="career-map-sidebar">
+        {editing && <section className="career-tool-section"><h3>填表工具</h3><div className="career-brushes">{[['details', '单格详情'], ['1cc', '1CC'], ['nm', 'NM'], ['nb', 'NB'], ['nn', 'NN'], ['erase', '擦除']].map(([id, label]) => <button type="button" key={id} aria-pressed={brush === id} onClick={() => setBrush(id)}>{label}</button>)}</div></section>}
+        <section className="career-tool-section"><h3>{selection ? cellLabel(selection) : '格子详情'}</h3>
+          {selection ? <CellEditor key={selection + JSON.stringify(shown[selection])} record={shown[selection] ?? blankRecord(selection)} editing={editing && brush === 'details'} onApply={record => update(selection, record)}/>
+          : <p>选择格子查看记录。</p>}
+          <label className="career-cell-jump">快速查找格子<select aria-label="快速查找格子" value={selection ?? ''} onChange={event => {const key = event.target.value; if (!key) return; setSelection(key); const cell = cells.find(cell => cell.key === key); if (cell) setView({scale: 2, x: (viewport.current?.clientWidth ?? 800) / 2 - cell.x * 2, y: (viewport.current?.clientHeight ?? 600) / 2 - cell.y * 2});}}><option value="">选择作品 / 机体 / 难度</option>{TRACKER_GAMES.filter(game => options.extra || !['IAMP', 'SWR', 'H.SOKU', 'HM', 'ULIL', 'AOCF', 'GI'].includes(game.name)).map(game => <optgroup key={game.name} label={game.title}>{TRACKER_CELLS.filter(cell => cell.game.name === game.name && (options.easy || !cell.difficulty.endsWith('E'))).map(cell => <option key={cell.key} value={cell.key}>{cell.character} · {cell.difficulty}</option>)}</optgroup>)}</select></label>
+        </section>
+        <section className="career-tool-section"><h3>图表显示</h3>{([['easy', '显示 Easy'], ['extra', '显示附加作品'], ['legend', '显示原版图例'], ['transparent', '透明 PNG 背景']] as const).map(([key, label]) => <label className="career-check" key={key}><input type="checkbox" checked={options[key]} onChange={event => changeOptions({...options, [key]: event.target.checked})}/>{label}</label>)}</section>
+        <section className="career-tool-section"><h3>本地备份</h3><div className="career-backup-actions"><button type="button" onClick={exportJson}>导出 JSON</button><button type="button" onClick={() => input.current?.click()}>导入 JSON</button></div><input hidden ref={input} type="file" accept="application/json,.json" onChange={async event => {
+          const file = event.target.files?.[0]; event.target.value = ''; if (!file) return;
+          try {if (file.size > 2_000_000) throw new Error(); const data = JSON.parse(await file.text()); if (data.version !== 2 || !validCareerRecords(data.records)) throw new Error();
+            setDraft(data.records); setEditing(true); setSelection(null); setMessage('备份已载入草稿，保存记录后生效'); if (validOptions(data.options)) changeOptions(data.options);
+          } catch {setMessage('无法导入：请选择有效的生涯 JSON 备份');}
+        }}/><p>导入后先预览，再保存整张通关图。</p></section>
+      </aside></div>{message && <div className="career-viewer-status" role="status">{message}</div>}
+    </dialog>}
   </section>;
 }
 
-function CareerCellDetail({label, record, editing, onApply, onClose}: {
-  label: string; record?: CareerRecord; editing: boolean; onApply: (record: CareerRecord | undefined) => void; onClose: () => void;
-}) {
-  const heading = useRef<HTMLHeadingElement>(null);
-  const [status, setStatus] = useState<CareerStatus>(record?.status ?? '1cc');
-  const [misses, setMisses] = useState(record?.misses?.toString() ?? '');
-  const [bombs, setBombs] = useState(record?.bombs?.toString() ?? '');
-  useEffect(() => {heading.current?.focus({preventScroll: true});}, []);
-  const preview = careerWithCounts({status}, misses === '' ? undefined : Number(misses), bombs === '' ? undefined : Number(bombs));
-  return <section className="career-detail" aria-label="单格记录详情">
-    <div className="career-detail-heading"><h3 ref={heading} tabIndex={-1}>{label}</h3><button type="button" aria-label="关闭单格详情" onClick={onClose}>×</button></div>
-    {editing ? <form onSubmit={event => {
-      event.preventDefault(); const data = new FormData(event.currentTarget);
-      onApply({...preview, restrictions: CAREER_RESTRICTIONS.filter(item => data.has(item.id)).map(item => item.id), challenge: String(data.get('challenge') ?? '').trim(), note: String(data.get('note') ?? '').trim()});
-    }}>
-      <div className="career-detail-fields"><label>通关方式<select aria-label="通关方式" value={status === 'clear' ? 'clear' : '1cc'} onChange={event => setStatus(event.target.value as CareerStatus)}><option value="1cc">不续关 · 1CC</option><option value="clear">续关通关</option></select></label>
-        <label>Miss 次数<input aria-label="Miss 次数" type="number" min="0" max="9999" step="1" placeholder="未知" value={misses} onChange={event => setMisses(event.target.value)}/></label>
-        <label>Bomb 次数<input aria-label="Bomb 次数" type="number" min="0" max="9999" step="1" placeholder="未知" value={bombs} onChange={event => setBombs(event.target.value)}/></label></div>
-      <fieldset><legend>特殊限制</legend>{CAREER_RESTRICTIONS.map(item => <label key={item.id}><input type="checkbox" name={item.id} defaultChecked={record?.restrictions?.includes(item.id)}/><span>{item.label} · {item.detail.split(' · ').at(-1)}</span></label>)}</fieldset>
-      <label className="career-note-label">自定义标记<input name="challenge" aria-label="自定义标记" maxLength={24} defaultValue={record?.challenge ?? ''} placeholder="例如 NNN、无结界；直接显示在格子里"/></label>
-      <label className="career-note-label">备注 / 作品机制<textarea name="note" aria-label="备注 / 作品机制" maxLength={240} rows={2} defaultValue={record?.note ?? ''} placeholder="说明本次通关的规则与成绩"/></label>
-      <div className="career-detail-footer"><span>显示为 <b>{careerStatus(preview.status).label}</b> · 次数留空表示未知</span><div className="profile-actions"><button type="button" disabled={!record} onClick={() => onApply(undefined)}>移除此格</button><button type="submit" className="profile-primary">应用到草稿</button></div></div>
-      <p className="career-detail-hint">填写同一次通关的数据；应用后点击「保存记录」保存整张表。</p>
-    </form> : <p className="career-detail-description">{careerDescription(record)}</p>}
-  </section>;
+function CellEditor({record, editing, onApply}: {record: TrackerRecord; editing: boolean; onApply: (record?: TrackerRecord) => void}) {
+  if (!editing) return <div className="career-record-description"><strong>{record.done ? '已通关 · 1CC' : record.continued ? '续关通关' : '尚无通关记录'}</strong><p>Miss {record.misses ?? '—'} · Bomb {record.bombs ?? '—'} · 初始残机 {record.lives ?? '—'}</p><p>{[record.vertical && 'NV', record.focus && 'NF', record.pacifist && 'Pacifist', record.unique && 'Unique', record.challenge].filter(Boolean).join(' · ')}</p>{record.note && <p>{record.note}</p>}</div>;
+  return <form className="career-cell-form" onSubmit={event => {
+    event.preventDefault(); const data = new FormData(event.currentTarget);
+    const next = {...record};
+    for (const key of ['done', 'vertical', 'focus', 'pacifist', 'unique'] as const) next[key] = data.has(key);
+    for (const key of ['misses', 'bombs', 'lives'] as const) next[key] = String(data.get(key) ?? '') || null;
+    next.continued = data.has('continued');
+    next.cellColour = String(data.get('cellColour')); next.textColour = String(data.get('textColour'));
+    next.note = String(data.get('note') ?? '').trim(); next.challenge = String(data.get('challenge') ?? '').trim();
+    onApply(next);
+  }}>
+    <label className="career-check"><input type="checkbox" name="done" defaultChecked={record.done}/>标记 1CC / 使用作品配色</label>
+    <label className="career-check"><input type="checkbox" name="continued" defaultChecked={record.continued}/>另记续关通关</label>
+    <div className="career-count-fields">{([['misses', 'Miss'], ['bombs', 'Bomb'], ['lives', '初始残机']] as const).map(([key, label]) => <label key={key}>{label}<select name={key} aria-label={label} defaultValue={record[key] ?? ''}><option value="">未知</option>{Array.from({length: 10}, (_, n) => <option key={n} value={n}>{n}</option>)}</select></label>)}</div>
+    <fieldset><legend>特殊限制</legend>{([['vertical', 'NV · 禁止纵向移动'], ['focus', 'NF · 禁止低速'], ['pacifist', 'P · 和平主义'], ['unique', 'U · 自定义限制']] as const).map(([key, label]) => <label className="career-check" key={key}><input type="checkbox" name={key} defaultChecked={record[key]}/>{label}</label>)}</fieldset>
+    <div className="career-color-fields"><label>格子颜色<input type="color" name="cellColour" defaultValue={record.cellColour}/></label><label>文字颜色<input type="color" name="textColour" defaultValue={record.textColour}/></label></div>
+    <p>取消作品配色后使用自定义格子颜色。</p>
+    <label>自定义标记<input name="challenge" maxLength={24} defaultValue={record.challenge}/></label><label>备注<textarea name="note" rows={2} maxLength={240} defaultValue={record.note}/></label>
+    <div className="career-backup-actions"><button type="button" onClick={() => onApply()}>移除此格</button><button className="is-primary" type="submit">应用到草稿</button></div>
+  </form>;
 }
-
-function CareerGameTable({game, records, editing, expanded, onExpand, onCell}: {
-  game: CareerGame; records: CareerRecords; editing: boolean; expanded: boolean; onExpand: () => void; onCell: (key: string, description: string) => void;
-}) {
-  const {t} = useLocale();
-  const label = (loadout: CareerGame['loadouts'][number]) => loadout.label ?? t(loadout.labelKey);
-  const completed = careerCount(game, records);
-  return <article className={`career-game${expanded ? ' is-expanded' : ''}`} data-career-game={game.id}>
-    <button type="button" className="career-game-toggle" aria-expanded={expanded} aria-controls={`career-table-${game.id}`} onClick={onExpand}>
-      <span className="career-game-art">{bookGameArtwork(game.id) && <img src={bookGameArtwork(game.id)} alt=""/>}</span>
-      <span className="career-game-name"><small>TH{game.number}</small><strong>{game.title}</strong></span>
-      <span className="career-game-count">{completed ? <><b>{completed}</b> 项 1CC</> : '暂无 1CC'}</span><span className="career-expand" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="m4 6 4 4 4-4"/></svg></span>
-    </button>
-    <div id={`career-table-${game.id}`} className="career-game-reveal" aria-hidden={!expanded} inert={!expanded}>
-      <div className="career-game-body">
-      {game.note && <p className="career-game-note">{game.note}</p>}
-      <div className="career-table-scroll" tabIndex={0} role="region" aria-label={`${game.title} 通关表，可横向滚动`}>
-        <table className="career-table" style={{'--career-column-count': game.loadouts.length} as CSSProperties}><caption className="visually-hidden">{game.title} 机体与难度通关记录</caption>
-          <colgroup><col/>{game.loadouts.map(loadout => <col key={loadout.id}/>)}</colgroup>
-          <thead><tr><th scope="col">难度 / 机体</th>{game.loadouts.map(loadout => <th scope="col" key={loadout.id}>{label(loadout)}</th>)}</tr></thead>
-          <tbody>{game.difficulties.map(difficulty => <tr key={difficulty} data-difficulty={difficulty.toLowerCase()}><th scope="row"><span className="career-difficulty-dot" aria-hidden="true"/>{difficulty}</th>{game.loadouts.map(loadout => {
-            const key = careerCellKey(game, difficulty, loadout.id), record = careerRecord(records[key]);
-            const available = careerCellAvailable(game, difficulty);
-            const cellLabel = `${game.title} · ${difficulty} · ${label(loadout)}`;
-            const description = `${cellLabel} · ${available ? careerDescription(records[key]) : '不适用'}`;
-            return <td key={loadout.id}>{available ? <button type="button" className={`career-cell${record ? ' is-complete' : ''}`} aria-pressed={!!record} data-status={record?.status}
-              aria-label={description} title={description} onClick={() => onCell(key, cellLabel)}>
-              <span aria-hidden="true">{record ? careerStatus(record.status).label : '·'}</span>
-              {record && <small aria-hidden="true">{[record.misses ? `${record.misses}M` : '', record.bombs ? `${record.bombs}B` : '',
-                ...(record.restrictions ?? []).map(id => CAREER_RESTRICTIONS.find(item => item.id === id)!.label),
-                record.challenge, record.note && !record.challenge && !(record.restrictions ?? []).includes('special') ? '★' : ''].filter(Boolean).join(' · ')}</small>}
-            </button> : <span className="career-unavailable" title={game.note} aria-label={description}>—</span>}</td>;
-          })}</tr>)}</tbody>
-        </table>
-      </div>
-      <p className="career-scroll-hint">横向滑动查看机体 · {editing ? '点击格子编辑' : '点击格子查看详情'}</p>
-      </div>
-    </div>
-  </article>;
-}
-
