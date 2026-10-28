@@ -114,3 +114,45 @@ html[data-book-theme='light'] .player-profile{color-scheme:light}.player-profile
 @media(prefers-reduced-motion:reduce){.profile-display-options label,.profile-display-order li,.profile-detail-fields :is(input,textarea){transition:none}}
 
 .profile-account-login{display:inline-block;margin-top:12px;font-size:12px;text-decoration:none}
+/* Settings occupy the same aligned surface as account sign-in pages. */
+.player-profile.profile-settings{width:calc(100% - 48px);max-width:1312px;margin-inline:auto;background:var(--book-surface);min-height:calc(100dvh - 61px)}
+.profile-settings::before{content:'';position:absolute;left:0;right:0;top:-16px;height:16px;background:var(--book-surface);pointer-events:none}
+html:has(.book-masthead) .profile-settings .profile-wrap{max-width:none;padding:0 40px 40px}
+html:has(.book-masthead) .profile-settings .profile-topbar{max-width:none;padding:24px 40px 0}
+.profile-settings-heading{padding-top:24px;border-bottom:1px solid var(--book-border)}
+.profile-settings-heading h1{font-size:25px;line-height:1.4;margin-bottom:24px}
+.profile-settings-heading nav{display:flex;gap:28px;overflow-x:auto}
+.player-profile .profile-settings-heading nav button{flex:none;padding:0 0 14px;border:0;border-bottom:2px solid transparent;border-radius:0;background:none;color:var(--book-muted);font-size:14px}
+.player-profile .profile-settings-heading nav button[aria-current]{border-color:var(--book-accent);color:var(--book-accent)}
+.player-profile.profile-settings .profile-editor-shell{max-width:none;margin:0;border:0;border-radius:0;box-shadow:none;background:transparent;overflow:visible}
+.profile-settings .profile-editor-shell>.profile-section-title{padding:28px 0 20px;border:0;background:transparent}
+.profile-settings .profile-editor-shell>.profile-section-title .profile-section-icon{padding:0;border:0;border-radius:0;background:none}
+.profile-settings .profile-details-columns,.profile-settings .profile-display-columns{padding:8px 0 32px;gap:48px}
+.profile-settings .profile-editor-shell .profile-editor-footer{padding:20px 0;background:transparent}
+.player-profile .profile-perspective{display:flex;align-items:center;gap:3px;color:var(--book-muted);font-size:12px}
+.player-profile .profile-perspective button{padding:6px 9px;border-color:transparent;background:transparent;color:var(--book-muted)}
+.player-profile .profile-perspective button[aria-pressed='true']{color:var(--book-accent);background:var(--book-accent-soft)}
+.profile-visitor .profile-avatar:disabled{cursor:default}
+.profile-visitor .profile-aside .profile-account-login{display:none}
+.profile-security-body{max-width:760px}
+.profile-security-section{padding:24px 0 30px;border-bottom:1px solid var(--book-border)}
+.profile-security-section h3{margin-bottom:20px;font-size:15px}
+.profile-binding-row{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.profile-binding-row p{margin-top:4px}
+.profile-security-section form{max-width:440px;gap:18px}
+.profile-security-section label{display:grid;gap:8px;font-size:13px}
+.profile-security-section input{width:100%;min-width:0;min-height:46px;padding:10px 12px;border:1px solid var(--book-border);border-radius:8px;background:var(--book-raised);color:var(--book-ink)}
+.profile-security-code{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.profile-security-section form>.profile-primary{justify-self:start;min-height:42px;margin-top:4px}
+.profile-security-feedback{padding:20px 0;color:var(--book-accent);font-size:13px}
+@media(max-width:780px),(hover:none),(pointer:coarse){
+ .player-profile.profile-settings{width:100%;min-height:calc(100dvh - 109px)}
+ html:has(.book-masthead) .profile-settings .profile-wrap{padding:0 20px 30px}
+ html:has(.book-masthead) .profile-settings .profile-topbar{padding:20px 20px 0}
+ .profile-settings-heading h1{font-size:23px}
+ .profile-settings-heading nav{gap:22px}
+ .profile-settings .profile-details-columns,.profile-settings .profile-display-columns{grid-template-columns:minmax(0,1fr);gap:30px}
+ .profile-security-editor>.profile-section-title{flex-wrap:wrap}
+ .profile-security-section input{font-size:16px}
+ .profile-identity>.profile-actions{justify-content:space-between}
+}

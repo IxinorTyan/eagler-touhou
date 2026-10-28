@@ -35,7 +35,7 @@ export function CareerSummary({records}: {records: CareerRecords}) {
     <button type="button" className="career-thumbnail" style={expanded ? undefined : {aspectRatio: "800 / " + previewHeight}} data-expanded={expanded} aria-expanded={expanded} onClick={() => setExpanded(value => !value)} aria-label={expanded ? "收起通关图" : "展开通关图"}><Chart records={records} options={DEFAULT_OPTIONS}/></button></section>;
 }
 
-export function CareerShowcase({records, onSave, initiallyOpen = false}: {records: CareerRecords; onSave: (next: CareerRecords) => void; initiallyOpen?: boolean}) {
+export function CareerShowcase({records, onSave, initiallyOpen = false, readOnly = false}: {records: CareerRecords; onSave: (next: CareerRecords) => void; initiallyOpen?: boolean; readOnly?: boolean}) {
   const [options, setOptions] = useState(DEFAULT_OPTIONS);
   const [helpOpen, setHelpOpen] = useState(false);
   const [open, setOpen] = useState(initiallyOpen), [editing, setEditing] = useState(false), [draft, setDraft] = useState<CareerRecords>({});
@@ -79,7 +79,7 @@ export function CareerShowcase({records, onSave, initiallyOpen = false}: {record
     area.addEventListener('wheel', wheel, {passive: false});
     return () => area.removeEventListener('wheel', wheel);
   }, [open]);
-  const launch = (edit = false) => {returnFocus.current = document.activeElement as HTMLElement; setOpen(true); setConfirmClose(false); if (edit) {setDraft({...records}); setEditing(true);} };
+  const launch = (edit = false) => {returnFocus.current = document.activeElement as HTMLElement; setOpen(true); setConfirmClose(false); if (edit && !readOnly) {setDraft({...records}); setEditing(true);} };
   const close = () => {if (dirty) {setConfirmClose(true); return;} setOpen(false); setEditing(false); setSelection(null);};
   const update = (key: string, record?: TrackerRecord) => setDraft(current => {const next = {...current}; if (record) next[key] = record; else delete next[key]; return next;});
   const select = (key: string) => {
@@ -129,11 +129,11 @@ export function CareerShowcase({records, onSave, initiallyOpen = false}: {record
   return <section className="profile-panel career-showcase" aria-label="东方生涯通关图">
     <div className="profile-section-title career-heading"><h2>东方通关图</h2><span className="career-total"><b>{completed(records)}</b> 项通关</span></div>
     <button type="button" className="career-thumbnail" onClick={() => launch()} aria-label="全屏查看通关图"><Chart records={records} options={options}/></button>
-    <div className="career-card-footer"><div><button type="button" onClick={() => launch(true)}>编辑记录</button><button type="button" onClick={exportPng}>导出 PNG</button></div></div>
+    <div className="career-card-footer"><div>{!readOnly && <button type="button" onClick={() => launch(true)}>编辑记录</button>}<button type="button" onClick={exportPng}>导出 PNG</button></div></div>
 
     {open && <dialog ref={dialog} className="career-viewer" aria-labelledby="career-viewer-title" onCancel={event => {event.preventDefault(); close();}}>
       <header className="career-viewer-header"><div><h2 id="career-viewer-title">{editing ? '编辑通关记录' : '东方通关图'}</h2><span className="career-viewer-count">{completed(shown)} / {TRACKER_CELLS.length}</span></div><div className="career-viewer-actions">
-        {editing ? <><button type="button" onClick={() => {if (dirty) setConfirmClose(true); else {setEditing(false); setSelection(null);}}}>取消编辑</button><button type="button" className="is-primary" onClick={() => {onSave(draft); setEditing(false); setSelection(null); setConfirmClose(false); setMessage('通关记录已保存到此浏览器');}}>保存记录</button></> : <button type="button" onClick={() => {setDraft({...records}); setEditing(true);}}>编辑记录</button>}
+        {editing ? <><button type="button" onClick={() => {if (dirty) setConfirmClose(true); else {setEditing(false); setSelection(null);}}}>取消编辑</button><button type="button" className="is-primary" onClick={() => {onSave(draft); setEditing(false); setSelection(null); setConfirmClose(false); setMessage('通关记录已保存到此浏览器');}}>保存记录</button></> : !readOnly && <button type="button" onClick={() => {setDraft({...records}); setEditing(true);}}>编辑记录</button>}
         <button type="button" className="career-help-trigger" onClick={() => setHelpOpen(true)}><span aria-hidden="true">?</span>说明</button><button type="button" onClick={exportPng}>导出 PNG</button><button type="button" aria-label="关闭全屏通关图" onClick={close}>×</button></div></header>
       {confirmClose && <div className="career-discard" role="alert">还有未保存的修改。<button type="button" onClick={() => setConfirmClose(false)}>继续编辑</button><button type="button" onClick={() => {setConfirmClose(false); setEditing(false); setOpen(false); setSelection(null);}}>放弃修改并关闭</button></div>}
       <div className="career-viewer-body"><div className="career-map-column">
