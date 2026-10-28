@@ -19,7 +19,7 @@ try {
   await page.evaluate(() => document.fonts.ready);
   // Hide the site's timed announcement in isolated screenshots.
   await page.addStyleTag({content: '.site-notice{display:none!important}'});
-  for (const width of [1920, 1440, 1024, 768, 390]) {
+  for (const width of [1920, 1440, 1024, 900, 768, 390, 320]) {
     await page.setViewport({width, height: 900});
     for (const theme of ['dark', 'light']) {
       await page.evaluate(theme => document.documentElement.setAttribute('data-book-theme', theme), theme); await settle(page);
@@ -32,14 +32,23 @@ try {
       assert.ok(Math.abs(login.header.left - login.shell.left) < 1, `${width}: left edges`);
       assert.ok(Math.abs(login.header.right - login.shell.right) < 1, `${width}: right edges`);
       assert.ok(Math.abs(login.header.bottom - login.shell.top) < 1, `${width}: top edge`);
-      assert.ok(Math.abs(login.shell.bottom - 900) < 1, `${width}: viewport height`);
+      if (width >= 960) assert.ok(Math.abs(login.shell.bottom - 900) < 1, `${width}: viewport height`);
+      else assert.ok(login.shell.bottom >= 899, `${width}: at least viewport height`);
       assert.equal(login.overflow, false);
-      if (width > 640) {
+      if (width >= 960) {
         assert.ok(Math.abs(login.art.top - (login.header.bottom - login.radius)) < 1, `${width}: artwork extends behind rounded corners`);
         assert.ok(Math.abs(login.art.bottom - login.shell.bottom) < 1, `${width}: artwork reaches the bottom`);
       }
       assert.equal(await page.$eval('.account-shell', el => getComputedStyle(el, '::before').height), `${login.radius}px`);
-      const image = width > 640 ? await (await page.$('.account-art')).screenshot() : null;
+      if (width < 960) {
+        const print = await page.evaluate(() => {
+          const art = document.querySelector('.account-art'), input = document.querySelector('.account-content input');
+          const a = art.getBoundingClientRect(), f = document.querySelector('form').getBoundingClientRect();
+          return {fit: getComputedStyle(art.querySelector('img')).objectFit, events: getComputedStyle(art).pointerEvents, scroll: getComputedStyle(document.querySelector('.account-content')).overflowY, size: getComputedStyle(input).fontSize, overlaps: a.left < f.right && a.right > f.left && a.top < f.bottom && a.bottom > f.top};
+        });
+        assert.deepEqual(print, {fit: 'contain', events: 'none', scroll: 'visible', size: '16px', overlaps: true});
+      }
+      const image = width >= 960 ? await (await page.$('.account-art')).screenshot() : null;
       if ([1440, 390].includes(width)) await page.screenshot({path: `.cache/account/login-${width}-${theme}.png`});
       await selectMode(page, '注册'); await settle(page);
       const registration = await dimensions();

@@ -11,7 +11,7 @@ export interface AccountCaptchaProps {
 }
 
 /** The provider owns widget loading and cleanup; tokens stay in memory. */
-export function AccountPage({captcha: Captcha}: {captcha?: ComponentType<AccountCaptchaProps>}) {
+export function AccountPage({captcha: Captcha, artworkSrc = backgroundUrl}: {captcha?: ComponentType<AccountCaptchaProps>; artworkSrc?: string}) {
   const [search, setSearch] = useSearchParams();
   const registering = search.get('mode') === 'register';
   const [username, setUsername] = useState(''), [email, setEmail] = useState('');
@@ -68,7 +68,7 @@ export function AccountPage({captcha: Captcha}: {captcha?: ComponentType<Account
   };
   return <main ref={pageRef} className="account-page" aria-labelledby="account-title">
     <section className={`account-shell${registering ? ' is-registering' : ''}`}>
-      <aside className="account-art" aria-hidden="true"><img src={backgroundUrl} alt="" className="account-art-image"/></aside>
+      <aside className="account-art" aria-hidden="true"><img src={artworkSrc} alt="" className="account-art-image"/></aside>
       <div className="account-content">
         <div className="account-topline"><AppLink href="./">← 返回游戏库</AppLink></div>
         <nav className="account-tabs" aria-label="账号操作">{[['login', '登录'], ['register', '注册']].map(([mode, label]) => <button type="button" key={mode} aria-current={registering === (mode === 'register') ? 'page' : undefined} onClick={() => setSearch(mode === 'register' ? {mode} : {})}>{label}</button>)}</nav>
