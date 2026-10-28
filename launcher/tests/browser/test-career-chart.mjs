@@ -25,6 +25,9 @@ try {
   await page.screenshot({path: output + '/desktop-card.png', fullPage: true});
   await page.click('.career-showcase .career-thumbnail'); await page.waitForSelector('.career-map-cell'); await nextFrame(page);
   assert.equal(await page.$$eval('.career-map-cell', cells => cells.length), 1070);
+  assert.ok(await page.$$eval('.career-map-cell', cells => cells.every(cell =>
+    Number.parseFloat(cell.style.left) * 2 % 1 === 0 && Number.parseFloat(cell.style.top) * 2 % 1 === 0)));
+
   assert.equal(await page.$eval('dialog', dialog => dialog.matches(':modal')), true);
   assert.equal(await page.$eval('input[type=file]', input => getComputedStyle(input).display), 'none');
   await page.click('.career-help-trigger');

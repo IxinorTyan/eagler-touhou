@@ -1,4 +1,5 @@
 // @ts-nocheck
+import {trackerCellEdges} from './tracker-grid';
 // Canvas layout and pixel drawing adapted from Doopu's Touhou 1CC Tracker.
 // Source: https://github.com/doopu/1ccTracker/blob/main/index.js
 // Browser controls and storage are owned by CareerShowcase; each renderer is isolated.
@@ -241,186 +242,6 @@ function drawExtraHeader(x, y) {
         drawText("EXTRA", 2, y + 8);
     }
 }
-function drawGFWBox(x, y) {
-    if (ctx) {
-        ctx.lineCap = 'butt';
-        ctx.lineJoin = 'miter';
-        ctx.strokeStyle = '#d8d4cb';
-        ctx.lineWidth = 1.3;
-        // Do the really annoying thing of tracing around the box...
-        ctx.beginPath();
-        ctx.lineTo(x, y);
-        ctx.lineTo(x + boxWidth * 6, y);
-        const height = easyMode ? 4 : 3;
-        ctx.lineTo(x + boxWidth * 6, y + boxWidth * (height - 1));
-        ctx.lineTo(x + boxWidth * 7, y + boxWidth * (height - 1));
-        ctx.lineTo(x + boxWidth * 7, y + boxWidth * height);
-        ctx.lineTo(x, y + boxWidth * height);
-        ctx.lineTo(x, y);
-        ctx.stroke();
-        // We disabled drawing lines for C2 and EX to handle this very
-        // annoying edge case, so draw them all in.
-        y += 0.5;
-        x += 0.5;
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        ctx.lineTo(x + boxWidth * 5, y + boxWidth * (height - 1));
-        ctx.lineTo(x + boxWidth * 6, y + boxWidth * (height - 1));
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.lineTo(x + boxWidth * 5, y + boxWidth * (height - 1));
-        ctx.lineTo(x + boxWidth * 5, y + boxWidth * height);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.lineTo(x + boxWidth * 6 - 1, y + boxWidth * (height - 1));
-        ctx.lineTo(x + boxWidth * 6 - 1, y + boxWidth * height + 8.5);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.lineTo(x + boxWidth * 6 + 1, y + boxWidth * (height - 1));
-        ctx.lineTo(x + boxWidth * 6 + 1, y + boxWidth * height + 8.5);
-        ctx.stroke();
-    }
-}
-function drawLOLKBox(x, y) {
-    if (ctx) {
-        ctx.lineCap = 'butt';
-        ctx.lineJoin = 'miter';
-        ctx.strokeStyle = '#d8d4cb';
-        ctx.lineWidth = 1.3;
-        // Do the really annoying thing of tracing around the box...
-        ctx.beginPath();
-        ctx.lineTo(x, y + boxWidth);
-        ctx.lineTo(x + boxWidth, y + boxWidth);
-        ctx.lineTo(x + boxWidth, y);
-        ctx.lineTo(x + boxWidth * 2, y);
-        ctx.lineTo(x + boxWidth * 2, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 3, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 3, y);
-        ctx.lineTo(x + boxWidth * 4, y);
-        ctx.lineTo(x + boxWidth * 4, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 5, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 5, y);
-        ctx.lineTo(x + boxWidth * 6, y);
-        ctx.lineTo(x + boxWidth * 6, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 7, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 7, y);
-        ctx.lineTo(x + boxWidth * 8, y);
-        if (!easyMode) {
-            ctx.lineTo(x + boxWidth * 8, y + boxWidth * 4);
-            ctx.lineTo(x, y + boxWidth * 4);
-            ctx.lineTo(x, y + boxWidth);
-        }
-        if (easyMode) {
-            ctx.lineTo(x + boxWidth * 8, y + boxWidth * 5);
-            ctx.lineTo(x, y + boxWidth * 5);
-            ctx.lineTo(x, y + boxWidth);
-        }
-        ctx.stroke();
-    }
-}
-function drawHSIFSBox(x, y) {
-    if (ctx) {
-        ctx.lineCap = 'square';
-        ctx.lineJoin = 'miter';
-        ctx.strokeStyle = '#d8d4cb';
-        ctx.lineWidth = 1.3;
-        // Do the really annoying thing of tracing around the box...
-        ctx.beginPath();
-        ctx.lineTo(x, y);
-        ctx.lineTo(x + boxWidth, y);
-        ctx.lineTo(x + boxWidth, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 4, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 4, y);
-        ctx.lineTo(x + boxWidth * 5, y);
-        ctx.lineTo(x + boxWidth * 5, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 8, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 8, y);
-        ctx.lineTo(x + boxWidth * 9, y);
-        ctx.lineTo(x + boxWidth * 9, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 12, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 12, y);
-        ctx.lineTo(x + boxWidth * 13, y);
-        ctx.lineTo(x + boxWidth * 13, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 16, y + boxWidth);
-        let height = 4;
-        if (easyMode) {
-            height = 5;
-        }
-        ctx.lineTo(x + boxWidth * 16, y + boxWidth * height);
-        ctx.lineTo(x, y + boxWidth * height);
-        ctx.lineTo(x, y);
-        ctx.stroke();
-        // Draw the X dividers
-        y += 0.5;
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        ctx.lineTo(x, y + boxWidth - 2);
-        ctx.lineTo(x + boxWidth, y + boxWidth - 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.lineTo(x + 4 * boxWidth, y + boxWidth - 2);
-        ctx.lineTo(x + 5 * boxWidth, y + boxWidth - 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.lineTo(x + 8 * boxWidth, y + boxWidth - 2);
-        ctx.lineTo(x + 9 * boxWidth, y + boxWidth - 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.lineTo(x + 12 * boxWidth, y + boxWidth - 2);
-        ctx.lineTo(x + 13 * boxWidth, y + boxWidth - 2);
-        ctx.stroke();
-    }
-}
-function drawTDUMBox(x, y) {
-    if (ctx) {
-        ctx.lineCap = 'square';
-        ctx.lineJoin = 'miter';
-        ctx.strokeStyle = '#d8d4cb';
-        ctx.lineWidth = 1.3;
-        // Do the really annoying thing of tracing around the box...
-        ctx.beginPath();
-        ctx.lineTo(x, y);
-        ctx.lineTo(x + boxWidth, y);
-        ctx.lineTo(x + boxWidth, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 2, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 2, y);
-        ctx.lineTo(x + boxWidth * 3, y);
-        ctx.lineTo(x + boxWidth * 3, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 4, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 4, y);
-        ctx.lineTo(x + boxWidth * 5, y);
-        ctx.lineTo(x + boxWidth * 5, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 6, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 6, y);
-        ctx.lineTo(x + boxWidth * 7, y);
-        ctx.lineTo(x + boxWidth * 7, y + boxWidth);
-        ctx.lineTo(x + boxWidth * 8, y + boxWidth);
-        const height = easyMode ? 5 : 4;
-        ctx.lineTo(x + boxWidth * 8, y + boxWidth * height);
-        ctx.lineTo(x, y + boxWidth * height);
-        ctx.lineTo(x, y);
-        ctx.stroke();
-        // Draw the X dividers
-        y += 0.5;
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        ctx.lineTo(x, y + boxWidth - 2);
-        ctx.lineTo(x + boxWidth, y + boxWidth - 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.lineTo(x + 2 * boxWidth, y + boxWidth - 2);
-        ctx.lineTo(x + 3 * boxWidth, y + boxWidth - 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.lineTo(x + 4 * boxWidth, y + boxWidth - 2);
-        ctx.lineTo(x + 5 * boxWidth, y + boxWidth - 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.lineTo(x + 6 * boxWidth, y + boxWidth - 2);
-        ctx.lineTo(x + 7 * boxWidth, y + boxWidth - 2);
-        ctx.stroke();
-    }
-}
 function drawBoxContentsAux(x, y, done, misses, bombs, lives, vertical, focus, pacifist, unique, cellColour, textColour, colour) {
     if (ctx) {
         if (done) {
@@ -499,187 +320,80 @@ function drawDot(colour, x, y, width = 2) {
     }
 }
 let boxes = [];
+function drawCellGrid(cells) {
+    const edges = trackerCellEdges(cells, boxWidth);
+    ctx.strokeStyle = '#d8d4cb';
+    ctx.lineJoin = 'miter';
+    // Each shared edge is stroked once. Thick outlines follow the actual cell union,
+    // including the stepped Extra rows, instead of a separately offset shape.
+    for (const outer of [false, true]) {
+        ctx.lineWidth = outer ? 2 : 1;
+        ctx.lineCap = outer ? 'square' : 'butt';
+        ctx.beginPath();
+        for (const edge of edges) {
+            if (edge.outer !== outer) continue;
+            ctx.moveTo(edge.x1, edge.y1);
+            ctx.lineTo(edge.x2, edge.y2);
+        }
+        ctx.stroke();
+    }
+}
 function drawGame(game, baseX, baseY, drawDifficulties = false) {
-    // Except for certain games, we can just draw a difficulties-by-subcharacters box grid
-    let width = 0;
-    // Expand out the subcharacters while we're at it
-    let expandedChars = [];
-    for (let character of game.characters) {
-        if (character.subcharacters.length > 0) {
-            width += character.subcharacters.length;
-            for (let subcharacter of character.subcharacters) {
-                expandedChars.push(character.name + subcharacter);
-            }
-        }
-        else {
-            width += 1;
-            expandedChars.push(character.name);
-        }
-    }
-    // Easy mode toggle need special work
+    // All grid, outline, label and hit-target coordinates share the same pixel lattice.
+    baseX = Math.round(baseX * 2) / 2;
+    baseY = Math.round(baseY * 2) / 2;
+    const characters = game.characters.flatMap(character => character.subcharacters.length
+        ? character.subcharacters.map(sub => character.name + sub) : [character.name]);
     let difficulties = game.difficulties.slice();
-    if (easyMode) {
-        if (game.name === 'IN') {
-            difficulties = ["X", "B-L", "B-H", "B-N", "B-E", "A-L", "A-H", "A-N", "A-E"];
-        }
-        else if (difficulties[difficulties.length - 1] === 'N') {
-            difficulties.push('E');
-        }
-    }
-    const height = difficulties.length;
-    // Draw difficulties?
-    if (drawDifficulties) {
-        if (game.name === 'IN') {
-            // IN has an A/B split, so do this custom-style.
-            difficulties = 'XLHNLHN'.split('');
-            if (easyMode) {
-                difficulties = 'XLHNELHNE'.split('');
-            }
-            if (ctx) {
-                ctx.lineWidth = 1.0;
-                ctx.beginPath();
-                ctx.lineTo(baseX - 3.5, baseY + (boxWidth));
-                ctx.lineTo(baseX + 15, baseY + (boxWidth));
-                ctx.stroke();
-                drawText("B", baseX - 2, baseY + (boxWidth) + 7);
-                let aOffset = 4;
-                if (easyMode) {
-                    aOffset = 5;
-                }
-                ctx.beginPath();
-                ctx.lineTo(baseX - 3.5, baseY + (aOffset * boxWidth));
-                ctx.lineTo(baseX + 15, baseY + (aOffset * boxWidth));
-                ctx.stroke();
-                drawText("A", baseX - 2, baseY + (aOffset * boxWidth) + 7);
-            }
-        }
-        let y = 1;
-        for (let difficulty of difficulties) {
-            drawText(difficulty, baseX + 11, baseY + (y * boxWidth) - 1, 'right');
-            y += 1;
-        }
-        baseX += 14;
-    }
-    // Drawing IN's A/B labels temporarily uses single-letter rows. Restore
-    // route-qualified keys in both display modes so records stay independent.
     if (game.name === 'IN') {
         difficulties = easyMode
-            ? ["X", "B-L", "B-H", "B-N", "B-E", "A-L", "A-H", "A-N", "A-E"]
-            : ["X", "B-L", "B-H", "B-N", "A-L", "A-H", "A-N"];
+            ? ['X', 'B-L', 'B-H', 'B-N', 'B-E', 'A-L', 'A-H', 'A-N', 'A-E']
+            : ['X', 'B-L', 'B-H', 'B-N', 'A-L', 'A-H', 'A-N'];
+    } else if (easyMode && difficulties.at(-1) === 'N') difficulties.push('E');
+    if (drawDifficulties) {
+        difficulties.forEach((difficulty, row) => {
+            drawText(difficulty.length > 1 && game.name === 'IN' ? difficulty.at(-1) : difficulty,
+                baseX + 11, baseY + (row + 1) * boxWidth - 1, 'right');
+            if (game.name === 'IN' && ['B-L', 'A-L'].includes(difficulty))
+                drawText(difficulty[0], baseX - 2, baseY + row * boxWidth + 7);
+        });
+        baseX += 14;
     }
-    let dotOffset = 0;
-    if (width == 1) {
-        dotOffset = -6;
-    }
-    let dotNameOffset = 3;
-    const gap = 4;
-    if (game.name === 'GFW' || game.name === 'PODD') {
-        dotNameOffset = 4;
-    }
-    // Draw game colour dot
-    drawDot(game.colour, baseX + dotNameOffset + dotOffset, baseY - 5);
-    // Draw game name
-    drawText(game.name, baseX + dotNameOffset + gap + dotOffset, baseY - 2);
-    let lastY = 0;
-    // Draw individual boxes
-    let x = 0;
-    let y = 0;
-    for (let character of expandedChars) {
-        y = 0;
-        for (let difficulty of difficulties) {
-            // Some games need to skip boxes...
-            let skipBox = false;
-            let skipDraw = false;
-            skipBox = skipBox || (game.name === 'GFW' && character === 'EX' && difficulty !== 'N');
-            skipBox = skipBox || (game.name === 'LOLK' && !character.endsWith('l') && difficulty === 'X');
-            skipBox = skipBox || (game.name === 'HSIFS' && !character.endsWith('sp') && difficulty === 'X');
-            skipBox = skipBox || (game.name === 'TD' && character.endsWith('2') && difficulty === 'X');
-            skipBox = skipBox || (game.name === 'UM' && character.endsWith('2') && difficulty === 'X');
-            skipDraw = (game.name === 'GFW' && character === 'EX' && difficulty === 'N');
-            if (easyMode) {
-                skipDraw = skipDraw || (game.name === 'GFW' && character === 'C2' && difficulty === 'E');
-            }
-            else {
-                skipDraw = skipDraw || (game.name === 'GFW' && character === 'C2' && difficulty === 'N');
-            }
-            if (!skipBox) {
-                let yDraw = y;
-                if (game.name === 'GFW' && character === 'EX' && difficulty === 'N' && easyMode) {
-                    yDraw += 1;
-                }
-                let boxName = game.name + '-' + character + '-' + difficulty;
-                boxes.push({key: boxName, x: baseX + x * boxWidth, y: baseY + yDraw * boxWidth});
-                drawBoxContents(baseX + (x * boxWidth), baseY + (yDraw * boxWidth), boxName, game.colour);
-                if (!skipDraw) {
-                    drawBox(baseX + (x * boxWidth), baseY + (yDraw * boxWidth), boxWidth, boxWidth, 1);
-                }
-            }
-            lastY = baseY + (y * boxWidth);
-            y++;
+    const dotOffset = characters.length === 1 ? -6 : 0;
+    const nameOffset = ['GFW', 'PODD'].includes(game.name) ? 4 : 3;
+    drawDot(game.colour, baseX + nameOffset + dotOffset, baseY - 5);
+    drawText(game.name, baseX + nameOffset + 4 + dotOffset, baseY - 2);
+    const gameCells = [];
+    characters.forEach((character, column) => difficulties.forEach((difficulty, row) => {
+        if ((game.name === 'GFW' && character === 'EX' && difficulty !== 'N') ||
+            (game.name === 'LOLK' && !character.endsWith('l') && difficulty === 'X') ||
+            (game.name === 'HSIFS' && !character.endsWith('sp') && difficulty === 'X') ||
+            (['TD', 'UM'].includes(game.name) && character.endsWith('2') && difficulty === 'X')) return;
+        const actualRow = row + (game.name === 'GFW' && character === 'EX' && easyMode ? 1 : 0);
+        const cell = {key: `${game.name}-${character}-${difficulty}`, x: baseX + column * boxWidth, y: baseY + actualRow * boxWidth};
+        gameCells.push(cell);
+        boxes.push(cell);
+        drawBoxContents(cell.x, cell.y, cell.key, game.colour);
+    }));
+    drawCellGrid(gameCells);
+    lastX = baseX + (characters.length - 1) * boxWidth;
+    const bottom = baseY + difficulties.length * boxWidth;
+    let column = 0;
+    for (const character of game.characters) {
+        const x = baseX + column * boxWidth;
+        // Retain the original character grouping, aligned exactly to the cell edge.
+        drawUILine(x, bottom, character.subcharacters.length ? boxWidth - 2 : boxWidth - 8, column === 0 ? 2 : 1);
+        if (character.subcharacters.length) {
+            drawText(character.name, x + 2, bottom + 14);
+            for (const [index, sub] of character.subcharacters.entries())
+                drawText(sub, x + index * boxWidth + 2, bottom + 7, 'left', '500 7px "Segoe UI", sans-serif');
+            column += character.subcharacters.length;
+        } else {
+            drawText(character.name, x + 2, bottom + 8);
+            column++;
         }
-        lastX = baseX + (x * boxWidth);
-        x++;
     }
-    // Draw outer box, except for annoying games like LOLK, GFW and HSIFS.
-    if (game.name != 'TD' && game.name != 'UM' && game.name !== 'LOLK' && game.name !== 'GFW' && game.name !== 'HSIFS') {
-        drawBox(baseX - 0.5, baseY - 0.5, boxWidth * width, boxWidth * height, 2);
-    }
-    if (game.name === 'LOLK') {
-        drawLOLKBox(baseX - 0.5, baseY - 0.5);
-    }
-    if (game.name === 'TD' || game.name === 'UM') {
-        drawTDUMBox(baseX - 0.5, baseY - 0.5);
-    }
-    if (game.name === 'GFW') {
-        drawGFWBox(baseX - 0.5, baseY - 0.5);
-    }
-    if (game.name === 'HSIFS') {
-        drawHSIFSBox(baseX - 0.5, baseY - 0.5);
-    }
-    // Draw characters
-    let charX = 0;
-    for (let character of game.characters) {
-        if (character.subcharacters.length > 0) {
-            let lineWidth = 1;
-            let xAdjust = 0;
-            let yAdjust = 0.5;
-            // If this is the first character, we need a long thick bar at the start..
-            if (charX == 0) {
-                lineWidth = 2;
-                xAdjust = -0.5;
-                yAdjust = 0.5;
-            }
-            drawUILine(xAdjust + (charX * boxWidth) + baseX, yAdjust + lastY + boxWidth, boxWidth - 2, lineWidth);
-            drawText(character.name, baseX + (charX * boxWidth) + 2, lastY + (boxWidth) + 14);
-            for (let subcharacter of character.subcharacters) {
-                drawText(subcharacter, baseX + (charX * boxWidth) + 2, lastY + (boxWidth) + 7, 'left', '500 7px "Segoe UI", sans-serif');
-                charX += 1;
-            }
-            charX -= 1;
-        }
-        else {
-            // If this is the first chracter, we need a thick short bar at the start, otherwise a thin one
-            let lineWidth = 1;
-            let xAdjust = 1;
-            let yAdjust = 0.5;
-            let textAdjust = 0;
-            if (charX == 0) {
-                lineWidth = 2;
-                xAdjust = 0.5;
-            }
-            if (game.name === 'GFW' && character.name === 'EX') {
-                textAdjust = 1;
-            }
-            else {
-                // We draw the GFW EX line ourselves
-                drawUILine(xAdjust + baseX - 1 + (charX * boxWidth), lastY + boxWidth, boxWidth - 8 + yAdjust, lineWidth);
-            }
-            drawText(character.name, textAdjust + baseX + (charX * boxWidth) + 2, lastY + (boxWidth) + 8);
-        }
-        charX += 1;
-    }
-    // Draw closing bar
-    drawUILine(baseX - 0.5 + (charX * boxWidth), lastY + boxWidth + 0.5, boxWidth - 8, 2);
+    drawUILine(baseX + column * boxWidth, bottom, boxWidth - 8, 2);
 }
 function drawLegend() {
     const left = canvas.width - 8 * boxWidth + 2.5;
@@ -781,7 +495,6 @@ return {draw(records, options) {
     surface.width = canvas.width * 2;
     surface.height = canvas.height * 2;
     ctx.scale(2, 2);
-    ctx.translate(0.5, 0.5);
     drawScreen();
     return boxes.map(({key, x, y}) => ({key, x, y}));
 }};

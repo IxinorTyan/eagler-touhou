@@ -9,7 +9,7 @@ let api, work;
 before(async () => {
   work = await mkdtemp(resolve(project, '.cache/career-chart-'));
   const outfile = resolve(work, 'records.mjs');
-  await build({absWorkingDir: project, entryPoints: ['app/components/launcher/tracker-records.ts'], outfile, bundle: true, platform: 'node', format: 'esm', logLevel: 'silent'});
+  await build({absWorkingDir: project, stdin: {resolveDir: project, contents: "export * from './app/components/launcher/tracker-records.ts'; export * from './app/components/launcher/tracker-grid.ts';"}, outfile, bundle: true, platform: 'node', format: 'esm', logLevel: 'silent'});
   api = await import(pathToFileURL(outfile).href);
 });
 after(async () => {await rm(work, {recursive: true, force: true});});
@@ -45,4 +45,19 @@ test('chart options require boolean flags; labels identify full works and distin
   assert.match(api.cellLabel('UFO-Ra-N'), /东方星莲船.*Normal/);
   assert.match(api.cellLabel('PCB-Ra-P'), /Phantasm/);
   assert.notEqual(api.cellLabel('IN-BT-A-N'), api.cellLabel('IN-BT-B-N'));
+});
+
+test('adjacent squares share one aligned border while exposed edges retain thick outlines', () => {
+  const edges = api.trackerCellEdges([{x: 0, y: 0}, {x: 17, y: 0}]);
+  assert.equal(edges.length, 7);
+  assert.equal(edges.filter(edge => edge.outer).length, 6);
+  assert.deepEqual(edges.filter(edge => !edge.outer), [{x1: 17, y1: 0, x2: 17, y2: 17, outer: false}]);
+  const stepped = api.trackerCellEdges([{x: 0, y: 17}, {x: 17, y: 17}, {x: 17, y: 0}]);
+  assert.equal(stepped.length, 10);
+  assert.equal(stepped.filter(edge => edge.outer).length, 8);
+  assert.equal(stepped.filter(edge => !edge.outer).length, 2);
+  assert.equal(stepped.some(edge => edge.x1 === 0 && edge.y1 === 0), false);
+  const fractional = api.trackerCellEdges([{x: 0.1, y: 0.9}, {x: 17.1, y: 0.9}]);
+  assert.equal(fractional.length, 7);
+  assert.equal(fractional.filter(edge => !edge.outer).length, 1);
 });
