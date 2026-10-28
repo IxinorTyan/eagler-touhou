@@ -47,7 +47,7 @@ export function BookLibrary({products, openedProduct, onSelect, onActivate, inte
     <span className="book-identity"><small>TH{product.number}</small><strong>{product.title}</strong><span>{product.subtitle}</span></span>
     {view === 'list' && <span className="book-row-action" aria-hidden="true">{en ? 'Play' : '开始游玩'} →</span>}
   </a>;
-  const displayedRecent = search.get('preview') === 'recent' ? available.slice(0, 4).map(product => product.id) : recent;
+  const displayedRecent = search.get('preview') === 'recent' ? available.slice(0, 7).map(product => product.id) : recent;
   const history = displayedRecent.map(id => available.find(product => product.id === id)).filter((product): product is LibraryProduct => !!product).slice(0, view === 'list' ? 5 : 20);
   return <div className={`book-library book-view-${view}`}>
     <aside className="book-sidebar" aria-label={en ? 'Game categories' : '游戏分类'}>
