@@ -8,7 +8,7 @@ export type CareerRecords = Record<string, TrackerRecord>;
 export type TrackerOptions = {easy: boolean; extra: boolean; legend: boolean; transparent: boolean};
 export const DEFAULT_OPTIONS: TrackerOptions = {easy: true, extra: true, legend: true, transparent: false};
 export const CAREER_STORAGE_KEY = 'player-career-chart-v2';
-const titles = ['东方灵异传', '东方封魔录', '东方梦时空', '东方幻想乡', '东方怪绮谈', '东方红魔乡', '东方文花帖', '东方文花帖 DS', '弹幕天邪鬼', '秘封噩梦日记', '弹幕狂们的黑市', '东方妖妖梦', '东方永夜抄', '东方花映塚', '东方风神录', '东方地灵殿', '东方星莲船', '妖精大战争', '东方神灵庙', '东方辉针城', '东方绀珠传', '东方天空璋', '东方鬼形兽', '东方虹龙洞', '东方兽王园', '东方萃梦想', '东方绯想天', '东方非想天则', '东方心绮楼', '东方深秘录', '东方凭依华', '东方刚欲异闻'];
+const titles = ['东方灵异传', '东方封魔录', '东方梦时空', '东方幻想乡', '东方怪绮谈', '东方红魔乡', '东方文花帖', '东方文花帖 DS', '弹幕天邪鬼', '秘封噩梦日记', '弹幕狂们的黑市', '东方妖妖梦', '东方永夜抄', '东方花映塚', '东方风神录', '东方地灵殿', '东方星莲船', '妖精大战争', '东方神灵庙', '东方辉针城', '东方绀珠传', '东方天空璋', '东方鬼形兽', '东方虹龙洞', '东方兽王园', '东方萃梦想', '东方绯想天', '东方非想天则', '东方心绮楼', '东方深秘录', '东方凭依华', '东方刚欲异闻', '东方锦上京'];
 export type TrackerGame = {name: string; colour: string; title: string; characters: string[]; difficulties: string[]};
 type SourceGame = {name: string; colour: string; characters: {name: string; subcharacters: string[]}[]; difficulties: string[]};
 export const TRACKER_GAMES: TrackerGame[] = (trackerGames as unknown as SourceGame[]).map((game, index) => ({

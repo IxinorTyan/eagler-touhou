@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState, type PointerEvent as ReactPointerEvent} from 'react';
-import {createTrackerRenderer, trackerLayout} from './tracker-renderer';
+import {createTrackerRenderer, trackerLayout, trackerDisplayName} from './tracker-renderer';
 import {blankRecord, cellLabel, DEFAULT_OPTIONS, TRACKER_CELLS, TRACKER_GAMES, validCareerRecords, validOptions,
   type CareerRecords, type TrackerOptions, type TrackerRecord} from './tracker-records';
 import {readBookPreference, writeBookPreference} from './book-preferences';
@@ -200,7 +200,7 @@ function CareerHelp({onClose}: {onClose: () => void}) {
       <section><h3>特殊限制</h3><dl className="career-help-definitions"><div><dt>横线 / NV</dt><dd>禁止纵向移动</dd></div><div><dt>F / NF</dt><dd>禁止低速</dd></div><div><dt>P</dt><dd>和平主义</dd></div><div><dt>U</dt><dd>自定义限制，具体规则填入备注。</dd></div></dl></section>
       <section><h3>路线与模式</h3><dl className="career-help-definitions"><div><dt>永夜抄 A / B</dt><dd>Final A / Final B 路线</dd></div><div><dt>绀珠传 p / l</dt><dd>绀珠模式 / 传统模式</dd></div><div><dt>天空璋 sp / sm / f / w</dt><dd>春 / 夏 / 秋 / 冬季节</dd></div><div><dt>e1 / e2</dt><dd>对应作品的两种结局记录</dd></div></dl><p>摄影作等作品沿用原图的场景与完成标记；记录时可在备注中补充条件。</p></section>
       <section><h3>查看与编辑</h3><p>滚轮或双指缩放，拖动画布移动。「适应屏幕」查看全图，「原始大小」返回 100%。</p><p>进入编辑后，选格子填写详情并应用到草稿；也可选择填表工具快速标记。点击「保存记录」保存整张图。</p><p>PNG 导出当前显示的通关图；JSON 用于备份和恢复记录。</p></section>
-      <section><h3>作品缩写</h3><dl className="career-help-games">{TRACKER_GAMES.map(game => <div key={game.name}><dt><i style={{background: game.colour}}/>{game.name}</dt><dd>{game.title}</dd></div>)}</dl></section>
+      <section><h3>作品编号</h3><dl className="career-help-games">{TRACKER_GAMES.map(game => <div key={game.name}><dt><i style={{background: game.colour}}/>{trackerDisplayName(game)}</dt><dd>{game.title}</dd></div>)}</dl></section>
     </div>
   </dialog>;
 }

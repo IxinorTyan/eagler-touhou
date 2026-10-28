@@ -216,7 +216,15 @@ const th20 = new Game('TH20', '#b75256', ['E', 'N', 'H', 'L', 'X'], [
     new Character('R', ['r', 'y', 'b', 'g']), new Character('M', ['r', 'y', 'b', 'g']),
 ]);
 
-export const trackerDisplayName = game => game.name === 'TH20' ? 'KJ' : game.name;
+const trackerNumbers = {
+    HRTP: '01', SOEW: '02', PODD: '03', LS: '04', MS: '05', EOSD: '06',
+    PCB: '07', IAMP: '07.5', IN: '08', POFV: '09', STB: '09.5', MOF: '10',
+    SWR: '10.5', SA: '11', UFO: '12', 'H.SOKU': '12.3', DS: '12.5', GFW: '12.8',
+    TD: '13', HM: '13.5', DDC: '14', ISC: '14.3', ULIL: '14.5', LOLK: '15',
+    AOCF: '15.5', HSIFS: '16', VD: '16.5', WBAWC: '17', GI: '17.5',
+    UM: '18', '100BM': '18.5', UDOALG: '19', TH20: '20',
+};
+export const trackerDisplayName = game => `Th${trackerNumbers[game.name]}`;
 export const trackerGames = [htrp, soew, podd, ls, ms, eosd, stb, ds, isc, vd, bm, pcb, imp, pofv, mof, sa, ufo, gfw, td, ddc, lolk, hsifs, wbawc, um, udoalg, iamp, swr, hsoku, hm, ulil, aocf, gi, th20];
 export const trackerSections = [
     {title: '整数作', games: [htrp, soew, ls, ms, eosd, pcb, imp, mof, sa, ufo, td, ddc, lolk, hsifs, wbawc, um, th20]},
@@ -225,32 +233,49 @@ export const trackerSections = [
 ];
 const additionalGames = new Set([iamp, swr, hsoku, hm, ulil, aocf, gi]);
 function gameDifficulties(game, easy) {
-    if (game.name === 'TH20') return game.difficulties.filter(difficulty => easy || difficulty !== 'E');
+    if (game.name === 'TH20') return game.difficulties.filter(difficulty => easy || difficulty !== 'E').toReversed();
     if (game.name === 'IN') return easy
         ? ['X', 'B-L', 'B-H', 'B-N', 'B-E', 'A-L', 'A-H', 'A-N', 'A-E']
         : ['X', 'B-L', 'B-H', 'B-N', 'A-L', 'A-H', 'A-N'];
     return [...game.difficulties, ...(easy && game.difficulties.at(-1) === 'N' ? ['E'] : [])];
 }
 export function trackerLayout(options) {
-    let y = 24;
+    let y = 16;
     const sections = trackerSections.map(section => {
         const top = y;
-        y += 42;
-        let x = 24, rowHeight = 0;
-        const games = section.games.filter(game => options.extra || !additionalGames.has(game)).map(game => {
+        y += 32;
+        const games = [], rows = [];
+        let row = [], used = 0;
+        const finishRow = () => {
+            if (!row.length) return;
+            const standard = row.some(block => block.standard);
+            const maxRows = Math.max(...row.map(block => block.difficulties.length));
+            const labels = standard ? row.filter(block => block.standard).sort((a, b) => b.difficulties.length - a.difficulties.length)[0].difficulties : [];
+            let x = 24 + (standard ? 30 : 0);
+            for (const block of row) {
+                const offset = block.standard ? maxRows - labels.length + labels.indexOf(block.difficulties[0]) : maxRows - block.difficulties.length;
+                Object.assign(block, {x, y: y + offset * 17, height: block.difficulties.length * 17 + 18, drawDifficulties: !block.standard});
+                games.push(block);
+                x += block.width;
+            }
+            rows.push({y: y + (maxRows - labels.length) * 17, labels});
+            y += maxRows * 17 + 36;
+            row = []; used = 0;
+        };
+        for (const game of section.games.filter(game => options.extra || !additionalGames.has(game))) {
+            const difficulties = gameDifficulties(game, options.easy);
+            const standard = difficulties.every(difficulty => ['P', 'X', 'L', 'H', 'N', 'E'].includes(difficulty));
             const columns = game.characters.reduce((n, character) => n + (character.subcharacters.length || 1), 0);
-            const width = columns * 17 + 30;
-            const height = gameDifficulties(game, options.easy).length * 17 + 44;
-            if (x + width > 776) {y += rowHeight + 20; x = 24; rowHeight = 0;}
-            const block = {game, x, y, width, height};
-            x += width + 20;
-            rowHeight = Math.max(rowHeight, height);
-            return block;
-        });
-        y += rowHeight + 30;
-        return {title: section.title, top, games};
+            // Matching difficulty rows share a label gutter and touching game boundaries.
+            const width = columns * 17 + (standard ? 0 : 44);
+            if (row.length && (used + width + 30 > 752)) finishRow();
+            row.push({game, width, difficulties, standard}); used += width;
+        }
+        finishRow();
+        y += 12;
+        return {title: section.title, top, games, rows};
     });
-    return {width: 800, height: y + (options.legend ? 98 : 0), sections};
+    return {width: 800, height: y + (options.legend ? 90 : 0), sections};
 }
 export function createTrackerRenderer(surface) {
 const ctx = surface.getContext('2d');
@@ -371,7 +396,13 @@ function drawGame(game, baseX, baseY, drawDifficulties = false) {
     const difficulties = gameDifficulties(game, easyMode);
     if (drawDifficulties) {
         difficulties.forEach((difficulty, row) => {
-            drawText(difficulty, baseX + 24, baseY + (row + 1) * boxWidth - 5, 'right');
+            drawText(game.name === 'IN' ? difficulty.at(-1) : difficulty,
+                baseX + 24, baseY + (row + 1) * boxWidth - 5, 'right');
+            if (game.name === 'IN' && ['B-L', 'A-L'].includes(difficulty)) {
+                const routeRows = easyMode ? 4 : 3;
+                drawText(difficulty[0], baseX + 5, baseY + row * boxWidth + routeRows * boxWidth / 2 + 3);
+            }
+
         });
         baseX += 30;
     }
@@ -392,6 +423,18 @@ function drawGame(game, baseX, baseY, drawDifficulties = false) {
         drawBoxContents(cell.x, cell.y, cell.key, game.colour);
     }));
     drawCellGrid(gameCells);
+    if (game.name === 'IN') {
+        ctx.strokeStyle = '#a49a8b';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'butt';
+        ctx.beginPath();
+        for (const route of ['B-L', 'A-L']) {
+            const y = baseY + difficulties.indexOf(route) * boxWidth;
+            ctx.moveTo(baseX, y);
+            ctx.lineTo(baseX + characters.length * boxWidth, y);
+        }
+        ctx.stroke();
+    }
     const bottom = baseY + difficulties.length * boxWidth;
     let column = 0;
     for (const character of game.characters) {
@@ -431,7 +474,9 @@ function drawScreen(layout) {
         ctx.strokeStyle = '#d8d4cb';
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(106, section.top + 9); ctx.lineTo(776, section.top + 9); ctx.stroke();
-        for (const block of section.games) drawGame(block.game, block.x, block.y, true);
+        for (const row of section.rows) row.labels.forEach((difficulty, index) =>
+            drawText(difficulty, 48, row.y + (index + 1) * boxWidth - 5, 'right'));
+        for (const block of section.games) drawGame(block.game, block.x, block.y, block.drawDifficulties);
     }
     if (showLegend) drawLegend(layout.height - 98);
 }

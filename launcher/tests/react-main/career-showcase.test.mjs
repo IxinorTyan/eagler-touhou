@@ -85,10 +85,40 @@ test('three chronological sections keep game tables separate and inside the char
 
 test('TH20 has five difficulties and four colors for both R and M in the integer section', () => {
   const game = api.TRACKER_GAMES.find(game => game.name === 'TH20');
-  assert.equal(api.trackerDisplayName(game), 'KJ');
+  assert.equal(api.trackerDisplayName(game), 'Th20');
   assert.deepEqual(game.difficulties, ['E', 'N', 'H', 'L', 'X']);
   assert.deepEqual(game.characters, ['Rr', 'Ry', 'Rb', 'Rg', 'Mr', 'My', 'Mb', 'Mg']);
   assert.equal(api.TRACKER_CELLS.filter(cell => cell.game.name === 'TH20').length, 40);
   assert.equal(api.trackerLayout(api.DEFAULT_OPTIONS).sections[0].games.at(-1).game.name, 'TH20');
   assert.equal(api.cellLabel('TH20-Rr-X'), '东方锦上京 · Rr · Extra');
+});
+
+
+test('compact chart shares aligned difficulty rows and fits versus games on one row', () => {
+  const layout = api.trackerLayout(api.DEFAULT_OPTIONS);
+  assert.ok(layout.height < 1400, `chart height: ${layout.height}`);
+  const versus = layout.sections[1];
+  assert.equal(versus.rows.length, 1);
+  assert.equal(versus.games[0].y + versus.games[0].difficulties.indexOf('N') * 17,
+    versus.games[1].y + versus.games[1].difficulties.indexOf('N') * 17);
+  assert.equal(versus.games[0].x + versus.games[0].width, versus.games[1].x);
+});
+
+
+test('shared difficulty labels align every standard game including games without Easy', () => {
+  const layout = api.trackerLayout(api.DEFAULT_OPTIONS);
+  for (const section of layout.sections) for (const block of section.games.filter(block => block.standard)) {
+    const row = section.rows.find(row => block.difficulties.every((difficulty, index) =>
+      row.labels.includes(difficulty) && row.y + row.labels.indexOf(difficulty) * 17 === block.y + index * 17));
+    assert.ok(row, block.game.name);
+  }
+});
+
+
+test('every work uses a unique Th number for its display label', () => {
+  const labels = api.TRACKER_GAMES.map(api.trackerDisplayName);
+  assert.equal(new Set(labels).size, 33);
+  assert.ok(labels.every(label => /^Th[0-9]{2}(?:\.[0-9])?$/.test(label)));
+  assert.equal(api.trackerDisplayName({name: 'STB'}), 'Th09.5');
+  assert.equal(api.trackerDisplayName({name: 'H.SOKU'}), 'Th12.3');
 });

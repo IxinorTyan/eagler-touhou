@@ -28,7 +28,8 @@ try {
   }));
   await page.screenshot({path: output + '/desktop-card.png', fullPage: true});
   await page.click('.career-showcase .career-thumbnail'); await page.waitForSelector('.career-map-cell'); await nextFrame(page);
-  assert.equal(await page.$$eval('.career-map-cell', cells => cells.length), 1070);
+  assert.equal(await page.$$eval('.career-map-cell', cells => cells.length), 1110);
+  assert.equal(await page.$$eval('[data-cell-key^="TH20-"]', cells => cells.length), 40);
   assert.ok(await page.$$eval('.career-map-cell', cells => cells.every(cell =>
     Number.parseFloat(cell.style.left) * 2 % 1 === 0 && Number.parseFloat(cell.style.top) * 2 % 1 === 0)));
 
@@ -38,7 +39,7 @@ try {
   await page.click('.career-help-trigger');
   await page.waitForSelector('.career-help-dialog[open]');
   assert.match(await page.$eval('.career-help-content', el => el.textContent), /Final A.*Final B/);
-  assert.equal(await page.$$eval('.career-help-games>div', el => el.length), 32);
+  assert.equal(await page.$$eval('.career-help-games>div', el => el.length), 33);
   await page.keyboard.press('Escape'); await page.waitForSelector('.career-help-dialog', {hidden: true});
   assert.equal(await page.$eval('.career-viewer', dialog => dialog.matches(':modal')), true);
   report.push('Help button, all game abbreviations, route explanations and Escape return to viewer');
@@ -80,7 +81,7 @@ try {
   await page.evaluate(() => {window.careerDownloads=[]; HTMLAnchorElement.prototype.click=function(){window.careerDownloads.push({name:this.download,href:this.href});};});
   await clickText(page, '.career-viewer-actions', '导出 PNG');
   const png = await page.evaluate(async () => {const image=new Image();image.src=window.careerDownloads.at(-1).href;await image.decode();const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);return {w:image.width,h:image.height,alpha:ctx.getImageData(image.width-2,image.height-2,1,1).data[3]};});
-  assert.equal(png.w,1600); assert.ok(png.h > 1756); assert.equal(png.alpha,255);
+  assert.equal(png.w,1600); assert.ok(png.h < 2800); assert.equal(png.alpha,255);
   // Select display toggles by their visible labels.
   const toggle = label => page.evaluate(label => {const el=[...document.querySelectorAll('.career-check')].find(el=>el.textContent===label);el.querySelector('input').click();}, label);
   // Export the same chart with a transparent background.
@@ -92,11 +93,11 @@ try {
   assert.equal(await page.$$eval('[data-cell-key="IN-BT-B-N"]', cells => cells.length), 1);
   assert.equal(await page.$$eval('[data-cell-key="IN-BT-A-N"]', cells => cells.length), 1);
   await toggle('显示 Easy'); await nextFrame(page);
-  await toggle('显示附加作品'); await nextFrame(page); assert.ok(await page.$$eval('.career-map-cell',cells=>cells.length)<1070);
+  await toggle('显示附加作品'); await nextFrame(page); assert.ok(await page.$$eval('.career-map-cell',cells=>cells.length)<1110);
   await toggle('显示附加作品'); await nextFrame(page);
   // Restore Easy if needed and ensure display filters never modify saved data.
   await page.evaluate(()=>{const el=[...document.querySelectorAll('.career-check')].find(el=>el.textContent==='显示 Easy').querySelector('input');if(!el.checked)el.click();});
-  await nextFrame(page); assert.equal(await page.$$eval('.career-map-cell',cells=>cells.length),1070);
+  await nextFrame(page); assert.equal(await page.$$eval('.career-map-cell',cells=>cells.length),1110);
   assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('eagler.book.player-career-chart-v2'))),saved);
   report.push('PNG dimensions/opacity, transparent export and non-destructive display filters');
   await clickText(page,'.career-backup-actions','导出 JSON');
