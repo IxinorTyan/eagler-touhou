@@ -11,6 +11,8 @@
 @property --book-overlay {syntax:"<color>";inherits:true;initial-value:#111111a8}
 
 :root, html[data-book-theme='dark'] {
+  --launcher-layout-width:1360px;
+  --launcher-layout-gutter:24px;
   --book-bg: #171717;
   --book-surface: #242424;
   --book-raised: #303030;
@@ -55,35 +57,20 @@ body:not(.mp-room-active):has(.book-masthead) {
 }
 /* The same source as the original Launcher is resolved by Vite for nested
    deployments and belongs to the existing offline asset graph. */
-body:not(.mp-room-active):has(.book-masthead)::before {
-  content:"";display:block;opacity:1;filter:none;transform:none;position:fixed;inset:0;z-index:0;pointer-events:none;
-  background:linear-gradient(var(--book-overlay),var(--book-overlay)),url('../../../public/assets/launcher-background.webp') center/cover no-repeat;
-}
-/* The library has one solid canvas, including the area above its content. */
-body:not(.mp-room-active):has(.book-library)::before {display:none}
+body:not(.mp-room-active):has(.book-masthead)::before {display:none}
 body:not(.mp-room-active):has(.book-masthead) :is(.sheet,.book-directory) {position:relative;z-index:1;background:transparent}
 body:not(.mp-room-active) .book-masthead {background:color-mix(in srgb,var(--book-bg) 88%,transparent)}
-/* All three destinations dissolve the content only. Keep the backdrop and
-   masthead steady, and never morph different page heights into one another. */
-body:not(.mp-room-active):has(.book-masthead) :is(.sheet,.book-directory,.player-profile) {view-transition-name:launcher-content}
-html:has(.book-masthead)::view-transition-group(root) {animation:none}
-html:has(.book-masthead)::view-transition-old(root) {animation:none;opacity:0}
-html:has(.book-masthead)::view-transition-new(root) {animation:none;opacity:1}
-::view-transition-group(launcher-content) {animation:none}
-::view-transition-old(launcher-content),::view-transition-new(launcher-content) {width:100%;height:100%;object-fit:none;object-position:center top}
-::view-transition-old(launcher-content) {animation:launcher-page-out var(--launcher-page-duration) ease-in-out both}
-::view-transition-new(launcher-content) {animation:launcher-page-in var(--launcher-page-duration) ease-in-out both}
+/* The same route layer serves the library, multiplayer, and profile pages. */
+.launcher-page-surface {position:relative;width:100%;max-width:var(--launcher-layout-width);margin-inline:auto;view-transition-name:launcher-page}
+html:has(.book-masthead) :is(.book-library,.book-directory,.profile-wrap,.profile-topbar) {max-width:var(--launcher-layout-width);padding-inline:var(--launcher-layout-gutter)}
 html:has(.book-masthead) .book-masthead {view-transition-name:launcher-masthead}
 ::view-transition-group(launcher-masthead) {animation:none}
-::view-transition-old(launcher-masthead) {animation:none;opacity:0}
+::view-transition-old(launcher-masthead) {animation:none;visibility:hidden}
 ::view-transition-new(launcher-masthead) {animation:none;opacity:1}
-html:has(body.less-motion)::view-transition-old(launcher-content),html:has(body.less-motion)::view-transition-new(launcher-content) {animation:none!important}
-@media(prefers-reduced-motion:reduce) {
-  ::view-transition-old(launcher-content),::view-transition-new(launcher-content) {animation:none!important}
-}
 .lobby-page .book-masthead .masthead-links {grid-column:3}
 html:has(.book-masthead) .book-directory:not(:has(>.book-masthead)) {padding-top:24px}
 @media(max-width:780px),(hover:none),(pointer:coarse) {
+  :root {--launcher-layout-gutter:14px}
   .lobby-page .book-masthead .masthead-links {grid-column:2}
   html:has(.book-masthead) .book-directory:not(:has(>.book-masthead)) {padding-top:18px}
 }

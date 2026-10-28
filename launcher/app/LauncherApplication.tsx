@@ -157,11 +157,13 @@ function LauncherSurfaces({host}: {host: LauncherHost}) {
     children: <LobbyOptionsHost open={presence.open} foregroundActive={navigation.surface === 'touch' || host.runtimeOpen === true || host.replayWorkspace === true} onCloseRequest={navigation.closeSurface}>{host.replayWorkspace && !roomOpen ? null : settingsPanel}</LobbyOptionsHost>};
   return <OptionsOwnership value={presence.targets}>
     {host.masthead}
+    <div className="launcher-page-surface" data-page={profilePage ? 'profile' : navigation.context}>
     {profilePage ? <ProfilePage/> : navigation.context === 'lobby' ? host.renderLobby ? host.renderLobby(lobbyProps) : <LobbySurface {...lobbyProps}/> : <LibrarySurface products={host.products} selectedProduct={preview} openedProduct={presence.openedProduct}
       onSelect={setPreview} onActivate={activate} masthead={null} footer={host.footer} serverStatusNote={host.serverStatusNote}
       lobbyHref={host.lobbyHref} roomUsersArtwork={host.assetUrl('assets/room-users.svg')} optionsOpen={presence.open} roomOpen={roomOpen} roomDrawer={host.roomDrawer} onBack={navigation.closeSurface}>
       {host.replayWorkspace && !roomOpen ? null : settingsPanel}{host.roomSurface}
     </LibrarySurface>}
+    </div>
     <PlayerSurface roomWorkspace={roomWorkspace} replayWorkspace={host.replayWorkspace} preview={host.bootTouchPreview} previewImage={host.bootTouchPreviewImage} onElement={setPlayerElement} onFrame={host.runtimeFrame} open={roomWorkspace || roomOpen && host.roomPlayerExpanded === true || navigation.surface === 'touch' || host.runtimeOpen === true || host.replayWorkspace === true} editing={navigation.surface === 'touch'}>{host.runtimeControls}</PlayerSurface>
     {editor}{host.overlays}
   </OptionsOwnership>;
