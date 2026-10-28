@@ -401,7 +401,7 @@ function drawGame(game, baseX, baseY, drawDifficulties = false) {
         baseX = gridX;
     }
     const dotOffset = characters.length === 1 ? -6 : 0;
-    const nameOffset = ['GFW', 'PODD'].includes(game.name) ? 4 : 3;
+    const nameOffset = game.name === 'UDOALG' ? 10 : ['GFW', 'PODD'].includes(game.name) ? 4 : 3;
     drawDot(game.colour, baseX + nameOffset + dotOffset, baseY - 5);
     drawText(trackerDisplayName(game), baseX + nameOffset + 4 + dotOffset, baseY - 2);
     const gameCells = [];

@@ -26,8 +26,9 @@ function Chart({records, options, onCells}: {records: CareerRecords; options: Tr
 }
 
 export function CareerSummary({records, onOpen}: {records: CareerRecords; onOpen: () => void}) {
+  const previewHeight = trackerLayout(DEFAULT_OPTIONS).sections[0].rows[1].y - 12;
   return <section className="profile-panel career-overview"><div className="profile-section-title"><h2>东方通关图</h2><span className="career-total"><b>{completed(records)}</b> 项通关</span></div>
-    <button type="button" className="career-thumbnail" onClick={() => onOpen()} aria-label="查看完整生涯通关图"><Chart records={records} options={DEFAULT_OPTIONS}/></button></section>;
+    <button type="button" className="career-thumbnail" style={{aspectRatio: "800 / " + previewHeight}} onClick={() => onOpen()} aria-label="查看完整生涯通关图"><Chart records={records} options={DEFAULT_OPTIONS}/></button></section>;
 }
 
 export function CareerShowcase({records, onSave, initiallyOpen = false}: {records: CareerRecords; onSave: (next: CareerRecords) => void; initiallyOpen?: boolean}) {

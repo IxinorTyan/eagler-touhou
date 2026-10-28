@@ -127,6 +127,10 @@ try {
   await mobile.click('button[aria-label="关闭全屏通关图"]');await mobile.waitForSelector('dialog',{hidden:true});
   await page.bringToFront();
   await page.goto(new URL('profile.html', base).href, {waitUntil: 'networkidle2'});
+  assert.ok(await page.$eval('.career-overview .career-thumbnail', button => {
+    const frame = button.getBoundingClientRect(), canvas = button.querySelector('canvas').getBoundingClientRect();
+    return frame.height < canvas.height / 2 && Math.abs(canvas.width - frame.width + 2) < 2;
+  }));
   await page.click('.career-overview .career-thumbnail');
   await page.waitForSelector('.career-viewer[open]');
   assert.equal(await page.$eval('.career-viewer', dialog => dialog.matches(':modal')), true);

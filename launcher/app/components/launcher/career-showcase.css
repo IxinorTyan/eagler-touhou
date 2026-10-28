@@ -11,6 +11,7 @@
 .career-card-footer>div{display:flex;gap:8px}
 .player-profile .career-card-footer button{padding:8px 16px;border-radius:6px;font-size:11px}
 .player-profile .career-card-footer button:first-child{border-color:var(--book-accent);background:var(--book-accent);color:var(--book-on-accent,#fff)}
+.player-profile .career-overview .career-thumbnail canvas{position:absolute;top:0;left:0}
 .career-overview .profile-section-title>span{color:var(--book-muted);font-size:11px}
 
 .career-viewer{position:fixed;inset:0;box-sizing:border-box;width:100vw;max-width:none;height:100dvh;max-height:none;margin:0;padding:0;border:0;background:var(--book-bg,#f6f2eb);color:var(--book-ink,#302c28);font-family:inherit;overflow:hidden}
