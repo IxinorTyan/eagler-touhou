@@ -390,7 +390,7 @@ body:not(.mp-room-active) .first-use-notice-item a.markdown-link-labeled {color:
 .book-lobby-item>input:focus-visible {outline:2px solid var(--book-accent);outline-offset:-2px}
 .book-lobby-game {display:grid;grid-template-columns:28px 30px minmax(0,1fr);align-items:center;gap:5px;min-width:0;min-height:44px;padding:0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;font:11px/1.4 var(--ui-font)}
 .book-lobby-cover {display:grid;place-items:center;width:28px;height:28px;aspect-ratio:1;overflow:hidden;border-radius:4px;background:var(--book-raised);font:9px/1 var(--ui-font)}
-.book-lobby-cover img {display:block;width:100%;height:100%;object-fit:contain}
+.book-lobby-cover img {display:block;width:100%;height:100%;object-fit:cover}
 .book-lobby-number {color:var(--book-muted);font:10px/1.2 var(--ui-font);font-variant-numeric:tabular-nums}
 .book-lobby-game strong {overflow-wrap:anywhere;font-size:11px}
 .book-lobby-favorite {display:grid;place-items:center;width:24px;height:30px;padding:3px;border:0;border-radius:5px;background:transparent;color:var(--book-muted);cursor:pointer}
@@ -496,7 +496,7 @@ html[data-book-theme='light'] body:not(.mp-room-active) :is(
 /* All games share one room row; Flower View adds only its score. */
 .book-directory {--room-action-width:78px}
 .book-directory .lobby-cover {width:52px;height:52px;flex-basis:52px;border-radius:4px}
-.book-directory .lobby-cover img {display:block;object-fit:contain}
+.book-directory .lobby-cover img {display:block;object-fit:cover}
 .book-directory .lobby-cover-number {display:none}
 .book-directory .book-room-score {min-width:0;flex:none;align-self:center;margin:0 3px;color:var(--book-accent);font:700 22px/1.2 var(--ui-font);white-space:nowrap}
 .book-directory .lobby-room-row>.lobby-join {width:var(--room-action-width);min-height:34px;padding:7px 13px;border-radius:7px;font-size:12px;justify-self:end}
