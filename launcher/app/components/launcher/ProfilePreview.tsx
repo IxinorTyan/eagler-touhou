@@ -16,7 +16,7 @@ function transitionProfile(update: () => void, scope: 'page' | 'content' | 'sett
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.body.classList.contains('less-motion')) {update(); return;}
   if (!document.startViewTransition) {
     flushSync(update);
-    document.querySelector(scope === 'content' ? '.profile-content' : scope === 'settings' ? '.profile-editor-shell' : '.player-profile')?.animate([{opacity: .65}, {opacity: 1}], {duration: 180, easing: 'ease-out'});
+    document.querySelector(scope === 'content' ? '.profile-content' : scope === 'settings' ? '.profile-editor-shell' : '.player-profile')?.animate([{opacity: .65}, {opacity: 1}], {duration: 140, easing: 'steps(3, end)'});
     return;
   }
   document.documentElement.dataset.profileTransition = scope;

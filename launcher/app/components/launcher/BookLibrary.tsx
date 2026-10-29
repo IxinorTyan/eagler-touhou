@@ -1,3 +1,4 @@
+import {impressFavorite} from './ink-feedback';
 import {useEffect, useState, type ReactNode} from 'react';
 import {useSearchParams} from 'react-router';
 import {useLocale} from '../../i18n';
@@ -68,7 +69,7 @@ export function BookLibrary({products, openedProduct, onSelect, onActivate, inte
           <select aria-label={en ? 'Sort games' : '作品排序'} value={sort} disabled={!interactive} onChange={event => setSort(event.target.value)}><option value="number">{en ? 'Number' : '按作品编号'}</option><option value="reverse">{en ? 'Number, descending' : '编号倒序'}</option><option value="name">{en ? 'Title' : '按作品名称'}</option></select>
         </div>
       </div>
-      <div className="book-grid">{list.map(product => <article key={product.id} className="book-card">{gameLink(product)}<button className="book-favorite" data-book-favorite={product.id} type="button" disabled={!interactive} aria-label={`${en ? 'Favorite' : '收藏'} ${product.title}`} aria-pressed={favorites.includes(product.id)} onClick={() => toggleFavorite(product.id)}><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 3 2.78 5.63L21 9.54l-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.93 1.06-6.2L3 9.54l6.22-.91Z"/></svg></button></article>)}</div>
+      <div className="book-grid">{list.map(product => <article key={product.id} className="book-card">{gameLink(product)}<button className="book-favorite" data-book-favorite={product.id} type="button" disabled={!interactive} aria-label={`${en ? 'Favorite' : '收藏'} ${product.title}`} aria-pressed={favorites.includes(product.id)} onClick={event => {impressFavorite(event.currentTarget); toggleFavorite(product.id);}}><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 3 2.78 5.63L21 9.54l-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.93 1.06-6.2L3 9.54l6.22-.91Z"/></svg></button></article>)}</div>
       {!list.length && <div className="book-empty"><h3>{en ? 'No matching games' : '未找到匹配的游戏'}</h3><p>{en ? 'Try another search or category.' : '请尝试搜索其他关键词或选择其他分类。'}</p><button type="button" onClick={() => {setQuery(''); setCategory('all');}}>{en ? 'Reset filters' : '重置筛选'}</button></div>}
       </div>
       {footer}

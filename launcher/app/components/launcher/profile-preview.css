@@ -172,10 +172,10 @@ html.profile-transition[data-profile-transition='page'] .player-profile,html.pro
 html.profile-transition::view-transition-group(*){animation:none}
 html.profile-transition::view-transition-old(*),html.profile-transition::view-transition-new(*){animation:none;mix-blend-mode:normal}
 html.profile-transition::view-transition-old(root),html.profile-transition::view-transition-old(launcher-page){visibility:hidden}
-html.profile-transition::view-transition-old(profile-content){animation:profile-content-out 210ms linear both}
-html.profile-transition::view-transition-new(profile-content){animation:profile-content-in 210ms ease-out both}
+html.profile-transition::view-transition-old(profile-content){animation:profile-content-out 140ms linear both}
+html.profile-transition::view-transition-new(profile-content){animation:profile-content-in 140ms steps(3,end) both}
 @keyframes profile-content-out{from{opacity:1}to{opacity:1}}
-@keyframes profile-content-in{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}
+@keyframes profile-content-in{from{opacity:0}to{opacity:1}}
 @media(prefers-reduced-motion:reduce){html.profile-transition::view-transition-old(profile-content),html.profile-transition::view-transition-new(profile-content){animation:none}}
 
 @media(max-width:780px),(hover:none),(pointer:coarse){

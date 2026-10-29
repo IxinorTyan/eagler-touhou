@@ -1,3 +1,4 @@
+import {impressFavorite} from './ink-feedback';
 import {useEffect, useState} from 'react';
 import {useLocale} from '../../i18n';
 import type {LibraryProduct} from './products';
@@ -38,7 +39,7 @@ export function BookDirectoryGames({products, selectedProduct, viewingProduct, p
           <span className="book-lobby-number">TH{product.number}</span><strong>{product.title}</strong>
         </button>
         <button type="button" className="book-lobby-favorite" aria-label={`${en ? 'Favorite' : '收藏'} ${product.title}`} aria-pressed={favorites.includes(product.id)} disabled={!interactive}
-          onClick={() => {const latest = readBookPreference('multiplayer-favorites', [], stringArray); writeBookPreference('multiplayer-favorites', latest.includes(product.id) ? latest.filter(id => id !== product.id) : [...latest, product.id]);}}>
+          onClick={event => {impressFavorite(event.currentTarget); const latest = readBookPreference('multiplayer-favorites', [], stringArray); writeBookPreference('multiplayer-favorites', latest.includes(product.id) ? latest.filter(id => id !== product.id) : [...latest, product.id]);}}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.78 5.63L21 9.54l-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.93 1.06-6.2L3 9.54l6.22-.91Z"/></svg>
         </button>
       </div>)}

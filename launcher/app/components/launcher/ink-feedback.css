@@ -1,0 +1,22 @@
+/* Short impressions rather than floating surfaces. Runtime controls are excluded. */
+body:not(.mp-room-active) :is(.book-library,.book-directory,.player-profile,.account-page,.book-masthead) button:not(:disabled){
+ transition:background-color 100ms steps(2,end),color 100ms steps(2,end),border-color 100ms steps(2,end),translate 80ms steps(2,end);
+ -webkit-tap-highlight-color:transparent;
+}
+body:not(.mp-room-active) :is(.book-library,.book-directory,.player-profile,.account-page,.book-masthead) button:not(:disabled):active{translate:0 1px}
+.book-library .book-card{transition:border-color 100ms steps(2,end),background-color 100ms steps(2,end)}
+.book-library .book-card:hover{transform:none;box-shadow:0 1px 3px #00000009}
+.book-library .book-art img{transition:filter 100ms steps(2,end)}
+.book-library .book-card:hover .book-art img{filter:brightness(1.025)}
+.book-library .book-recent-link:hover{box-shadow:none}
+body:not(.mp-room-active) :is(.book-favorite,.book-lobby-favorite) svg{transform-origin:center}
+body:not(.mp-room-active) :is(.profile-social-tools input,.profile-social-tools input::before,.profile-display-options input,.profile-display-options input::before){transition-duration:120ms;transition-timing-function:steps(3,end)}
+@media(prefers-reduced-motion:reduce){
+ body:not(.mp-room-active) :is(.book-library,.book-directory,.player-profile,.account-page,.book-masthead) button:not(:disabled){transition:none}
+ body:not(.mp-room-active) :is(.book-library,.book-directory,.player-profile,.account-page,.book-masthead) button:not(:disabled):active{translate:none}
+ .account-mode-content{animation:none}
+ html.profile-transition::view-transition-new(profile-content),html.profile-transition::view-transition-old(profile-content){animation:none}
+}
+body.less-motion :is(.book-library,.book-directory,.player-profile,.account-page,.book-masthead) button:not(:disabled){transition:none}
+body.less-motion :is(.book-library,.book-directory,.player-profile,.account-page,.book-masthead) button:not(:disabled):active{translate:none}
+html:has(body.less-motion) .account-mode-content{animation:none}
