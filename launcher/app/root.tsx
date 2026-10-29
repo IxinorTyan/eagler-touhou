@@ -13,6 +13,7 @@ import './components/launcher/book-ui.css';
 import './components/launcher/book-surfaces.css';
 import './components/launcher/ink-feedback.css';
 import './components/launcher/selection-controls.css';
+import './components/launcher/ui-controls.css';
 import './components/room/room-light.css';
 export function Layout({children}: {children: ReactNode}) {
   const {pathname} = useLocation();

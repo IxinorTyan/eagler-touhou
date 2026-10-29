@@ -10,7 +10,7 @@ try {
   // Local style fixture: no live room or relay action is invoked.
   await page.$eval('.book-directory', el => {
     const fixture = document.createElement('section');
-    fixture.innerHTML = '<div class="lobby-room-row lobby-room-initial"><button id="hoverJoin" class="lobby-button lobby-join">加入</button><button id="hoverDisabled" class="lobby-button lobby-primary" disabled>不可用</button></div>';
+    fixture.innerHTML = '<div class="lobby-room-row lobby-room-initial"><button id="hoverJoin" class="ui-control lobby-button lobby-join" data-ui-variant="primary">加入</button><button id="hoverDisabled" class="ui-control lobby-button lobby-primary" data-ui-variant="primary" disabled>不可用</button></div>';
     el.append(fixture);
   });
   const settle = () => page.evaluate(() => new Promise(resolve => setTimeout(resolve, 180)));

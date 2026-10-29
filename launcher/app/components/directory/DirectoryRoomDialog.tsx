@@ -1,3 +1,4 @@
+import {BookButton} from '../launcher/BookButton';
 import {useLayoutEffect, useRef, useSyncExternalStore} from 'react';
 import {PRODUCT_GAMES, gameIdForProduct, isMultiplayerProductId, multiplayerConfigForProduct} from '../../../src/contracts/product-catalog.mts';
 import type {LobbyDirectoryService} from '../../services/lobby-directory';
@@ -65,7 +66,7 @@ export function DirectoryRoomDialog({service, open, onCloseRequest, completionCo
       <label className="lobby-field" id="codeField" hidden={created}><span>{t('lobby.roomCode')}</span><input ref={code} id="roomCodeInput" type="text" inputMode="numeric" autoComplete="off" pattern="[0-9]{4,8}" minLength={4} maxLength={8} placeholder="0000" required={!created} value={form.code} onChange={event => {event.currentTarget.setCustomValidity(''); service.updateForm({code: event.currentTarget.value});}}/></label>
       <div className="lobby-form-pair" id="policyFields" hidden={!created}><label className="lobby-field"><span>{t('room.visibility')}</span><select id="visibilitySelect" value={form.visibility} onChange={event => service.updateForm({visibility: event.target.value === 'private' ? 'private' : 'public'})}><option value="public">{t('room.public')}</option><option value="private">{t('room.private')}</option></select></label><label className="lobby-field"><span>{t('room.cheatMovement')}</span><select id="cheatSelect" value={form.disableCheatMovement ? '1' : '0'} onChange={event => service.updateForm({disableCheatMovement: event.target.value === '1'})}><option value="0">{t('room.cheatAllowed')}</option><option value="1">{t('room.cheatDisabled')}</option></select></label></div>
       <p className="lobby-form-note" id="formNote">{t(created ? form.visibility === 'private' ? 'room.privateHint' : 'lobby.publicRoom' : 'lobby.codeHint')}</p><p className="lobby-form-error" id="formError" role="alert" hidden/>
-      <button className="lobby-button lobby-primary lobby-submit" id="submitRoom" type="submit" disabled={disabled}>{t(created ? 'lobby.create' : 'lobby.joinRoom')}</button>
+      <BookButton variant="primary" className="lobby-button lobby-primary lobby-submit" id="submitRoom" type="submit" disabled={disabled}>{t(created ? 'lobby.create' : 'lobby.joinRoom')}</BookButton>
     </form>
   </dialog>;
 }

@@ -1,3 +1,4 @@
+import {BookButton} from './BookButton';
 import {useEffect, useState, type ReactNode} from 'react';
 import {readBookPreference, writeBookPreference} from './book-preferences';
 import { useLocale } from '../../i18n';
@@ -64,7 +65,7 @@ export function LobbySurface({
         <header className="lobby-intro">
           <h1>{t('lobby.title')}</h1>
           <nav className="lobby-support-links" aria-label={t('multiplayerGuide.title')}>
-            <button
+            <BookButton variant="quiet"
               className="lobby-support-link"
               id="lobbyGuideOpen"
               type="button"
@@ -73,8 +74,8 @@ export function LobbySurface({
             >
               <span>{t('multiplayerGuide.action')}</span>
               <span aria-hidden="true">›</span>
-            </button>
-            <button
+            </BookButton>
+            <BookButton variant="quiet"
               className={`lobby-support-link${networkRunning ? ' running' : ''}`}
               id="lobbyNetworkCheck"
               aria-disabled={networkRunning ? 'true' : undefined}
@@ -84,7 +85,7 @@ export function LobbySurface({
             >
               <span>{t('networkCheck.action')}</span>
               <span aria-hidden="true">›</span>
-            </button>
+            </BookButton>
             <a className="lobby-support-link lobby-survey-link" href="https://v.wjx.cn/vm/QqmTdwh.aspx#" target="_blank" rel="noopener noreferrer" title={t('lobby.surveyNotice')}>
               <span>{t('lobby.surveyAction')}</span><span aria-hidden="true">›</span>
             </a>
@@ -102,7 +103,7 @@ export function LobbySurface({
         <header className="lobby-room-tools">
           <div className="lobby-actions">{roomTools}</div>
           <div className="book-room-view-toggle" role="group" aria-label={locale === 'en' ? 'Room display' : '房间显示模式'}>
-            {(['cards', 'list'] as const).map(view => <button key={view} type="button" aria-pressed={roomView === view} onClick={() => {setRoomView(view); writeBookPreference('lobby-room-view', view);}}>{view === 'cards' ? (locale === 'en' ? 'Normal' : '普通模式') : (locale === 'en' ? 'List' : '列表模式')}</button>)}
+            {(['cards', 'list'] as const).map(view => <BookButton variant="choice" key={view} type="button" aria-pressed={roomView === view} onClick={() => {setRoomView(view); writeBookPreference('lobby-room-view', view);}}>{view === 'cards' ? (locale === 'en' ? 'Normal' : '普通模式') : (locale === 'en' ? 'List' : '列表模式')}</BookButton>)}
           </div>
         </header>
         {roomFilters}
@@ -148,14 +149,14 @@ export function LobbySurface({
               <h2 id="emptyTitle">{emptyState.title}</h2>
               <p id="emptyHint">{emptyState.hint}</p>
               {emptyState.action && (
-                <button
+                <BookButton variant="action"
                   className="lobby-button"
                   id="emptyAction"
                   type="button"
                   onClick={emptyState.action.onClick}
                 >
                   {emptyState.action.label}
-                </button>
+                </BookButton>
               )}
             </div>
           )}

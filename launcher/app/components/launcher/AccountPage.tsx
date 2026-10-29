@@ -1,3 +1,4 @@
+import {BookButton} from './BookButton';
 import {useCallback, useEffect, useRef, useState, type ComponentType, type FormEvent} from 'react';
 import {useSearchParams} from 'react-router';
 import backgroundUrl from '../../../public/assets/launcher-background.webp?url';
@@ -69,24 +70,24 @@ export function AccountPage({captcha: Captcha, artworkSrc = backgroundUrl}: {cap
     <section className={`account-shell${registering ? ' is-registering' : ''}`}>
       <aside className="account-art" aria-hidden="true"><img src={artworkSrc} alt="" className="account-art-image"/></aside>
       <div className="account-content">
-        <nav className="account-tabs" aria-label="账号操作">{[['login', '登录'], ['register', '注册']].map(([mode, label]) => <button type="button" key={mode} aria-current={registering === (mode === 'register') ? 'page' : undefined} onClick={() => setSearch(mode === 'register' ? {mode} : {})}>{label}</button>)}</nav>
+        <nav className="account-tabs" aria-label="账号操作">{[['login', '登录'], ['register', '注册']].map(([mode, label]) => <BookButton variant="tab" type="button" key={mode} aria-current={registering === (mode === 'register') ? 'page' : undefined} onClick={() => setSearch(mode === 'register' ? {mode} : {})}>{label}</BookButton>)}</nav>
         <div key={registering ? 'register' : 'login'} className="account-mode-content">
         <header><h1 id="account-title">{registering ? '注册账号' : '登录'}</h1></header>
         <form method="post" onSubmit={submit}>
           {registering ? <>
             <label>用户名<input name="username" autoComplete="username" maxLength={32} required value={username} onChange={event => setUsername(event.target.value)} placeholder="填写用户名"/></label>
             <label>邮箱<input name="email" type="email" autoComplete="email" required value={email} onChange={event => {setEmail(event.target.value); setCaptchaToken('');}} placeholder="name@example.com"/></label>
-            <label>邮箱验证码<span className="account-code"><input name="code" autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={event => setCode(event.target.value.replace(/\D/g, ''))} placeholder="6 位验证码"/><button type="button" disabled={remaining > 0} onClick={sendCode}>{remaining ? `${remaining}s` : '获取验证码'}</button></span></label>
+            <label>邮箱验证码<span className="account-code"><input name="code" autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={event => setCode(event.target.value.replace(/\D/g, ''))} placeholder="6 位验证码"/><BookButton variant="action" type="button" disabled={remaining > 0} onClick={sendCode}>{remaining ? `${remaining}s` : '获取验证码'}</BookButton></span></label>
           </> : <label>用户名 / 邮箱<input name="identity" autoComplete="username" required value={identity} onChange={event => setIdentity(event.target.value)} placeholder="填写用户名或邮箱"/></label>}
-          <label>密码<span className="account-password"><input name="password" type={showPassword ? 'text' : 'password'} autoComplete={registering ? 'new-password' : 'current-password'} minLength={registering ? 8 : undefined} required value={password} onChange={event => setPassword(event.target.value)} placeholder={registering ? '至少 8 位' : '填写密码'}/><button type="button" className="account-password-toggle" aria-label={showPassword ? '隐藏密码' : '显示密码'} aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>{showPassword && <path d="m3 3 18 18"/>}</svg></button></span></label>
+          <label>密码<span className="account-password"><input name="password" type={showPassword ? 'text' : 'password'} autoComplete={registering ? 'new-password' : 'current-password'} minLength={registering ? 8 : undefined} required value={password} onChange={event => setPassword(event.target.value)} placeholder={registering ? '至少 8 位' : '填写密码'}/><BookButton variant="icon" type="button" className="account-password-toggle" aria-label={showPassword ? '隐藏密码' : '显示密码'} aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>{showPassword && <path d="m3 3 18 18"/>}</svg></BookButton></span></label>
           {registering && <><label>确认密码<input name="confirmation" type={showPassword ? 'text' : 'password'} autoComplete="new-password" required value={confirmation} onChange={event => setConfirmation(event.target.value)} placeholder="再次填写密码" aria-invalid={confirmation.length > 0 && password !== confirmation ? true : undefined}/>{confirmation.length > 0 && password !== confirmation && <small className="account-field-error">两次输入的密码不一致</small>}</label>
             <div className="account-captcha-field"><span>人机验证</span><div className="account-captcha-slot" data-captcha-slot="" aria-label="人机验证服务预留区域">{Captcha && <Captcha key={email} onVerify={verifyCaptcha} onExpire={clearCaptcha} onError={clearCaptcha}/>}</div></div>
           </>}
           {error && <p className="account-feedback is-error" role="alert" ref={messageRef} tabIndex={-1}>{error}</p>}
           {message && <p className="account-feedback" role="status">{message}</p>}
-          <button type="submit" className="account-submit">{registering ? '注册' : '登录'}<span aria-hidden="true">→</span></button>
+          <BookButton variant="primary" type="submit" className="account-submit">{registering ? '注册' : '登录'}<span aria-hidden="true">→</span></BookButton>
         </form>
-        {!registering && <><div className="account-divider"><span>或</span></div><button type="button" className="account-discord" onClick={() => {setError(''); setMessage('Discord 登录将在接入账号服务后开放。');}}><DiscordIcon/>使用 Discord 登录</button></>}
+        {!registering && <><div className="account-divider"><span>或</span></div><BookButton variant="action" type="button" className="account-discord" onClick={() => {setError(''); setMessage('Discord 登录将在接入账号服务后开放。');}}><DiscordIcon/>使用 Discord 登录</BookButton></>}
         <p className="account-demo-note">前端预览 · 尚未接入账号服务</p>
         </div>
       </div>

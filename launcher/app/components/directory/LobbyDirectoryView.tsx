@@ -1,3 +1,4 @@
+import {BookButton} from '../launcher/BookButton';
 import {useEffect, useState, useSyncExternalStore} from 'react';
 import {BOOK_PREFERENCES_EVENT, readBookPreference, stringArray} from '../launcher/book-preferences';
 import {useLocale} from '../../i18n';
@@ -38,13 +39,13 @@ export function LobbyDirectoryView({service, assetUrl, onOpenForm, onReplay, ini
   const disabled = state.connection !== 'live' || !!state.mine || state.leaving || !state.products.length;
   const warning = <aside className="lobby-warning lobby-connection-warning" id="connectionWarning" role="alert" hidden={!state.connectionInterrupted}>
     <div><strong><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 4.7 2.8 18a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.7a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4m0 4h.01"/></svg><span id="connectionWarningTitle">{t(state.connection === 'unsupported' ? 'lobby.unsupported' : state.rooms.length ? 'lobby.disconnected' : 'lobby.offline')}</span></strong><p id="connectionWarningHint">{t(state.connection === 'unsupported' ? 'lobby.unsupportedHint' : state.connection === 'missing' ? 'lobby.noService' : 'lobby.refreshHint')}</p></div>
-    <button className="lobby-button" id="connectionRefresh" type="button" onClick={service.retry}>{t('lobby.refresh')}</button>
+    <BookButton variant="action" className="lobby-button" id="connectionRefresh" type="button" onClick={service.retry}>{t('lobby.refresh')}</BookButton>
   </aside>;
-  const membership = <aside className="lobby-membership" id="membership" hidden={!state.mine}><strong id="membershipTitle">{state.mine ? t('lobby.mine', {code: state.mine.code}) : ''}</strong><p id="membershipHint">{t(state.supportsRecovery ? 'lobby.mineHint' : 'lobby.releaseUnsupported')}</p><button className="lobby-button" id="releaseMembership" type="button" hidden={!state.mine || !state.supportsRecovery} disabled={!!state.recovering || state.connection !== 'live' || state.leaving || !state.mine?.recoveryToken} onClick={service.releaseMembership}>{t(state.recovering ? 'lobby.releasing' : 'lobby.release')}</button></aside>;
+  const membership = <aside className="lobby-membership" id="membership" hidden={!state.mine}><strong id="membershipTitle">{state.mine ? t('lobby.mine', {code: state.mine.code}) : ''}</strong><p id="membershipHint">{t(state.supportsRecovery ? 'lobby.mineHint' : 'lobby.releaseUnsupported')}</p><BookButton variant="action" className="lobby-button" id="releaseMembership" type="button" hidden={!state.mine || !state.supportsRecovery} disabled={!!state.recovering || state.connection !== 'live' || state.leaving || !state.mine?.recoveryToken} onClick={service.releaseMembership}>{t(state.recovering ? 'lobby.releasing' : 'lobby.release')}</BookButton></aside>;
   const roomTools = <LobbyRoomTools disabled={disabled} onCreate={() => onOpenForm('create')} onReplay={onReplay} onJoin={() => onOpenForm('join')} onRefresh={service.refreshRooms}/>;
   const roomFilters = <div className="book-room-filters" role="group" aria-label={locale === 'en' ? 'Filter rooms' : '筛选房间'}>
     {([{id: 'all', zh: '全部房间', en: 'All rooms'}, {id: 'open', zh: '有空位', en: 'Open seats'}, {id: 'waiting', zh: '等待开始', en: 'Waiting'}, {id: 'spectate', zh: '可旁观', en: 'Spectate'}] as const).map(filter =>
-      <button type="button" key={filter.id} data-room-filter={filter.id} aria-pressed={roomFilter === filter.id} onClick={() => setRoomFilter(filter.id)}>{locale === 'en' ? filter.en : filter.zh}<span>{filterDirectoryRooms(filteredRooms, filter.id).length}</span></button>)}
+      <BookButton variant="choice" type="button" key={filter.id} data-room-filter={filter.id} aria-pressed={roomFilter === filter.id} onClick={() => setRoomFilter(filter.id)}>{locale === 'en' ? filter.en : filter.zh}<span>{filterDirectoryRooms(filteredRooms, filter.id).length}</span></BookButton>)}
     <span className="book-room-filter-count" role="status">{locale === 'en' ? `${state.visibleRooms.length} rooms shown` : `显示 ${state.visibleRooms.length} 个房间`}</span>
   </div>;
   const filtering = roomFilter !== 'all' || !!surface.productFilters?.length || !!surface.viewingProduct;

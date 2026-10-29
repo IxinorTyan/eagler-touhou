@@ -1,3 +1,4 @@
+import {BookButton} from '../launcher/BookButton';
 import { Fragment, useRef, useState } from 'react';
 import {
   PRODUCT_GAMES,
@@ -177,7 +178,7 @@ function RoomRow({
       <span className="lobby-room-state" data-state={state}>
         {t(`lobby.${state}`)}
       </span>
-      <button
+      <BookButton variant="primary"
         className="lobby-button lobby-join"
         type="button"
         disabled={disabled}
@@ -192,7 +193,7 @@ function RoomRow({
               ? 'lobby.join'
               : `lobby.${state}`,
         )}
-      </button>
+      </BookButton>
     </article>
   );
 }

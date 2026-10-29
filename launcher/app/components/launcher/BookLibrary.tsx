@@ -1,3 +1,4 @@
+import {BookButton} from './BookButton';
 import {impressFavorite} from './ink-feedback';
 import {useEffect, useState, type ReactNode} from 'react';
 import {useSearchParams} from 'react-router';
@@ -53,10 +54,10 @@ export function BookLibrary({products, openedProduct, onSelect, onActivate, inte
   return <div className={`book-library book-view-${view}`}>
     <aside className="book-sidebar" aria-label={en ? 'Game categories' : '游戏分类'}>
       <label className="book-search"><span aria-hidden="true">⌕</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} disabled={!interactive} placeholder={en ? 'Search games…' : '搜索游戏或代号…'} aria-label={en ? 'Search games' : '搜索游戏'}/></label>
-      <nav>{categories.map(item => <button key={item} type="button" data-book-category={item} className={category === item ? 'active' : ''} aria-pressed={category === item} disabled={!interactive} onClick={() => setCategory(item)}>
+      <nav>{categories.map(item => <BookButton variant="choice" key={item} type="button" data-book-category={item} className={category === item ? 'active' : ''} aria-pressed={category === item} disabled={!interactive} onClick={() => setCategory(item)}>
         <span className="book-cat-icon" aria-hidden="true">{item === 'all' ? '▤' : item === 'favorites' ? '★' : '•'}</span><span>{labels[item]}</span>
         <small>{available.filter(product => item === 'all' || (item === 'favorites' ? favorites.includes(product.id) : bookCategory(product) === item)).length}</small>
-      </button>)}</nav>
+      </BookButton>)}</nav>
       <p className="book-sidebar-note">EAGLER TOUHOU</p>
     </aside>
     <div className="book-content">
@@ -65,12 +66,12 @@ export function BookLibrary({products, openedProduct, onSelect, onActivate, inte
         <div className="book-recent-games">{history.length ? history.map(product => <article key={product.id}>{gameLink(product, true)}</article>) : <p className="book-recent-empty">{en ? 'Choose a game below to begin your collection.' : '还没有游玩记录，从下方选择一部作品开始吧。'}</p>}</div>
       </section>
       <div className="book-view-header"><div className="book-current"><h2>{labels[category]}</h2><span role="status">{list.length} {en ? 'games' : '部作品'}</span></div>
-        <div className="book-tools"><div className="book-view-switch" role="group" aria-label={en ? 'Library view' : '书库显示方式'}>{(['covers', 'list'] as const).map(mode => <button key={mode} type="button" data-book-view={mode} disabled={!interactive} aria-pressed={view === mode} onClick={() => {setView(mode); writeBookPreference('view', mode);}}>{mode === 'covers' ? en ? '▦ Covers' : '▦ 封面' : en ? '☷ List' : '☷ 列表'}</button>)}</div>
+        <div className="book-tools"><div className="book-view-switch" role="group" aria-label={en ? 'Library view' : '书库显示方式'}>{(['covers', 'list'] as const).map(mode => <BookButton variant="choice" key={mode} type="button" data-book-view={mode} disabled={!interactive} aria-pressed={view === mode} onClick={() => {setView(mode); writeBookPreference('view', mode);}}>{mode === 'covers' ? en ? '▦ Covers' : '▦ 封面' : en ? '☷ List' : '☷ 列表'}</BookButton>)}</div>
           <select aria-label={en ? 'Sort games' : '作品排序'} value={sort} disabled={!interactive} onChange={event => setSort(event.target.value)}><option value="number">{en ? 'Number' : '按作品编号'}</option><option value="reverse">{en ? 'Number, descending' : '编号倒序'}</option><option value="name">{en ? 'Title' : '按作品名称'}</option></select>
         </div>
       </div>
-      <div className="book-grid">{list.map(product => <article key={product.id} className="book-card">{gameLink(product)}<button className="book-favorite" data-book-favorite={product.id} type="button" disabled={!interactive} aria-label={`${en ? 'Favorite' : '收藏'} ${product.title}`} aria-pressed={favorites.includes(product.id)} onClick={event => {impressFavorite(event.currentTarget); toggleFavorite(product.id);}}><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 3 2.78 5.63L21 9.54l-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.93 1.06-6.2L3 9.54l6.22-.91Z"/></svg></button></article>)}</div>
-      {!list.length && <div className="book-empty"><h3>{en ? 'No matching games' : '未找到匹配的游戏'}</h3><p>{en ? 'Try another search or category.' : '请尝试搜索其他关键词或选择其他分类。'}</p><button type="button" onClick={() => {setQuery(''); setCategory('all');}}>{en ? 'Reset filters' : '重置筛选'}</button></div>}
+      <div className="book-grid">{list.map(product => <article key={product.id} className="book-card">{gameLink(product)}<BookButton variant="icon" className="book-favorite" data-book-favorite={product.id} type="button" disabled={!interactive} aria-label={`${en ? 'Favorite' : '收藏'} ${product.title}`} aria-pressed={favorites.includes(product.id)} onClick={event => {impressFavorite(event.currentTarget); toggleFavorite(product.id);}}><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 3 2.78 5.63L21 9.54l-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.93 1.06-6.2L3 9.54l6.22-.91Z"/></svg></BookButton></article>)}</div>
+      {!list.length && <div className="book-empty"><h3>{en ? 'No matching games' : '未找到匹配的游戏'}</h3><p>{en ? 'Try another search or category.' : '请尝试搜索其他关键词或选择其他分类。'}</p><BookButton variant="action" type="button" onClick={() => {setQuery(''); setCategory('all');}}>{en ? 'Reset filters' : '重置筛选'}</BookButton></div>}
       </div>
       {footer}
     </div>
