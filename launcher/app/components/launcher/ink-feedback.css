@@ -23,8 +23,8 @@ html:has(body.less-motion) .account-mode-content{animation:none}
 /* Pointer hover reads as a light ink impression; the selected mark stays stronger. */
 @media(hover:hover) and (pointer:fine){
  body:not(.mp-room-active) :is(.book-sidebar nav,.book-view-switch,.profile-actions,.profile-tabs,.profile-settings-heading nav,.account-tabs,.profile-editor-footer,.profile-security-section,.profile-social-tools,.book-directory .lobby-actions) button:not(:disabled){transition:background-color 140ms steps(3,end),color 140ms steps(3,end),border-color 140ms steps(3,end),box-shadow 140ms steps(3,end),translate 80ms steps(2,end)}
- .book-library .book-sidebar nav button:not(.active):hover{background:color-mix(in srgb,var(--book-ink) 7%,transparent);color:var(--book-ink);box-shadow:inset 2px 0 color-mix(in srgb,var(--book-ink) 36%,transparent)}
- .book-library .book-sidebar nav button.active{box-shadow:inset 2px 0 var(--book-accent)}
+ .book-library .book-sidebar nav button:not(.active):hover{background:color-mix(in srgb,var(--book-ink) 7%,transparent);color:var(--book-ink);box-shadow:none}
+ .book-library .book-sidebar nav button.active{box-shadow:none}
  html:has(.book-masthead) .book-main-nav :is(a,button){position:relative;transition:background-color 140ms steps(3,end),color 140ms steps(3,end)}
  html:has(.book-masthead) .book-main-nav :is(a,button)::after{content:'';position:absolute;left:calc(50% - 12px);bottom:8px;width:24px;height:2px;background:currentColor;opacity:0;pointer-events:none;transition:opacity 140ms steps(3,end)}
  html:has(.book-masthead) .book-main-nav :is(a,button):not([aria-current='page']):not([aria-pressed='true']):hover{color:var(--book-ink);background:color-mix(in srgb,var(--book-ink) 5%,transparent)}

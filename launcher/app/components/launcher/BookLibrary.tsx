@@ -44,7 +44,7 @@ export function BookLibrary({products, openedProduct, onSelect, onActivate, inte
     className={recentLink ? 'book-recent-link' : 'book-game-link'} href={product.href}
     data-book-product={product.id} data-game={product.gameId} aria-current={openedProduct === product.id ? 'page' : 'false'}
     onClick={interactive ? event => {if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); activate(product);} : undefined}>
-    {view === 'covers' && <span className="book-art"><BookCover product={product}/></span>}
+    {(view === 'covers' || !recentLink) && <span className="book-art"><BookCover product={product}/></span>}
     <span className="book-identity"><small>TH{product.number}</small><strong>{product.title}</strong><span>{product.subtitle}</span></span>
     {view === 'list' && <span className="book-row-action" aria-hidden="true">{en ? 'Play' : '开始游玩'} →</span>}
   </a>;
