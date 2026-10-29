@@ -26,3 +26,19 @@ body:not(.mp-room-active) :is(.book-lobby-item>input,.career-check>input[type='c
 @media(hover:none),(pointer:coarse){body:not(.mp-room-active) :is(.book-lobby-item>input,.career-check>input[type='checkbox']){height:44px;min-height:44px}}
 @media(prefers-reduced-motion:reduce){body:not(.mp-room-active) :is(.book-lobby-item>input,.career-check>input[type='checkbox'])::before,body:not(.mp-room-active) :is(.book-lobby-item>input,.career-check>input[type='checkbox'])::after,.player-profile :is(.profile-display-options,.profile-social-tools) input[type='checkbox'],.player-profile :is(.profile-display-options,.profile-social-tools) input[type='checkbox']::before{transition:none}}
 body.less-motion :is(.book-lobby-item>input,.career-check>input[type='checkbox'])::before,body.less-motion :is(.book-lobby-item>input,.career-check>input[type='checkbox'])::after,body.less-motion .player-profile :is(.profile-display-options,.profile-social-tools) input[type='checkbox'],body.less-motion .player-profile :is(.profile-display-options,.profile-social-tools) input[type='checkbox']::before{transition:none}
+/* Selection belongs to the game row rather than a separate boxed widget. */
+body:not(.mp-room-active) .book-directory .book-lobby-item{transition:background-color 140ms steps(3,end),border-color 140ms steps(3,end);border-color:transparent}
+body:not(.mp-room-active) .book-directory .book-lobby-item>input::before{width:3px;height:3px;padding:0;border:0;border-radius:50%;background:var(--book-muted);box-shadow:none;opacity:.45}
+body:not(.mp-room-active) .book-directory .book-lobby-item>input:checked::before{display:none}
+body:not(.mp-room-active) .book-directory .book-lobby-item>input::after{width:20px;height:20px;mask-size:20px 20px}
+body:not(.mp-room-active) .book-directory .book-lobby-item[data-selected='true']{border-color:transparent;background:var(--book-accent-soft)}
+body:not(.mp-room-active) .book-directory .book-lobby-item[data-selected='true'] .book-lobby-game{color:var(--book-accent)}
+body:not(.mp-room-active) .book-directory .book-lobby-item[data-viewing='true']{border-color:color-mix(in srgb,var(--book-accent) 40%,transparent)}
+body:not(.mp-room-active) .book-directory .book-lobby-item:has(>input:focus-visible){outline:2px solid var(--book-accent);outline-offset:2px}
+body:not(.mp-room-active) .book-directory .book-lobby-item>input:focus-visible{outline:none}
+@media(hover:hover) and (pointer:fine){
+ body:not(.mp-room-active) .book-directory .book-lobby-item[data-selected='false']:has(>input:not(:disabled):hover){background:color-mix(in srgb,var(--book-ink) 6%,transparent)}
+ body:not(.mp-room-active) .book-directory .book-lobby-item>input:not(:disabled):not(:checked):hover::before{width:3px;height:3px;border:0;background:var(--book-accent);opacity:1}
+}
+@media(prefers-reduced-motion:reduce){body:not(.mp-room-active) .book-directory .book-lobby-item{transition:none}}
+body.less-motion .book-directory .book-lobby-item{transition:none}
