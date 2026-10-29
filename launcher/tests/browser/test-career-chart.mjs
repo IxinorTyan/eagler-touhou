@@ -14,7 +14,7 @@ const nextFrame = page => page.evaluate(() => new Promise(resolve => requestAnim
 const zoom = page => page.$eval('.career-map-sheet', el => new DOMMatrix(getComputedStyle(el).transform).a);
 const enter = async page => {
   await page.goto(new URL('profile.html', base).href, {waitUntil: 'networkidle2'});
-  await clickText(page, '.profile-tabs', '生涯'); await page.waitForSelector('.career-showcase');
+  await clickText(page, '.profile-tabs', '生涯'); await page.waitForSelector('.career-showcase'); await page.waitForFunction(() => !document.documentElement.classList.contains('profile-transition'));
   await page.evaluate(() => document.fonts.ready);
 };
 try {
@@ -54,7 +54,7 @@ try {
   assert.equal(await zoom(page), rememberedZoom);
   report.push('Full chart, wheel zoom, drag, Escape and remembered viewport');
   await clickText(page, '.career-viewer-actions', '编辑记录'); await nextFrame(page);
-  await page.select('select[aria-label="快速查找格子"]', 'UFO-Ra-N');
+  await page.select('select[aria-label="查找作品"]', 'UFO'); await page.evaluate(() => [...document.querySelectorAll('.career-finder-difficulties button')].find(el => el.textContent === 'N').click()); await page.click('[data-locate-cell="UFO-Ra-N"]');
   await clickText(page, '.career-brushes', 'NN'); await nextFrame(page);
   const position = await page.$eval('.career-map-cell[title="东方星莲船 · Ra · Normal"]', el => {const r = el.getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2};});
   await page.mouse.click(position.x, position.y); await nextFrame(page);
@@ -70,7 +70,7 @@ try {
   report.push('Unhosted game editing, NN brush, detailed counts, limitations and explicit persistence');
   await clickText(page, '.career-viewer-actions', '编辑记录');
   await clickText(page, '.career-brushes', '擦除');
-  await page.select('select[aria-label="快速查找格子"]', 'UFO-Ra-N'); await nextFrame(page);
+  await page.select('select[aria-label="查找作品"]', 'UFO'); await page.evaluate(() => [...document.querySelectorAll('.career-finder-difficulties button')].find(el => el.textContent === 'N').click()); await page.click('[data-locate-cell="UFO-Ra-N"]'); await nextFrame(page);
   const erasePosition = await page.$eval('.career-map-cell[title="东方星莲船 · Ra · Normal"]', el => {const r=el.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};});
   await page.mouse.click(erasePosition.x, erasePosition.y); await nextFrame(page);
   await page.keyboard.press('Escape'); await page.waitForSelector('.career-discard');

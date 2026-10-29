@@ -148,10 +148,15 @@ export function CareerShowcase({records, onSave, initiallyOpen = false, readOnly
       </div>
       <aside className="career-map-sidebar">
         {editing && <section className="career-tool-section"><h3>填表工具</h3><div className="career-brushes">{[['details', '单格详情'], ['1cc', '1CC'], ['nm', 'NM'], ['nb', 'NB'], ['nn', 'NN'], ['erase', '擦除']].map(([id, label]) => <button type="button" key={id} aria-pressed={brush === id} onClick={() => setBrush(id)}>{label}</button>)}</div></section>}
+        <CellFinder visibleKeys={cells.map(cell => cell.key)} selection={selection} onLocate={key => {
+          setSelection(key);
+          const cell = cells.find(cell => cell.key === key);
+          if (cell) setView({scale: 2, x: (viewport.current?.clientWidth ?? 800) / 2 - cell.x * 2, y: (viewport.current?.clientHeight ?? 600) / 2 - cell.y * 2});
+        }}/>
         <section className="career-tool-section"><div className="career-detail-title"><h3>{selection ? cellLabel(selection) : '格子详情'}</h3><button type="button" className="career-detail-help" aria-label="查看格子说明" onClick={() => setHelpOpen(true)}>?</button></div>
           {selection ? <CellEditor key={selection + JSON.stringify(shown[selection])} record={shown[selection] ?? blankRecord(selection)} editing={editing && brush === 'details'} onApply={record => update(selection, record)}/>
           : <p>选择格子查看记录。</p>}
-          <label className="career-cell-jump">快速查找格子<select aria-label="快速查找格子" value={selection ?? ''} onChange={event => {const key = event.target.value; if (!key) return; setSelection(key); const cell = cells.find(cell => cell.key === key); if (cell) setView({scale: 2, x: (viewport.current?.clientWidth ?? 800) / 2 - cell.x * 2, y: (viewport.current?.clientHeight ?? 600) / 2 - cell.y * 2});}}><option value="">选择作品 / 机体 / 难度</option>{TRACKER_GAMES.filter(game => options.extra || !['IAMP', 'SWR', 'H.SOKU', 'HM', 'ULIL', 'AOCF', 'GI'].includes(game.name)).map(game => <optgroup key={game.name} label={game.title}>{TRACKER_CELLS.filter(cell => cell.game.name === game.name && (options.easy || !cell.difficulty.endsWith('E'))).map(cell => <option key={cell.key} value={cell.key}>{cell.character} · {cell.difficulty}</option>)}</optgroup>)}</select></label>
+
         </section>
         <section className="career-tool-section"><h3>图表显示</h3>{([['easy', '显示 Easy'], ['extra', '显示附加作品'], ['transparent', '透明 PNG 背景']] as const).map(([key, label]) => <label className="career-check" key={key}><input type="checkbox" checked={options[key]} onChange={event => changeOptions({...options, [key]: event.target.checked})}/>{label}</label>)}</section>
         <section className="career-tool-section"><h3>本地备份</h3><div className="career-backup-actions"><button type="button" onClick={exportJson}>导出 JSON</button><button type="button" onClick={() => input.current?.click()}>导入 JSON</button></div><input hidden ref={input} type="file" accept="application/json,.json" onChange={async event => {
@@ -163,6 +168,27 @@ export function CareerShowcase({records, onSave, initiallyOpen = false, readOnly
       </aside></div>{message && <div className="career-viewer-status" role="status">{message}</div>}
     {helpOpen && <CareerHelp onClose={() => setHelpOpen(false)}/>}
     </dialog>}
+  </section>;
+}
+
+function CellFinder({visibleKeys, selection, onLocate}: {visibleKeys: string[]; selection: string | null; onLocate(key: string): void}) {
+  const [gameName, setGameName] = useState('EOSD'), [difficulty, setDifficulty] = useState(''), [query, setQuery] = useState('');
+  const selected = TRACKER_CELLS.find(cell => cell.key === selection);
+  useEffect(() => {if (selected) {setGameName(selected.game.name); setDifficulty(selected.difficulty); setQuery('');}}, [selection]);
+  const visible = new Set(visibleKeys);
+  const available = TRACKER_CELLS.filter(cell => visible.has(cell.key));
+  const games = TRACKER_GAMES.filter(game => available.some(cell => cell.game.name === game.name));
+  const game = games.find(game => game.name === gameName) ?? games[0];
+  const gameCells = available.filter(cell => cell.game.name === game?.name);
+  const difficulties = game?.difficulties.filter(value => gameCells.some(cell => cell.difficulty === value)) ?? [];
+  const activeDifficulty = difficulties.includes(difficulty) ? difficulty : difficulties[0];
+  const results = gameCells.filter(cell => cell.difficulty === activeDifficulty && cell.character.toLowerCase().includes(query.trim().toLowerCase()));
+  return <section className="career-tool-section career-cell-finder" aria-label="快速查找格子"><h3>快速查找</h3>
+    <label>作品<select aria-label="查找作品" value={game?.name ?? ''} onChange={event => {setGameName(event.target.value); setDifficulty(''); setQuery('');}}>{games.map(game => <option value={game.name} key={game.name}>{trackerDisplayName(game)} · {game.title}</option>)}</select></label>
+    <div className="career-finder-difficulties" role="group" aria-label="查找难度">{difficulties.map(value => <button type="button" key={value} aria-pressed={activeDifficulty === value} onClick={() => setDifficulty(value)}>{value}</button>)}</div>
+    {results.length > 12 || query ? <input type="search" aria-label="筛选机体或关卡" placeholder="筛选机体 / 关卡" value={query} onChange={event => setQuery(event.target.value)}/> : null}
+    <div className="career-finder-results" role="group" aria-label="选择格子并定位">{results.map(cell => <button type="button" key={cell.key} aria-pressed={selection === cell.key} data-locate-cell={cell.key} onClick={() => onLocate(cell.key)}>{cell.character}</button>)}</div>
+    {!results.length && <p>没有匹配的格子</p>}
   </section>;
 }
 

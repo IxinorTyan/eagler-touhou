@@ -130,3 +130,10 @@ html[data-book-theme='light']{--career-paper:#fff}
 .career-overview .profile-section-title{display:flex;align-items:center;gap:12px}
 .career-overview .career-total{margin-left:auto}
 .player-profile .career-overview-toggle{font-size:12px;padding:5px 10px}
+.career-cell-finder>label{display:grid;gap:7px;font-size:11px;color:var(--book-muted)}
+.career-finder-difficulties{display:flex;flex-wrap:wrap;gap:5px;margin:12px 0}
+.career-viewer .career-finder-difficulties button{min-width:32px;min-height:32px;padding:5px 8px}
+.career-finder-results{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;max-height:240px;overflow-y:auto;margin-top:10px;padding:2px}
+.career-viewer .career-finder-results button{min-width:0;min-height:36px;padding:7px 4px;overflow-wrap:anywhere}
+.career-viewer :is(.career-finder-difficulties,.career-finder-results) button[aria-pressed='true']{background:var(--book-accent-soft);border-color:var(--book-accent);color:var(--book-accent)}
+@media(hover:none),(pointer:coarse){.career-viewer :is(.career-finder-difficulties,.career-finder-results) button{min-height:44px}}
