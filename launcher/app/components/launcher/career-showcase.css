@@ -7,8 +7,8 @@ html[data-book-theme='light']{--career-paper:#fff}
 .career-total b{font-size:22px;font-weight:500;font-variant-numeric:tabular-nums;color:var(--book-ink)}
 .player-profile .career-thumbnail{position:relative;display:block;width:100%;padding:0;overflow:hidden;border:1px solid var(--book-border);border-radius:6px;background:var(--career-paper);cursor:zoom-in}
 .player-profile .career-thumbnail canvas{display:block;width:100%;height:auto;max-width:none;max-height:none;margin:0;background:var(--career-paper);box-shadow:none;image-rendering:auto}
-.career-thumbnail:hover{border-color:var(--book-accent);box-shadow:0 5px 20px #0000000b}
-.career-thumbnail:focus-visible{outline:2px solid var(--book-accent);outline-offset:4px}
+.player-profile .career-thumbnail:hover{border-color:var(--book-border);box-shadow:none}
+.player-profile .career-thumbnail:focus-visible{outline:2px solid color-mix(in srgb,var(--book-muted) 65%,transparent);outline-offset:3px}
 .career-card-footer{display:flex;justify-content:flex-end;padding-top:16px}
 .career-card-footer>div{display:flex;gap:8px}
 .player-profile .career-card-footer button{padding:8px 16px;border-radius:6px;font-size:12px}
