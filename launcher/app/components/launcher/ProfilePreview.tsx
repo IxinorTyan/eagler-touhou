@@ -14,7 +14,7 @@ let profileTransition: {skipTransition(): void} | undefined;
 function transitionProfile(update: () => void, scope: 'page' | 'content' | 'settings' = 'page') {
   profileTransition?.skipTransition();
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.body.classList.contains('less-motion')) {update(); return;}
-  if (!document.startViewTransition) {
+  if (scope === 'page' || !document.startViewTransition) {
     flushSync(update);
     document.querySelector(scope === 'content' ? '.profile-content' : scope === 'settings' ? '.profile-editor-shell' : '.player-profile')?.animate([{opacity: .65}, {opacity: 1}], {duration: 140, easing: 'steps(3, end)'});
     return;

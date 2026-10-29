@@ -17,7 +17,14 @@ try {
       };
     });
     const change = async (scope, label) => {
+      await page.evaluate(() => {window.profileTestTransition = undefined;});
       await page.evaluate(({scope, label}) => [...document.querySelectorAll(`${scope} button`)].find(el => el.textContent.includes(label)).click(), {scope, label});
+      if (['账户设置', '返回主页'].includes(label)) {
+        assert.equal(await page.evaluate(() => window.profileTestTransition === undefined), true, 'Page changes do not retain old snapshots');
+        await page.evaluate(() => Promise.all(document.querySelector('.player-profile').getAnimations().map(a => a.finished)));
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+        return;
+      }
       const animations = await page.evaluate(async () => {
         await window.profileTestTransition.ready;
         return document.getAnimations().map(animation => animation.animationName);
