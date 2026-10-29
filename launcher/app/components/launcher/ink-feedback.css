@@ -40,3 +40,33 @@ html:has(body.less-motion) .account-mode-content{animation:none}
  body:not(.mp-room-active) :is(.book-sidebar nav,.book-view-switch,.profile-actions,.profile-tabs,.profile-settings-heading nav,.account-tabs,.profile-editor-footer,.profile-security-section,.profile-social-tools,.book-directory .lobby-actions) button:not(:disabled),html:has(.book-masthead) .book-main-nav :is(a,button),html:has(.book-masthead) .book-main-nav :is(a,button)::after{transition:none}
 }
 html:has(body.less-motion) :is(.book-sidebar nav,.book-view-switch,.profile-actions,.profile-tabs,.profile-settings-heading nav,.account-tabs,.profile-editor-footer,.profile-security-section,.profile-social-tools,.book-directory .lobby-actions) button:not(:disabled),html:has(body.less-motion) .book-main-nav :is(a,button),html:has(body.less-motion) .book-main-nav :is(a,button)::after{transition:none}
+/* The directory uses the same hover/press states as the library, including its dialogs. */
+body:not(.mp-room-active) :is(.book-directory,.lobby-dialog) :is(button,a.lobby-button):not(:disabled){
+ transition:background-color 140ms steps(3,end),color 140ms steps(3,end),border-color 140ms steps(3,end),translate 80ms steps(2,end);
+}
+body:not(.mp-room-active) :is(.book-directory,.lobby-dialog) :is(button,a.lobby-button):not(:disabled):active{transform:none;translate:0 1px}
+body:not(.mp-room-active) :is(.book-directory,.lobby-dialog) button:disabled{transform:none;translate:none;text-decoration:none;cursor:default}
+body:not(.mp-room-active) :is(.book-directory,.lobby-dialog) :is(button,a,input,select):focus-visible{outline:2px solid var(--book-accent);outline-offset:3px}
+body:not(.mp-room-active) .book-directory .book-lobby-item>input::before{transition:background-color 140ms steps(3,end),border-color 140ms steps(3,end)}
+@media(hover:hover) and (pointer:fine){
+ body:not(.mp-room-active) :is(.book-directory,.lobby-dialog) .lobby-button:not(:disabled):not(.lobby-primary):not(.lobby-join):hover{background:color-mix(in srgb,var(--book-raised) 90%,var(--book-ink));color:var(--book-ink);border-color:color-mix(in srgb,var(--book-ink) 30%,var(--book-border))}
+ body:not(.mp-room-active) :is(.book-directory,.lobby-dialog) :is(.lobby-primary,.lobby-join):not(:disabled):hover{background:color-mix(in srgb,var(--book-accent) 90%,var(--book-ink));color:var(--book-on-accent);border-color:var(--book-accent)}
+ body:not(.mp-room-active) .book-directory :is(.book-room-filters,.book-room-view-toggle) button:not(:disabled):not([aria-pressed='true']):hover,
+ body:not(.mp-room-active) .book-directory :is(.book-lobby-all,.book-lobby-game):not(:disabled):not([aria-pressed='true']):hover{background:color-mix(in srgb,var(--book-ink) 7%,var(--book-surface));color:var(--book-ink);border-color:color-mix(in srgb,var(--book-ink) 30%,var(--book-border))}
+ body:not(.mp-room-active) .book-directory :is(.book-room-filters,.book-room-view-toggle) button[aria-pressed='true']:hover,
+ body:not(.mp-room-active) .book-directory :is(.book-lobby-all,.book-lobby-game)[aria-pressed='true']:hover{background:var(--book-accent-soft);color:var(--book-accent)}
+ body:not(.mp-room-active) .book-directory .book-lobby-favorite:not(:disabled):hover{background:color-mix(in srgb,var(--book-ink) 7%,var(--book-surface));color:var(--book-accent)}
+ body:not(.mp-room-active) .book-directory .book-lobby-item>input:not(:disabled):not(:checked):hover::before{border-color:var(--book-ink);background:color-mix(in srgb,var(--book-raised) 90%,var(--book-ink))}
+ body:not(.mp-room-active) .lobby-dialog :is(input,select):not(:disabled):hover{border-color:color-mix(in srgb,var(--book-ink) 35%,var(--book-border))}
+ body:not(.mp-room-active) .lobby-dialog button:not(.lobby-button):not(:disabled):hover{background:color-mix(in srgb,var(--book-ink) 7%,var(--book-surface));color:var(--book-ink)}
+ body:not(.mp-room-active) .book-directory .lobby-room-row:has(.lobby-join:not(:disabled):hover){background:color-mix(in srgb,var(--book-ink) 3%,var(--book-surface))}
+}
+@media(hover:none),(pointer:coarse){
+ body:not(.mp-room-active) :is(.book-directory,.lobby-dialog) :is(button,a.lobby-button):not(:disabled):active{filter:brightness(.94)}
+}
+@media(prefers-reduced-motion:reduce){
+ body:not(.mp-room-active) :is(.book-directory,.lobby-dialog) :is(button,a.lobby-button):not(:disabled),body:not(.mp-room-active) .book-directory .book-lobby-item>input::before{transition:none}
+ body:not(.mp-room-active) :is(.book-directory,.lobby-dialog) :is(button,a.lobby-button):not(:disabled):active{translate:none}
+}
+body.less-motion :is(.book-directory,.lobby-dialog) :is(button,a.lobby-button):not(:disabled),body.less-motion .book-directory .book-lobby-item>input::before{transition:none}
+body.less-motion :is(.book-directory,.lobby-dialog) :is(button,a.lobby-button):not(:disabled):active{translate:none}
