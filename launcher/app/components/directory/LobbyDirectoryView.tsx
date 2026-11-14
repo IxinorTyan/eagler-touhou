@@ -1,6 +1,8 @@
 import {BookButton} from '../launcher/BookButton';
 import {useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore} from 'react';
 import {BOOK_PREFERENCES_EVENT, readBookPreference, stringArray} from '../launcher/book-preferences';
+import {multiplayerGroup} from '../launcher/products';
+import {gameIdForProduct} from '../../../src/contracts/product-catalog.mts';
 import {beginFilterReorder,useFavoriteReorder} from '../launcher/favorite-reorder';
 import {useLocale} from '../../i18n';
 import {LobbySurface, type LobbySurfaceProps} from '../launcher/LobbySurface';
@@ -55,7 +57,11 @@ export function LobbyDirectoryView({service, assetUrl, onOpenForm, initialRows =
     : surface.productFilters !== undefined ? snapshot.rooms : snapshot.visibleRooms;
   const filteredRooms = surface.productFilters?.length ? visibleRooms.filter(room => surface.productFilters!.includes(room.product))
     : surface.viewingProduct ? visibleRooms.filter(room => room.product === surface.viewingProduct) : visibleRooms;
-  const filtered = filterDirectoryRooms(filteredRooms, roomFilter).sort((a, b) => Number(favorites.includes(b.product)) - Number(favorites.includes(a.product)));
+  const allGames = !surface.productFilters?.length && !surface.viewingProduct && !snapshot.selectedProduct;
+  const oldGame = (room: DirectoryRoom) => multiplayerGroup({gameId: gameIdForProduct(room.product)}) === 'pc98';
+  const filtered = filterDirectoryRooms(filteredRooms, roomFilter).sort((a, b) =>
+    (allGames ? Number(oldGame(a)) - Number(oldGame(b)) : 0) ||
+    Number(favorites.includes(b.product)) - Number(favorites.includes(a.product)));
   const th09Rooms = filtered.filter(room => room.product === 'th09mp');
   const {players, mine, cards} = useTh09Ratings(surface.interactive !== false && th09Rooms.length > 0,
     th09Rooms.flatMap(room => room.seats.map(seat => seat?.profile?.username)));

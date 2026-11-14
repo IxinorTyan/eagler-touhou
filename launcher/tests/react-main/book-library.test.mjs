@@ -79,7 +79,7 @@ test('anchored multiplayer menu preserves deep-link selection and shares multi-s
   await click('.book-lobby-picker-trigger');
   assert.equal(node('.book-lobby-picker').getAttribute('role'),'menu');assert.equal(env.document.querySelector('[role="dialog"]'),null);
   const grouping=scope=>[...env.document.querySelectorAll(`${scope} [data-lobby-category]`)].map(group=>[group.dataset.lobbyCategory,[...group.querySelectorAll('[data-lobby-product]')].map(row=>row.dataset.lobbyProduct)]);
-  const expectedGroups=[['versus',['th03mp','th09mp']],['original',['th06mp','th10mp','th15mp']],['fighting',['th075mp']],['pc98',['th01mp']]];
+  const expectedGroups=[['versus',['th09mp']],['original',['th06mp','th10mp','th15mp']],['fighting',['th075mp']],['pc98',['th01mp','th03mp']]];
   assert.deepEqual(grouping('.book-lobby-desktop'),expectedGroups);
   assert.deepEqual(grouping('.book-lobby-picker'),expectedGroups,'Both presentations consume the same catalog classification');
   assert.equal(node('.book-lobby-picker [data-lobby-product="th10mp"] strong').textContent,'東方風神録');

@@ -19,6 +19,13 @@ import './chat-controls.css';
 import {ParticipantAvatar} from './ParticipantAvatar';
 import {withUiLanguage} from '../../../src/launcher/i18n.mts';
 
+const sendErrorMessages = new Map<string, 'chat.banned' | 'chat.sendRateLimited' | 'chat.signInRequired' | 'chat.reviewUnavailable'>([
+  ['chat-banned', 'chat.banned'],
+  ['send-rate-limited', 'chat.sendRateLimited'],
+  ['sign-in-required', 'chat.signInRequired'],
+  ['review-unavailable', 'chat.reviewUnavailable'],
+]);
+
 export function ChatComposer({ model, gameplay = false, openOnClick = false }: {
   model: MultiplayerQuickChatModel;
   gameplay?: boolean;
@@ -57,6 +64,9 @@ export function ChatComposer({ model, gameplay = false, openOnClick = false }: {
             if (canSend) model.sendText();
           }}
         >
+          {state.sendError && <p className="chat-send-notice" role="status">
+            {t(sendErrorMessages.get(state.sendError) ?? 'chat.failed')}
+          </p>}
           <InputGroup>
             <InputGroupInput
               aria-label={t('chat.message')}

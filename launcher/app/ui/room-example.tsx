@@ -144,7 +144,7 @@ export function RoomExample({
       },
     });
     setChat(model);
-    return () => {pending.forEach(timer=>window.clearTimeout(timer));model.dispose();};
+    return () => {pending.forEach(timer=>{window.clearTimeout(timer);});model.dispose();};
   }, [announce]);
   useEffect(() => {
     chat?.update({

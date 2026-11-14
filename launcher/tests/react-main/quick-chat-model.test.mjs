@@ -603,10 +603,11 @@ test('verified member sends trimmed text and waits for server results before ena
   assert.equal(model.getSnapshot().draft,'');
   assert.equal(model.getSnapshot().entries.at(-1).delivery,'failed');
   assert.equal(model.getSnapshot().entries.at(-1).phrase.zh,'typed while sending');
-  assert.deepEqual(notifications,['send-rate-limited']);
+  assert.equal(model.getSnapshot().sendError,'send-rate-limited');
+  assert.deepEqual(notifications,[]);
   model.receive({type:'chat-result',action:'free-chat',ok:false,code:'sign-in-required'});
   assert.equal(model.getSnapshot().registered,false);
-  assert.deepEqual(notifications,['send-rate-limited','sign-in-required']);
+  assert.deepEqual(notifications,[]);
 });
 test('send timeout releases pending state, then disconnect clears verification and its timer', (t) => {
   const {model,clock,sends,notifications}=fixture(t,context({localClientId:'local'}));
@@ -620,9 +621,11 @@ test('send timeout releases pending state, then disconnect clears verification a
   assert.equal(model.getSnapshot().sending,false);
   assert.equal(model.getSnapshot().draft,'');
   assert.equal(model.getSnapshot().entries.at(-1).delivery,'failed');
-  assert.deepEqual(notifications,['service-unavailable']);
+  assert.equal(model.getSnapshot().sendError,'service-unavailable');
+  assert.deepEqual(notifications,[]);
 
   model.setDraft('keep this text'); model.sendText();
+  assert.equal(model.getSnapshot().sendError,undefined);
   assert.equal(clock.jobs.size,1);
   model.update(context({localClientId:'local',connected:false}));
   assert.equal(model.getSnapshot().registered,false);

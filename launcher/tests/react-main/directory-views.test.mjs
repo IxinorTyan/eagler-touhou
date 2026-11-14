@@ -422,6 +422,18 @@ test('favorite multiplayer rooms sort first, update immediately and retain order
   }
 });
 
+test('all games lists Windows rooms before favorited PC-98 rooms', async () => {
+  const rooms = [room({product:'th03mp', code:'1111', capacity:2, seats:[null,null]}), room({code:'2222'})];
+  const f = await fixture({selectedProduct:'', host:{games:['th03','th06']}}).live(rooms);
+  env.window.localStorage.setItem('eagler.book.multiplayer-favorites', '["th03mp"]');
+  try {
+    await mountLobby(f);
+    assert.deepEqual(all('#roomList .lobby-room-row').map(el => el.dataset.key), ['th06mp-2222','th03mp-1111']);
+  } finally {
+    env.window.localStorage.removeItem('eagler.book.multiplayer-favorites');
+  }
+});
+
 test('Lobby defaults to live ratings and shows no-rating games without a win-rate fallback', async () => {
   const originalFetch = globalThis.fetch;
   const requests = [];

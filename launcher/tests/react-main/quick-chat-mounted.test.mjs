@@ -293,6 +293,21 @@ test('account-enabled chat gives guests the same input with a sign-in hint', asy
     assert.equal(inputs[index].disabled,false);
   }
 });
+test('free-chat failure appears above the composer and keeps the failed text', async () => {
+  const {model}=fixture(); model.update({...context(),inRoom:true});
+  await mount(model,{room:true});
+  await act(()=>{
+    model.receive({type:'chat-status',registered:true,authorId:'account-1',bannedUntil:0});
+    model.setDraft('failed message');
+    model.sendText();
+    model.receive({type:'chat-result',action:'free-chat',ok:false,code:'send-rate-limited'});
+  });
+  const notice = query('#mpRoomChat form .chat-send-notice');
+  assert.equal(notice.getAttribute('role'),'status');
+  assert.ok(notice.textContent.trim());
+  assert.match(query('#mpRoomChat .room-chat-entry').textContent,/failed message/);
+});
+
 test('Alt toggles the room quick chat without intercepting combinations or text input', async () => {
   const {model}=fixture(); model.update({...context(),inRoom:true}); await mount(model,{room:true});
   const key=(type,key,options={})=>env.window.dispatchEvent(new env.window.KeyboardEvent(type,{key,bubbles:true,cancelable:true,...options}));

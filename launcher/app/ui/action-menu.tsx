@@ -23,10 +23,10 @@ export function ActionMenu({label, trigger, children, className, minimumWidth = 
   useEffect(() => {if (open) {setHost(uiPortalHost(anchor.current));setSurface(anchor.current?.closest('[data-ui-surface]')?.getAttribute('data-ui-surface') ?? undefined);}}, [open]);
   useEffect(() => {
     if (!open) return;
-    const close = () => changeOpen(false);
+    const close = () => {setOpen(false); onOpenChange?.(false);};
     document.addEventListener('fullscreenchange', close); document.addEventListener('webkitfullscreenchange', close);
     return () => {document.removeEventListener('fullscreenchange', close);document.removeEventListener('webkitfullscreenchange', close);};
-  }, [open]);
+  }, [open, onOpenChange]);
   function changeOpen(next: boolean) {
     if (next) {setHost(uiPortalHost(anchor.current));setSurface(anchor.current?.closest('[data-ui-surface]')?.getAttribute('data-ui-surface') ?? undefined);}
     setOpen(next);

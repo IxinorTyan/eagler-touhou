@@ -130,7 +130,7 @@ function RoomRow({
     setNow(Date.now());
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, [waiting, room.createdAt]);
+  }, [waiting]);
   const waitingSeconds = waiting ? Math.max(0, Math.floor((now - room.createdAt!) / 1000)) : 0;
   const longWait = waiting && waitingSeconds >= 15 * 60;
   const statusLabel = t(longWait ? 'lobby.longWait' : `lobby.${state}`);
