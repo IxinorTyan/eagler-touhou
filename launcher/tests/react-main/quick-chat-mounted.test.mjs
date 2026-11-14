@@ -957,7 +957,8 @@ test('actual RoomSession routes valid socket chat into React and UI sends throug
     await act(()=>query('#mpRoomChat button[aria-label="Send"]').click());
     assert.deepEqual(socket.sent.at(-1),{type:'free-chat',text:'room session message',serial:7});
     await act(()=>socket.message({type:'chat-result',action:'free-chat',ok:false,code:'send-rate-limited'}));
-    assert.deepEqual(notifications,['chat.sendRateLimited']);
+    assert.ok(query('#mpRoomChat .chat-send-notice').textContent.trim());
+    assert.deepEqual(notifications,[]);
 
     const free=(messageId,authorId,clientId,seat,name,text)=>({type:'free-chat',room:'th06mp-1234',serial:7,
       messageId,authorId,clientId,seat,spectator:seat===-1,name,text});
@@ -978,7 +979,7 @@ test('actual RoomSession routes valid socket chat into React and UI sends throug
       await vi.waitFor(()=>assert.deepEqual(socket.sent.at(-1),{type:'chat-report',messageId:51,reason:'test reason'}),{timeout:1000,interval:1});
     });
     await act(()=>socket.message({type:'chat-result',action:'chat-report',ok:false,code:'report-rate-limited'}));
-    assert.deepEqual(notifications,['chat.sendRateLimited','chat.reportRateLimited']);
+    assert.deepEqual(notifications,['chat.reportRateLimited']);
     await act(()=>socket.message({type:'chat-retract',authorId:'account-2',throughId:51,bannedUntil:0}));
     assert.deepEqual(session.quickChat.getSnapshot().entries.filter(entry=>entry.messageId).map(entry=>entry.messageId),[52]);
     await act(()=>socket.message(free(51,'account-2','remote123456',1,'B','delayed')));

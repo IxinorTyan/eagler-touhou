@@ -123,16 +123,16 @@ function RoomRow({
   const minutes = Math.max(...room.seats.map(seat => seat?.stats?.minutes ?? 0), 0);
   const difficulty = policy.inGameSelection && room.product !== 'th03mp' ? '' : policy.difficulties[room.difficulty];
   const state = directoryRoomState(room);
-  const waiting = policy.gameplay === 'versus' && state === 'recruiting' && !!room.createdAt;
+  const waitingSince = policy.gameplay === 'versus' && state === 'recruiting' ? room.createdAt : undefined;
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
-    if (!waiting) return;
+    if (waitingSince === undefined) return;
     setNow(Date.now());
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, [waiting]);
-  const waitingSeconds = waiting ? Math.max(0, Math.floor((now - room.createdAt!) / 1000)) : 0;
-  const longWait = waiting && waitingSeconds >= 15 * 60;
+  }, [waitingSince]);
+  const waitingSeconds = waitingSince === undefined ? 0 : Math.max(0, Math.floor((now - waitingSince) / 1000));
+  const longWait = waitingSeconds >= 15 * 60;
   const statusLabel = t(longWait ? 'lobby.longWait' : `lobby.${state}`);
   const spectating = directoryRoomSpectatorEntry(room);
   const count = t('lobby.count', { players: room.players, capacity: room.capacity });
@@ -181,7 +181,7 @@ function RoomRow({
               <span className="lobby-room-fact-divider" aria-hidden="true">|</span>
               <RoomElapsed phase={room.phase} startedAt={duel ? undefined : room.startedAt} elapsedMinutes={duel ? minutes : undefined}/>
             </span>}
-            {waiting && <span className="lobby-room-duration"><span className="lobby-room-fact-divider" aria-hidden="true">|</span>
+            {waitingSince !== undefined && <span className="lobby-room-duration"><span className="lobby-room-fact-divider" aria-hidden="true">|</span>
               <span>{t('lobby.waitTime', {time:`${Math.floor(waitingSeconds / 60)}:${String(waitingSeconds % 60).padStart(2,'0')}`})}</span>
             </span>}
             {room.listeningTrack && <span className="lobby-room-music">

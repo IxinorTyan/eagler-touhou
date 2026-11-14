@@ -1,7 +1,7 @@
 import {synchronizedMainAuthority} from './source-text.mjs';
 /** Independent pinned-main component/service regression. SYNTHETIC DOM + MEMORY
  * ROUTER ONLY: not production-host wiring, browser top layer, CSS, relay or runtime QA. */
-import {test, beforeAll as before, afterAll as after, afterEach} from 'vitest';
+import {test, beforeAll as before, afterAll as after, afterEach, vi} from 'vitest';
 import assert from 'node:assert/strict';
 import {existsSync, readFileSync} from 'node:fs';
 import {mkdtemp, rm} from 'node:fs/promises';
@@ -423,7 +423,7 @@ test('favorite multiplayer rooms sort first, update immediately and retain order
 });
 
 test('all games lists Windows rooms before favorited PC-98 rooms', async () => {
-  const rooms = [room({product:'th03mp', code:'1111', capacity:2, seats:[null,null]}), room({code:'2222'})];
+  const rooms = [room({product:'th03mp', code:'1111', capacity:2, seats:[{initial:'A',online:true},null]}), room({code:'2222'})];
   const f = await fixture({selectedProduct:'', host:{games:['th03','th06']}}).live(rooms);
   env.window.localStorage.setItem('eagler.book.multiplayer-favorites', '["th03mp"]');
   try {
@@ -448,7 +448,7 @@ test('Lobby defaults to live ratings and shows no-rating games without a win-rat
       '/api/v1/profiles/rated': {nickname:'Rated'},
       '/api/v1/profiles/unrated': {nickname:'Unrated'},
     };
-    assert.ok(path in responses, path);
+    assert.ok(path in responses, path); if (path.startsWith('/api/v1/profiles/')) assert.equal(url.searchParams.get('media'), 'urls');
     return new Response(JSON.stringify(responses[path]), {headers:{'Content-Type':'application/json'}});
   };
   try {
@@ -473,7 +473,7 @@ test('Lobby defaults to live ratings and shows no-rating games without a win-rat
     assert.deepEqual(all('.player-profile-card-characters strong').map(node=>node.textContent),['1,410','1,380','1,290']);
     await click('.lobby-seat[data-registered]');
     await click('.lobby-room-row:nth-child(2) .lobby-seat[data-registered]');
-    assert.equal(n('.player-profile-card-name h3').textContent,'Unrated');
+    await React.act(async () => vi.waitFor(() => assert.equal(n('.player-profile-card-name h3').textContent,'Unrated')));
     assert.equal(env.document.querySelector('.player-profile-card-scores'),null);
     assert.ok(requests.every(path=>!path.endsWith('/th09-duels')));
     await m.unmount();
