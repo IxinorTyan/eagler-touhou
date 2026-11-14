@@ -1,4 +1,4 @@
-import { memo, useCallback, useState, useSyncExternalStore } from 'react';
+import { memo, useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, ChevronUp, Ellipsis, Flag, Send, Settings, VolumeX, Zap } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Button as UiButton } from '../../ui/controls';
@@ -93,6 +93,25 @@ function RoomQuickPicker({model, enabled, openOnClick, compact, locale}: {
   const {t} = useLocale();
   const state = useSyncExternalStore(model.subscribe, model.getSnapshot, model.getSnapshot);
   const [view, setView] = useState<'favorites' | 'all' | 'slots' | 'choose'>('favorites');
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!enabled || !state.context?.inRoom) {setOpen(false);return;}
+    let alt = false;
+    const down = (event:KeyboardEvent) => {
+      if (event.key === 'Alt' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.isComposing) {
+        const target=event.target;
+        alt = !(target instanceof HTMLElement && (target.isContentEditable || !!target.closest('input,textarea,select,[role="dialog"],dialog')));
+      } else if (event.key !== 'Alt') alt=false;
+    };
+    const up = (event:KeyboardEvent) => {
+      if (event.key !== 'Alt') return;
+      if (alt && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.isComposing) {event.preventDefault();setOpen(value=>!value);}
+      alt=false;
+    };
+    const blur=()=>{alt=false;};
+    window.addEventListener('keydown',down);window.addEventListener('keyup',up);window.addEventListener('blur',blur);
+    return ()=>{window.removeEventListener('keydown',down);window.removeEventListener('keyup',up);window.removeEventListener('blur',blur);};
+  },[enabled,state.context?.inRoom]);
   const [slot, setSlot] = useState(0);
   const zh = locale === 'zh-CN', ja = locale === 'ja';
   const copy = {
@@ -104,11 +123,11 @@ function RoomQuickPicker({model, enabled, openOnClick, compact, locale}: {
   const text = (phrase: typeof QUICK_CHAT_PHRASES[number]) => locale === 'en' ? phrase.en : phrase.zh;
   const ids = view === 'favorites' || view === 'slots' ? state.slots : QUICK_CHAT_PHRASES.map(phrase => phrase.id);
   const switchView = (next: typeof view) => {setView(next);};
-  return <ActionMenu label={t('room.quickChat')} openOnClick={openOnClick} side="top" align="start" minimumWidth={260}
+  return <ActionMenu label={t('room.quickChat')} openOnClick={openOnClick} open={open} onOpenChange={setOpen} side="top" align="start" minimumWidth={260}
     className="room-action-menu room-quick-chat-picker quick-picker-menu"
     trigger={<Button variant={compact ? 'outline' : 'secondary'} size={compact ? 'default' : 'lg'}
       className={compact ? undefined : 'room-quick-chat-trigger h-12 w-full justify-between gap-3 data-[state=open]:bg-accent'}
-      title={t('room.quickChat')} aria-label={t('room.quickChat')} disabled={!enabled}>
+      title={t('room.quickChat')} aria-label={t('room.quickChat')} aria-keyshortcuts="Alt" disabled={!enabled}>
       {compact ? <Zap aria-hidden="true"/> : <>{t('room.quickChat')}<ChevronUp className="room-quick-chat-chevron" aria-hidden="true"/></>}
     </Button>}>
     <div className="quick-picker-toolbar">
@@ -191,7 +210,7 @@ export function ChatMessageText({ entry, label }: {entry: QuickChatEntry; label:
       {(!rating || rating.authorProfile) && <strong>{rating ? <a href={profile(rating.author)} target="_blank" rel="noopener">{entry.name}</a> : entry.name || badge}</strong>}
       <span className="chat-role">{badge}</span>
     </span>
-    <span className="chat-body">{rating ? <>
+    <span className="chat-body">{entry.delivery === 'pending' ? <span className="chat-sending" role="status" aria-label={t('chat.sending')}><i/><i/><i/></span> : rating ? <>
       {t('th09.matchEnded')}
       {rating.changes.length === 0 && <span className="chat-rating-line">{t('th09.matchUnrated')}</span>}
       {rating.changes.map(({username,before,after}) => {
@@ -202,7 +221,7 @@ export function ChatMessageText({ entry, label }: {entry: QuickChatEntry; label:
             <span data-rating-delta={delta > 0 ? 'gain' : delta < 0 ? 'loss' : undefined}>{delta > 0 ? '+' : ''}{delta}</span>}
         </span>;
       })}
-    </> : label}</span>
+    </> : <>{label}{entry.delivery === 'failed' && <span className="chat-send-failed"> {t('chat.sendFailed')}</span>}</>}</span>
   </>;
 }
 

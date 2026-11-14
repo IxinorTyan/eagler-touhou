@@ -168,13 +168,6 @@ function expectedDialog(f, locale) {
   n('#closeDialog', doc).replaceChildren();
   n('#submitRoom', doc).textContent = t(locale, create ? 'lobby.create' : 'lobby.joinRoom');
   n('#createFields', doc).hidden = n('#policyFields', doc).hidden = !create; n('#codeField', doc).hidden = create;
-  const rules = doc.createElement('details'), summary = doc.createElement('summary');
-  rules.className = 'lobby-create-rules';
-  rules.hidden = !create;
-  summary.textContent = t(locale, 'room.ruleSettings');
-  const fields = n('#policyFields', doc);
-  fields.before(rules);
-  rules.append(summary, fields);
   n('#roomCodeInput', doc).required = !create;
   n('#codeField span', doc).className = 'sr-only';
   if (create && form.visibility === 'private') n('#formNote', doc).textContent = t(locale, 'room.privateHint');
@@ -297,6 +290,19 @@ test('Running cooperative room admits an observer even when its engine must wait
   }
 });
 
+test('versus rooms show elapsed waiting time and become long-wait at fifteen minutes', async () => {
+  const f=await fixture({selectedProduct:'th09mp',host:{games:['th09']}}).live([room({product:'th09mp',capacity:2,seats:[{initial:'A',online:true},null],createdAt:Date.now()-14*60_000})]);
+  assert.ok(f.service.getSnapshot().visibleRooms[0].createdAt);
+  const m=await mount(owners.DirectoryRoomRows,{snapshot:f.service.getSnapshot(),service:f.service,assetUrl});
+  assert.match(n('.lobby-room-duration').textContent,/Waiting 14:/);
+  assert.equal(n('.lobby-room-state').textContent,t('en','lobby.recruiting'));
+  await f.receive([room({product:'th09mp',capacity:2,seats:[{initial:'A',online:true},null],createdAt:Date.now()-15*60_000})]);
+  await m.update({snapshot:f.service.getSnapshot()});
+  assert.equal(n('.lobby-room-state').textContent,t('en','lobby.longWait'));
+  assert.ok(n('.lobby-room-row').hasAttribute('data-long-wait'));
+  assert.equal(n('.lobby-join').textContent,t('en','lobby.join'));
+});
+
 for (const locale of ['zh-CN', 'en']) test(`Lobby real loading/live/empty/list conditions and original static sections: ${locale}`, async () => {
   const f = fixture({locale}); const {opens} = await mountLobby(f, {}, {locale});
   assert.equal(n('#roomList').getAttribute('aria-busy'), 'true'); assert.equal(n('#listLoading').hidden, false);
@@ -378,7 +384,7 @@ for (const [kind, title, hint] of [['offline', 'lobby.offline', 'lobby.refreshHi
     const detail = kind === 'offline' ? t('en', 'network.manifestUnavailable')
       : kind === 'unsupported' ? t('en', 'network.relayClosed', {code: 1008}) : '';
     assert.equal(n('#connectionWarningHint').textContent, [t('en', hint), detail].filter(Boolean).join(' | '));
-    assert.equal(n('#connectionWarning').getAttribute('role'), 'alert'); assert.equal(env.document.querySelector('#emptyState'), null);
+    assert.equal(n('#connectionWarning').getAttribute('role'), 'alert'); assert.ok(n('.lobby-list-surface').contains(n('#connectionWarning'))); assert.equal(env.document.querySelector('#emptyState'), null);
     assert.equal(n('#createButton').disabled, true); assert.equal(n('#codeButton').disabled, true);
     const before = f.sockets.length; await click('#connectionRefresh'); await flush();
     if (kind === 'unsupported') assert.equal(f.sockets.length, before + 1);
@@ -518,9 +524,8 @@ for (const locale of ['zh-CN', 'en']) for (const mode of ['create', 'join']) tes
   const dialog = n('#roomDialog').cloneNode(true);
   assert.ok(n('#closeDialog svg[aria-hidden="true"]', dialog));
   n('#closeDialog', dialog).replaceChildren();
-  assert.equal(n('.lobby-create-rules', dialog).open, false);
-  assert.ok(n('.lobby-create-rules summary svg[aria-hidden="true"]', dialog));
-  n('.lobby-create-rules summary', dialog).textContent = t(locale, 'room.ruleSettings');
+  assert.equal(dialog.querySelector('.lobby-create-rules'), null);
+  assert.equal(n('#policyFields', dialog).hidden, mode !== 'create');
   assert.deepEqual(normalize(dialog), normalize(expectedDialog(f, locale)));
   assert.equal(n('#roomDialog').open, true); assert.equal(n('#roomDialog').getAttribute('aria-labelledby'), 'dialogTitle');
   assert.deepEqual(all('#roomDialog select.custom-select-native').map(s => s.id), ['gameSelect', 'capacitySelect', 'difficultySelect', 'visibilitySelect', 'cheatSelect']);

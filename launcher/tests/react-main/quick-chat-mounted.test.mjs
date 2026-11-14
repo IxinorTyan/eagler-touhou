@@ -271,8 +271,11 @@ test('settlement chat uses a plain bot until the published account is available'
 });
 test('account-enabled chat gives guests the same input with a sign-in hint', async () => {
   const {model,calls}=fixture();
+  globalThis.__roomAccountRequest=async()=>null;
   const original=owner; owner=ownerAccounts;
   try {await mount(model,{room:true});} finally {owner=original;}
+  await vi.waitFor(()=>assert.equal(query('#mpRoomChat input[aria-label="Message"]').placeholder,'Sign in to chat'));
+  globalThis.__roomAccountRequest=undefined;
   const views=['#mpRoomChat','.mp-quick-chat-picker'];
   const inputs=views.map(view=>query(`${view} input[aria-label="Message"]`));
   for (const input of inputs) {
@@ -290,6 +293,20 @@ test('account-enabled chat gives guests the same input with a sign-in hint', asy
     assert.equal(inputs[index].disabled,false);
   }
 });
+test('Alt toggles the room quick chat without intercepting combinations or text input', async () => {
+  const {model}=fixture(); model.update({...context(),inRoom:true}); await mount(model,{room:true});
+  const key=(type,key,options={})=>env.window.dispatchEvent(new env.window.KeyboardEvent(type,{key,bubbles:true,cancelable:true,...options}));
+  await act(()=>{key('keydown','Alt',{altKey:true});key('keyup','Alt');});
+  assert.ok(query('.room-quick-chat-picker'));
+  await act(()=>{key('keydown','Alt',{altKey:true});key('keyup','Alt');});
+  await vi.waitFor(()=>assert.equal(env.document.querySelector('.room-quick-chat-picker'),null));
+  await act(()=>{key('keydown','Alt',{altKey:true});key('keydown','x',{altKey:true});key('keyup','Alt');});
+  assert.equal(env.document.querySelector('.room-quick-chat-picker'),null);
+  const input=env.document.createElement('input');env.document.body.append(input);input.focus();
+  await act(()=>{input.dispatchEvent(new env.window.KeyboardEvent('keydown',{key:'Alt',altKey:true,bubbles:true}));input.dispatchEvent(new env.window.KeyboardEvent('keyup',{key:'Alt',bubbles:true}));});
+  assert.equal(env.document.querySelector('.room-quick-chat-picker'),null);
+});
+
 test('room messages stay above the controls and sending closes the upward picker', async () => {
   const {model,clock,calls}=fixture();model.update({...context(),inRoom:true});
   await mount(model,{room:'split',strict:true});
@@ -347,6 +364,9 @@ test('guest room UI keeps quick chat and shared history; registered chat can sen
   await act(()=>input.dispatchEvent(new env.window.Event('input',{bubbles:true})));
   await act(()=>query('#mpRoomChat button[aria-label="Send"]').click());
   assert.deepEqual(calls.at(-1),['send',{type:'free-chat',text:'mounted message',serial:7}]);
+  assert.equal(input.value,'');
+  assert.ok(query('#mpRoomChat .chat-sending'));
+  await act(()=>model.receive(free(30,'account-1','a',0,'Local','mounted message')));
   await act(()=>model.receive({type:'chat-result',action:'free-chat',ok:true}));
   assert.equal(input.value,'');
 
@@ -959,7 +979,7 @@ test('actual RoomSession routes valid socket chat into React and UI sends throug
         }),
       ),
     );
-    assert.equal(session.quickChat.getSnapshot().entries.length, 3);
+    assert.equal(session.quickChat.getSnapshot().entries.length, 4);
     assert.deepEqual(session.quickChat.getSnapshot().entries.filter(entry=>entry.messageId).map(entry=>entry.messageId),[52]);
     replay = false;
     launched = false;
