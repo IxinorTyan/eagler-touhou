@@ -87,3 +87,22 @@ test('snapshots are released on correction, confirmation and close',()=>{
  assert.deepEqual([...released].sort((a,b)=>a-b),captured);
  assert.equal(new Set(released).size,released.length,'each snapshot is released exactly once');
 });
+
+test('all native snapshot slots cover a burst without dropping held input or inventing frames',()=>{
+ let state=0;const occupied=new Set(),confirmed=[];
+ const net=new NativeRollback({seat:0,maxPrediction:16,send:()=>{},
+  capture(){assert.ok(occupied.size<16);const snapshot={state};occupied.add(snapshot);return snapshot;},
+  restore:snapshot=>{state=snapshot.state;},release:snapshot=>assert.ok(occupied.delete(snapshot)),
+  step:pair=>{state+=pair[1];},confirm:frame=>confirmed.push(frame)});
+ const remote=(frame,input)=>JSON.stringify({type:'native-rollback-input',frame,input});
+ net.receive(remote(0,8|16));assert.ok(net.submit(0,true));assert.equal(state,24);
+ for(let frame=1;frame<=16;frame++)assert.ok(net.submit(0,true));
+ assert.equal(state,24+16*8,'hold movement through an outage without repeating the bomb');
+ assert.equal(occupied.size,16);
+ assert.equal(net.submit(0,true),false);
+ assert.equal(net.frame,17);assert.deepEqual(confirmed,[0]);
+ for(let frame=1;frame<=16;frame++)net.receive(remote(frame,0));
+ assert.equal(state,24,'all speculation is corrected by the actual released control');
+ assert.equal(net.confirmed,17);assert.equal(occupied.size,0);
+ assert.equal(net.rollbacks,1);
+});

@@ -3,7 +3,7 @@ import {packTouch,unpackTouch} from './touch-input.js';
 // supplied by the runtime; no remote-provided bytes are ever restored.
 export class NativeRollback {
   constructor({seat,send,capture,restore,release=()=>{},step,confirm,canConfirm=()=>true,onCaptureUnavailable=()=>false,onError=()=>{},maxPrediction=6}) {
-    if(![0,1].includes(seat)||!Number.isInteger(maxPrediction)||maxPrediction<1||maxPrediction>12)throw Error('Invalid rollback configuration');
+    if(![0,1].includes(seat)||!Number.isInteger(maxPrediction)||maxPrediction<1||maxPrediction>16)throw Error('Invalid rollback configuration');
     Object.assign(this,{seat,send,capture,restore,release,step,confirm,canConfirm,onCaptureUnavailable,onError,maxPrediction});
     this.frame=0;this.confirmed=0;this.nextLocal=0;this.local=new Map();this.remote=new Map();this.used=new Map();this.snapshots=new Map();this.closed=false;this.rollbacks=0;this.blocked=false;
   }
@@ -41,7 +41,7 @@ export class NativeRollback {
     // Hold continuous controls for bounded prediction. Actual releases rewind
     // incorrect predictions; without received input the prediction limit stops
     // the match from generating indefinite fire. Never repeat one-shot inputs.
-    for(let at=frame-1;at>=Math.max(0,frame-12);at--)if(this.remote.has(at)){const input=this.remote.get(at),touch=unpackTouch(input);return packTouch((input&2047)&~(16|128|256),{active:touch.active,unlimited:touch.unlimited});}
+    for(let at=frame-1;at>=Math.max(0,frame-Math.max(12,this.maxPrediction));at--)if(this.remote.has(at)){const input=this.remote.get(at),touch=unpackTouch(input);return packTouch((input&2047)&~(16|128|256),{active:touch.active,unlimited:touch.unlimited});}
     return 0;
   }
   receive(text) {

@@ -9,6 +9,16 @@ export function createRollbackMatch({seat,channel,engine,sample,options={},onFra
   const metadata=()=>({scene:engine._th03_classic_scene(),round:engine._th03_semantic_round?.()??-1,serial:engine._th03_classic_match_serial?.()??0,winner:engine._th03_classic_match_winner?.()??-1});
   const compare=frame=>{if(!proofs.has(frame)||!remoteProofs.has(frame))return;if(proofs.get(frame)!==remoteProofs.get(frame))throw Error(`双方游戏状态不同步（第 ${frame} 帧）`);proofs.delete(frame);remoteProofs.delete(frame);};
   const freeSlots=Array.from({length:16},(_,i)=>15-i);let captures=0,restores=0,correction=Infinity;
+  // Local opt-in timing: ordinary matches do not collect these samples.
+  let timing;
+  function diagnostics(reset){
+    const at=now();
+    if(reset||!timing)timing={startedAt:at,tickAt:null,remoteAt:null,remoteFrame:-1,ticks:0,
+      predictionLimitTicks:0,maxTickGapMs:0,maxRemoteInputGapMs:0,maxRollbackDepth:0,rollbackFrames:0};
+    const {startedAt,tickAt,remoteAt,...stats}=timing;
+    return {...stats,elapsedMs:at-startedAt,remoteInputAgeMs:remoteAt===null?null:at-remoteAt,
+      frame:sync.frame,confirmed:sync.confirmed,rollbacks:sync.rollbacks};
+  }
   const remoteCharge=new NativeChargeHistory(24),localCharge=new Map(),chargeBoundaries=new Set();
   let localShadow;
   const supportsCharge=typeof engine._th03_classic_charge_enable==='function';
@@ -24,7 +34,7 @@ export function createRollbackMatch({seat,channel,engine,sample,options={},onFra
   const snapshot=()=>{const slot=freeSlots.pop();if(slot===undefined)throw Error('原生回滚历史已满');if(!engine._th03_classic_capture(slot)){freeSlots.push(slot);return null;}captures++;return {slot,fire:fire.map(item=>({...item.state})),pause:pause.capture()};};
   const release=s=>{freeSlots.push(s.slot);};
   const restore=s=>{if(!engine._th03_classic_restore(s.slot))throw Error('原生回滚状态恢复失败');restores++;fire.forEach((item,i)=>item.state={...s.fire[i]});pause.restore(s.pause);};
-  const sync=new NativeRollback({seat,send:text=>channel.send(text),capture:snapshot,restore,release,onError,maxPrediction:12,canConfirm:frame=>!needsCharge(frame)||(localCharge.has(frame)&&!!remoteCharge.get(frame)),onCaptureUnavailable(frame){if(!supportsCharge||!needsCharge(frame))return false;chargeBoundaries.add(frame);channel.send(JSON.stringify({type:'native-charge-boundary',frame}));return true;},step(inputs,frame,speculative){
+  const sync=new NativeRollback({seat,send:text=>channel.send(text),capture:snapshot,restore,release,onError,maxPrediction:freeSlots.length,canConfirm:frame=>!needsCharge(frame)||(localCharge.has(frame)&&!!remoteCharge.get(frame)),onCaptureUnavailable(frame){if(!supportsCharge||!needsCharge(frame))return false;chargeBoundaries.add(frame);channel.send(JSON.stringify({type:'native-charge-boundary',frame}));return true;},step(inputs,frame,speculative){
     const recordedInputs=[...inputs];
     const chargeFrame=needsCharge(frame);
     if(speculative&&(pause.state.owner!==null||(engine._th03_classic_scene()===9&&((inputs[0]|inputs[1])&128))))return false;
@@ -68,13 +78,17 @@ export function createRollbackMatch({seat,channel,engine,sample,options={},onFra
   sync.restore=(s,at)=>{originalRestore(s);remoteCharge.rewind(at);for(const frame of outputs.keys())if(frame>=at)outputs.delete(frame);};
   const canPredict=()=>engine._th03_classic_scene()===9&&!!engine._th03_classic_surrender_allowed()&&pause.state.owner===null&&!engine._th03_classic_paused();
   function reconcile(){
-    if(correction!==Infinity){const frame=correction;correction=Infinity;sync.rewind(frame);}
+    if(correction!==Infinity){
+      const frame=correction,depth=sync.frame-frame;correction=Infinity;
+      sync.rewind(frame);
+      if(timing){timing.rollbackFrames+=sync.frame-frame;timing.maxRollbackDepth=Math.max(timing.maxRollbackDepth,depth);}
+    }
     sync.flush();
   }
   function receive(messages){
     if(!running)return;
     try{
-      let receivedInput=false,boundary=false;
+      let receivedInput=false,boundary=false,newest=timing?.remoteFrame;
       for(const text of messages){
         const msg=JSON.parse(text);
         if(msg.type==='native-rollback-proof'){
@@ -93,8 +107,14 @@ export function createRollbackMatch({seat,channel,engine,sample,options={},onFra
           if(remoteCharge.accept(msg.frame,msg.sample,sync.frame)&&msg.frame<sync.frame)correction=Math.min(correction,msg.frame);
         }else {
           const frame=sync.acceptInput(msg);
+          if(timing&&msg.frame>newest)newest=msg.frame;
           if(frame!==undefined){correction=Math.min(correction,frame);boundary||=!!(msg.input&128);}
         }
+      }
+      if(timing&&newest>timing.remoteFrame){
+        const at=now();
+        if(timing.remoteAt!==null)timing.maxRemoteInputGapMs=Math.max(timing.maxRemoteInputGapMs,at-timing.remoteAt);
+        timing.remoteAt=at;timing.remoteFrame=newest;
       }
       if(!receivedInput)return;
       // Coalesce gameplay corrections until the next simulation tick. A
@@ -107,7 +127,11 @@ export function createRollbackMatch({seat,channel,engine,sample,options={},onFra
   channel.onmessage=event=>receive([event.data]);
   channel.oninputbatch=receive;
   channel.onclose=()=>{if(running){running=false;onError(Error('另一位玩家已断开'));}};
-  return {tick(){if(!running)return;if(now()-lastProgress>10000){running=false;sync.close();onError(Error('另一位玩家连接超时'));return;}
+  return {diagnostics,tick(){if(!running)return;const at=now();if(at-lastProgress>10000){running=false;sync.close();onError(Error('另一位玩家连接超时'));return;}
+    if(timing){
+      if(timing.tickAt!==null)timing.maxTickGapMs=Math.max(timing.maxTickGapMs,at-timing.tickAt);
+      timing.tickAt=at;timing.ticks++;
+    }
     const predicting=canPredict();
     // In battle, sample the current frontier only. Pre-sampling an extra
     // frame during a stall keeps one stale control frame ahead of fresh input.
@@ -115,6 +139,7 @@ export function createRollbackMatch({seat,channel,engine,sample,options={},onFra
     // Send the fresh frontier input first; historical steps use stored inputs.
     const recovering=correction!==Infinity;
     if(recovering)reconcile();
-    sync.advance(recovering?canPredict():predicting);
+    const allowPrediction=recovering?canPredict():predicting;
+    if(!sync.advance(allowPrediction)&&timing&&allowPrediction&&sync.frame-sync.confirmed>=sync.maxPrediction)timing.predictionLimitTicks++;
   },stop(){running=false;sync.close();remoteCharge.clear();localCharge.clear();chargeBoundaries.clear();outputs.clear();proofs.clear();remoteProofs.clear();},get snapshotStats(){return {captures,restores};},get pause(){return pause;},get frame(){return sync.frame;},get confirmed(){return sync.confirmed;},get confirmedInput(){return confirmedInput;},get rollbacks(){return sync.rollbacks;},get running(){return running;}};
 }

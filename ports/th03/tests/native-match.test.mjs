@@ -101,15 +101,24 @@ test('battle coalesces successive corrections and sends fresh input before repla
   _th03_classic_audio_command_count:()=>0,_th03_classic_audio_commit:()=>0,_th03_classic_audio:()=>0,
   _th03_classic_audio_frames:()=>0,_th03_semantic_replay_samples:()=>0};
  const channel={send:text=>events.push(JSON.parse(text).frame)};
- let input=0;
- const match=createRollbackMatch({seat:0,channel,engine,sample:()=>input,onConfirmedInput:(frame,pair)=>confirmed.push([frame,pair])});
- for(let i=0;i<4;i++)match.tick();
+ let input=0,clock=0;
+ const match=createRollbackMatch({seat:0,channel,engine,sample:()=>input,now:()=>clock,onConfirmedInput:(frame,pair)=>confirmed.push([frame,pair])});
+ match.diagnostics(true);
+ for(let i=0;i<4;i++){clock+=16;match.tick();}
  for(const [frame,value] of [[2,8],[0,4],[1,4]])channel.onmessage({data:JSON.stringify({type:'native-rollback-input',frame,input:value})});
  assert.equal(match.frame,4);assert.equal(match.rollbacks,0);assert.deepEqual(confirmed,[]);
- input=2;match.tick();
+ input=2;clock+=16;match.tick();
  assert.deepEqual(events,[0,1,2,3,4,'restore']);assert.equal(match.frame,5);assert.equal(match.rollbacks,1);
  assert.deepEqual(confirmed,[[0,[0,4]],[1,[0,4]],[2,[0,8]]]);
- channel.onmessage({data:JSON.stringify({type:'native-rollback-input',frame:4,input:8})});
+ clock+=140;channel.onmessage({data:JSON.stringify({type:'native-rollback-input',frame:4,input:8})});
  channel.onmessage({data:JSON.stringify({type:'native-rollback-input',frame:3,input:8})});
  assert.deepEqual(confirmed.at(-1),[4,[2,8]]);
+ for(let i=0;i<17;i++){clock+=16;match.tick();}
+ const stats=match.diagnostics();
+ assert.equal(stats.maxRemoteInputGapMs,156);
+ assert.equal(stats.maxTickGapMs,156);
+ assert.equal(stats.predictionLimitTicks,1);
+ assert.equal(stats.maxRollbackDepth,4);
+ assert.equal(stats.rollbackFrames,4);
+ assert.equal(match.diagnostics(true).maxRemoteInputGapMs,0);
 });
