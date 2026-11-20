@@ -5,10 +5,7 @@ const states=new WeakMap();
 const encoder=new TextEncoder();
 const bytes=value=>encoder.encode(value).length;
 const integer=value=>Number.isSafeInteger(value)&&value>=0;
-const isInput=text=>{
-  const value=JSON.parse(text);
-  return (['input','native-input','native-rollback-input','native-charge','native-charge-boundary'].includes(value.type)&&Number.isSafeInteger(value.frame))||value.type==='frame';
-};
+const isInput=value=>(['input','native-input','native-rollback-input','native-charge','native-charge-boundary'].includes(value.type)&&Number.isSafeInteger(value.frame))||value.type==='frame';
 
 // Preserve control/input causality across two lanes. Inputs within one control
 // epoch can arrive out of order; commands never pass their preceding inputs.
@@ -18,7 +15,7 @@ export class InputTransport {
     this.kind='loss-resilient';this.ordered=false;this.maxRetransmits=0;this.maxPacketLifeTime=null;
     this.readyState='connecting';this.control=null;this.fast=null;this.remoteHello=false;this.early=[];
     this.sentInput=0;this.receivedInput=0;this.deliveredInput=0;
-    this.sentControl=0;this.receivedControl=0;this.deliveredControl=0;
+    this.sentControl=0;this.inputBarrier=0;this.receivedControl=0;this.deliveredControl=0;
     this.pending=new Map();this.incoming=new Map();this.received=new Set();this.delivered=new Set();this.controls=new Map();
     this.pendingBytes=0;this.nextRetry=0;this.lastProgress=now();this.lastRepair=now();this.lastAckRepair=now();
     this.ackDirty=false;this.ackRepair=false;this.draining=false;this.timer=null;
@@ -54,12 +51,13 @@ export class InputTransport {
   send(text){
     if(this.readyState!=='open')throw Error('Input transport is not open');
     if(typeof text!=='string'||bytes(text)>65536)throw Error('Invalid input transport message');
-    if(isInput(text)){
+    const message=JSON.parse(text);
+    if(isInput(message)){
       const size=bytes(text);
       if(size>8192)throw Error('Input frame exceeds transport limit');
       if(this.pending.size>=MAX_PENDING||this.pendingBytes+size>MAX_BYTES)throw Error('Unacknowledged input history is full');
       if(!this.pending.size)this.lastProgress=this.lastRepair=this.now();
-      const entry={id:++this.sentInput,barrier:this.sentControl,data:text,size};
+      const entry={id:++this.sentInput,barrier:this.inputBarrier,data:text,size};
       entry.wireSize=bytes(JSON.stringify({id:entry.id,barrier:entry.barrier,data:entry.data}));
       this.pending.set(entry.id,entry);this.pendingBytes+=size;
       this.transmit(false,entry.id);
@@ -67,6 +65,9 @@ export class InputTransport {
       const id=this.sentControl+1;
       this.control.send(JSON.stringify({wire:WIRE,kind:'control',id,fence:this.sentInput,data:text}));
       this.sentControl=id;
+      // A state proof observes confirmed history; the match can compare it
+      // later. Keep it reliable, but do not gate newer gameplay inputs on it.
+      if(message.type!=='native-rollback-proof')this.inputBarrier=id;
     }
   }
   packet(limit,preferred){
@@ -129,7 +130,7 @@ export class InputTransport {
     const bundle=new Map();
     for(const entry of packet.entries){
       if(!integer(entry.id)||entry.id<1||entry.id>this.deliveredInput+MAX_PENDING||!integer(entry.barrier)||
-        entry.barrier>this.receivedControl+MAX_PENDING||typeof entry.data!=='string'||bytes(entry.data)>8192||!isInput(entry.data))throw Error('Invalid input history entry');
+        entry.barrier>this.receivedControl+MAX_PENDING||typeof entry.data!=='string'||bytes(entry.data)>8192||!isInput(JSON.parse(entry.data)))throw Error('Invalid input history entry');
       const previous=bundle.get(entry.id)||this.incoming.get(entry.id);
       if(previous&&(previous.data!==entry.data||previous.barrier!==entry.barrier))throw Error('Conflicting input history');
       bundle.set(entry.id,entry);

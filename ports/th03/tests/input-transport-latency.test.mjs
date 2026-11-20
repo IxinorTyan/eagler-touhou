@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 const transports = await Promise.all(['th01', 'th02', 'th03', 'th04'].map(async game =>
   [game, (await import(`../../${game}/web/netplay/input-transport.js`)).InputTransport]));
 
-function setup(InputTransport) {
+function setup(InputTransport, OtherTransport=InputTransport) {
   let now = 0;
   const queues = [[], []], timers = [], received = [[], []];
-  const peers = [0, 1].map(() => new InputTransport('test', {now: () => now,
+  const peers = [InputTransport, OtherTransport].map(Transport => new Transport('test', {now: () => now,
     repeat: (fn, ms) => {timers.push(ms); return fn;}, cancel: () => {}}));
   for (let id = 0; id < 2; id++) {
     const lane = fast => ({label: fast ? 'test-fast' : 'test', ordered: !fast,
@@ -66,5 +66,51 @@ test('th03 delivers recovered inputs together before their fenced control', () =
     f.deliver(1);assert.deepEqual(order,[]);
     f.peers[1].receive(recovered.data,true);
     assert.deepEqual(order,[[0,0],'native-rollback-proof']);
+  } finally {f.close();}
+});
+
+test('th03 still delivers fast input while a reliable proof is delayed', () => {
+  const f=setup(transports.find(([game])=>game==='th03')[1]);
+  try {
+    const sender=f.peers[0],receiver=f.peers[1],seen=f.received[1];
+    const first={type:'native-rollback-input',frame:119,input:0};
+    const proof={type:'native-rollback-proof',frame:119,proof:123};
+    const next={type:'native-rollback-input',frame:120,input:8};
+    const charge={type:'native-charge',frame:120,sample:[0,0,-1,0]};
+    for(const message of [first,proof,next,charge])sender.send(JSON.stringify(message));
+    const held=f.queues[1].splice(1,1)[0];
+    assert.equal(held.fast,false);
+    f.deliver(1);
+    assert.deepEqual(seen,[first,next,charge]);
+    receiver.receive(held.data,false);
+    assert.deepEqual(seen,[first,next,charge,proof]);
+    // A real lifecycle control still acts as a barrier for later inputs.
+    const control={type:'control',value:'lifecycle'},last={...next,frame:121};
+    sender.send(JSON.stringify(control));
+    sender.send(JSON.stringify(last));
+    const barrier=f.queues[1].shift();
+    f.deliver(1);
+    assert.deepEqual(seen.at(-1),proof);
+    receiver.receive(barrier.data,false);
+    assert.deepEqual(seen.slice(-2),[control,last]);
+  } finally {f.close();}
+});
+
+test('th03 reliable repair and control order stay compatible with the unchanged pc98-input/1 transport', () => {
+  const byGame=Object.fromEntries(transports),f=setup(byGame.th03,byGame.th02);
+  try {
+    for(const seat of [0,1]){
+      f.peers[seat].send(JSON.stringify({type:'frame',frame:0,input:seat}));
+      f.queues[seat^1].length=0;
+      f.peers[seat].send(JSON.stringify({type:'native-rollback-proof',frame:119,proof:123}));
+      f.deliver(seat^1);
+      assert.deepEqual(f.received[seat^1],[]);
+    }
+    f.time(80);
+    for(const seat of [0,1]){f.peers[seat].pump();f.queues[seat^1]=f.queues[seat^1].filter(packet=>!packet.fast);f.deliver(seat^1);}
+    for(const seat of [0,1])assert.deepEqual(f.received[seat],[
+      {type:'frame',frame:0,input:seat^1},
+      {type:'native-rollback-proof',frame:119,proof:123},
+    ]);
   } finally {f.close();}
 });
